@@ -3,6 +3,7 @@
  * Base for all celestial objects (stars, planets, moons)
  */
 
+import * as THREE from 'three';
 import { PhysicsObject } from '../physics/PhysicsObject.js';
 import { SCALE } from '../../config/globals.js';
 

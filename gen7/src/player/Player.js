@@ -3,6 +3,7 @@
  * Handles player movement, physics, and interaction
  */
 
+import * as THREE from 'three';
 import { PhysicsObject } from '../physics/PhysicsObject.js';
 import { Vector3D } from '../utils/Vector3D.js';
 import { CONFIG } from '../../config/globals.js';

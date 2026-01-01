@@ -3,6 +3,7 @@
  * Rocky or gas giant planets with optional atmosphere
  */
 
+import * as THREE from 'three';
 import { CelestialBody } from './CelestialBody.js';
 import { CONFIG } from '../../config/globals.js';
 

@@ -3,6 +3,7 @@
  * Physics-enabled objects that player can interact with
  */
 
+import * as THREE from 'three';
 import { PhysicsObject } from '../physics/PhysicsObject.js';
 import { CONFIG } from '../../config/globals.js';
 

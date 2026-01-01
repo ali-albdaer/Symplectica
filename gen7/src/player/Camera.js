@@ -4,6 +4,7 @@
  * with smooth transitions and cinematic following
  */
 
+import * as THREE from 'three';
 import { CONFIG } from '../../config/globals.js';
 
 export class CameraController {

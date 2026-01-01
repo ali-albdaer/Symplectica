@@ -3,6 +3,7 @@
  * Natural satellite orbiting a planet
  */
 
+import * as THREE from 'three';
 import { CelestialBody } from './CelestialBody.js';
 
 export class Moon extends CelestialBody {

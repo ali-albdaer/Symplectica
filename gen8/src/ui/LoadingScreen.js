@@ -1,19 +1,51 @@
 /**
  * LoadingScreen.js
  * Display loading progress and prevent stuck loading screens.
+ * Uses existing HTML elements from index.html
  */
 
 import { loadingTracker } from '../utils/DebugLogger.js';
 
 export class LoadingScreen {
     constructor() {
-        this.container = null;
-        this.progressBar = null;
-        this.statusText = null;
-        this.errorContainer = null;
+        // Use existing HTML elements or create new ones
+        this.container = document.getElementById('loading-screen') || 
+                        document.getElementById('initial-loading');
         
-        this.createUI();
+        // If no loading screen exists, create one
+        if (!this.container) {
+            this.createUI();
+        } else {
+            // Transform the initial loading into a full loading screen
+            this.transformExistingUI();
+        }
+        
         this.setupTracker();
+    }
+
+    transformExistingUI() {
+        // Update the existing initial-loading to be a proper loading screen
+        this.container.id = 'loading-screen';
+        this.container.innerHTML = `
+            <h1 style="font-size: 48px; font-weight: 300; margin-bottom: 10px; color: #4a9eff; text-shadow: 0 0 30px rgba(74, 158, 255, 0.5);">
+                🌌 Solar System Simulator
+            </h1>
+            <p style="font-size: 16px; color: #888; margin-bottom: 40px;">
+                Initializing the cosmos...
+            </p>
+            <div style="width: 400px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-bottom: 20px;">
+                <div id="loading-progress" style="width: 0%; height: 100%; background: linear-gradient(90deg, #4a9eff, #00ff88); transition: width 0.3s ease;"></div>
+            </div>
+            <p id="loading-status" style="font-size: 14px; color: #666;">Preparing...</p>
+            <div id="loading-error" style="margin-top: 30px; padding: 15px 25px; background: rgba(255, 50, 50, 0.2); border: 1px solid #ff4444; border-radius: 8px; display: none; max-width: 500px; text-align: center;"></div>
+            <div style="position: absolute; bottom: 40px; color: #555; font-size: 13px;">
+                <p>💡 Tip: Press <span style="color: #4a9eff">F3</span> for debug info, <span style="color: #4a9eff">/</span> for developer menu</p>
+            </div>
+        `;
+        
+        this.progressBar = document.getElementById('loading-progress');
+        this.statusText = document.getElementById('loading-status');
+        this.errorContainer = document.getElementById('loading-error');
     }
 
     createUI() {
@@ -35,93 +67,35 @@ export class LoadingScreen {
             font-family: 'Segoe UI', sans-serif;
         `;
         
-        // Title
-        const title = document.createElement('h1');
-        title.style.cssText = `
-            font-size: 48px;
-            font-weight: 300;
-            margin-bottom: 10px;
-            color: #4a9eff;
-            text-shadow: 0 0 30px rgba(74, 158, 255, 0.5);
+        this.container.innerHTML = `
+            <h1 style="font-size: 48px; font-weight: 300; margin-bottom: 10px; color: #4a9eff; text-shadow: 0 0 30px rgba(74, 158, 255, 0.5);">
+                🌌 Solar System Simulator
+            </h1>
+            <p style="font-size: 16px; color: #888; margin-bottom: 40px;">
+                Initializing the cosmos...
+            </p>
+            <div style="width: 400px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; margin-bottom: 20px;">
+                <div id="loading-progress" style="width: 0%; height: 100%; background: linear-gradient(90deg, #4a9eff, #00ff88); transition: width 0.3s ease;"></div>
+            </div>
+            <p id="loading-status" style="font-size: 14px; color: #666;">Preparing...</p>
+            <div id="loading-error" style="margin-top: 30px; padding: 15px 25px; background: rgba(255, 50, 50, 0.2); border: 1px solid #ff4444; border-radius: 8px; display: none; max-width: 500px; text-align: center;"></div>
+            <div style="position: absolute; bottom: 40px; color: #555; font-size: 13px;">
+                <p>💡 Tip: Press <span style="color: #4a9eff">F3</span> for debug info, <span style="color: #4a9eff">/</span> for developer menu</p>
+            </div>
         `;
-        title.textContent = '🌌 Solar System Simulator';
-        this.container.appendChild(title);
-        
-        // Subtitle
-        const subtitle = document.createElement('p');
-        subtitle.style.cssText = `
-            font-size: 16px;
-            color: #888;
-            margin-bottom: 40px;
-        `;
-        subtitle.textContent = 'Initializing the cosmos...';
-        this.container.appendChild(subtitle);
-        
-        // Progress container
-        const progressContainer = document.createElement('div');
-        progressContainer.style.cssText = `
-            width: 400px;
-            height: 4px;
-            background: #333;
-            border-radius: 2px;
-            overflow: hidden;
-            margin-bottom: 20px;
-        `;
-        
-        this.progressBar = document.createElement('div');
-        this.progressBar.style.cssText = `
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #4a9eff, #00ff88);
-            transition: width 0.3s ease;
-        `;
-        progressContainer.appendChild(this.progressBar);
-        this.container.appendChild(progressContainer);
-        
-        // Status text
-        this.statusText = document.createElement('p');
-        this.statusText.style.cssText = `
-            font-size: 14px;
-            color: #666;
-        `;
-        this.statusText.textContent = 'Preparing...';
-        this.container.appendChild(this.statusText);
-        
-        // Error container (hidden by default)
-        this.errorContainer = document.createElement('div');
-        this.errorContainer.style.cssText = `
-            margin-top: 30px;
-            padding: 15px 25px;
-            background: rgba(255, 50, 50, 0.2);
-            border: 1px solid #ff4444;
-            border-radius: 8px;
-            display: none;
-            max-width: 500px;
-            text-align: center;
-        `;
-        this.container.appendChild(this.errorContainer);
-        
-        // Tips
-        const tips = document.createElement('div');
-        tips.style.cssText = `
-            position: absolute;
-            bottom: 40px;
-            color: #555;
-            font-size: 13px;
-        `;
-        tips.innerHTML = `
-            <p>💡 Tip: Press <span style="color: #4a9eff">F3</span> for debug info, <span style="color: #4a9eff">/</span> for developer menu</p>
-        `;
-        this.container.appendChild(tips);
         
         document.body.appendChild(this.container);
+        
+        this.progressBar = document.getElementById('loading-progress');
+        this.statusText = document.getElementById('loading-status');
+        this.errorContainer = document.getElementById('loading-error');
     }
 
     setupTracker() {
         loadingTracker.onProgress = (completed, total, currentTask) => {
             const percent = total > 0 ? (completed / total) * 100 : 0;
-            this.progressBar.style.width = `${percent}%`;
-            this.statusText.textContent = currentTask || 'Loading...';
+            if (this.progressBar) this.progressBar.style.width = `${percent}%`;
+            if (this.statusText) this.statusText.textContent = currentTask || 'Loading...';
         };
         
         loadingTracker.onError = (taskId, error) => {
@@ -134,10 +108,12 @@ export class LoadingScreen {
     }
 
     show() {
-        this.container.style.display = 'flex';
+        if (this.container) this.container.style.display = 'flex';
     }
 
     hide() {
+        if (!this.container) return;
+        
         this.container.style.opacity = '1';
         this.container.style.transition = 'opacity 0.5s ease';
         
@@ -150,6 +126,8 @@ export class LoadingScreen {
     }
 
     showError(message) {
+        if (!this.errorContainer) return;
+        
         this.errorContainer.style.display = 'block';
         this.errorContainer.innerHTML = `
             <p style="color: #ff6666; margin: 0 0 10px 0;">❌ Error Loading</p>
@@ -167,10 +145,10 @@ export class LoadingScreen {
     }
 
     setStatus(text) {
-        this.statusText.textContent = text;
+        if (this.statusText) this.statusText.textContent = text;
     }
 
     setProgress(percent) {
-        this.progressBar.style.width = `${percent}%`;
+        if (this.progressBar) this.progressBar.style.width = `${percent}%`;
     }
 }

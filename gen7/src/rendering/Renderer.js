@@ -3,6 +3,7 @@
  * Handles Three.js rendering, post-processing, and visual quality
  */
 
+import * as THREE from 'three';
 import { CONFIG } from '../../config/globals.js';
 
 export class Renderer {

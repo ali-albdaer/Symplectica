@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solar System Simulator</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style>
         * {
             margin: 0;
@@ -118,11 +119,21 @@
     <!-- Game renders here -->
     <div id="game-container"></div>
     
+    <!-- Import Map for Three.js from CDN (no npm required) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    
     <!-- Main script -->
     <script type="module">
         // Hide initial loading once module starts loading
         document.getElementById('initial-loading').style.display = 'none';
     </script>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="./src/main.js"></script>
 </body>
 </html>

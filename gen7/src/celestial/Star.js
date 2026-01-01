@@ -3,6 +3,7 @@
  * Self-luminous celestial body
  */
 
+import * as THREE from 'three';
 import { CelestialBody } from './CelestialBody.js';
 
 export class Star extends CelestialBody {

@@ -3,6 +3,7 @@
  * Manages all lighting in the scene including sun, ambient, and dynamic lights
  */
 
+import * as THREE from 'three';
 import { CONFIG } from '../../config/globals.js';
 
 export class LightingSystem {
