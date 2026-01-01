@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0f0f23 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 10000;
+        }
+        
+        #loading-screen h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        #loading-screen p {
+            font-size: 1.2rem;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #333;
+            border-top: 4px solid #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #loading-status {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        #error-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(30, 0, 0, 0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 10001;
+            padding: 40px;
+        }
+        
+        #error-screen h1 {
+            color: #ff4444;
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+        
+        #error-screen pre {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 800px;
+            overflow: auto;
+            font-size: 12px;
+            color: #ff8888;
+        }
+        
+        #error-screen button {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #ff4444;
+            border: none;
+            color: white;
+            border-radius: 5px;
+        }
+        
+        #error-screen button:hover {
+            background: #ff6666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <h1>🌌 Solar System</h1>
+        <p>3D Simulation Engine</p>
+        <div class="loader"></div>
+        <div id="loading-status">Initializing...</div>
+    </div>
+    
+    <!-- Error Screen (hidden by default) -->
+    <div id="error-screen">
+        <h1>⚠️ Initialization Error</h1>
+        <p id="error-message">An error occurred while loading the simulation.</p>
+        <pre id="error-stack"></pre>
+        <button onclick="location.reload()">Reload Page</button>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Import map for ES6 modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js"
+        }
+    }
+    </script>
+
+    <!-- Main Application -->
+    <script type="module">
+        import { Engine } from './Engine.js';
+        import { Config } from './Config.js';
+        import { Logger } from './Utils.js';
+        
+        // Global error handler
+        window.onerror = function(message, source, lineno, colno, error) {
+            showError('JavaScript Error', `${message}\n\nSource: ${source}\nLine: ${lineno}`, error?.stack);
+            return true;
+        };
+        
+        window.addEventListener('unhandledrejection', function(event) {
+            showError('Promise Rejection', event.reason?.message || String(event.reason), event.reason?.stack);
+        });
+        
+        function showError(title, message, stack) {
+            const loadingScreen = document.getElementById('loading-screen');
+            const errorScreen = document.getElementById('error-screen');
+            const errorMessage = document.getElementById('error-message');
+            const errorStack = document.getElementById('error-stack');
+            
+            loadingScreen.style.display = 'none';
+            errorScreen.style.display = 'flex';
+            errorMessage.textContent = message;
+            errorStack.textContent = stack || 'No stack trace available';
+            
+            console.error(title, message, stack);
+        }
+        
+        function updateLoadingStatus(message) {
+            const status = document.getElementById('loading-status');
+            if (status) {
+                status.textContent = message;
+            }
+        }
+        
+        // Main initialization
+        async function main() {
+            try {
+                updateLoadingStatus('Checking WebGL support...');
+                
+                // Check for WebGL support
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                
+                if (!gl) {
+                    throw new Error('WebGL is not supported by your browser. Please use a modern browser like Chrome, Firefox, or Edge.');
+                }
+                
+                updateLoadingStatus('Creating engine...');
+                
+                // Create and initialize engine
+                const engine = new Engine();
+                
+                // Make engine globally accessible for debugging
+                window.engine = engine;
+                window.Config = Config;
+                window.Logger = Logger;
+                
+                updateLoadingStatus('Initializing systems...');
+                
+                // Initialize the engine
+                await engine.initialize();
+                
+                // Hide loading screen
+                const loadingScreen = document.getElementById('loading-screen');
+                loadingScreen.style.opacity = '0';
+                loadingScreen.style.transition = 'opacity 0.5s';
+                
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 500);
+                
+                // Start the game loop
+                engine.start();
+                
+                // Log success
+                console.log('%c🌌 Solar System Simulation Started!', 'color: #00d4ff; font-size: 16px; font-weight: bold;');
+                console.log('%cPress "/" to open the Developer Console', 'color: #888;');
+                console.log('%cPress "T" to toggle telemetry', 'color: #888;');
+                console.log('%cPress "F" to toggle flight mode', 'color: #888;');
+                console.log('%cPress "C" to toggle camera mode', 'color: #888;');
+                console.log('%cAccess config: window.Config', 'color: #888;');
+                console.log('%cAccess engine: window.engine', 'color: #888;');
+                
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                showError('Initialization Failed', error.message, error.stack);
+            }
+        }
+        
+        // Wait for DOM and Three.js to load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', main);
+        } else {
+            main();
+        }
+    </script>
+</body>
+</html>
