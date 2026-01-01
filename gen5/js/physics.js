@@ -73,7 +73,13 @@ export class PhysicsWorld {
 
     integrateRigidBodies(dt) {
         for (const rb of this.rigidBodies) {
-            if (rb.isPlayer && rb.isFreeFlight) continue;
+            if (rb.isPlayer && rb.isFreeFlight) {
+                // Skip physics but update mesh
+                if (rb.mesh) {
+                    rb.mesh.position.set(rb.position.x, rb.position.y, rb.position.z);
+                }
+                continue;
+            }
 
             // Calculate gravity from all celestial bodies
             let gx = 0, gy = 0, gz = 0;
@@ -103,10 +109,8 @@ export class PhysicsWorld {
             rb.velocity.y += gy * dt;
             rb.velocity.z += gz * dt;
 
-            // Apply damping
-            rb.velocity.x *= 0.999;
-            rb.velocity.y *= 0.999;
-            rb.velocity.z *= 0.999;
+            // Damping removed to prevent de-orbiting in space
+            // Only apply friction when grounded (handled in collision)
 
             // Update position
             rb.position.x += rb.velocity.x * dt;
