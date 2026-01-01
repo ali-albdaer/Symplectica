@@ -15,19 +15,12 @@ export class LightingSystem {
     }
 
     createLights() {
-        // Ambient light for base illumination
-        this.lights.ambient = new THREE.AmbientLight(
-            LIGHTING.ambient.color,
-            LIGHTING.ambient.intensity
-        );
-        this.scene.add(this.lights.ambient);
-        
-        // Sun directional light (main light source)
+        // Sun directional light (primary)
         this.lights.sunLight = new THREE.DirectionalLight(
             LIGHTING.sunLight.color,
             LIGHTING.sunLight.intensity
         );
-        this.lights.sunLight.position.copy(this.sun.position);
+        this.lights.sunLight.position.copy(this.sun.position).add(new THREE.Vector3(500, 500, 500));
         this.lights.sunLight.castShadow = LIGHTING.sunLight.castShadow;
         
         // Configure shadows
@@ -46,32 +39,21 @@ export class LightingSystem {
         
         this.scene.add(this.lights.sunLight);
         
-        // Sun point light for close-range illumination
-        this.lights.sunPoint = new THREE.PointLight(
-            0xFFA500,
-            2,
-            1000,
-            2
-        );
+        // Sun point glow for close range
+        this.lights.sunPoint = new THREE.PointLight(0xFFA500, 3, 2000, 2);
         this.lights.sunPoint.position.copy(this.sun.position);
         this.scene.add(this.lights.sunPoint);
-        
-        // Hemisphere light for atmospheric scattering effect
-        this.lights.hemisphere = new THREE.HemisphereLight(
-            0x87CEEB, // Sky color
-            0x332211, // Ground color
-            0.3
-        );
-        this.scene.add(this.lights.hemisphere);
     }
 
     update(camera) {
-        // Update sun light to follow camera for optimal shadow coverage
-        if (this.lights.sunLight && camera) {
-            const offset = new THREE.Vector3(50, 100, 50);
-            this.lights.sunLight.position.copy(camera.position).add(offset);
-            this.lights.sunLight.target.position.copy(camera.position);
+        // Keep light anchored to the sun's position
+        if (this.lights.sunLight && this.sun) {
+            this.lights.sunLight.position.copy(this.sun.position).add(new THREE.Vector3(500, 500, 500));
+            this.lights.sunLight.target.position.copy(this.sun.position);
             this.lights.sunLight.target.updateMatrixWorld();
+        }
+        if (this.lights.sunPoint && this.sun) {
+            this.lights.sunPoint.position.copy(this.sun.position);
         }
     }
 

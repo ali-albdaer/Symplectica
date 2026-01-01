@@ -105,16 +105,16 @@ const PLAYER = {
     mouseSensitivity: 0.002,
 
     // Flight mode
-    flightSpeed: 30,
-    flightAcceleration: 4,
-    flightMaxSpeed: 120,
+    flightSpeed: 24,
+    flightAcceleration: 3,
+    flightMaxSpeed: 90,
     
     // Camera
     cameraOffset: { x: 0, y: 0.8, z: 0 },
-    thirdPersonDistance: 6,
-    thirdPersonHeight: 2.5,
-    cameraSmoothing: 0.12,
-    cameraLookAhead: 2
+    thirdPersonDistance: 4.5,
+    thirdPersonHeight: 2.2,
+    cameraSmoothing: 0.08,
+    cameraLookAhead: 1.1
 };
 
 // Interactable objects configuration
@@ -125,7 +125,8 @@ const INTERACTABLES = {
         { name: 'Cube', mass: 10, size: 0.5, color: 0xFF6B6B },
         { name: 'Sphere', mass: 8, size: 0.4, color: 0x4ECDC4 },
         { name: 'Cylinder', mass: 12, size: 0.6, color: 0x45B7D1 },
-        { name: 'Cone', mass: 7, size: 0.5, color: 0xFFA07A }
+        { name: 'Cone', mass: 7, size: 0.5, color: 0xFFA07A },
+        { name: 'GlowOrb', mass: 5, size: 0.45, color: 0xFFFFAA, luminous: true }
     ],
     friction: 0.7,
     restitution: 0.4,                  // Bounciness

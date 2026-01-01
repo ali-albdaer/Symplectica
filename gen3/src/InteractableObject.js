@@ -62,14 +62,23 @@ export class InteractableObject {
         const material = new THREE.MeshStandardMaterial({
             color: this.color,
             roughness: 0.6,
-            metalness: 0.4,
-            flatShading: false
+            metalness: 0.2,
+            flatShading: false,
+            emissive: this.type.luminous ? this.color : 0x000000,
+            emissiveIntensity: this.type.luminous ? 1.5 : 0
         });
         
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
         this.mesh.userData.interactable = this;
+
+        // Optional glow light
+        if (this.type.luminous) {
+            const light = new THREE.PointLight(this.color, 2, 12, 2);
+            light.castShadow = false;
+            this.mesh.add(light);
+        }
         
         this.updateMeshTransform();
     }

@@ -22,10 +22,18 @@ export class Player {
         this.onGround = false;
         this.isFlying = false;
         this.isRunning = false;
+
+        this.heldObject = null;
         
         // Camera orientation
         this.pitch = 0;
         this.yaw = 0;
+
+        this._flightToggleDebounce = false;
+
+        // Mouse button state tracking
+        this._rightHoldActive = false;
+        this._throwCooldown = 0;
         
         // Reference to current planet
         this.currentPlanet = null;
@@ -52,9 +60,9 @@ export class Player {
         // Spawn player on planet surface
         this.currentPlanet = planet;
         
-        // Position player slightly above surface
-        const spawnHeight = this.height;
-        const direction = new THREE.Vector3(1, 0, 0).normalize();
+        // Position player comfortably above surface
+        const spawnHeight = this.height + 3;
+        const direction = new THREE.Vector3(1, 0.1, 0).normalize();
         this.position.copy(planet.position).add(
             direction.multiplyScalar(planet.radius + spawnHeight)
         );
@@ -65,17 +73,25 @@ export class Player {
     }
 
     update(deltaTime) {
+        if (this._throwCooldown > 0) {
+            this._throwCooldown -= deltaTime;
+        }
         this.handleInput(deltaTime);
+        this.handleInteraction();
         this.applyPhysics(deltaTime);
         this.updateMeshPosition();
     }
 
     handleInput(deltaTime) {
-        // Toggle flight mode
-        if (this.input.isKeyPressed('Insert')) {
+        // Toggle flight mode (F)
+        if (this.input.isKeyPressed('KeyF')) {
             // Debounce check
             if (!this._flightToggleDebounce) {
                 this.isFlying = !this.isFlying;
+                this.onGround = false;
+                if (this.isFlying && this.velocity.length() < 1) {
+                    this.velocity.set(0, 0, 0);
+                }
                 this._flightToggleDebounce = true;
                 setTimeout(() => this._flightToggleDebounce = false, 200);
             }
@@ -93,19 +109,17 @@ export class Player {
             this.rotation.set(this.pitch, this.yaw, 0);
         }
         
-        // Calculate movement direction based on camera orientation
-        const moveDirection = new THREE.Vector3();
-        const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, this.yaw, 0));
-        const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, this.yaw, 0));
-        
+        // Calculate local forward/right based on look + local up
+        const { forward, right, up } = this.getLocalAxes();
+
         if (this.isFlying) {
-            this.handleFlightMovement(deltaTime, forward, right);
+            this.handleFlightMovement(deltaTime, forward, right, up);
         } else {
-            this.handleGroundMovement(deltaTime, forward, right);
+            this.handleGroundMovement(deltaTime, forward, right, up);
         }
     }
 
-    handleGroundMovement(deltaTime, forward, right) {
+    handleGroundMovement(deltaTime, forward, right, up) {
         const moveDirection = new THREE.Vector3();
         
         // WASD movement
@@ -130,35 +144,24 @@ export class Player {
             this.isRunning = this.input.isKeyPressed('ShiftLeft') || this.input.isKeyPressed('ShiftRight');
             const speed = this.isRunning ? PLAYER.runSpeed : PLAYER.walkSpeed;
             
-            // Apply movement relative to planet surface
-            if (this.currentPlanet) {
-                // Get local up direction (away from planet center)
-                const up = new THREE.Vector3()
-                    .subVectors(this.position, this.currentPlanet.position)
-                    .normalize();
-                
-                // Project movement onto planet surface
-                const tangentMove = moveDirection.clone();
-                tangentMove.sub(up.clone().multiplyScalar(tangentMove.dot(up)));
-                tangentMove.normalize();
-                
-                this.velocity.add(tangentMove.multiplyScalar(speed * deltaTime * 10));
-            }
+            // Project movement onto planet surface
+            const tangentMove = moveDirection.clone();
+            tangentMove.sub(up.clone().multiplyScalar(tangentMove.dot(up)));
+            tangentMove.normalize();
+            
+            this.velocity.add(tangentMove.multiplyScalar(speed * deltaTime * 10));
         }
         
         // Jumping
         if (this.input.isKeyPressed('Space') && this.onGround) {
-            const jumpDir = new THREE.Vector3()
-                .subVectors(this.position, this.currentPlanet.position)
-                .normalize();
+            const jumpDir = up.clone();
             this.velocity.add(jumpDir.multiplyScalar(PLAYER.jumpForce));
             this.onGround = false;
         }
     }
 
-    handleFlightMovement(deltaTime, forward, right) {
+    handleFlightMovement(deltaTime, forward, right, up) {
         const moveDirection = new THREE.Vector3();
-        const up = new THREE.Vector3(0, 1, 0);
         
         // Include pitch in forward direction for flight
         const pitchedForward = forward.clone().applyAxisAngle(right, this.pitch);
@@ -179,17 +182,10 @@ export class Player {
         
         // Up/Down in flight mode
         if (this.input.isKeyPressed('Space')) {
-            // Get local up direction
-            const localUp = this.currentPlanet 
-                ? new THREE.Vector3().subVectors(this.position, this.currentPlanet.position).normalize()
-                : new THREE.Vector3(0, 1, 0);
-            moveDirection.add(localUp);
+            moveDirection.add(up);
         }
         if (this.input.isKeyPressed('ShiftLeft') || this.input.isKeyPressed('ShiftRight')) {
-            const localUp = this.currentPlanet 
-                ? new THREE.Vector3().subVectors(this.position, this.currentPlanet.position).normalize()
-                : new THREE.Vector3(0, 1, 0);
-            moveDirection.sub(localUp);
+            moveDirection.sub(up);
         }
         
         // Apply flight movement
@@ -205,6 +201,29 @@ export class Player {
         
         // Apply drag in flight mode
         this.velocity.multiplyScalar(0.95);
+    }
+
+    handleInteraction() {
+        const rightHeld = this.input.isMouseButtonPressed(2);
+
+        if (rightHeld && !this._rightHoldActive && !this.heldObject) {
+            this.pickUpObject();
+            this._rightHoldActive = true;
+        }
+
+        if (!rightHeld && this.heldObject) {
+            this.dropObject();
+            this._rightHoldActive = false;
+        }
+
+        if (!rightHeld) {
+            this._rightHoldActive = false;
+        }
+
+        if (this.heldObject && this.input.isMouseButtonPressed(0) && this._throwCooldown <= 0) {
+            this.throwObject();
+            this._throwCooldown = 0.25;
+        }
     }
 
     applyPhysics(deltaTime) {
@@ -230,9 +249,7 @@ export class Player {
                     this.onGround = true;
                     
                     // Position correction
-                    const correctionDir = new THREE.Vector3()
-                        .subVectors(this.position, this.currentPlanet.position)
-                        .normalize();
+                    const correctionDir = gravityDir.clone().negate();
                     this.position.copy(this.currentPlanet.position).add(
                         correctionDir.multiplyScalar(this.currentPlanet.radius + this.height)
                     );
@@ -260,22 +277,87 @@ export class Player {
             this.mesh.position.copy(this.position);
             this.mesh.rotation.copy(this.rotation);
         }
+
+        if (this.heldObject) {
+            const forward = this.getForwardVector();
+            const up = this.getLocalAxes().up;
+            const holdDistance = 2;
+            const holdHeight = 0.5;
+            this.heldObject.position.copy(this.position)
+                .addScaledVector(forward, holdDistance)
+                .addScaledVector(up, holdHeight);
+            this.heldObject.velocity.set(0, 0, 0);
+        }
     }
 
     getCameraPosition() {
         const offset = PLAYER.cameraOffset;
-        const rotatedOffset = new THREE.Vector3(offset.x, offset.y, offset.z)
-            .applyEuler(this.rotation);
+        const { forward, right, up } = this.getLocalAxes();
+        const rotatedOffset = new THREE.Vector3()
+            .addScaledVector(right, offset.x)
+            .addScaledVector(up, offset.y)
+            .addScaledVector(forward, offset.z);
         return this.position.clone().add(rotatedOffset);
     }
 
     getCameraDirection() {
-        return new THREE.Vector3(0, 0, -1).applyEuler(this.rotation);
+        const { forward } = this.getLocalAxes();
+        // Apply pitch around local right
+        const right = this.getLocalAxes().right;
+        return forward.clone().applyAxisAngle(right, this.pitch).normalize();
+    }
+
+    getForwardVector() {
+        const { forward, right } = this.getLocalAxes();
+        return forward.clone().applyAxisAngle(right, this.pitch).normalize();
     }
 
     setMeshVisible(visible) {
         if (this.mesh) {
             this.mesh.visible = visible;
+        }
+    }
+
+    getLocalAxes() {
+        const up = this.currentPlanet
+            ? new THREE.Vector3().subVectors(this.position, this.currentPlanet.position).normalize()
+            : new THREE.Vector3(0, 1, 0);
+        const yawQuat = new THREE.Quaternion().setFromAxisAngle(up, this.yaw);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(yawQuat).normalize();
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(yawQuat).normalize();
+        return { forward, right, up };
+    }
+
+    getEyePosition() {
+        const up = this.getLocalAxes().up;
+        return this.position.clone().addScaledVector(up, this.height * 0.5);
+    }
+
+    pickUpObject() {
+        const rayOrigin = this.getEyePosition();
+        const rayDir = this.getForwardVector();
+        const hit = this.physicsEngine.raycast(rayOrigin, rayDir, 5)[0];
+
+        if (hit && hit.object && hit.object !== this.currentPlanet) {
+            this.heldObject = hit.object;
+            this.heldObject.isHeld = true;
+            this.heldObject.velocity.set(0, 0, 0);
+        }
+    }
+
+    dropObject() {
+        if (this.heldObject) {
+            this.heldObject.isHeld = false;
+            this.heldObject = null;
+        }
+    }
+
+    throwObject() {
+        if (this.heldObject) {
+            const forward = this.getForwardVector();
+            const throwForce = 25;
+            this.heldObject.velocity.copy(this.velocity).addScaledVector(forward, throwForce);
+            this.dropObject();
         }
     }
 
