@@ -3,7 +3,7 @@
  */
 
 import * as THREE from 'three';
-import { PHYSICS } from './config.js';
+import { PHYSICS, SCALE } from './config.js';
 
 export class PhysicsEngine {
     constructor() {
@@ -12,6 +12,7 @@ export class PhysicsEngine {
         this.gravity = new THREE.Vector3(0, -9.81, 0);
         this.accumulator = 0;
         this.fixedTimeStep = PHYSICS.timeStep;
+        this.softening = PHYSICS.softeningLength;
     }
 
     addCelestialBody(body) {
@@ -30,8 +31,9 @@ export class PhysicsEngine {
     }
 
     update(deltaTime) {
-        // Use fixed timestep for physics stability
-        this.accumulator += Math.min(deltaTime, PHYSICS.maxTimeStep);
+        // Use fixed timestep for physics stability; scale time for orbits if requested
+        const scaledDelta = Math.min(deltaTime * SCALE.time, PHYSICS.maxTimeStep);
+        this.accumulator += scaledDelta;
         
         while (this.accumulator >= this.fixedTimeStep) {
             this.fixedUpdate(this.fixedTimeStep);
@@ -51,6 +53,11 @@ export class PhysicsEngine {
     }
 
     updateCelestialGravity(dt) {
+        // Reset accelerations
+        for (const body of this.celestialBodies) {
+            body.acceleration.set(0, 0, 0);
+        }
+
         // Calculate gravitational forces between all celestial bodies
         for (let i = 0; i < this.celestialBodies.length; i++) {
             const bodyA = this.celestialBodies[i];
@@ -101,7 +108,8 @@ export class PhysicsEngine {
             const distanceFromSurface = minDistance - closestBody.radius;
             
             // Apply inverse square law for gravity (weaker as you get further)
-            const gravityFalloff = Math.max(0, 1 - (distanceFromSurface / (closestBody.radius * 10)));
+            const soft = this.softening;
+            const gravityFalloff = 1 / Math.max(1, (distanceFromSurface + soft) / (closestBody.radius + soft));
             const gravityForce = gravityDir.multiplyScalar(surfaceGravity * gravityFalloff);
             
             // Apply gravity to velocity

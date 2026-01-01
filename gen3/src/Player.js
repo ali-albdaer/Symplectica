@@ -59,7 +59,8 @@ export class Player {
             direction.multiplyScalar(planet.radius + spawnHeight)
         );
         
-        this.velocity.set(0, 0, 0);
+        // Match planet orbital velocity so the player stays bound to the surface frame
+        this.velocity.copy(planet.velocity || new THREE.Vector3());
         this.updateMeshPosition();
     }
 

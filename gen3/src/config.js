@@ -3,115 +3,118 @@
  * All values are scientifically scaled for playability while maintaining realistic ratios
  */
 
-// Scale factors for playability (1 unit = 1000 km in real space)
+// World scale: fully-gameplay values (units are arbitrary game units).
+// Tuned for stability while keeping body sizes/render distances reasonable.
 const SCALE = {
-    distance: 0.00001,  // Distance scale
-    size: 0.001,        // Body size scale
-    time: 60,           // Time acceleration (60x real time)
-    gravity: 1.5        // Gravity multiplier for gameplay
+    distance: 1,      // Distances are authored directly in game units
+    size: 1,          // Mesh sizes use authored units
+    time: 1,          // Simulation time multiplier (can be >1 to accelerate orbits)
+    gravity: 1        // Additional gravity multiplier for gameplay tweaks
 };
 
-// Physics constants
+// Physics constants (game-scaled)
 const PHYSICS = {
-    gravitationalConstant: 6.674e-11,
-    timeStep: 1/60,                    // 60 FPS target
-    maxTimeStep: 1/30,                 // Minimum 30 FPS
+    // Gravitational constant tuned for the authored masses/distances below.
+    // Picked to produce a stable 2-planet + moon system with circular-ish orbits.
+    gravitationalConstant: 0.001,
+    timeStep: 1 / 120,              // Fixed physics step (seconds of simulation time)
+    maxTimeStep: 1 / 30,            // Clamp per-frame delta to avoid spiral of death
     gravityMultiplier: SCALE.gravity,
+    softeningLength: 5,             // Softening to prevent singularities at close range
     collisionIterations: 3,
-    damping: 0.98,
-    airResistance: 0.99,
-    groundFriction: 0.85
+    damping: 0.995,                 // Global velocity damping for dynamic bodies
+    airResistance: 0.995,
+    groundFriction: 0.9
 };
 
-// Sun configuration
+// Sun configuration (game-scaled)
 const SUN = {
     name: 'Sun',
-    mass: 1.989e30,                    // kg
-    radius: 696340 * SCALE.size,       // km
-    rotationPeriod: 25.4 * 24 * 3600,  // seconds (equatorial)
-    luminosity: 3.828e26,              // watts
-    temperature: 5778,                  // Kelvin
+    mass: 100000,          // Arbitrary game mass units
+    radius: 500,           // Game units
+    rotationPeriod: 180,   // Seconds per full rotation
+    luminosity: 1,         // Kept for future post-processing use
+    temperature: 6000,
     color: 0xFDB813,
     emissive: 0xFFA500,
-    emissiveIntensity: 1.5,
+    emissiveIntensity: 2,
     position: { x: 0, y: 0, z: 0 }
 };
 
-// Planet 1 configuration (Earth-like)
+// Planet 1 configuration (spawn planet)
 const PLANET_1 = {
     name: 'Terra',
-    mass: 5.972e24,                    // kg
-    radius: 6371 * SCALE.size,         // km
-    orbitRadius: 149.6e6 * SCALE.distance,  // km (1 AU)
-    orbitPeriod: 365.25 * 24 * 3600,   // seconds (1 year)
-    rotationPeriod: 24 * 3600,         // seconds (1 day)
-    axialTilt: 23.5,                   // degrees
-    eccentricity: 0.0167,
-    density: 5514,                     // kg/m³
-    albedo: 0.306,
+    mass: 1500,
+    radius: 60,
+    orbitRadius: 2000,
+    rotationPeriod: 120,   // Day length (s)
+    axialTilt: 15,
+    eccentricity: 0.01,
+    density: 5.5,
+    albedo: 0.3,
     color: 0x4169E1,
     hasAtmosphere: true,
     atmosphereColor: 0x87CEEB,
-    atmosphereOpacity: 0.3,
-    surfaceGravity: 9.81               // m/s²
+    atmosphereOpacity: 0.25,
+    surfaceGravity: 9.5,
+    parentBody: 'sun'
 };
 
-// Planet 2 configuration (Mars-like)
+// Planet 2 configuration
 const PLANET_2 = {
     name: 'Ares',
-    mass: 6.39e23,                     // kg
-    radius: 3389.5 * SCALE.size,       // km
-    orbitRadius: 227.9e6 * SCALE.distance,  // km
-    orbitPeriod: 687 * 24 * 3600,      // seconds
-    rotationPeriod: 24.6 * 3600,       // seconds
-    axialTilt: 25.2,                   // degrees
-    eccentricity: 0.0934,
-    density: 3933,                     // kg/m³
+    mass: 2000,
+    radius: 90,
+    orbitRadius: 3400,
+    rotationPeriod: 200,
+    axialTilt: 20,
+    eccentricity: 0.04,
+    density: 3.9,
     albedo: 0.25,
     color: 0xCD5C5C,
     hasAtmosphere: true,
     atmosphereColor: 0xFFB6C1,
     atmosphereOpacity: 0.15,
-    surfaceGravity: 3.71               // m/s²
+    surfaceGravity: 7.5,
+    parentBody: 'sun'
 };
 
 // Moon configuration (orbiting Planet 1)
 const MOON = {
     name: 'Luna',
-    mass: 7.342e22,                    // kg
-    radius: 1737.4 * SCALE.size,       // km
-    orbitRadius: 384400 * SCALE.distance,   // km from Planet 1
-    orbitPeriod: 27.3 * 24 * 3600,     // seconds
-    rotationPeriod: 27.3 * 24 * 3600,  // seconds (tidally locked)
-    eccentricity: 0.0549,
-    density: 3344,                     // kg/m³
+    mass: 80,
+    radius: 18,
+    orbitRadius: 180,
+    rotationPeriod: 180,
+    eccentricity: 0.02,
+    density: 3.3,
     albedo: 0.12,
     color: 0xC0C0C0,
-    parentBody: 'Terra',
-    surfaceGravity: 1.62               // m/s²
+    parentBody: 'planet1',
+    surfaceGravity: 1.6
 };
 
 // Player configuration
 const PLAYER = {
-    height: 1.8,                       // meters
-    radius: 0.3,                       // meters
-    mass: 70,                          // kg
-    walkSpeed: 3,                      // m/s
-    runSpeed: 6,                       // m/s
-    jumpForce: 6,                      // m/s
+    height: 1.8,
+    radius: 0.4,
+    mass: 80,
+    walkSpeed: 6,
+    runSpeed: 10,
+    jumpForce: 10,
     mouseSensitivity: 0.002,
-    
+
     // Flight mode
-    flightSpeed: 20,                   // m/s
-    flightAcceleration: 2,
-    flightMaxSpeed: 100,
+    flightSpeed: 30,
+    flightAcceleration: 4,
+    flightMaxSpeed: 120,
     
     // Camera
-    cameraOffset: { x: 0, y: 0.6, z: 0 },  // First person eye level
-    thirdPersonDistance: 5,
-    thirdPersonHeight: 2,
-    cameraSmoothing: 0.1,
-    cameraLookAhead: 1.5
+    cameraOffset: { x: 0, y: 0.8, z: 0 },
+    thirdPersonDistance: 6,
+    thirdPersonHeight: 2.5,
+    cameraSmoothing: 0.12,
+    cameraLookAhead: 2
 };
 
 // Interactable objects configuration
@@ -171,7 +174,7 @@ const GRAPHICS = {
     currentPreset: 'high',
     shadowMapSize: 2048,
     particleCount: 5000,
-    renderDistance: 30000,
+    renderDistance: 12000,
     antialiasing: true,
     bloom: true,
     lensFlare: true,

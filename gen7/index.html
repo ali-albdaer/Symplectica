@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Simulation - Gen7</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>Solar System Simulation</h1>
+            <div class="loading-bar">
+                <div id="loading-progress"></div>
+            </div>
+            <p id="loading-text">Initializing...</p>
+            <div id="loading-details"></div>
+        </div>
+    </div>
+
+    <!-- Main Canvas -->
+    <canvas id="render-canvas"></canvas>
+
+    <!-- HUD Overlay -->
+    <div id="hud">
+        <!-- Performance Monitor -->
+        <div id="performance-monitor" class="hud-panel hidden">
+            <h3>Performance Metrics</h3>
+            <div id="fps-counter">FPS: 0</div>
+            <div id="frame-time">Frame Time: 0ms</div>
+            <div id="draw-calls">Draw Calls: 0</div>
+            <div id="triangles">Triangles: 0</div>
+            <div id="gpu-memory">GPU Memory: N/A</div>
+        </div>
+
+        <!-- Coordinates Display -->
+        <div id="coordinates-display" class="hud-panel hidden">
+            <h3>Coordinates</h3>
+            <div id="player-position">Position: (0, 0, 0)</div>
+            <div id="player-velocity">Velocity: (0, 0, 0)</div>
+            <div id="current-body">On: Planet 1</div>
+            <div id="altitude">Altitude: 0m</div>
+        </div>
+
+        <!-- Controls Help -->
+        <div id="controls-help" class="hud-panel">
+            <h3>Controls</h3>
+            <ul>
+                <li><strong>WASD</strong> - Move</li>
+                <li><strong>Mouse</strong> - Look</li>
+                <li><strong>Space</strong> - Jump / Fly Up</li>
+                <li><strong>Shift</strong> - Fly Down (flight mode)</li>
+                <li><strong>INS</strong> - Toggle Free Flight</li>
+                <li><strong>V</strong> - Toggle Camera View</li>
+                <li><strong>F</strong> - Toggle Performance</li>
+                <li><strong>C</strong> - Toggle Coordinates</li>
+                <li><strong>/</strong> - Developer Menu</li>
+                <li><strong>H</strong> - Toggle Help</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Developer Menu -->
+    <div id="dev-menu" class="hidden">
+        <div class="dev-menu-content">
+            <div class="dev-menu-header">
+                <h2>Developer Menu</h2>
+                <button id="dev-menu-close">×</button>
+            </div>
+            <div class="dev-menu-tabs">
+                <button class="tab-button active" data-tab="celestial">Celestial Bodies</button>
+                <button class="tab-button" data-tab="physics">Physics Settings</button>
+                <button class="tab-button" data-tab="graphics">Graphics Settings</button>
+                <button class="tab-button" data-tab="debug">Debug Tools</button>
+            </div>
+            <div id="dev-menu-body">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
+    
+    <!-- Configuration -->
+    <script type="module" src="config/globals.js"></script>
+    
+    <!-- Utilities -->
+    <script type="module" src="src/utils/Vector3D.js"></script>
+    
+    <!-- Physics Engine -->
+    <script type="module" src="src/physics/PhysicsObject.js"></script>
+    <script type="module" src="src/physics/GravityEngine.js"></script>
+    
+    <!-- Celestial Bodies -->
+    <script type="module" src="src/celestial/CelestialBody.js"></script>
+    <script type="module" src="src/celestial/Star.js"></script>
+    <script type="module" src="src/celestial/Planet.js"></script>
+    <script type="module" src="src/celestial/Moon.js"></script>
+    
+    <!-- Player Systems -->
+    <script type="module" src="src/player/Camera.js"></script>
+    <script type="module" src="src/player/Player.js"></script>
+    
+    <!-- Interactive Objects -->
+    <script type="module" src="src/objects/InteractiveObject.js"></script>
+    
+    <!-- Rendering -->
+    <script type="module" src="src/rendering/LightingSystem.js"></script>
+    <script type="module" src="src/rendering/Renderer.js"></script>
+    
+    <!-- UI -->
+    <script type="module" src="src/ui/PerformanceMonitor.js"></script>
+    <script type="module" src="src/ui/DevMenu.js"></script>
+    
+    <!-- Main Application -->
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

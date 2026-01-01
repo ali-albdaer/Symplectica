@@ -144,7 +144,7 @@ class SolarSystemSimulation {
         this.physics.addCelestialBody(this.celestialBodies.sun);
         
         // Create Planet 1
-        this.celestialBodies.planet1 = new CelestialBody(PLANET_1);
+        this.celestialBodies.planet1 = new CelestialBody(PLANET_1, this.celestialBodies.sun);
         this.scene.add(this.celestialBodies.planet1.mesh);
         this.physics.addCelestialBody(this.celestialBodies.planet1);
         
@@ -153,7 +153,7 @@ class SolarSystemSimulation {
         if (orbit1) this.scene.add(orbit1);
         
         // Create Planet 2
-        this.celestialBodies.planet2 = new CelestialBody(PLANET_2);
+        this.celestialBodies.planet2 = new CelestialBody(PLANET_2, this.celestialBodies.sun);
         this.scene.add(this.celestialBodies.planet2.mesh);
         this.physics.addCelestialBody(this.celestialBodies.planet2);
         

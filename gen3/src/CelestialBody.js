@@ -12,17 +12,17 @@ export class CelestialBody {
         
         // Physical properties
         this.mass = config.mass;
-        this.radius = config.radius;
+        this.radius = config.radius; // game-space radius (already scaled in config)
         this.position = new THREE.Vector3();
         this.velocity = new THREE.Vector3();
         this.acceleration = new THREE.Vector3();
         this.rotation = 0;
-        this.rotationSpeed = (2 * Math.PI) / (config.rotationPeriod / SCALE.time);
+        this.rotationSpeed = (2 * Math.PI) / (config.rotationPeriod || 120);
         
         // Orbital elements
         this.orbitRadius = config.orbitRadius || 0;
         this.orbitPeriod = config.orbitPeriod || 0;
-        this.orbitSpeed = this.orbitPeriod ? (2 * Math.PI) / (this.orbitPeriod / SCALE.time) : 0;
+        this.orbitSpeed = 0;
         this.orbitAngle = Math.random() * Math.PI * 2; // Random starting position
         this.eccentricity = config.eccentricity || 0;
         this.axialTilt = (config.axialTilt || 0) * (Math.PI / 180);
@@ -150,14 +150,21 @@ export class CelestialBody {
         } else {
             // Calculate initial orbital position
             this.updateOrbitalPosition(0);
-            
-            // Set initial velocity perpendicular to position (circular orbit approximation)
-            const orbitalSpeed = this.orbitSpeed * this.orbitRadius;
+
+            // Compute circular orbital velocity based on parent mass
+            const mu = PHYSICS.gravitationalConstant * (this.parentBody ? this.parentBody.mass : 0);
+            const orbitalSpeed = Math.sqrt(Math.max(mu, 0) / Math.max(this.orbitRadius, PHYSICS.softeningLength));
+            this.orbitSpeed = orbitalSpeed / Math.max(this.orbitRadius, 1);
+
             this.velocity.set(
                 -Math.sin(this.orbitAngle) * orbitalSpeed,
                 0,
                 Math.cos(this.orbitAngle) * orbitalSpeed
             );
+            // If the parent already has velocity (e.g., moon around planet), inherit it
+            if (this.parentBody) {
+                this.velocity.add(this.parentBody.velocity);
+            }
         }
         
         this.updateMeshPosition();
@@ -183,15 +190,11 @@ export class CelestialBody {
         const dy = otherBody.position.y - this.position.y;
         const dz = otherBody.position.z - this.position.z;
         
-        const distanceSquared = dx * dx + dy * dy + dz * dz;
+        const soft = PHYSICS.softeningLength;
+        const distanceSquared = dx * dx + dy * dy + dz * dz + soft * soft;
         const distance = Math.sqrt(distanceSquared);
         
-        // Avoid division by zero and unrealistic forces at very small distances
-        if (distance < (this.radius + otherBody.radius)) {
-            return;
-        }
-        
-        // F = G * (m1 * m2) / r^2
+        // F = G * (m1 * m2) / (r^2 + eps^2)
         const force = (PHYSICS.gravitationalConstant * this.mass * otherBody.mass) / distanceSquared;
         const forceMagnitude = force * PHYSICS.gravityMultiplier;
         
@@ -242,7 +245,7 @@ export class CelestialBody {
 
     getSurfaceGravity() {
         // g = GM / r^2
-        const g = (PHYSICS.gravitationalConstant * this.mass) / (this.radius * this.radius);
+        const g = (PHYSICS.gravitationalConstant * this.mass) / Math.max(this.radius * this.radius, PHYSICS.softeningLength * PHYSICS.softeningLength);
         return g * PHYSICS.gravityMultiplier;
     }
 
