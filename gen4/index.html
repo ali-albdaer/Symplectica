@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Simulator</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- Performance Metrics -->
+        <div id="performance-metrics" class="hidden">
+            <div id="fps">FPS: 0</div>
+            <div id="frame-time">Frame: 0ms</div>
+            <div id="physics-time">Physics: 0ms</div>
+            <div id="render-time">Render: 0ms</div>
+            <div id="gpu-memory">GPU Mem: 0MB</div>
+            <div id="draw-calls">Draw Calls: 0</div>
+        </div>
+        
+        <!-- HUD -->
+        <div id="hud">
+            <div id="crosshair">+</div>
+            <div id="player-info">
+                <div id="position">Position: (0, 0, 0)</div>
+                <div id="velocity">Velocity: 0 m/s</div>
+                <div id="current-body">On: Planet 1</div>
+                <div id="flight-mode">Mode: Walking</div>
+            </div>
+            <div id="controls-hint">
+                <p>WASD - Move | Space - Jump | Mouse - Look</p>
+                <p>INS - Toggle Flight | V - Toggle View | / - Dev Menu | F3 - Metrics</p>
+            </div>
+        </div>
+        
+        <!-- Developer Menu -->
+        <div id="dev-menu" class="hidden">
+            <div class="dev-menu-header">
+                <h2>Developer Console</h2>
+                <button id="dev-menu-close">×</button>
+            </div>
+            <div class="dev-menu-content">
+                <div class="dev-tabs">
+                    <button class="tab-btn active" data-tab="bodies">Celestial Bodies</button>
+                    <button class="tab-btn" data-tab="physics">Physics</button>
+                    <button class="tab-btn" data-tab="graphics">Graphics</button>
+                    <button class="tab-btn" data-tab="player">Player</button>
+                </div>
+                
+                <div id="tab-bodies" class="tab-content active">
+                    <div id="bodies-list"></div>
+                </div>
+                
+                <div id="tab-physics" class="tab-content">
+                    <div class="setting-group">
+                        <label>Time Scale</label>
+                        <input type="range" id="time-scale" min="0" max="1000" value="1">
+                        <span id="time-scale-value">1x</span>
+                    </div>
+                    <div class="setting-group">
+                        <label>Gravitational Constant (×10⁻¹¹)</label>
+                        <input type="number" id="g-constant" value="6.674" step="0.001">
+                    </div>
+                    <div class="setting-group">
+                        <label>Physics Steps/Frame</label>
+                        <input type="range" id="physics-steps" min="1" max="16" value="4">
+                        <span id="physics-steps-value">4</span>
+                    </div>
+                </div>
+                
+                <div id="tab-graphics" class="tab-content">
+                    <div class="setting-group">
+                        <label>Quality Preset</label>
+                        <select id="quality-preset">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high" selected>High</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>Shadow Quality</label>
+                        <select id="shadow-quality">
+                            <option value="off">Off</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high" selected>High</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>Atmosphere Effects</label>
+                        <select id="atmosphere-quality">
+                            <option value="off">Off</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high" selected>High</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>Bloom</label>
+                        <input type="checkbox" id="bloom-enabled" checked>
+                    </div>
+                    <div class="setting-group">
+                        <label>Anti-Aliasing</label>
+                        <select id="aa-quality">
+                            <option value="off">Off</option>
+                            <option value="fxaa">FXAA</option>
+                            <option value="msaa" selected>MSAA 4x</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>Star Field Density</label>
+                        <input type="range" id="star-density" min="0" max="10000" value="5000">
+                        <span id="star-density-value">5000</span>
+                    </div>
+                </div>
+                
+                <div id="tab-player" class="tab-content">
+                    <div class="setting-group">
+                        <label>Walk Speed (m/s)</label>
+                        <input type="number" id="walk-speed" value="5" step="0.5">
+                    </div>
+                    <div class="setting-group">
+                        <label>Run Speed (m/s)</label>
+                        <input type="number" id="run-speed" value="10" step="0.5">
+                    </div>
+                    <div class="setting-group">
+                        <label>Jump Force</label>
+                        <input type="number" id="jump-force" value="8" step="0.5">
+                    </div>
+                    <div class="setting-group">
+                        <label>Flight Speed (m/s)</label>
+                        <input type="number" id="flight-speed" value="50" step="5">
+                    </div>
+                    <div class="setting-group">
+                        <label>Mouse Sensitivity</label>
+                        <input type="range" id="mouse-sensitivity" min="0.1" max="2" step="0.1" value="0.5">
+                        <span id="mouse-sensitivity-value">0.5</span>
+                    </div>
+                    <div class="setting-group">
+                        <label>Third Person Distance</label>
+                        <input type="range" id="tp-distance" min="2" max="20" value="5">
+                        <span id="tp-distance-value">5</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loading Screen -->
+        <div id="loading-screen">
+            <div class="loader">
+                <div class="planet-loader"></div>
+                <h2>Loading Solar System...</h2>
+                <div id="loading-progress">
+                    <div id="loading-bar"></div>
+                </div>
+                <p id="loading-status">Initializing...</p>
+            </div>
+        </div>
+        
+        <!-- Start Screen -->
+        <div id="start-screen" class="hidden">
+            <h1>Solar System Simulator</h1>
+            <p>Experience realistic planetary physics</p>
+            <button id="start-button">Click to Start</button>
+            <div class="start-info">
+                <p>Use WASD to move, Mouse to look around</p>
+                <p>Press / for developer console</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Game Modules -->
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

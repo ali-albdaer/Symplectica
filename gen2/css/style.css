@@ -1,0 +1,58 @@
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  user-select: none;
+}
+
+#game-container {
+  position: absolute;
+  inset: 0;
+}
+
+#ui-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#instructions {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 14px 16px;
+  border-radius: 10px;
+  text-align: center;
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#instructions .title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+#instructions .line {
+  font-size: 13px;
+  opacity: 0.9;
+  line-height: 1.35;
+}
+
+#hud {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  white-space: pre;
+}
+
+/* dat.gui layering */
+.dg.ac {
+  z-index: 1000 !important;
+}
