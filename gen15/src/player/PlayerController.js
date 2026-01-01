@@ -20,6 +20,7 @@ export class PlayerController {
     this.playerMass = 85;
     this.jumpReady = true;
     this.isGrounded = false;
+    this.worldUp = new Vector3(0, 1, 0);
     this.flightEnabled = false;
     this.grabbedObject = null;
     this.raycaster = new Raycaster();
@@ -126,7 +127,7 @@ export class PlayerController {
 
   update(delta) {
     this.updateOrientation();
-    this.applyGravity();
+    this.updateGravityFrame();
     this.processMovement();
     this.updateGrabbedObject();
   }
@@ -136,24 +137,27 @@ export class PlayerController {
     this.quaternion.setFromEuler(this.euler);
   }
 
-  applyGravity() {
+  updateGravityFrame() {
     const nearest = this.findDominantGravitySource();
-    if (!nearest) return;
+    if (!nearest) {
+      this.gravityNormal.lerp(this.worldUp, 0.1);
+      this.isGrounded = false;
+      this.gravityNormal.normalize();
+      return;
+    }
     const playerPos = this.getPosition();
     const direction = nearest.position.clone().sub(playerPos);
     const distance = Math.max(direction.length(), 1e-2);
     direction.normalize();
-    const gravityMagnitude = (this.config.gravityConstant * nearest.mass * this.playerMass) / (distance * distance);
-    const gravityForce = direction.multiplyScalar(gravityMagnitude);
-    this.body.applyForce(new CANNON.Vec3(gravityForce.x, gravityForce.y, gravityForce.z));
     if (distance < this.config.player.gravitySnapThreshold) {
       this.gravityNormal.copy(direction.clone().multiplyScalar(-1));
     } else {
-      this.gravityNormal.set(0, 1, 0);
+      this.gravityNormal.lerp(this.worldUp, 0.08);
     }
 
     const surfaceDistance = distance - nearest.radius;
     this.isGrounded = surfaceDistance < 1.5 && !this.flightEnabled;
+    this.gravityNormal.normalize();
   }
 
   findDominantGravitySource() {

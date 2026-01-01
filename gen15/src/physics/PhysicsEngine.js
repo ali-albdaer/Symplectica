@@ -9,6 +9,7 @@ export class PhysicsEngine {
     this.celestialBodies = [];
     this.microObjects = [];
     this.gravitationalPairs = [];
+    this.playerEntry = null;
   }
 
   init() {
@@ -37,6 +38,10 @@ export class PhysicsEngine {
       this.world.addBody(micro.body);
       this.microObjects.push(micro);
     });
+
+    if (this.playerEntry?.body) {
+      this.registerPlayerBody(this.playerEntry.body);
+    }
   }
 
   createCelestialBody(def) {
@@ -112,6 +117,9 @@ export class PhysicsEngine {
   applyGravitationalForces() {
     const G = this.config.gravityConstant;
     const bodies = [...this.celestialBodies, ...this.microObjects];
+    if (this.playerEntry) {
+      bodies.push(this.playerEntry);
+    }
     bodies.forEach((entry) => entry.body.force.set(0, 0, 0));
     for (let i = 0; i < bodies.length - 1; i++) {
       for (let j = i + 1; j < bodies.length; j++) {
@@ -133,6 +141,9 @@ export class PhysicsEngine {
 
   registerPlayerBody(body) {
     if (!this.world) return;
-    this.world.addBody(body);
+    if (!this.world.bodies.includes(body)) {
+      this.world.addBody(body);
+    }
+    this.playerEntry = { id: "player", body };
   }
 }
