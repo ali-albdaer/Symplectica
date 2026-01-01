@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Solar System Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #telemetry {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #0f0;
+            font-size: 12px;
+            min-width: 200px;
+            pointer-events: none;
+            z-index: 100;
+            visibility: hidden;
+        }
+
+        #telemetry.active {
+            visibility: visible;
+        }
+
+        #telemetry div {
+            margin: 4px 0;
+        }
+
+        #telemetry .label {
+            color: #0f0;
+            font-weight: bold;
+        }
+
+        #telemetry .value {
+            color: #0ff;
+            margin-left: 10px;
+        }
+
+        #debug-overlay {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border: 2px solid #f00;
+            font-size: 12px;
+            max-width: 400px;
+            max-height: 200px;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 101;
+            visibility: hidden;
+            color: #f00;
+        }
+
+        #debug-overlay.active {
+            visibility: visible;
+        }
+
+        #debug-overlay div {
+            margin: 3px 0;
+        }
+
+        #dev-console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40%;
+            background: rgba(0, 0, 0, 0.95);
+            border-top: 2px solid #0f0;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            pointer-events: auto;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            font-family: 'Courier New', monospace;
+        }
+
+        #dev-console.active {
+            transform: translateY(0);
+        }
+
+        #dev-console-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 12px;
+            border-bottom: 1px solid #0f0;
+        }
+
+        #dev-console-output div {
+            margin: 2px 0;
+            color: #0f0;
+        }
+
+        #dev-console-output .error {
+            color: #f00;
+        }
+
+        #dev-console-output .warning {
+            color: #ff0;
+        }
+
+        #dev-console-output .info {
+            color: #0ff;
+        }
+
+        #dev-console-controls {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group label {
+            min-width: 150px;
+            color: #0f0;
+        }
+
+        .control-group input {
+            background: #111;
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 4px 8px;
+            font-family: 'Courier New', monospace;
+            min-width: 100px;
+        }
+
+        .control-group button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 4px 12px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+
+        .control-group button:hover {
+            background: #0ff;
+        }
+
+        #help-text {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border: 1px solid #0f0;
+            font-size: 11px;
+            max-width: 250px;
+            pointer-events: none;
+            z-index: 100;
+            color: #0f0;
+            line-height: 1.4;
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid #0f0;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .crosshair::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 4px;
+            background: #0f0;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="ui-container">
+        <div class="crosshair"></div>
+        
+        <div id="help-text">
+            <strong>CONTROLS:</strong><br>
+            WASD: Move | Space: Jump<br>
+            F: Toggle Free Flight<br>
+            Right-Click: Grab Object<br>
+            /: Dev Console<br>
+            Tab: Telemetry<br>
+            ESC: Unlock Cursor
+        </div>
+        
+        <div id="telemetry">
+            <div><span class="label">FPS:</span><span class="value" id="fps">60</span></div>
+            <div><span class="label">Frame:</span><span class="value" id="frame-time">0.0ms</span></div>
+            <div><span class="label">Pos:</span><span class="value" id="pos">0,0,0</span></div>
+            <div><span class="label">Bodies:</span><span class="value" id="bodies">0</span></div>
+            <div><span class="label">Draw Calls:</span><span class="value" id="draw-calls">0</span></div>
+            <div><span class="label">Memory:</span><span class="value" id="memory">0MB</span></div>
+        </div>
+
+        <div id="debug-overlay"></div>
+    </div>
+
+    <div id="dev-console">
+        <div id="dev-console-output"></div>
+        <div id="dev-console-controls"></div>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Cannon.js Physics Engine (stable build) -->
+    <script src="https://cdn.jsdelivr.net/npm/cannon@0.20.0/build/cannon.js"></script>
+
+    <!-- Game Modules -->
+    <script src="js/debug-log.js"></script>
+    <script src="js/utilities.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/physics-engine.js"></script>
+    <script src="js/entity.js"></script>
+    <script src="js/celestial-body.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/input-handler.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/telemetry.js"></script>
+    <script src="js/dev-console.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
