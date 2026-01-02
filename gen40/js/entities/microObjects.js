@@ -1,3 +1,4 @@
+import * as THREE from 'https://unpkg.com/three@0.162.0/build/three.module.js';
 import { Config } from '../core/config.js';
 import { State } from '../core/state.js';
 import { registerBody } from '../physics/physicsWorld.js';

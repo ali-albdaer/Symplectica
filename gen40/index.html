@@ -14,9 +14,7 @@
   <div id="settings-menu" class="overlay-panel hidden"></div>
   <canvas id="webgl-canvas"></canvas>
 
-  <!-- Three.js via CDN, no npm/node -->
-  <script src="https://unpkg.com/three@0.162.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.162.0/examples/js/controls/PointerLockControls.js"></script>
+  <!-- Entry point as ES module; Three.js is imported from CDN inside modules. -->
   <script type="module" src="./js/core/main.js"></script>
 </body>
 </html>

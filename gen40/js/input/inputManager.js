@@ -1,3 +1,4 @@
+import * as THREE from 'https://unpkg.com/three@0.162.0/build/three.module.js';
 import { State } from '../core/state.js';
 import { pickObject } from '../entities/interaction.js';
 
