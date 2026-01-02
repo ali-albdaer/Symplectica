@@ -1,0 +1,133 @@
+╔══════════════════════════════════════════════════════════════╗
+║                    🌌 QUICK START GUIDE 🌌                    ║
+╚══════════════════════════════════════════════════════════════╝
+
+▶ TO RUN THE SIMULATION:
+  
+  1. Open terminal in this directory
+  2. Run: python -m http.server 8000
+  3. Open browser: http://localhost:8000
+  4. Click canvas to start!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎮 ESSENTIAL CONTROLS:
+
+  Movement:
+    W/A/S/D      - Move (camera-relative)
+    Space        - Jump / Fly Up
+    Shift        - Run / Fly Down
+    Mouse        - Look around
+    
+  Modes:
+    F            - Toggle Free Flight
+    V            - Toggle Camera View (1st/3rd person)
+    
+  Interaction:
+    Right Click  - Grab/Release objects
+    
+  Debug:
+    /            - Developer Console
+    F3           - Performance Metrics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 PROJECT FILES:
+
+  config.js              → All settings & constants
+  physics.js             → N-body gravity engine
+  celestialBodies.js     → Sun, planets, moon
+  player.js              → Character controller
+  camera.js              → First/third person camera
+  objects.js             → Interactive objects
+  ui.js                  → Developer console & HUD
+  main.js                → Game loop
+  index.html             → Entry point
+  styles.css             → Styling
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚙️ CONFIGURATION:
+
+  • All parameters in config.js
+  • Edit live via Developer Console (/)
+  • Changes apply immediately
+  • Default settings create stable orbits
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 KEY FEATURES:
+
+  ✓ Realistic N-body physics
+  ✓ Stable orbital mechanics
+  ✓ Camera-relative movement
+  ✓ 1st/3rd person views
+  ✓ Grabbable objects
+  ✓ Luminous objects
+  ✓ Dynamic shadows
+  ✓ Performance metrics
+  ✓ Real-time config editor
+  ✓ Debug logging
+  ✓ 3-tier quality settings
+  ✓ 5000+ star skybox
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 TROUBLESHOOTING:
+
+  Issue: Black screen
+  → Check browser console (F12)
+  → Verify http.server is running
+  → Ensure Three.js CDN is accessible
+
+  Issue: Low FPS
+  → Press F3 to check metrics
+  → Open Dev Console (/) → set fidelity to Low
+  → Disable shadows in config
+
+  Issue: Physics unstable
+  → Press F3 and check System Energy
+  → Open Dev Console → reduce Time Scale
+  → Increase Integration Steps in config.js
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 EXPANDING THE PROJECT:
+
+  Add Black Holes:
+    1. Create class extending CelestialBody
+    2. Override gravity calculations
+    3. Add visual effects
+
+  Add Telescopes:
+    1. Extend camera.js
+    2. Add zoom mechanics
+    3. Create UI overlay
+
+  Add More Bodies:
+    1. Define in config.js
+    2. Add to createSolarSystem()
+    3. Physics auto-integrates
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 ARCHITECTURE:
+
+  config.js          → Central configuration
+       ↓
+  physics.js         → N-body engine
+       ↓
+  celestialBodies    → Planets, moons
+  player.js          → Character
+  objects.js         → Items
+       ↓
+  camera.js          → View control
+  ui.js              → Interface
+       ↓
+  main.js            → Game loop
+       ↓
+  renderer           → Three.js output
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌟 ENJOY YOUR JOURNEY THROUGH THE COSMOS! 🌟

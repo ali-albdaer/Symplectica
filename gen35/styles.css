@@ -1,0 +1,205 @@
+/**
+ * STYLES
+ * Global CSS for the solar system simulation
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    overflow: hidden;
+    background: #000000;
+    color: #ffffff;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: none; /* Hide cursor when pointer is locked */
+}
+
+/* Loading Screen */
+#loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.5s ease;
+}
+
+.loading-content {
+    text-align: center;
+    max-width: 500px;
+    padding: 40px;
+}
+
+.loading-content h1 {
+    font-size: 36px;
+    margin-bottom: 30px;
+    color: #4444ff;
+    text-shadow: 0 0 20px rgba(68, 68, 255, 0.5);
+}
+
+.loading-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.loading-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #4444ff, #00ffff);
+    width: 100%;
+    animation: loading 2s ease-in-out infinite;
+}
+
+@keyframes loading {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.loading-content p {
+    margin: 10px 0;
+    color: #aaaaff;
+}
+
+.loading-details {
+    font-size: 12px;
+    color: #6666aa;
+}
+
+/* Scrollbar styling for dev console */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(68, 68, 255, 0.5);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(68, 68, 255, 0.8);
+}
+
+/* Button styling */
+button {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(68, 68, 255, 0.5);
+}
+
+button:active {
+    transform: scale(0.95);
+}
+
+/* Input styling for dev console */
+input[type="number"],
+input[type="text"],
+select {
+    font-family: 'Courier New', monospace;
+    transition: all 0.3s ease;
+}
+
+input[type="number"]:focus,
+input[type="text"]:focus,
+select:focus {
+    outline: none;
+    border-color: #6666ff !important;
+    box-shadow: 0 0 10px rgba(68, 68, 255, 0.3);
+}
+
+/* Cursor states */
+body.menu-open canvas {
+    cursor: default !important;
+}
+
+/* Performance optimization - disable selection */
+body {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Accessibility - focus indicators */
+button:focus,
+input:focus,
+select:focus {
+    outline: 2px solid #4444ff;
+    outline-offset: 2px;
+}
+
+/* Mobile responsiveness (basic) */
+@media (max-width: 768px) {
+    .loading-content h1 {
+        font-size: 24px;
+    }
+    
+    #dev-console {
+        width: 95% !important;
+        max-width: none !important;
+        font-size: 12px;
+    }
+}
+
+/* Print optimization */
+@media print {
+    #loading-screen,
+    #debug-overlay,
+    #metrics-overlay,
+    #dev-console {
+        display: none !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .loading-content h1 {
+        color: #ffffff;
+        text-shadow: none;
+    }
+    
+    button {
+        border: 2px solid white;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Dark mode (default) - already dark */
+/* Light mode - not applicable for space simulation */

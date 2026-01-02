@@ -1,0 +1,329 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    background: #000;
+    color: #fff;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Loading Screen */
+#loadingScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.5s;
+}
+
+.loading-content {
+    text-align: center;
+    max-width: 500px;
+}
+
+.loading-content h1 {
+    font-size: 2.5em;
+    margin-bottom: 30px;
+    background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.loading-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+#loadingProgress {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s;
+}
+
+#loadingText {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9em;
+}
+
+/* Debug Log */
+#debugLog {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    max-width: 400px;
+    max-height: 300px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    overflow-y: auto;
+    font-size: 0.85em;
+    display: none;
+    z-index: 100;
+}
+
+#debugLog h3 {
+    margin-bottom: 10px;
+    color: #667eea;
+}
+
+#debugLogContent {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.debug-error {
+    color: #ff5555;
+}
+
+.debug-warning {
+    color: #ffaa55;
+}
+
+.debug-info {
+    color: #55ff55;
+}
+
+/* Telemetry */
+#telemetry {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    font-size: 0.9em;
+    font-family: 'Courier New', monospace;
+    z-index: 100;
+}
+
+.telemetry-item {
+    margin-bottom: 8px;
+    color: #0f0;
+}
+
+/* Controls Help */
+#controlsHelp {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 15px;
+    font-size: 0.85em;
+    z-index: 100;
+}
+
+#controlsHelp h3 {
+    margin-bottom: 10px;
+    color: #667eea;
+}
+
+#controlsHelp p {
+    margin: 5px 0;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#controlsHelp strong {
+    color: #fff;
+    min-width: 100px;
+    display: inline-block;
+}
+
+/* Menu Panel */
+.menu-panel {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 2px solid rgba(102, 126, 234, 0.5);
+    border-radius: 12px;
+    padding: 30px;
+    min-width: 400px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.menu-panel h2 {
+    color: #667eea;
+    margin-bottom: 25px;
+    font-size: 1.8em;
+    text-align: center;
+}
+
+.menu-panel h3 {
+    color: #8a9acc;
+    margin: 20px 0 10px 0;
+    font-size: 1.1em;
+}
+
+/* Settings Menu */
+#settingsMenu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.settings-group {
+    margin: 15px 0;
+}
+
+.settings-group select {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 1em;
+    cursor: pointer;
+}
+
+.settings-group label {
+    display: block;
+    padding: 8px 0;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.settings-group input[type="checkbox"] {
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    color: #fff;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 10px 5px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+/* Developer Console */
+#devConsole {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.dev-console-panel {
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+#devConsoleContent {
+    margin-bottom: 20px;
+}
+
+.config-section {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.config-section h4 {
+    color: #667eea;
+    margin-bottom: 12px;
+    font-size: 1.2em;
+}
+
+.config-item {
+    display: grid;
+    grid-template-columns: 200px 1fr 80px;
+    gap: 10px;
+    align-items: center;
+    margin: 10px 0;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+.config-item label {
+    color: #8a9acc;
+    font-size: 0.9em;
+}
+
+.config-item input {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 6px 10px;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+}
+
+.config-item .unit {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85em;
+    text-align: right;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.5);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.7);
+}

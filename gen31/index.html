@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solar System Simulation</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(ellipse at center, #050910 0%, #02040a 60%, #000 100%);
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: #e8ecf1;
+    }
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    canvas { display: block; }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      pointer-events: none;
+      color: #e8ecf1;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    }
+    #hud {
+      padding: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      background: linear-gradient(135deg, rgba(14,23,38,0.7), rgba(12,18,28,0.4));
+      border-bottom-right-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+      width: 320px;
+      pointer-events: auto;
+      display: none;
+    }
+    #hud h1 {
+      margin: 0 0 6px 0;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      font-size: 16px;
+    }
+    #telemetry {
+      position: absolute;
+      top: 0;
+      right: 0;
+      padding: 10px 12px;
+      background: rgba(8,10,14,0.65);
+      font-size: 12px;
+      border-bottom-left-radius: 8px;
+      display: none;
+      pointer-events: none;
+      text-align: right;
+    }
+    #log {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.45);
+      max-height: 35%;
+      overflow-y: auto;
+      font-size: 12px;
+      width: 50%;
+      box-shadow: 0 -4px 14px rgba(0,0,0,0.3);
+      pointer-events: none;
+      display: none;
+    }
+    #dev-panel-container {
+      position: absolute;
+      top: 50px;
+      right: 20px;
+      pointer-events: auto;
+      display: none;
+    }
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 12px;
+      height: 12px;
+      margin-left: -6px;
+      margin-top: -6px;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(255,255,255,0.6);
+      display: none;
+      pointer-events: none;
+    }
+    #menu {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(8,12,20,0.85);
+      padding: 24px;
+      border-radius: 12px;
+      min-width: 320px;
+      text-align: center;
+      display: none;
+      pointer-events: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    #menu h2 { margin-top: 0; }
+    button, select {
+      background: #1f2a3a;
+      color: #e8ecf1;
+      border: 1px solid #2f3b52;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover, select:hover { border-color: #4fa3ff; }
+    a { color: #9bc7ff; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="hud" class="overlay">
+      <h1>Solar System Dev HUD</h1>
+      <div id="hud-text"></div>
+    </div>
+    <div id="telemetry" class="overlay"></div>
+    <div id="log" class="overlay"></div>
+    <div id="crosshair"></div>
+    <div id="menu">
+      <h2>Simulation Paused</h2>
+      <p>Press Esc to resume. Use / for Dev Console, V to change camera, F for free flight, / to tune physics.</p>
+      <div style="margin-top: 12px;">
+        <label for="fidelity-select">Fidelity:</label>
+        <select id="fidelity-select"></select>
+      </div>
+    </div>
+    <div id="dev-panel-container"></div>
+  </div>
+
+  <!-- Using CDN only; no node/npm required. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm" type="module"></script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

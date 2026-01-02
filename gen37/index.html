@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Simulation</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Loading Screen with Debug Info -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>Solar System Simulation</h1>
+            <div class="loading-spinner"></div>
+            <p id="loading-status">Initializing...</p>
+            <div id="loading-progress">
+                <div id="loading-bar"></div>
+            </div>
+        </div>
+        <div id="loading-debug-log"></div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- Telemetry Overlay -->
+    <div id="telemetry-overlay" class="hidden">
+        <div id="fps-counter">FPS: --</div>
+        <div id="frame-time">Frame: -- ms</div>
+        <div id="coordinates">Pos: (0, 0, 0)</div>
+        <div id="velocity-display">Vel: 0 m/s</div>
+        <div id="mode-display">Mode: Walking</div>
+    </div>
+
+    <!-- Developer Console -->
+    <div id="developer-console" class="hidden">
+        <div class="console-header">
+            <h2>Developer Console</h2>
+            <span class="console-hint">Press / to close</span>
+        </div>
+        <div class="console-tabs">
+            <button class="tab-btn active" data-tab="physics">Physics</button>
+            <button class="tab-btn" data-tab="celestial">Celestial Bodies</button>
+            <button class="tab-btn" data-tab="player">Player</button>
+            <button class="tab-btn" data-tab="rendering">Rendering</button>
+            <button class="tab-btn" data-tab="debug">Debug Log</button>
+        </div>
+        <div class="console-content">
+            <div id="tab-physics" class="tab-panel active"></div>
+            <div id="tab-celestial" class="tab-panel"></div>
+            <div id="tab-player" class="tab-panel"></div>
+            <div id="tab-rendering" class="tab-panel"></div>
+            <div id="tab-debug" class="tab-panel">
+                <div id="debug-log-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls Help Overlay -->
+    <div id="controls-help" class="hidden">
+        <h3>Controls</h3>
+        <ul>
+            <li><kbd>W A S D</kbd> - Move</li>
+            <li><kbd>Space</kbd> - Jump / Fly Up</li>
+            <li><kbd>Shift</kbd> - Fly Down</li>
+            <li><kbd>F</kbd> - Toggle Flight Mode</li>
+            <li><kbd>V</kbd> - Toggle Camera View</li>
+            <li><kbd>Right Click</kbd> - Grab Object</li>
+            <li><kbd>/</kbd> - Developer Console</li>
+            <li><kbd>T</kbd> - Toggle Telemetry</li>
+            <li><kbd>H</kbd> - Toggle This Help</li>
+            <li><kbd>Esc</kbd> - Release Mouse</li>
+        </ul>
+    </div>
+
+    <!-- Crosshair -->
+    <div id="crosshair" class="hidden">+</div>
+
+    <!-- Interaction Prompt -->
+    <div id="interaction-prompt" class="hidden">
+        <span>Right-click to grab</span>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Application Modules -->
+    <script src="js/utils/logger.js"></script>
+    <script src="js/utils/math-utils.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/physics/physics-engine.js"></script>
+    <script src="js/physics/gravity-solver.js"></script>
+    <script src="js/entities/entity-base.js"></script>
+    <script src="js/entities/celestial-body.js"></script>
+    <script src="js/entities/sun.js"></script>
+    <script src="js/entities/planet.js"></script>
+    <script src="js/entities/moon.js"></script>
+    <script src="js/entities/interactive-object.js"></script>
+    <script src="js/player/player-controller.js"></script>
+    <script src="js/player/camera-controller.js"></script>
+    <script src="js/rendering/skybox.js"></script>
+    <script src="js/rendering/renderer.js"></script>
+    <script src="js/rendering/post-processing.js"></script>
+    <script src="js/ui/developer-console.js"></script>
+    <script src="js/ui/telemetry.js"></script>
+    <script src="js/ui/menu-manager.js"></script>
+    <script src="js/core/entity-manager.js"></script>
+    <script src="js/core/input-manager.js"></script>
+    <script src="js/core/game.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

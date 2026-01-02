@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Solar System Sim (Gen30)</title>
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- No npm: load Three as an ES module via import map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="canvas"></canvas>
+
+    <div id="hud">
+      <div id="telemetry" class="panel hidden"></div>
+      <div id="debugLog" class="panel hidden"></div>
+
+      <div id="hint" class="panel">
+        <div><b>Click</b> to lock cursor. <b>/</b> Dev Menu. <b>T</b> Telemetry.</div>
+        <div><b>WASD</b> move, <b>Space</b> jump, <b>V</b> 1st/3rd, <b>F</b> free flight, <b>RMB</b> grab.</div>
+      </div>
+
+      <div id="devMenu" class="panel hidden" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
