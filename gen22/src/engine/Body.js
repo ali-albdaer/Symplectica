@@ -35,9 +35,11 @@ export class Body {
         this.mesh.position.copy(this.position.clone().multiplyScalar(this.renderScale));
         this.light = null;
         if (this.luminosity > 0) {
-            const intensity = Math.cbrt(this.luminosity) * 1e-9;
-            this.light = new THREE.PointLight(color || 0xffffff, intensity, 0, 2);
-            this.light.castShadow = false;
+            const scaledIntensity = Math.cbrt(this.luminosity) * 0.01;
+            const intensity = this.type === "star" ? Math.max(scaledIntensity, 120) : Math.max(scaledIntensity, 1.5);
+            const range = this.type === "star" ? 0 : Math.max(this.computeScaledRadius() * 25, 3);
+            this.light = new THREE.PointLight(color || 0xffffff, intensity, range, 2);
+            this.light.castShadow = this.type === "star";
         }
         this.forceAccumulator = new THREE.Vector3();
         this.damping = 0.99998;
@@ -62,8 +64,7 @@ export class Body {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.userData.body = this;
-        const scaledRadius = Math.max(this.radius * this.renderScale, 0.0001);
-        mesh.scale.setScalar(scaledRadius);
+        mesh.scale.setScalar(this.computeScaledRadius());
         return mesh;
     }
 
@@ -83,6 +84,14 @@ export class Body {
         this.mesh.geometry = newMesh.geometry;
         this.mesh.material = newMesh.material;
         this.mesh.scale.copy(newMesh.scale);
+    }
+
+    computeScaledRadius() {
+        const nominal = this.radius * this.renderScale;
+        if (this.isPlayer || this.type === "avatar" || this.isInteractive || this.type === "prop") {
+            return Math.max(nominal, 0.5);
+        }
+        return Math.max(nominal, 0.0001);
     }
 
     applyForce(force) {
@@ -128,7 +137,6 @@ export class Body {
             return;
         }
         this.radius = newRadius;
-        const scaledRadius = Math.max(this.radius * this.renderScale, 0.0001);
-        this.mesh.scale.setScalar(scaledRadius);
+        this.mesh.scale.setScalar(this.computeScaledRadius());
     }
 }

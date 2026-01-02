@@ -2,7 +2,7 @@ import {
   Scene,
   PerspectiveCamera,
   WebGLRenderer,
-  sRGBEncoding,
+  SRGBColorSpace,
   Vector3,
   Color,
   Mesh,
@@ -26,7 +26,7 @@ export class RenderPipeline {
     this.scene = new Scene();
     this.camera = new PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 5e13);
     this.renderer = new WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
-    this.renderer.outputEncoding = sRGBEncoding;
+    this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = 2; // PCFSoftShadowMap
     this.bodies = new Map();

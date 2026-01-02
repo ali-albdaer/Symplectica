@@ -122,7 +122,8 @@ export class Player extends Body {
         this.yaw -= input.mouseDelta.x * Config.player.mouseSensitivity;
         this.pitch -= input.mouseDelta.y * Config.player.mouseSensitivity;
         this.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.pitch));
-        input.mouseDelta.set(0, 0); // Reset delta
+        input.mouseDelta.x = 0;
+        input.mouseDelta.y = 0;
     }
 
     jump() {

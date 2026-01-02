@@ -85,8 +85,11 @@ export class RendererEngine {
         geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
         const material = new THREE.PointsMaterial({
             color: 0xffffff,
-            size: 6000000 * this.renderScale,
-            sizeAttenuation: true
+            size: 8000000 * this.renderScale,
+            sizeAttenuation: true,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
         });
         this.starfield = new THREE.Points(geometry, material);
         this.scene.add(this.starfield);

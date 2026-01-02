@@ -88,8 +88,11 @@ window.SceneManager = {
         this.player = playerBody;
 
         // Create player mesh (first-person, not visible)
+        // Using CylinderGeometry since CapsuleGeometry isn't in Three.js r128
+        const playerRadius = Config.player.height * 0.25;
+        const playerHeight = Config.player.height;
         const mesh = new THREE.Mesh(
-            new THREE.CapsuleGeometry(Config.player.height * 0.25, Config.player.height, 4, 8),
+            new THREE.CylinderGeometry(playerRadius, playerRadius, playerHeight, 8),
             new THREE.MeshPhongMaterial({ color: 0x4488ff })
         );
         mesh.userData.physicsBody = playerBody;

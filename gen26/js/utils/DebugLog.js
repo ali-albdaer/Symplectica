@@ -61,24 +61,32 @@ const DebugLog = {
         const originalError = console.error.bind(console);
         const originalInfo = console.info.bind(console);
         
+        const self = this;
+        
         console.log = (...args) => {
             originalLog(...args);
-            this.log(args.map(a => this.stringify(a)).join(' '));
+            self.log(args.map(a => self.stringify(a)).join(' '));
         };
         
         console.warn = (...args) => {
             originalWarn(...args);
-            this.warn(args.map(a => this.stringify(a)).join(' '));
+            self.warn(args.map(a => self.stringify(a)).join(' '));
         };
         
         console.error = (...args) => {
             originalError(...args);
-            this.error(args.map(a => this.stringify(a)).join(' '));
+            self.error(args.map(a => self.stringify(a)).join(' '));
         };
         
         console.info = (...args) => {
             originalInfo(...args);
-            this.info(args.map(a => this.stringify(a)).join(' '));
+            self.info(args.map(a => self.stringify(a)).join(' '));
+        };
+        
+        // Add custom success method (not standard, but useful)
+        console.success = (...args) => {
+            originalLog('✓', ...args);
+            self.success(args.map(a => self.stringify(a)).join(' '));
         };
     },
     

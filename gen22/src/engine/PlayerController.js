@@ -21,6 +21,7 @@ export class PlayerController {
         this.heldObject = null;
         this.heldDistance = 2;
         this.flightMomentum = new THREE.Vector3();
+        this.lastUp = new THREE.Vector3(0, 1, 0);
     }
 
     toggleFlight() {
@@ -56,7 +57,7 @@ export class PlayerController {
         let closest = null;
         let minDistance = Infinity;
         for (const body of celestialBodies) {
-            if (body === this.body || body.type === "star") {
+            if (body === this.body || body.type === "star" || body.isInteractive || body.isPlayer) {
                 continue;
             }
             const distance = body.position.distanceTo(this.body.position) - body.radius;
@@ -81,13 +82,18 @@ export class PlayerController {
         const forward = this.getForwardVector();
         const right = this.getRightVector(forward);
 
-        const upVector = new THREE.Vector3(0, 1, 0);
-        if (this.mode === "walk") {
-            const { body: groundBody, distance } = this.detectGround(celestialBodies);
-            if (groundBody) {
-                const surfaceNormal = this.body.position.clone().sub(groundBody.position).normalize();
-                upVector.copy(surfaceNormal);
-                const tangentForward = projectOntoPlane(forward, surfaceNormal);
+        const groundInfo = this.detectGround(celestialBodies);
+        let upVector = this.lastUp.clone();
+        let surfaceNormal = null;
+        if (groundInfo.body) {
+            surfaceNormal = this.body.position.clone().sub(groundInfo.body.position).normalize();
+            upVector.copy(surfaceNormal);
+            this.lastUp.copy(surfaceNormal);
+        }
+
+        if (this.mode === "walk" && surfaceNormal) {
+            const distance = groundInfo.distance;
+            const tangentForward = projectOntoPlane(forward, surfaceNormal);
                 const tangentRight = new THREE.Vector3().crossVectors(surfaceNormal, tangentForward).normalize();
                 const isSprinting = this.input.isKeyDown("shift");
                 const speed = isSprinting ? walkSpeed * sprintMultiplier : walkSpeed;
@@ -107,31 +113,30 @@ export class PlayerController {
                 if (moveDirection.lengthSq() > 0) {
                     moveDirection.normalize().multiplyScalar(speed);
                     const desiredVelocity = moveDirection;
-                    const currentVelocity = projectOntoPlane(this.body.velocity, surfaceNormal);
+                    const currentVelocity = projectOntoPlane(this.body.velocity, surfaceNormal, false);
                     const change = desiredVelocity.sub(currentVelocity);
                     this.body.applyForce(change.multiplyScalar(this.body.mass / Math.max(deltaSim, 1e-3)));
                 }
-                if (distance > 1.5) {
+            if (distance > 1.5) {
                     this.body.applyForce(surfaceNormal.clone().multiplyScalar(-this.body.mass * 15));
                 }
-                if (distance < 0.4) {
+            if (distance < 0.4) {
                     const normalForce = surfaceNormal.clone().multiplyScalar(this.body.mass * 25);
                     this.body.applyForce(normalForce);
                     if (this.input.isKeyDown(" ")) {
                         const jumpForce = surfaceNormal.clone().multiplyScalar(this.body.mass * jumpImpulse / Math.max(deltaSim, 1e-3));
                         this.body.applyForce(jumpForce);
                     }
-                }
             }
-        } else {
+        } else if (this.mode === "flight") {
             const boost = this.input.isKeyDown("control") ? flightBoostMultiplier : 1;
             const moveDirection = new THREE.Vector3();
             if (this.input.isKeyDown("w")) moveDirection.add(forward);
             if (this.input.isKeyDown("s")) moveDirection.sub(forward);
             if (this.input.isKeyDown("a")) moveDirection.sub(right);
             if (this.input.isKeyDown("d")) moveDirection.add(right);
-            if (this.input.isKeyDown(" ")) moveDirection.add(upVector);
-            if (this.input.isKeyDown("shift")) moveDirection.sub(upVector);
+            if (this.input.isKeyDown(" ")) moveDirection.add(this.lastUp);
+            if (this.input.isKeyDown("shift")) moveDirection.sub(this.lastUp);
             if (moveDirection.lengthSq() > 0) {
                 moveDirection.normalize();
                 const targetVelocity = moveDirection.multiplyScalar(flightSpeed * boost);
@@ -208,12 +213,25 @@ export class PlayerController {
     releaseHeldObject() {
         this.heldObject = null;
     }
+
+    alignToSurface(upVector, tangentialVelocity) {
+        if (upVector.lengthSq() === 0) {
+            return;
+        }
+        const normalizedUp = upVector.clone().normalize();
+        this.lastUp.copy(normalizedUp);
+        const forward = projectOntoPlane(tangentialVelocity, normalizedUp);
+        if (forward.lengthSq() > 0) {
+            this.yaw = Math.atan2(forward.x, forward.z);
+            this.pitch = 0;
+        }
+    }
 }
 
-function projectOntoPlane(vector, normal) {
+function projectOntoPlane(vector, normal, normalizeResult = true) {
     const projection = vector.clone().sub(normal.clone().multiplyScalar(vector.dot(normal)));
     if (projection.lengthSq() < 1e-6) {
         return new THREE.Vector3();
     }
-    return projection.normalize();
+    return normalizeResult ? projection.normalize() : projection;
 }

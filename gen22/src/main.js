@@ -189,8 +189,9 @@ function createSolarSystem() {
     });
     registerBody(moon);
 
-    const spawnNormal = planetAPosition.clone().normalize();
-    const spawnSurfacePoint = spawnNormal.clone().multiplyScalar(planetA.radius + 2);
+    const spawnNormal = planetAPosition.clone().normalize().negate();
+    const spawnAltitude = planetA.radius + config.player.height * 0.6;
+    const spawnSurfacePoint = planetAPosition.clone().add(spawnNormal.clone().multiplyScalar(spawnAltitude));
 
     playerBody = new Body({
         id: "player",
@@ -214,23 +215,39 @@ function createSolarSystem() {
         renderScale
     });
     playerBody.controller = playerController;
+    playerController.alignToSurface(spawnNormal, planetAVelocity.clone());
 
-    spawnInteractiveObjects(spawnSurfacePoint, spawnNormal, planetAVelocity, renderScale);
+    spawnInteractiveObjects({
+        basePosition: spawnSurfacePoint,
+        surfaceNormal: spawnNormal,
+        orbitalVelocity: planetAVelocity,
+        renderScale
+    });
 
     logInfo("Solar system initialized with default configuration.");
 }
 
-function spawnInteractiveObjects(surfacePoint, surfaceNormal, orbitalVelocity, renderScale) {
+function spawnInteractiveObjects({ basePosition, surfaceNormal, orbitalVelocity, renderScale }) {
     const config = getConfig();
     const objects = config.interactions.localObjects;
-    const tangent = new THREE.Vector3().crossVectors(surfaceNormal, new THREE.Vector3(0, 1, 0));
-    if (tangent.lengthSq() < 1e-4) {
-        tangent.set(1, 0, 0);
+    if (!objects.length) {
+        return;
+    }
+    const worldUp = new THREE.Vector3(0, 1, 0);
+    const tangent = new THREE.Vector3().crossVectors(worldUp, surfaceNormal);
+    if (tangent.lengthSq() < 1e-6) {
+        tangent.copy(new THREE.Vector3(1, 0, 0));
     }
     tangent.normalize();
+    const bitangent = new THREE.Vector3().crossVectors(surfaceNormal, tangent).normalize();
+    const ringRadius = 2.5;
     objects.forEach((entry, index) => {
-        const offset = tangent.clone().multiplyScalar((index + 1) * 1.5);
-        const position = surfacePoint.clone().add(surfaceNormal.clone().multiplyScalar(0.5)).add(offset);
+        const angle = (index / objects.length) * Math.PI * 2;
+        const lateralOffset = tangent.clone().multiplyScalar(Math.cos(angle) * ringRadius)
+            .add(bitangent.clone().multiplyScalar(Math.sin(angle) * ringRadius));
+        const position = basePosition.clone()
+            .add(lateralOffset)
+            .add(surfaceNormal.clone().multiplyScalar(0.8));
         const body = new Body({
             id: entry.id,
             name: entry.id,

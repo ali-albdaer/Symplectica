@@ -70,7 +70,9 @@ class Game {
 
         // Create Player
         this.player = new Player(this.scene, this.camera, this.physicsWorld);
-        this.physicsWorld.addBody(this.player);
+        // Note: Player is updated manually to handle input and collision, 
+        // and to avoid double-gravity if PhysicsWorld also updated it.
+        // this.physicsWorld.addBody(this.player); 
         
         // Spawn Player
         const spawnBody = bodyMap[Config.player.spawnBody];
@@ -106,11 +108,8 @@ class Game {
             }
 
             this.props.push(prop);
-            // Note: We don't add props to main physicsWorld N-body loop to save perf, 
-            // or we can if we want them to attract planets (negligible).
-            // For "realistic physics" requested, let's add them but maybe ignore their force ON planets?
-            // The PhysicsWorld is N^2. 5 props + 4 bodies = 9^2 = 81 interactions. Fine.
-            this.physicsWorld.addBody(prop);
+            // Note: Props are updated manually to handle collision with planets
+            // this.physicsWorld.addBody(prop);
         }
     }
 
@@ -131,6 +130,9 @@ class Game {
             this.physicsWorld.step(dt / substeps);
             this.player.handleInput(this.input, dt / substeps, this.props);
             this.player.update(dt / substeps, this.celestialBodies);
+            
+            // Update Props
+            this.props.forEach(prop => prop.update(dt / substeps, this.celestialBodies));
         }
 
         this.debugUI.update();
