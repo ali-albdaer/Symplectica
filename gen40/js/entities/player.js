@@ -10,7 +10,8 @@ export function createPlayer() {
     State.celestialBodies[1];
 
   const spawnPos = planetEntry.body.position.clone();
-  const up = spawnPos.clone().sub(planetEntry.body.position).normalize() || new THREE.Vector3(0, 1, 0);
+  // Spawn above the "north pole" of the planet to avoid starting inside it.
+  const up = new THREE.Vector3(0, 1, 0);
   spawnPos.add(up.clone().multiplyScalar(planetEntry.config.radius + spawnAltitude));
 
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
@@ -25,6 +26,11 @@ export function createPlayer() {
     dynamic: true,
     onPostIntegrate: null
   };
+  // Start the player co-orbiting with the reference planet so the sun's
+  // gravity does not immediately shear them away on a very different orbit.
+  if (planetEntry.body.velocity) {
+    playerBody.velocity.copy(planetEntry.body.velocity);
+  }
   registerBody(playerBody);
 
   const player = new PlayerController(playerBody, planetEntry);
