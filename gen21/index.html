@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Solar System Simulation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: black;
+      color: #e0e0e0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #app {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    canvas {
+      display: block;
+    }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      pointer-events: none;
+      color: #e0e0e0;
+      font-size: 12px;
+      text-shadow: 0 0 4px #000;
+    }
+    #telemetryOverlay {
+      padding: 6px 8px;
+    }
+    #debugOverlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      max-height: 40%;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      background: rgba(0, 0, 0, 0.5);
+      overflow-y: auto;
+      pointer-events: auto;
+      font-family: "Consolas", "Courier New", monospace;
+      display: none;
+    }
+    #devConsole {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 420px;
+      max-height: 70%;
+      box-sizing: border-box;
+      padding: 10px;
+      background: rgba(10, 10, 16, 0.96);
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+      overflow-y: auto;
+      pointer-events: auto;
+      display: none;
+    }
+    #devConsole h2 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+    #devConsole label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 4px 0;
+      font-size: 11px;
+    }
+    #devConsole input[type="range"],
+    #devConsole input[type="number"],
+    #devConsole select {
+      margin-left: 6px;
+      flex: 1;
+    }
+    #menuHint {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.55);
+      border-radius: 4px;
+      pointer-events: none;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="telemetryOverlay" class="overlay"></div>
+    <div id="debugOverlay"></div>
+    <div id="devConsole"></div>
+    <div id="menuHint">WASD/Space/Shift, F = fly, V = view, / = dev console, F3 = telemetry</div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

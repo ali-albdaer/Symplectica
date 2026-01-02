@@ -1,0 +1,98 @@
+:root{
+	--bg: rgba(10,12,16,0.85);
+	--fg: #e8eef8;
+	--muted: rgba(232,238,248,0.75);
+	--accent: #8ab4ff;
+	--danger: #ff6b6b;
+	--panelBorder: rgba(232,238,248,0.16);
+	--panelShadow: rgba(0,0,0,0.35);
+}
+
+html, body{
+	margin:0;
+	padding:0;
+	width:100%;
+	height:100%;
+	overflow:hidden;
+	background:#000;
+	color:var(--fg);
+	font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+canvas{ display:block; }
+
+#overlay-root{
+	position:fixed;
+	inset:0;
+	pointer-events:none;
+}
+
+.hidden{ display:none; }
+
+.panel{
+	pointer-events:none;
+	background:var(--bg);
+	border:1px solid var(--panelBorder);
+	box-shadow: 0 10px 30px var(--panelShadow);
+	border-radius:10px;
+	padding:10px 12px;
+}
+
+.panel.small{
+	padding:8px 10px;
+	font-size:12px;
+	line-height:1.4;
+}
+
+#loading{
+	position:absolute;
+	left:14px;
+	top:14px;
+	pointer-events:none;
+}
+
+.hud{
+	position:absolute;
+	inset:0;
+}
+
+#telemetry{
+	position:absolute;
+	left:14px;
+	bottom:14px;
+	min-width:240px;
+}
+
+#help{
+	position:absolute;
+	right:14px;
+	bottom:14px;
+	max-width:330px;
+}
+
+.devui{
+	position:absolute;
+	top:14px;
+	right:14px;
+	pointer-events:auto;
+}
+
+.debuglog{
+	position:absolute;
+	left:14px;
+	top:14px;
+	width:min(760px, calc(100% - 28px));
+	max-height:45vh;
+	overflow:auto;
+	pointer-events:auto;
+	white-space:pre-wrap;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+	font-size:12px;
+	line-height:1.35;
+}
+
+.debuglog .row{ padding:4px 6px; border-bottom:1px solid rgba(255,255,255,0.06); }
+.debuglog .row.error{ color: var(--danger); }
+.debuglog .row.warn{ color: #ffd479; }
+.debuglog .row.info{ color: var(--muted); }
+.debuglog .row strong{ color: var(--fg); }

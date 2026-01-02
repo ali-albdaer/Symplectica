@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Simulation - 3D Physics Game</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
+</head>
+<body>
+    <!-- Loading screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>🌌 Solar System Simulation</h1>
+            <div class="loading-spinner"></div>
+            <p>Initializing N-Body Physics Engine...</p>
+            <p class="loading-details">Calculating stable orbital parameters</p>
+        </div>
+    </div>
+
+    <!-- Main game container (UI elements will be injected here) -->
+    
+    <!-- Load game scripts in order -->
+    <script src="config.js"></script>
+    <script src="physics.js"></script>
+    <script src="celestial.js"></script>
+    <script src="player.js"></script>
+    <script src="camera.js"></script>
+    <script src="ui.js"></script>
+    <script src="main.js"></script>
+    
+    <script>
+        // Hide loading screen when game initializes
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingScreen.style.display = 'none';
+                    }, 500);
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solar System Sim (Gen19)</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="canvas"></canvas>
+
+      <div id="hud">
+        <div id="hint">Click to lock cursor · WASD move · Space jump · F free flight · V camera · / dev · T telemetry</div>
+      </div>
+
+      <div id="telemetry" class="panel hidden"></div>
+      <div id="debugLog" class="panel hidden"></div>
+
+      <div id="devMenu" class="panel hidden" role="dialog" aria-label="Developer Menu">
+        <div class="devHeader">
+          <div class="devTitle">Developer Menu</div>
+          <div class="devSubtitle">Press "/" to toggle · Click fields to edit · Changes apply live</div>
+        </div>
+        <div id="devContent" class="devContent"></div>
+        <div class="devFooter">
+          <button id="devReset" class="btn">Reset defaults</button>
+          <button id="devClose" class="btn">Close (/)</button>
+        </div>
+      </div>
+
+      <div id="menuBlocker" class="menuBlocker hidden"></div>
+    </div>
+
+    <!-- Import map keeps this “no Node/NPM”. Needs internet unless you vendor libs locally. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

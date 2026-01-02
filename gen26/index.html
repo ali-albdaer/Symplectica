@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Simulation</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>Solar System Simulation</h1>
+            <div class="loading-bar">
+                <div class="loading-progress" id="loading-progress"></div>
+            </div>
+            <p id="loading-status">Initializing...</p>
+        </div>
+    </div>
+
+    <!-- Debug Log Overlay (always visible for errors) -->
+    <div id="debug-log">
+        <div class="debug-header">
+            <span>Debug Log</span>
+            <button id="debug-clear">Clear</button>
+            <button id="debug-toggle-minimize">_</button>
+        </div>
+        <div class="debug-content" id="debug-content"></div>
+    </div>
+
+    <!-- HUD Overlay -->
+    <div id="hud" class="hidden">
+        <div id="performance-stats">
+            <div>FPS: <span id="fps">0</span></div>
+            <div>Frame Time: <span id="frame-time">0</span>ms</div>
+            <div>Physics Time: <span id="physics-time">0</span>ms</div>
+        </div>
+        <div id="coordinates">
+            <div>Position: <span id="player-pos">0, 0, 0</span></div>
+            <div>Velocity: <span id="player-vel">0, 0, 0</span></div>
+            <div>On Body: <span id="current-body">None</span></div>
+        </div>
+        <div id="controls-hint">
+            <p>WASD: Move | Space: Jump/Up | Shift: Down | F: Toggle Flight</p>
+            <p>V: Toggle Camera | /: Dev Console | T: Toggle HUD</p>
+            <p>RClick: Grab Object | ESC: Release Cursor</p>
+        </div>
+    </div>
+
+    <!-- Developer Console -->
+    <div id="dev-console" class="hidden">
+        <div class="console-header">
+            <h2>Developer Console</h2>
+            <button id="console-close">×</button>
+        </div>
+        <div class="console-content">
+            <div class="console-section">
+                <h3>Performance Settings</h3>
+                <div class="setting-row">
+                    <label>Fidelity Level:</label>
+                    <select id="fidelity-level">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="ultra">Ultra</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label>LOD Enabled:</label>
+                    <input type="checkbox" id="lod-enabled">
+                </div>
+                <div class="setting-row">
+                    <label>Shadow Quality:</label>
+                    <select id="shadow-quality">
+                        <option value="off">Off</option>
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+            </div>
+            <div class="console-section">
+                <h3>Physics Settings</h3>
+                <div class="setting-row">
+                    <label>Time Scale:</label>
+                    <input type="range" id="time-scale" min="0" max="100" value="1" step="0.1">
+                    <span id="time-scale-value">1</span>
+                </div>
+                <div class="setting-row">
+                    <label>G Constant (×10⁻¹¹):</label>
+                    <input type="number" id="g-constant" value="6.674" step="0.001">
+                </div>
+            </div>
+            <div class="console-section" id="celestial-bodies-section">
+                <h3>Celestial Bodies</h3>
+                <!-- Dynamically populated -->
+            </div>
+            <div class="console-section">
+                <h3>Player Settings</h3>
+                <div class="setting-row">
+                    <label>Move Speed:</label>
+                    <input type="number" id="player-speed" value="5" step="0.5">
+                </div>
+                <div class="setting-row">
+                    <label>Jump Force:</label>
+                    <input type="number" id="jump-force" value="8" step="0.5">
+                </div>
+                <div class="setting-row">
+                    <label>Flight Speed:</label>
+                    <input type="number" id="flight-speed" value="50" step="5">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Crosshair -->
+    <div id="crosshair" class="hidden">+</div>
+
+    <!-- Three.js and Game Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Core Modules -->
+    <script src="js/config.js"></script>
+    <script src="js/utils/MathUtils.js"></script>
+    <script src="js/utils/DebugLog.js"></script>
+    <script src="js/core/Renderer.js"></script>
+    <script src="js/core/Physics.js"></script>
+    <script src="js/core/InputManager.js"></script>
+    
+    <!-- Entity System -->
+    <script src="js/entities/Entity.js"></script>
+    <script src="js/entities/CelestialBody.js"></script>
+    <script src="js/entities/Sun.js"></script>
+    <script src="js/entities/Planet.js"></script>
+    <script src="js/entities/Moon.js"></script>
+    <script src="js/entities/InteractiveObject.js"></script>
+    <script src="js/entities/Player.js"></script>
+    
+    <!-- Systems -->
+    <script src="js/systems/CameraSystem.js"></script>
+    <script src="js/systems/LightingSystem.js"></script>
+    <script src="js/systems/SkySystem.js"></script>
+    <script src="js/systems/EntityManager.js"></script>
+    
+    <!-- UI -->
+    <script src="js/ui/HUD.js"></script>
+    <script src="js/ui/DevConsole.js"></script>
+    
+    <!-- Main Engine -->
+    <script src="js/core/Engine.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

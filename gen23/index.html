@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Sim</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Libraries -->
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.umd.min.js"></script>
+    <script src="https://unpkg.com/stats.js@0.17.0/build/stats.min.js"></script>
+</head>
+<body>
+    <div id="instructions">
+        <h1>Solar System Simulator</h1>
+        <p>Click to Start</p>
+        <p>WASD to Move | Space to Jump | Shift to Run</p>
+        <p>F: Toggle Flight | V: Toggle Camera</p>
+        <p>Right Click: Grab Objects</p>
+        <p>/: Developer Menu</p>
+    </div>
+
+    <!-- Game Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/entities.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+
+    <script>
+        const instructions = document.getElementById('instructions');
+        
+        instructions.addEventListener('click', () => {
+            document.body.requestPointerLock();
+            instructions.style.display = 'none';
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === document.body) {
+                instructions.style.display = 'none';
+            } else {
+                instructions.style.display = 'flex';
+            }
+        });
+    </script>
+</body>
+</html>

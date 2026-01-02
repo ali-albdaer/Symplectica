@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Solar System Sim (Gen28)</title>
+		<link rel="stylesheet" href="./styles.css" />
+	</head>
+	<body>
+		<div id="overlay-root">
+			<div id="loading" class="panel">Loading…</div>
+			<div id="hud" class="hud hidden">
+				<div id="telemetry" class="panel small hidden"></div>
+				<div id="help" class="panel small">
+					<div><b>Controls</b></div>
+					<div>Click: pointer lock</div>
+					<div>WASD: move | Mouse: look</div>
+					<div>Space: jump / up (flight)</div>
+					<div>Shift: down (flight)</div>
+					<div>F: toggle free flight</div>
+					<div>V: 1st/3rd person</div>
+					<div>/ : Dev menu</div>
+					<div>T: telemetry</div>
+					<div>Right click: grab/release</div>
+				</div>
+			</div>
+			<div id="devui" class="devui hidden"></div>
+			<div id="debuglog" class="debuglog hidden"></div>
+		</div>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+					"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+				}
+			}
+		</script>
+
+		<script type="module" src="./src/main.js"></script>
+	</body>
+</html>
