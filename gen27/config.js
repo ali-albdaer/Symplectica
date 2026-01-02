@@ -13,10 +13,11 @@ window.Config = {
     },
 
     // Scene scale (all real distances divided by this to make universe fit in view)
+    // We use 1:1 scale with Floating Origin for best physics/visual alignment
     scales: {
-        distanceScale: 1e9,   // 1 unit = 1 billion meters
-        timeScale: 86400,     // 1 unit = 1 day
-        sizeScale: 1e8,       // 1 unit of size = 100 million meters
+        distanceScale: 1.0,   // 1 unit = 1 meter
+        timeScale: 1.0,       // 1 unit = 1 second (physics time)
+        sizeScale: 1.0,       // 1 unit = 1 meter
     },
 
     // Celestial bodies configuration

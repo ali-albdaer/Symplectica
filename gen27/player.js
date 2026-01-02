@@ -216,7 +216,9 @@ window.PlayerController = {
 
         // Raycast from camera
         const ray = Renderer.getWorldRayFromScreen(window.innerWidth / 2, window.innerHeight / 2);
-        const cameraPos = Renderer.camera.position;
+        
+        // Convert camera position to physics space (Floating Origin compensation)
+        const cameraPos = Renderer.camera.position.clone().add(this.body.position);
 
         // Find closest interactive object in range
         let closest = null;
@@ -273,6 +275,9 @@ window.PlayerController = {
         const holdPos = Renderer.camera.position.clone();
         const forward = CameraSystem.getForwardVector();
         holdPos.addScaledVector(forward, holdDistance);
+        
+        // Convert to physics space
+        holdPos.add(this.body.position);
 
         // Move object to held position
         const targetPos = holdPos;

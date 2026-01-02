@@ -79,8 +79,10 @@ window.CameraSystem = {
         // Position camera at player eyes
         const eyePos = new THREE.Vector3(eyeOffset[0], eyeOffset[1], eyeOffset[2]);
         eyePos.applyMatrix4(rotationMatrix);
-        eyePos.add(playerBody.position);
-
+        
+        // With Floating Origin, player is always at (0,0,0) in render space
+        // So we don't add playerBody.position (which is in physics coordinates)
+        
         this.camera.position.copy(eyePos);
         this.camera.quaternion.setFromEuler(
             new THREE.Euler(this.state.pitchAngle, this.state.yawAngle, 0, 'YXZ')
@@ -103,11 +105,12 @@ window.CameraSystem = {
         this.thirdPerson.currentOffset.lerp(this.thirdPerson.desiredOffset, smoothingFactor);
 
         // Position camera
-        const cameraPos = playerBody.position.clone().add(this.thirdPerson.currentOffset);
+        // With Floating Origin, player is at (0,0,0)
+        const cameraPos = this.thirdPerson.currentOffset.clone();
         this.camera.position.copy(cameraPos);
 
         // Look at player (with slight upward bias)
-        const lookTarget = playerBody.position.clone();
+        const lookTarget = new THREE.Vector3(0, 0, 0);
         lookTarget.y += Config.player.eyeHeight * 0.5;
         
         this.camera.lookAt(lookTarget);

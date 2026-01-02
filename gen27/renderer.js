@@ -63,6 +63,7 @@ window.Renderer = {
                 canvas: this.canvas,
                 antialias: true,
                 powerPreference: 'high-performance',
+                logarithmicDepthBuffer: true,
             });
             this.renderer.setSize(width, height);
             this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -277,15 +278,21 @@ window.Renderer = {
      * Update all body positions and rotations
      */
     updateBodies() {
+        const player = PhysicsEngine.getBody('Player');
+        const playerPos = player ? player.position : new THREE.Vector3(0, 0, 0);
+
         for (let body of PhysicsEngine.bodies) {
             const mesh = this.meshes.bodies[body.id];
             if (!mesh) continue;
 
-            // Position
+            // Position relative to player (Floating Origin)
+            // We subtract player position so player is always near (0,0,0) in rendering space
+            const relativePos = Utils.vec3.subtract(body.position, playerPos);
+
             const displayPos = new THREE.Vector3(
-                Config.getScaledDistance(body.position.x),
-                Config.getScaledDistance(body.position.y),
-                Config.getScaledDistance(body.position.z)
+                Config.getScaledDistance(relativePos.x),
+                Config.getScaledDistance(relativePos.y),
+                Config.getScaledDistance(relativePos.z)
             );
             mesh.position.copy(displayPos);
 
@@ -304,13 +311,17 @@ window.Renderer = {
      */
     updateSunLight() {
         const sun = PhysicsEngine.getBody('Sun');
+        const player = PhysicsEngine.getBody('Player');
         if (!sun) return;
+
+        const playerPos = player ? player.position : new THREE.Vector3(0, 0, 0);
+        const relativePos = Utils.vec3.subtract(sun.position, playerPos);
 
         // Position light far from sun in direction away from planets
         const sunPos = new THREE.Vector3(
-            Config.getScaledDistance(sun.position.x),
-            Config.getScaledDistance(sun.position.y),
-            Config.getScaledDistance(sun.position.z)
+            Config.getScaledDistance(relativePos.x),
+            Config.getScaledDistance(relativePos.y),
+            Config.getScaledDistance(relativePos.z)
         );
 
         // Place light source at sun position
