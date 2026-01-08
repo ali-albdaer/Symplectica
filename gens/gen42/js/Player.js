@@ -17,6 +17,7 @@ class Player {
         };
         
         this.velocity = { x: 0, y: 0, z: 0 };
+        this.acceleration = { x: 0, y: 0, z: 0 };
         
         // Orientation (euler angles)
         this.rotation = { pitch: 0, yaw: 0, roll: 0 };
@@ -34,6 +35,10 @@ class Player {
         this.mass = Config.player.mass;
         this.height = Config.player.height;
         this.radius = Config.player.radius;
+        
+        // Physics state
+        this.gravityEnabled = true;
+        this.celestialBodies = []; // Reference to bodies for gravity
         
         // Three.js objects
         this.mesh = null;
@@ -112,9 +117,68 @@ class Player {
     }
     
     /**
+     * Set celestial bodies reference for gravity calculation
+     */
+    setCelestialBodies(bodies) {
+        this.celestialBodies = bodies;
+    }
+    
+    /**
+     * Apply gravitational forces from all celestial bodies
+     */
+    applyGravity(deltaTime) {
+        if (!this.gravityEnabled || this.celestialBodies.length === 0) return;
+        
+        const G = Config.physics.G;
+        let ax = 0, ay = 0, az = 0;
+        
+        for (const body of this.celestialBodies) {
+            const dx = body.position.x - this.position.x;
+            const dy = body.position.y - this.position.y;
+            const dz = body.position.z - this.position.z;
+            
+            let distSq = dx * dx + dy * dy + dz * dz;
+            let dist = Math.sqrt(distSq);
+            
+            // Minimum distance to prevent extreme forces
+            const minDist = body.radius + 5;
+            if (dist < minDist) {
+                dist = minDist;
+                distSq = minDist * minDist;
+            }
+            
+            // a = G * M / r²
+            const accelMag = (G * body.mass) / distSq;
+            
+            ax += (dx / dist) * accelMag;
+            ay += (dy / dist) * accelMag;
+            az += (dz / dist) * accelMag;
+        }
+        
+        this.acceleration.x = ax;
+        this.acceleration.y = ay;
+        this.acceleration.z = az;
+    }
+    
+    /**
      * Update player state
      */
     update(deltaTime) {
+        // Apply gravity if not flying
+        if (!this.isFlying) {
+            this.applyGravity(deltaTime);
+            
+            // Apply acceleration to velocity
+            this.velocity.x += this.acceleration.x * deltaTime;
+            this.velocity.y += this.acceleration.y * deltaTime;
+            this.velocity.z += this.acceleration.z * deltaTime;
+            
+            // Apply velocity to position
+            this.position.x += this.velocity.x * deltaTime;
+            this.position.y += this.velocity.y * deltaTime;
+            this.position.z += this.velocity.z * deltaTime;
+        }
+        
         // Update mesh position
         if (this.mesh) {
             this.mesh.position.set(

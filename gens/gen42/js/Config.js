@@ -111,14 +111,17 @@ const Config = {
             emissiveIntensity: 0,
             rotationSpeed: 0.01,
             // Moon orbits Planet1
-            // Distance from planet: 60
-            // Combined orbital velocity = planet velocity + moon orbital velocity
-            // Moon orbital v = sqrt(G * M_planet / r) = sqrt(6.674 * 1000 / 60) ≈ 10.5
+            // Distance from planet: 60 (relative to planet)
+            // Moon needs velocity perpendicular to its position relative to planet
+            // Planet is at (400, 0, 0) with velocity (0, 0, 129.2)
+            // Moon at (400, 0, 60) - offset in Z from planet
+            // Moon orbital v around planet = sqrt(G * M_planet / r) = sqrt(6.674 * 1000 / 60) ≈ 10.55
+            // Moon velocity = planet velocity + orbital velocity perpendicular to planet-moon line
+            // Since moon is offset in +Z, orbital velocity is in +X direction
             parentBody: 'planet1',
             orbitalDistance: 60,
-            // Position relative to planet1, will be set during initialization
-            position: { x: 460, y: 0, z: 0 },
-            velocity: { x: 0, y: 0, z: 139.7 }, // Planet velocity + orbital velocity
+            position: { x: 400, y: 0, z: 60 },
+            velocity: { x: 10.55, y: 0, z: 129.2 }, // Planet velocity (Z) + orbital velocity (X)
             textureUrl: null
         }
     },

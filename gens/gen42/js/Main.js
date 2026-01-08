@@ -92,6 +92,9 @@ class SolarSystemSimulation {
                 Physics.addInteractiveObject(obj);
             }
             
+            // Give player reference to celestial bodies for gravity
+            Player.setCelestialBodies(this.celestialBodies);
+            
             // Initialize UI
             Debug.setLoadingStatus('Initializing UI...');
             UI.init(this.celestialBodies);
@@ -204,8 +207,9 @@ class SolarSystemSimulation {
         // Update player
         Player.update(deltaTime);
         
-        // Update stars (for twinkling effect)
-        Stars.update(deltaTime);
+        // Update stars (follow camera so they appear fixed)
+        const cameraPos = Renderer.getCamera().position;
+        Stars.update(deltaTime, cameraPos);
     }
     
     /**

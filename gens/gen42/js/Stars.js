@@ -139,11 +139,22 @@ class Stars {
     }
     
     /**
-     * Update stars (for future animations like twinkling)
+     * Update stars - follow camera position so stars appear fixed in background
      */
-    update(deltaTime) {
-        if (this.starField && this.starField.material.uniforms) {
-            this.starField.material.uniforms.time.value += deltaTime;
+    update(deltaTime, cameraPosition) {
+        if (this.starField) {
+            // Stars follow camera so they appear infinitely far away
+            if (cameraPosition) {
+                this.starField.position.set(
+                    cameraPosition.x,
+                    cameraPosition.y,
+                    cameraPosition.z
+                );
+            }
+            
+            if (this.starField.material.uniforms) {
+                this.starField.material.uniforms.time.value += deltaTime;
+            }
         }
     }
     

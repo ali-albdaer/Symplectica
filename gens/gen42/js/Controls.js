@@ -54,8 +54,15 @@ class Controls {
         document.addEventListener('pointerlockchange', () => this.onPointerLockChange());
         document.addEventListener('pointerlockerror', () => this.onPointerLockError());
         
-        // Click to lock pointer
-        this.canvas.addEventListener('click', () => this.requestPointerLock());
+        // Click to lock pointer - use document for broader capture
+        document.addEventListener('click', (e) => {
+            // Only lock if clicking on canvas or start prompt
+            if (e.target === this.canvas || 
+                e.target.closest('#start-prompt') ||
+                e.target.closest('#canvas-container')) {
+                this.requestPointerLock();
+            }
+        });
         
         Debug.info('Controls initialized');
     }
@@ -65,6 +72,12 @@ class Controls {
      */
     requestPointerLock() {
         if (this.isMenuOpen) return;
+        
+        // Hide start prompt when locking
+        const startPrompt = document.getElementById('start-prompt');
+        if (startPrompt) {
+            startPrompt.classList.add('hidden');
+        }
         
         this.canvas.requestPointerLock();
     }
@@ -327,27 +340,19 @@ class Controls {
             player.position.y += moveY * speed * deltaTime;
             player.position.z += moveZ * speed * deltaTime;
         } else {
-            // Velocity-based for walking with simple gravity
-            player.velocity.x = moveX * speed;
-            player.velocity.z = moveZ * speed;
+            // Walking mode - add movement impulse to existing velocity
+            // The actual gravity is handled in Player.update() from celestial bodies
+            const moveForce = speed * 0.1; // Impulse strength
             
-            // Simple gravity
-            if (!player.isGrounded) {
-                player.velocity.y -= 30 * deltaTime; // Gravity
-            }
+            player.velocity.x += moveX * moveForce * deltaTime * 60;
+            player.velocity.z += moveZ * moveForce * deltaTime * 60;
             
-            // Apply velocity
-            player.position.x += player.velocity.x * deltaTime;
-            player.position.y += player.velocity.y * deltaTime;
-            player.position.z += player.velocity.z * deltaTime;
+            // Apply some drag to prevent infinite acceleration
+            player.velocity.x *= 0.98;
+            player.velocity.z *= 0.98;
             
-            // Simple ground check (for demo, ground at y=0)
-            // In full implementation, would raycast to celestial bodies
-            if (player.position.y < 0) {
-                player.position.y = 0;
-                player.velocity.y = 0;
-                player.isGrounded = true;
-            }
+            // Jump adds upward velocity (relative to current down direction)
+            // Position is updated in Player.update() with gravity
         }
     }
     
