@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Simulation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Main Canvas Container -->
+    <div id="canvas-container"></div>
+    
+    <!-- Debug Log Overlay -->
+    <div id="debug-log" class="overlay">
+        <div class="debug-header">
+            <span>Debug Log</span>
+            <button id="clear-debug" class="btn-small">Clear</button>
+        </div>
+        <div id="debug-messages"></div>
+    </div>
+    
+    <!-- Telemetry Overlay -->
+    <div id="telemetry" class="overlay hidden">
+        <div class="telemetry-item">
+            <span class="label">FPS:</span>
+            <span id="fps-value">0</span>
+        </div>
+        <div class="telemetry-item">
+            <span class="label">Frame Time:</span>
+            <span id="frametime-value">0</span>
+            <span class="unit">ms</span>
+        </div>
+        <div class="telemetry-item">
+            <span class="label">Position:</span>
+            <span id="position-value">0, 0, 0</span>
+        </div>
+        <div class="telemetry-item">
+            <span class="label">Mode:</span>
+            <span id="mode-value">Walking</span>
+        </div>
+    </div>
+    
+    <!-- Controls Help Overlay -->
+    <div id="controls-help" class="overlay">
+        <div class="help-header">Controls</div>
+        <div class="help-item"><kbd>W A S D</kbd> Move</div>
+        <div class="help-item"><kbd>Space</kbd> Jump / Up</div>
+        <div class="help-item"><kbd>Shift</kbd> Down (Flight)</div>
+        <div class="help-item"><kbd>F</kbd> Toggle Flight Mode</div>
+        <div class="help-item"><kbd>V</kbd> Toggle Camera View</div>
+        <div class="help-item"><kbd>T</kbd> Toggle Telemetry</div>
+        <div class="help-item"><kbd>H</kbd> Hide UI</div>
+        <div class="help-item"><kbd>/</kbd> Developer Console</div>
+        <div class="help-item"><kbd>RMB</kbd> Grab Object</div>
+        <div class="help-item"><kbd>Click</kbd> Lock Cursor</div>
+    </div>
+    
+    <!-- Crosshair -->
+    <div id="crosshair" class="hidden">+</div>
+    
+    <!-- Developer Console -->
+    <div id="dev-console" class="overlay hidden">
+        <div class="console-header">
+            <span>⚙️ Developer Console</span>
+            <button id="close-console" class="btn-close">×</button>
+        </div>
+        <div class="console-tabs">
+            <button class="tab-btn active" data-tab="physics">Physics</button>
+            <button class="tab-btn" data-tab="bodies">Celestial Bodies</button>
+            <button class="tab-btn" data-tab="graphics">Graphics</button>
+            <button class="tab-btn" data-tab="player">Player</button>
+        </div>
+        <div id="console-content" class="console-content">
+            <!-- Content populated by UI.js -->
+        </div>
+    </div>
+    
+    <!-- Performance Settings -->
+    <div id="perf-settings" class="overlay">
+        <select id="quality-select">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="ultra">Ultra</option>
+        </select>
+    </div>
+    
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loader">
+            <div class="loader-ring"></div>
+            <div class="loader-text">Loading Solar System...</div>
+            <div id="loading-status">Initializing...</div>
+        </div>
+    </div>
+    
+    <!-- Click to Start Prompt -->
+    <div id="start-prompt" class="overlay hidden">
+        <div class="prompt-content">
+            <h2>🌌 Solar System Simulation</h2>
+            <p>Click anywhere to start</p>
+            <p class="prompt-sub">Press <kbd>/</kbd> anytime for Developer Console</p>
+        </div>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Application Modules -->
+    <script type="module" src="js/Main.js"></script>
+</body>
+</html>
