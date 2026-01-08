@@ -86,9 +86,6 @@ class CelestialBody {
                 color: this.color,
                 // Basic material is always "lit" - perfect for stars
             });
-            
-            // Add glow effect
-            this.createGlow(THREE);
         } else {
             // Standard material for planets/moons with lighting
             material = new THREE.MeshStandardMaterial({
@@ -110,6 +107,11 @@ class CelestialBody {
         // Create atmosphere if applicable
         if (this.hasAtmosphere && qualitySettings.atmosphereEnabled !== false) {
             this.createAtmosphere(THREE);
+        }
+        
+        // Add glow effect for stars (after mesh is created)
+        if (this.type === 'star') {
+            this.createGlow(THREE);
         }
         
         return this.mesh;
