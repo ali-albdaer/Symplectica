@@ -56,11 +56,11 @@ class Player {
             this.position.z
         );
         
-        // Create simple player mesh (capsule/cylinder)
-        const geometry = new THREE.CapsuleGeometry(
+        // Create simple player mesh (cylinder with spheres for a capsule-like shape)
+        const bodyGeometry = new THREE.CylinderGeometry(
+            this.radius,
             this.radius,
             this.height - this.radius * 2,
-            4,
             8
         );
         
@@ -72,7 +72,7 @@ class Player {
             metalness: 0.3
         });
         
-        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh = new THREE.Mesh(bodyGeometry, material);
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
         this.mesh.visible = false; // Hidden in first person
