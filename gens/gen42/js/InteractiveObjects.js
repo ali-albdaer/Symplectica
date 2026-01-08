@@ -214,37 +214,44 @@ class InteractiveObjectsManager {
     }
     
     /**
-     * Spawn initial objects near player
+     * Spawn initial objects near player on planet surface
      */
     spawnObjects() {
         const config = Config.interactiveObjects;
         const spawnCount = config.spawnCount;
-        const spawnRadius = config.spawnRadius;
         
-        // Get player's orbital velocity to give objects the same velocity
-        // This ensures they orbit with the player instead of falling into the sun
-        const orbitalVelocity = Config.player.spawnVelocity || { x: 0, y: 0, z: 129.2 };
+        // Get planet1 info for spawning on its surface
+        const planet = Config.celestialBodies.planet1;
+        const planetPos = planet.position;
+        const planetRadius = planet.radius;
+        const planetVelocity = planet.velocity;
         
         for (let i = 0; i < spawnCount; i++) {
             const isLuminous = i < config.luminousCount;
             
-            // Random position around player spawn
-            const angle = (i / spawnCount) * Math.PI * 2;
-            const distance = Utils.randomRange(10, spawnRadius);
-            const height = Utils.randomRange(-10, 10);
+            // Spawn objects on the surface of the planet
+            // Use spherical coordinates for even distribution
+            const theta = (i / spawnCount) * Math.PI * 2; // Longitude
+            const phi = Math.PI / 2 + Utils.randomRange(-0.3, 0.3); // Near equator
+            
+            const surfaceOffset = planetRadius + Utils.randomRange(1, 3); // Just above surface
+            
+            // Calculate position on planet surface
+            const localX = surfaceOffset * Math.sin(phi) * Math.cos(theta);
+            const localY = surfaceOffset * Math.cos(phi);
+            const localZ = surfaceOffset * Math.sin(phi) * Math.sin(theta);
             
             const objConfig = {
                 position: {
-                    x: Config.player.spawnPosition.x + Math.cos(angle) * distance,
-                    y: Config.player.spawnPosition.y + height,
-                    z: Config.player.spawnPosition.z + Math.sin(angle) * distance
+                    x: planetPos.x + localX,
+                    y: planetPos.y + localY,
+                    z: planetPos.z + localZ
                 },
-                // Give objects the same orbital velocity as the player/planet
-                // Plus small random perturbation for variety
+                // Objects on planet surface inherit planet's velocity exactly
                 velocity: {
-                    x: orbitalVelocity.x + Utils.randomRange(-2, 2),
-                    y: orbitalVelocity.y + Utils.randomRange(-1, 1),
-                    z: orbitalVelocity.z + Utils.randomRange(-2, 2)
+                    x: planetVelocity.x,
+                    y: planetVelocity.y,
+                    z: planetVelocity.z
                 },
                 mass: Utils.randomRange(config.minMass, config.maxMass),
                 radius: Utils.randomRange(config.minRadius, config.maxRadius),

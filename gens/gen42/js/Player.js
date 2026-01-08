@@ -32,6 +32,7 @@ class Player {
         this.isFlying = false;
         this.isGrounded = false;
         this.isSprinting = false;
+        this.groundedBody = null; // Reference to body player is standing on
         
         // Camera mode
         this.isFirstPerson = true;
@@ -170,41 +171,42 @@ class Player {
      * Handle collision with a celestial body
      */
     handleCollision(body, dx, dy, dz, dist) {
-        const collisionDist = body.radius + this.radius + 0.5; // Small buffer
+        const surfaceHeight = body.radius + this.height;
         
         // Calculate surface normal (pointing away from body center)
         const nx = -dx / dist;
         const ny = -dy / dist;
         const nz = -dz / dist;
         
-        // Push player to surface
-        this.position.x = body.position.x + nx * collisionDist;
-        this.position.y = body.position.y + ny * collisionDist;
-        this.position.z = body.position.z + nz * collisionDist;
+        // Gently push player to surface
+        this.position.x = body.position.x + nx * surfaceHeight;
+        this.position.y = body.position.y + ny * surfaceHeight;
+        this.position.z = body.position.z + nz * surfaceHeight;
         
-        // Calculate velocity component toward body
-        const velDotNormal = this.velocity.x * nx + this.velocity.y * ny + this.velocity.z * nz;
+        // Calculate velocity relative to body
+        const relVelX = this.velocity.x - body.velocity.x;
+        const relVelY = this.velocity.y - body.velocity.y;
+        const relVelZ = this.velocity.z - body.velocity.z;
         
-        // If moving toward body, reflect/stop that component
+        // Calculate velocity component toward body (in normal direction)
+        const velDotNormal = relVelX * nx + relVelY * ny + relVelZ * nz;
+        
+        // If moving toward body surface, cancel that velocity component
         if (velDotNormal < 0) {
-            // Remove the component of velocity going into the surface
-            this.velocity.x -= velDotNormal * nx * 1.1; // Slight bounce
-            this.velocity.y -= velDotNormal * ny * 1.1;
-            this.velocity.z -= velDotNormal * nz * 1.1;
-            
-            // Apply some friction
-            this.velocity.x *= 0.95;
-            this.velocity.y *= 0.95;
-            this.velocity.z *= 0.95;
+            // Remove only the component going into the surface
+            this.velocity.x -= velDotNormal * nx;
+            this.velocity.y -= velDotNormal * ny;
+            this.velocity.z -= velDotNormal * nz;
         }
         
-        // Match body velocity to "stand" on it
-        const matchFactor = 0.1;
-        this.velocity.x += (body.velocity.x - this.velocity.x) * matchFactor;
-        this.velocity.y += (body.velocity.y - this.velocity.y) * matchFactor;
-        this.velocity.z += (body.velocity.z - this.velocity.z) * matchFactor;
+        // Inherit body's velocity to stay on the moving planet
+        // This is crucial for standing on orbiting bodies
+        this.velocity.x = body.velocity.x + (this.velocity.x - body.velocity.x) * 0.98;
+        this.velocity.y = body.velocity.y + (this.velocity.y - body.velocity.y) * 0.98;
+        this.velocity.z = body.velocity.z + (this.velocity.z - body.velocity.z) * 0.98;
         
         this.isGrounded = true;
+        this.groundedBody = body;
     }
     
     /**

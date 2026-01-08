@@ -45,7 +45,7 @@ const Config = {
             name: 'Sun',
             type: 'star',
             mass: 1000000,          // Scaled mass units
-            radius: 50,              // Visual radius
+            radius: 200,             // Much larger sun
             density: 1.41,           // g/cm³
             color: 0xffdd44,
             emissive: 0xffaa00,
@@ -62,7 +62,7 @@ const Config = {
             name: 'Terra',
             type: 'planet',
             mass: 1000,
-            radius: 12,
+            radius: 80,              // Much larger planet
             density: 5.51,
             color: 0x4488ff,
             emissive: 0x000000,
@@ -70,10 +70,10 @@ const Config = {
             rotationSpeed: 0.02,
             // Orbital parameters calculated for stable orbit
             // v = sqrt(G * M / r) for circular orbit
-            // At distance 400, v = sqrt(6.674 * 1000000 / 400) ≈ 129.2
-            orbitalDistance: 400,
-            position: { x: 400, y: 0, z: 0 },
-            velocity: { x: 0, y: 0, z: 129.2 },
+            // At distance 2000, v = sqrt(6.674 * 1000000 / 2000) ≈ 57.8
+            orbitalDistance: 2000,
+            position: { x: 2000, y: 0, z: 0 },
+            velocity: { x: 0, y: 0, z: 57.8 },
             textureUrl: null,
             hasAtmosphere: true,
             atmosphereColor: 0x88aaff,
@@ -84,16 +84,16 @@ const Config = {
             name: 'Pyrrus',
             type: 'planet',
             mass: 800,
-            radius: 10,
+            radius: 60,              // Larger planet
             density: 3.93,
             color: 0xff6644,
             emissive: 0x331100,
             emissiveIntensity: 0.1,
             rotationSpeed: 0.015,
-            // At distance 700, v = sqrt(6.674 * 1000000 / 700) ≈ 97.7
-            orbitalDistance: 700,
-            position: { x: 700, y: 0, z: 0 },
-            velocity: { x: 0, y: 0, z: 97.7 },
+            // At distance 3500, v = sqrt(6.674 * 1000000 / 3500) ≈ 43.7
+            orbitalDistance: 3500,
+            position: { x: 3500, y: 0, z: 0 },
+            velocity: { x: 0, y: 0, z: 43.7 },
             textureUrl: null,
             hasAtmosphere: true,
             atmosphereColor: 0xff8866,
@@ -104,24 +104,19 @@ const Config = {
             name: 'Luna',
             type: 'moon',
             mass: 50,
-            radius: 4,
+            radius: 25,              // Larger moon
             density: 3.34,
             color: 0xaaaaaa,
             emissive: 0x000000,
             emissiveIntensity: 0,
             rotationSpeed: 0.01,
             // Moon orbits Planet1
-            // Distance from planet: 60 (relative to planet)
-            // Moon needs velocity perpendicular to its position relative to planet
-            // Planet is at (400, 0, 0) with velocity (0, 0, 129.2)
-            // Moon at (400, 0, 60) - offset in Z from planet
-            // Moon orbital v around planet = sqrt(G * M_planet / r) = sqrt(6.674 * 1000 / 60) ≈ 10.55
-            // Moon velocity = planet velocity + orbital velocity perpendicular to planet-moon line
-            // Since moon is offset in +Z, orbital velocity is in +X direction
+            // Distance from planet: 250 (relative to planet)
+            // Moon orbital v around planet = sqrt(G * M_planet / r) = sqrt(6.674 * 1000 / 250) ≈ 5.17
             parentBody: 'planet1',
-            orbitalDistance: 60,
-            position: { x: 400, y: 0, z: 60 },
-            velocity: { x: 10.55, y: 0, z: 129.2 }, // Planet velocity (Z) + orbital velocity (X)
+            orbitalDistance: 250,
+            position: { x: 2000, y: 0, z: 250 },
+            velocity: { x: 5.17, y: 0, z: 57.8 }, // Planet velocity (Z) + orbital velocity (X)
             textureUrl: null
         }
     },
@@ -130,27 +125,27 @@ const Config = {
     // Player Configuration
     // ==========================================
     player: {
-        // Initial spawn position (near planet1)
-        spawnPosition: { x: 420, y: 20, z: 0 },
+        // Initial spawn position (on surface of planet1)
+        // Planet1 is at x=2000 with radius 80, so spawn just above surface
+        spawnPosition: { x: 2000 + 80 + 5, y: 0, z: 0 },
         
         // Initial velocity - must match planet1's orbital velocity to stay in orbit!
-        // This is calculated as sqrt(G * M_sun / r) at the spawn distance
-        // At x=420, v = sqrt(6.674 * 1000000 / 420) ≈ 126.1, but we use planet1's velocity for co-orbit
-        spawnVelocity: { x: 0, y: 0, z: 129.2 },
+        // Planet1 velocity is (0, 0, 57.8)
+        spawnVelocity: { x: 0, y: 0, z: 57.8 },
         
-        // Walking mode
-        walkSpeed: 30,
-        runSpeed: 60,
-        jumpForce: 15,
+        // Walking mode - MUCH slower for proper scale
+        walkSpeed: 0.5,
+        runSpeed: 1.5,
+        jumpForce: 3,
         
-        // Flight mode
-        flightSpeed: 100,
-        flightSprintMultiplier: 3,
+        // Flight mode - reasonable for exploring
+        flightSpeed: 5,
+        flightSprintMultiplier: 10,
         
         // Physics
         mass: 1,
-        height: 2,
-        radius: 0.5,
+        height: 3,
+        radius: 1,
         
         // Camera
         mouseSensitivity: 0.002,
@@ -163,8 +158,8 @@ const Config = {
         thirdPersonHeight: 3,
         
         // Interaction
-        grabDistance: 20,
-        grabHoldDistance: 5,
+        grabDistance: 30,
+        grabHoldDistance: 8,
         grabForce: 50
     },
     
@@ -233,11 +228,11 @@ const Config = {
         // Spawn radius around player
         spawnRadius: 50,
         
-        // Object properties
+        // Object properties - larger for visibility
         minMass: 0.1,
         maxMass: 5,
-        minRadius: 0.3,
-        maxRadius: 1.5,
+        minRadius: 1,
+        maxRadius: 4,
         
         // How many should be luminous
         luminousCount: 3,
