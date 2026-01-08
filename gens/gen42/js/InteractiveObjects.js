@@ -221,13 +221,17 @@ class InteractiveObjectsManager {
         const spawnCount = config.spawnCount;
         const spawnRadius = config.spawnRadius;
         
+        // Get player's orbital velocity to give objects the same velocity
+        // This ensures they orbit with the player instead of falling into the sun
+        const orbitalVelocity = Config.player.spawnVelocity || { x: 0, y: 0, z: 129.2 };
+        
         for (let i = 0; i < spawnCount; i++) {
             const isLuminous = i < config.luminousCount;
             
             // Random position around player spawn
             const angle = (i / spawnCount) * Math.PI * 2;
             const distance = Utils.randomRange(10, spawnRadius);
-            const height = Utils.randomRange(5, 20);
+            const height = Utils.randomRange(-10, 10);
             
             const objConfig = {
                 position: {
@@ -235,10 +239,12 @@ class InteractiveObjectsManager {
                     y: Config.player.spawnPosition.y + height,
                     z: Config.player.spawnPosition.z + Math.sin(angle) * distance
                 },
+                // Give objects the same orbital velocity as the player/planet
+                // Plus small random perturbation for variety
                 velocity: {
-                    x: Utils.randomRange(-2, 2),
-                    y: Utils.randomRange(-1, 1),
-                    z: Utils.randomRange(-2, 2)
+                    x: orbitalVelocity.x + Utils.randomRange(-2, 2),
+                    y: orbitalVelocity.y + Utils.randomRange(-1, 1),
+                    z: orbitalVelocity.z + Utils.randomRange(-2, 2)
                 },
                 mass: Utils.randomRange(config.minMass, config.maxMass),
                 radius: Utils.randomRange(config.minRadius, config.maxRadius),

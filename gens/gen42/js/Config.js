@@ -133,6 +133,11 @@ const Config = {
         // Initial spawn position (near planet1)
         spawnPosition: { x: 420, y: 20, z: 0 },
         
+        // Initial velocity - must match planet1's orbital velocity to stay in orbit!
+        // This is calculated as sqrt(G * M_sun / r) at the spawn distance
+        // At x=420, v = sqrt(6.674 * 1000000 / 420) ≈ 126.1, but we use planet1's velocity for co-orbit
+        spawnVelocity: { x: 0, y: 0, z: 129.2 },
+        
         // Walking mode
         walkSpeed: 30,
         runSpeed: 60,

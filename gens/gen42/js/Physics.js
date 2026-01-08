@@ -480,7 +480,6 @@ class Physics {
      */
     updateInteractiveObjects(dt) {
         const G = Config.physics.G;
-        const drag = Config.interactiveObjects.dragCoefficient;
         
         for (const obj of this.interactiveObjects) {
             if (obj.isHeld) continue;
@@ -508,15 +507,10 @@ class Physics {
                 az += (dz / dist) * accelMag;
             }
             
-            // Update velocity
+            // Update velocity (no drag - objects should orbit freely)
             obj.velocity.x += ax * dt;
             obj.velocity.y += ay * dt;
             obj.velocity.z += az * dt;
-            
-            // Apply drag (space drag for gameplay feel)
-            obj.velocity.x *= drag;
-            obj.velocity.y *= drag;
-            obj.velocity.z *= drag;
             
             // Update position
             obj.position.x += obj.velocity.x * dt;

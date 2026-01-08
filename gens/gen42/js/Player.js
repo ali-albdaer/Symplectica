@@ -16,7 +16,13 @@ class Player {
             z: Config.player.spawnPosition.z
         };
         
-        this.velocity = { x: 0, y: 0, z: 0 };
+        // Initial velocity - must match orbital velocity of nearby planet to stay in orbit
+        // Player spawns near planet1, so inherit its orbital velocity
+        this.velocity = { 
+            x: Config.player.spawnVelocity?.x || 0, 
+            y: Config.player.spawnVelocity?.y || 0, 
+            z: Config.player.spawnVelocity?.z || 129.2  // Match planet1's orbital velocity
+        };
         this.acceleration = { x: 0, y: 0, z: 0 };
         
         // Orientation (euler angles)
@@ -140,11 +146,11 @@ class Player {
             let distSq = dx * dx + dy * dy + dz * dz;
             let dist = Math.sqrt(distSq);
             
-            // Minimum distance to prevent extreme forces
-            const minDist = body.radius + 5;
-            if (dist < minDist) {
-                dist = minDist;
-                distSq = minDist * minDist;
+            // Check for collision with celestial body
+            const collisionDist = body.radius + this.radius;
+            if (dist < collisionDist) {
+                this.handleCollision(body, dx, dy, dz, dist);
+                continue; // Skip gravity for this body during collision
             }
             
             // a = G * M / r²
@@ -158,6 +164,47 @@ class Player {
         this.acceleration.x = ax;
         this.acceleration.y = ay;
         this.acceleration.z = az;
+    }
+    
+    /**
+     * Handle collision with a celestial body
+     */
+    handleCollision(body, dx, dy, dz, dist) {
+        const collisionDist = body.radius + this.radius + 0.5; // Small buffer
+        
+        // Calculate surface normal (pointing away from body center)
+        const nx = -dx / dist;
+        const ny = -dy / dist;
+        const nz = -dz / dist;
+        
+        // Push player to surface
+        this.position.x = body.position.x + nx * collisionDist;
+        this.position.y = body.position.y + ny * collisionDist;
+        this.position.z = body.position.z + nz * collisionDist;
+        
+        // Calculate velocity component toward body
+        const velDotNormal = this.velocity.x * nx + this.velocity.y * ny + this.velocity.z * nz;
+        
+        // If moving toward body, reflect/stop that component
+        if (velDotNormal < 0) {
+            // Remove the component of velocity going into the surface
+            this.velocity.x -= velDotNormal * nx * 1.1; // Slight bounce
+            this.velocity.y -= velDotNormal * ny * 1.1;
+            this.velocity.z -= velDotNormal * nz * 1.1;
+            
+            // Apply some friction
+            this.velocity.x *= 0.95;
+            this.velocity.y *= 0.95;
+            this.velocity.z *= 0.95;
+        }
+        
+        // Match body velocity to "stand" on it
+        const matchFactor = 0.1;
+        this.velocity.x += (body.velocity.x - this.velocity.x) * matchFactor;
+        this.velocity.y += (body.velocity.y - this.velocity.y) * matchFactor;
+        this.velocity.z += (body.velocity.z - this.velocity.z) * matchFactor;
+        
+        this.isGrounded = true;
     }
     
     /**
