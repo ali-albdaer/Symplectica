@@ -149,10 +149,9 @@ html, body {
 }
 
 #body-list-panel {
-    left: 10px;
-    top: auto;
-    bottom: 80px;
-    max-height: 200px;
+    right: 240px;
+    top: 60px;
+    max-height: 250px;
 }
 
 .key-hint {

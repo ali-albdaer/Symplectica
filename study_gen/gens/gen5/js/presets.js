@@ -53,7 +53,7 @@ export const Presets = {
                 mass: 3.3011e23,
                 radius: 2.4397e6,
                 x: 5.791e10, y: 0, z: 0,  // 0.387 AU
-                vx: 0, vy: 4.736e4, vz: 0,  // 47.36 km/s
+                vx: 0, vy: 0, vz: 4.736e4,  // 47.36 km/s in Z for XZ plane orbit
                 color: 0x8c8c8c,
                 hasAtmosphere: false,
             },
@@ -64,7 +64,7 @@ export const Presets = {
                 mass: 4.8675e24,
                 radius: 6.0518e6,
                 x: 1.082e11, y: 0, z: 0,  // 0.723 AU
-                vx: 0, vy: 3.502e4, vz: 0,  // 35.02 km/s
+                vx: 0, vy: 0, vz: 3.502e4,  // 35.02 km/s in Z for XZ plane orbit
                 color: 0xe6c87a,
                 hasAtmosphere: true,
             },
@@ -75,7 +75,7 @@ export const Presets = {
                 mass: EARTH_MASS,
                 radius: EARTH_RADIUS,
                 x: AU, y: 0, z: 0,  // 1 AU
-                vx: 0, vy: 2.978e4, vz: 0,  // 29.78 km/s
+                vx: 0, vy: 0, vz: 2.978e4,  // 29.78 km/s in Z for XZ plane orbit
                 color: 0x4488ff,
                 hasAtmosphere: true,
             },
@@ -86,7 +86,7 @@ export const Presets = {
                 mass: 6.4171e23,
                 radius: 3.3895e6,
                 x: 2.279e11, y: 0, z: 0,  // 1.524 AU
-                vx: 0, vy: 2.407e4, vz: 0,  // 24.07 km/s
+                vx: 0, vy: 0, vz: 2.407e4,  // 24.07 km/s in Z for XZ plane orbit
                 color: 0xc1440e,
                 hasAtmosphere: true,
             },
@@ -97,7 +97,7 @@ export const Presets = {
                 mass: JUPITER_MASS,
                 radius: 6.9911e7,
                 x: 7.785e11, y: 0, z: 0,  // 5.2 AU
-                vx: 0, vy: 1.307e4, vz: 0,  // 13.07 km/s
+                vx: 0, vy: 0, vz: 1.307e4,  // 13.07 km/s in Z for XZ plane orbit
                 color: 0xd8ca9d,
                 hasAtmosphere: true,
             },
@@ -130,7 +130,7 @@ export const Presets = {
                 mass: EARTH_MASS,
                 radius: EARTH_RADIUS,
                 x: AU, y: 0, z: 0,
-                vx: 0, vy: 2.978e4, vz: 0,
+                vx: 0, vy: 0, vz: 2.978e4,  // Velocity in Z for XZ plane orbit
                 color: 0x4488ff,
                 hasAtmosphere: true,
             },
@@ -141,7 +141,7 @@ export const Presets = {
                 mass: MOON_MASS,
                 radius: 1.7374e6,
                 x: AU + 3.844e8, y: 0, z: 0,  // Earth + 384,400 km
-                vx: 0, vy: 2.978e4 + 1.022e3, vz: 0,  // Earth velocity + 1.022 km/s
+                vx: 0, vy: 0, vz: 2.978e4 + 1.022e3,  // Earth velocity + 1.022 km/s in Z
                 color: 0xaaaaaa,
                 hasAtmosphere: false,
             },
@@ -269,8 +269,8 @@ export const Presets = {
      * Initial conditions from Simó (2001), scaled to solar masses and AU.
      * 
      * Original normalized values (G=1, m=1, period≈6.32):
-     * x1 = 0.97000436, y1 = -0.24308753
-     * vx1 = 0.4662036850, vy1 = 0.4323657300
+     * x1 = 0.97000436, z1 = -0.24308753 (using XZ plane for top-down view)
+     * vx1 = 0.4662036850, vz1 = 0.4323657300
      * (other two bodies by rotation symmetry)
      */
     'figure-eight': {
@@ -288,11 +288,11 @@ export const Presets = {
             // Velocity scale: V = L/T
             const V = L / T;
             
-            // Normalized initial conditions (Simó)
+            // Normalized initial conditions (Simó) - mapped to XZ plane
             const x0 = 0.97000436;
-            const y0 = -0.24308753;
+            const z0 = -0.24308753;
             const vx0 = 0.4662036850;
-            const vy0 = 0.4323657300;
+            const vz0 = 0.4323657300;
             
             return [
                 {
@@ -300,8 +300,8 @@ export const Presets = {
                     type: BodyType.STAR,
                     mass: M,
                     radius: SOLAR_RADIUS * 0.3,
-                    x: x0 * L, y: y0 * L, z: 0,
-                    vx: vx0 * V, vy: vy0 * V, vz: 0,
+                    x: x0 * L, y: 0, z: z0 * L,
+                    vx: vx0 * V, vy: 0, vz: vz0 * V,
                     color: 0xff4444,
                     luminosity: 1e26,
                 },
@@ -310,8 +310,8 @@ export const Presets = {
                     type: BodyType.STAR,
                     mass: M,
                     radius: SOLAR_RADIUS * 0.3,
-                    x: -x0 * L, y: -y0 * L, z: 0,
-                    vx: vx0 * V, vy: vy0 * V, vz: 0,
+                    x: -x0 * L, y: 0, z: -z0 * L,
+                    vx: vx0 * V, vy: 0, vz: vz0 * V,
                     color: 0x44ff44,
                     luminosity: 1e26,
                 },
@@ -321,7 +321,7 @@ export const Presets = {
                     mass: M,
                     radius: SOLAR_RADIUS * 0.3,
                     x: 0, y: 0, z: 0,
-                    vx: -2 * vx0 * V, vy: -2 * vy0 * V, vz: 0,
+                    vx: -2 * vx0 * V, vy: 0, vz: -2 * vz0 * V,
                     color: 0x4444ff,
                     luminosity: 1e26,
                 },
@@ -352,7 +352,7 @@ export const Presets = {
                 mass: 1e20, // Very small
                 radius: 1e6,
                 x: 1e8, y: 0, z: 0,
-                vx: 0, vy: 1.15e6, vz: 0,
+                vx: 0, vy: 0, vz: 1.15e6,  // Velocity in Z for XZ plane orbit
                 color: 0x88ffff,
             },
             // Test particle 2 - medium orbit
@@ -362,7 +362,7 @@ export const Presets = {
                 mass: 1e20,
                 radius: 1e6,
                 x: 5e8, y: 0, z: 0,
-                vx: 0, vy: 5.2e5, vz: 0,
+                vx: 0, vy: 0, vz: 5.2e5,  // Velocity in Z for XZ plane orbit
                 color: 0xff88ff,
             },
         ],
@@ -393,7 +393,7 @@ export const Presets = {
                 mass: 0.5 * SOLAR_MASS,
                 radius: 0.5 * SOLAR_RADIUS,
                 x: 5e9, y: 0, z: 0, // Close orbit
-                vx: 0, vy: 1.9e5, vz: 0,
+                vx: 0, vy: 0, vz: 1.9e5,  // Velocity in Z for XZ plane orbit
                 color: 0xffaaaa,
             },
         ],
