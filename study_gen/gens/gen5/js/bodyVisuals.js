@@ -168,10 +168,10 @@ function createStarMesh(body, radius) {
 function createPlanetMesh(body, radius) {
     const geometry = new THREE.SphereGeometry(radius, 32, 32);
     
-    const material = new THREE.MeshStandardMaterial({
+    // Use MeshBasicMaterial for guaranteed visibility
+    // (MeshStandardMaterial requires light which may not reach distant planets)
+    const material = new THREE.MeshBasicMaterial({
         color: body.color,
-        roughness: 0.8,
-        metalness: 0.1,
     });
     
     const mesh = new THREE.Mesh(geometry, material);

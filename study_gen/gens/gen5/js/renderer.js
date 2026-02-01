@@ -184,12 +184,12 @@ export class Renderer {
      * @private
      */
     _createLighting() {
-        // Ambient light for minimum visibility
-        this.ambientLight = new THREE.AmbientLight(0x111122, 0.3);
+        // Ambient light for minimum visibility - bright enough to see all objects
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         this.scene.add(this.ambientLight);
         
         // Hemisphere light for better ambient
-        const hemiLight = new THREE.HemisphereLight(0x444466, 0x080820, 0.5);
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444466, 0.5);
         this.scene.add(hemiLight);
     }
 

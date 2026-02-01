@@ -628,40 +628,51 @@ export class UIManager {
             return el ? el.value : '';
         };
         
-        // Track if radius changed (need to rebuild mesh)
-        const oldRadius = body.radius;
-        let radiusChanged = false;
+        // Track what changed for debugging
+        const changes = [];
         
         // Update name
         const name = getStringValue('insp-name');
-        if (name) body.name = name;
+        if (name && name !== body.name) {
+            body.name = name;
+            changes.push(`name=${name}`);
+        }
         
         // Update mass
         const mass = getValue('insp-mass');
-        if (!isNaN(mass) && mass > 0) body.mass = mass;
+        if (!isNaN(mass) && mass > 0 && mass !== body.mass) {
+            body.mass = mass;
+            changes.push(`mass=${mass.toExponential(2)}`);
+        }
         
-        // Update radius
+        // Update radius - always force mesh rebuild for radius changes
         const radius = getValue('insp-radius');
-        if (!isNaN(radius) && radius > 0) {
+        const oldRadius = body.radius;
+        if (!isNaN(radius) && radius > 0 && radius !== oldRadius) {
             body.radius = radius;
-            radiusChanged = (radius !== oldRadius);
+            changes.push(`radius=${radius.toExponential(2)}`);
         }
         
         // Update position
         const px = getValue('insp-px');
         const py = getValue('insp-py');
         const pz = getValue('insp-pz');
-        if (!isNaN(px)) body.position.x = px;
-        if (!isNaN(py)) body.position.y = py;
-        if (!isNaN(pz)) body.position.z = pz;
+        if (!isNaN(px) && px !== body.position.x) { body.position.x = px; changes.push(`px=${px.toExponential(2)}`); }
+        if (!isNaN(py) && py !== body.position.y) { body.position.y = py; changes.push(`py=${py.toExponential(2)}`); }
+        if (!isNaN(pz) && pz !== body.position.z) { body.position.z = pz; changes.push(`pz=${pz.toExponential(2)}`); }
         
         // Update velocity
         const vx = getValue('insp-vx');
         const vy = getValue('insp-vy');
         const vz = getValue('insp-vz');
-        if (!isNaN(vx)) body.velocity.x = vx;
-        if (!isNaN(vy)) body.velocity.y = vy;
-        if (!isNaN(vz)) body.velocity.z = vz;
+        if (!isNaN(vx) && vx !== body.velocity.x) { body.velocity.x = vx; changes.push(`vx=${vx.toExponential(2)}`); }
+        if (!isNaN(vy) && vy !== body.velocity.y) { body.velocity.y = vy; changes.push(`vy=${vy.toExponential(2)}`); }
+        if (!isNaN(vz) && vz !== body.velocity.z) { body.velocity.z = vz; changes.push(`vz=${vz.toExponential(2)}`); }
+        
+        if (changes.length === 0) {
+            console.log(`No changes detected for ${body.name}`);
+            return;
+        }
         
         // Clear trail after changes
         body.clearTrail();
@@ -670,28 +681,32 @@ export class UIManager {
         const simulation = getSimulation();
         simulation._updateInitialConservation();
         
-        // If radius changed, force mesh rebuild by removing old mesh
-        if (radiusChanged) {
-            const renderer = getRenderer();
-            const mesh = renderer.bodyMeshes.get(body.id);
-            if (mesh) {
-                renderer.bodiesGroup.remove(mesh);
-                if (mesh.geometry) mesh.geometry.dispose();
-                if (mesh.material) {
-                    if (Array.isArray(mesh.material)) {
-                        mesh.material.forEach(m => m.dispose());
+        // Always force mesh rebuild when ANY property changes to ensure visual update
+        const renderer = getRenderer();
+        const mesh = renderer.bodyMeshes.get(body.id);
+        if (mesh) {
+            renderer.bodiesGroup.remove(mesh);
+            // Dispose geometry
+            if (mesh.geometry) mesh.geometry.dispose();
+            // Dispose materials (handle groups and single meshes)
+            mesh.traverse((child) => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
                     } else {
-                        mesh.material.dispose();
+                        child.material.dispose();
                     }
                 }
-                renderer.bodyMeshes.delete(body.id);
-            }
+            });
+            renderer.bodyMeshes.delete(body.id);
+            console.log(`Removed old mesh for ${body.name}, will recreate`);
         }
         
         syncBodyVisuals();
         this.update();
         
-        console.log(`Applied changes to ${body.name}: mass=${body.mass.toExponential(2)}, radius=${body.radius.toExponential(2)}`);
+        console.log(`Applied changes to ${body.name}: ${changes.join(', ')}`);
     }
 
     /**
