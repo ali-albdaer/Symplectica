@@ -148,6 +148,68 @@ html, body {
     right: 10px;
 }
 
+#body-list-panel {
+    right: 10px;
+    top: auto;
+    bottom: 80px;
+    max-height: 200px;
+}
+
+.key-hint {
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: normal;
+    text-transform: none;
+}
+
+/* Body List */
+.body-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.body-list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    margin: 2px 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.body-list-item:hover {
+    background: var(--button-bg);
+}
+
+.body-list-item.selected {
+    background: var(--button-active);
+    border-left: 3px solid var(--text-accent);
+}
+
+.body-index {
+    color: var(--text-secondary);
+    font-size: 11px;
+    min-width: 20px;
+}
+
+.body-name {
+    flex: 1;
+    color: var(--text-primary);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.body-type {
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-transform: capitalize;
+}
+
 #settings-panel {
     right: 240px;
 }

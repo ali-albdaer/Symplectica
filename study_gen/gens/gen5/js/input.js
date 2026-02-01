@@ -19,6 +19,7 @@ import { syncBodyVisuals } from './bodyVisuals.js';
 import { Body } from './body.js';
 import { getDefaultBodyParams, loadPreset } from './presets.js';
 import { exportToFile } from './serialization.js';
+import { getUIManager } from './ui.js';
 
 /**
  * Input manager class
@@ -74,6 +75,11 @@ export class InputManager {
             
             // Camera
             'KeyC': () => this._recenterCamera(),
+            'KeyF': () => this._autoScaleView(),
+            
+            // Body navigation
+            'KeyN': () => this._cycleToNextBody(),
+            'KeyP': () => this._cycleToPreviousBody(),
             
             // Performance presets
             'Digit1': () => this._setPerformancePreset('low'),
@@ -584,6 +590,35 @@ export class InputManager {
      */
     _recenterCamera() {
         getCameraController().recenter();
+    }
+
+    /**
+     * Auto-scale view to fit all bodies
+     * @private
+     */
+    _autoScaleView() {
+        const renderer = getRenderer();
+        renderer.autoScaleView();
+    }
+
+    /**
+     * Cycle to next body in the list
+     * @private
+     */
+    _cycleToNextBody() {
+        const ui = getUIManager();
+        ui.cycleBody(1);
+        if (this.onUIUpdate) this.onUIUpdate();
+    }
+
+    /**
+     * Cycle to previous body in the list
+     * @private
+     */
+    _cycleToPreviousBody() {
+        const ui = getUIManager();
+        ui.cycleBody(-1);
+        if (this.onUIUpdate) this.onUIUpdate();
     }
 
     /**

@@ -168,9 +168,12 @@ export class Renderer {
             1e3,
             1e15
         );
+        // Looking down the Y axis (top-down view of XZ plane)
+        // Position camera above the origin looking down
         this.orthographicCamera.position.set(0, 10 * AU / this.viewScale, 0);
         this.orthographicCamera.lookAt(0, 0, 0);
-        this.orthographicCamera.up.set(0, 0, -1);
+        // Set up vector so +Z points up on screen (like a map with north at top)
+        this.orthographicCamera.up.set(0, 0, 1);
         
         // Start with orthographic (edit mode)
         this.activeCamera = this.orthographicCamera;
@@ -389,8 +392,10 @@ export class Renderer {
         const worldDx = (dx / this.width) * frustumSize * aspect;
         const worldDy = (dy / this.height) * frustumSize;
         
+        // With up vector (0,0,1), +Z is up on screen
+        // So moving mouse up (dy < 0) should show more +Z (camera moves +Z)
         this.orthographicCamera.position.x -= worldDx;
-        this.orthographicCamera.position.z += worldDy;
+        this.orthographicCamera.position.z -= worldDy;
     }
 
     /**
@@ -445,6 +450,87 @@ export class Renderer {
             // For now, just mark it
             mesh.userData.isSelected = true;
         }
+    }
+
+    /**
+     * Focus the camera on a specific body
+     * @param {Body} body - The body to focus on
+     */
+    focusOnBody(body) {
+        if (!body) return;
+        
+        const scaledPos = {
+            x: body.position.x / this.viewScale,
+            y: body.position.y / this.viewScale,
+            z: body.position.z / this.viewScale
+        };
+        
+        if (getState().mode === AppMode.EDIT) {
+            // Move orthographic camera to center on body
+            this.orthographicCamera.position.x = scaledPos.x;
+            this.orthographicCamera.position.z = scaledPos.z;
+        } else {
+            // Move perspective camera towards body
+            const distance = Math.max(body.radius * 5 / this.viewScale, 2);
+            this.perspectiveCamera.position.set(
+                scaledPos.x + distance,
+                scaledPos.y + distance * 0.5,
+                scaledPos.z + distance
+            );
+            this.perspectiveCamera.lookAt(scaledPos.x, scaledPos.y, scaledPos.z);
+        }
+    }
+
+    /**
+     * Auto-scale the view to fit all bodies
+     */
+    autoScaleView() {
+        const simulation = getSimulation();
+        const bodies = simulation.getBodies();
+        
+        if (bodies.length === 0) return;
+        
+        // Find bounding box of all bodies
+        let minX = Infinity, maxX = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
+        
+        bodies.forEach(body => {
+            const x = body.position.x / this.viewScale;
+            const z = body.position.z / this.viewScale;
+            const r = Math.max(body.radius / this.viewScale, 1); // Minimum visible radius
+            
+            minX = Math.min(minX, x - r);
+            maxX = Math.max(maxX, x + r);
+            minZ = Math.min(minZ, z - r);
+            maxZ = Math.max(maxZ, z + r);
+        });
+        
+        // Add padding
+        const padding = 1.2;
+        const rangeX = (maxX - minX) * padding;
+        const rangeZ = (maxZ - minZ) * padding;
+        const range = Math.max(rangeX, rangeZ);
+        
+        // Calculate center
+        const centerX = (minX + maxX) / 2;
+        const centerZ = (minZ + maxZ) / 2;
+        
+        // Update orthographic camera
+        const aspect = this.width / this.height;
+        const frustumSize = 10 * AU / this.viewScale;
+        
+        // Calculate zoom to fit
+        const zoomX = (frustumSize * aspect) / range;
+        const zoomZ = frustumSize / range;
+        const newZoom = Math.min(zoomX, zoomZ);
+        
+        // Apply
+        this.orthographicCamera.zoom = Math.max(0.01, Math.min(100, newZoom));
+        this.orthographicCamera.position.x = centerX;
+        this.orthographicCamera.position.z = centerZ;
+        this.orthographicCamera.updateProjectionMatrix();
+        
+        console.log(`Auto-scaled view: center=(${centerX.toFixed(2)}, ${centerZ.toFixed(2)}), zoom=${newZoom.toFixed(3)}`);
     }
 
     /**

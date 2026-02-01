@@ -112,7 +112,19 @@ class AppState {
         this.effectsEnabled = true;
         
         /** @type {number} Max trail points */
-        this.maxTrailPoints = 200;
+        this.maxTrailPoints = 500;
+        
+        /** @type {number} Trail line width */
+        this.trailWidth = 2;
+        
+        /** @type {number} Velocity vector scale */
+        this.vectorScale = 1;
+        
+        /** @type {boolean} Show body labels */
+        this.showLabels = true;
+        
+        /** @type {number} Body visual scale multiplier */
+        this.bodyScale = 1;
 
         // ========== Event Subscribers ==========
         /** @type {Map<string, Set<Function>>} Event listeners */

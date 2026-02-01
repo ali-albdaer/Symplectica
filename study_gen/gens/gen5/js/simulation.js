@@ -157,6 +157,14 @@ export class Simulation {
     }
 
     /**
+     * Get all bodies in the simulation
+     * @returns {Body[]} Array of all bodies
+     */
+    getBodies() {
+        return this.bodies;
+    }
+
+    /**
      * Clear all bodies
      */
     clearBodies() {

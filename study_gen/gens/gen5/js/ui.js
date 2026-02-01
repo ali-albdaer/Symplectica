@@ -28,6 +28,7 @@ export class UIManager {
         this.settingsPanel = null;
         this.errorPanel = null;
         this.controlsHelp = null;
+        this.bodyListPanel = null;
         
         // Display elements
         this.modeLabel = null;
@@ -42,6 +43,10 @@ export class UIManager {
         
         // Inspector content
         this.inspectorContent = null;
+        
+        // Track which body inspector is showing (to avoid rebuilding when not needed)
+        this.inspectorBodyId = null;
+        this.inspectorNeedsRefresh = false;
         
         // FPS tracking
         this.fpsFrames = 0;
@@ -63,6 +68,7 @@ export class UIManager {
         this.settingsPanel = document.getElementById('settings-panel');
         this.errorPanel = document.getElementById('error-panel');
         this.controlsHelp = document.getElementById('controls-help');
+        this.bodyListPanel = document.getElementById('body-list-panel');
         
         // Get display elements
         this.modeLabel = document.getElementById('mode-label');
@@ -212,14 +218,43 @@ export class UIManager {
             getRenderer().updateVisibility();
         });
         
+        document.getElementById('trail-length-slider')?.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            getState().maxTrailPoints = value;
+            document.getElementById('trail-length-value').textContent = `${value} points`;
+        });
+        
+        document.getElementById('trail-width-slider')?.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            getState().trailWidth = value;
+            document.getElementById('trail-width-value').textContent = `${value}px`;
+        });
+        
         document.getElementById('show-vectors')?.addEventListener('change', (e) => {
             getState().showVelocityVectors = e.target.checked;
             getRenderer().updateVisibility();
         });
         
+        document.getElementById('vector-scale-slider')?.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            getState().vectorScale = value;
+            document.getElementById('vector-scale-value').textContent = `${value}x`;
+        });
+        
         document.getElementById('show-grid')?.addEventListener('change', (e) => {
             getState().showGrid = e.target.checked;
             getRenderer().updateVisibility();
+        });
+        
+        document.getElementById('show-labels')?.addEventListener('change', (e) => {
+            getState().showLabels = e.target.checked;
+            getRenderer().updateVisibility();
+        });
+        
+        document.getElementById('body-scale-slider')?.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            getState().bodyScale = value;
+            document.getElementById('body-scale-value').textContent = `${value}x`;
         });
         
         // Error panel dismiss
@@ -263,7 +298,16 @@ export class UIManager {
         this._updateModeIndicator();
         this._updateDiagnostics();
         this._updateInspector();
+        this._updateBodyList();
         this._updateCursor();
+    }
+    
+    /**
+     * Force refresh of inspector (call when selection changes)
+     */
+    refreshInspector() {
+        this.inspectorNeedsRefresh = true;
+        this._updateInspector();
     }
 
     /**
@@ -379,6 +423,15 @@ export class UIManager {
         if (!this.inspectorContent) return;
         
         const body = state.getSelectedBody();
+        const currentBodyId = body ? body.id : null;
+        
+        // Only rebuild inspector HTML if selection changed or refresh requested
+        if (currentBodyId === this.inspectorBodyId && !this.inspectorNeedsRefresh) {
+            return;
+        }
+        
+        this.inspectorBodyId = currentBodyId;
+        this.inspectorNeedsRefresh = false;
         
         if (!body) {
             this.inspectorContent.innerHTML = '<p class="hint">Select a body to inspect</p>';
@@ -457,6 +510,7 @@ export class UIManager {
             </div>
             
             <button id="insp-apply" style="width:100%; margin-top:10px;">Apply Changes</button>
+            <button id="insp-refresh" style="width:100%; margin-top:5px; background: rgba(80,80,150,0.6);">Refresh Values</button>
             <button id="insp-delete" style="width:100%; margin-top:5px; background: rgba(150,50,50,0.6);">Delete Body</button>
         `;
         
@@ -467,12 +521,95 @@ export class UIManager {
             this._applyInspectorChanges(body);
         });
         
+        document.getElementById('insp-refresh')?.addEventListener('click', () => {
+            this.refreshInspector();
+        });
+        
         document.getElementById('insp-delete')?.addEventListener('click', () => {
             simulation.removeBody(body.id);
             state.selectBody(null);
             syncBodyVisuals();
+            this.inspectorBodyId = null;
             this.update();
         });
+        
+        // Set up hover detection for new input elements
+        const inputManager = getInputManager();
+        this.inspectorContent.querySelectorAll('input, button').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                inputManager.setMouseOverUI(true);
+            });
+            el.addEventListener('mouseleave', () => {
+                inputManager.setMouseOverUI(false);
+            });
+        });
+    }
+
+    /**
+     * Update body list panel
+     * @private
+     */
+    _updateBodyList() {
+        const bodyListContent = document.getElementById('body-list-content');
+        if (!bodyListContent) return;
+        
+        const simulation = getSimulation();
+        const state = getState();
+        const bodies = simulation.getBodies();
+        
+        if (bodies.length === 0) {
+            bodyListContent.innerHTML = '<p class="hint">No bodies in simulation</p>';
+            return;
+        }
+        
+        let html = '<ul class="body-list">';
+        bodies.forEach((body, index) => {
+            const isSelected = state.selectedBodyId === body.id;
+            html += `<li class="body-list-item ${isSelected ? 'selected' : ''}" data-body-id="${body.id}">
+                <span class="body-index">${index + 1}.</span>
+                <span class="body-name">${body.name}</span>
+                <span class="body-type">${body.type}</span>
+            </li>`;
+        });
+        html += '</ul>';
+        
+        bodyListContent.innerHTML = html;
+        
+        // Add click handlers
+        bodyListContent.querySelectorAll('.body-list-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const bodyId = item.dataset.bodyId;
+                state.selectBody(bodyId);
+                this.refreshInspector();
+            });
+        });
+    }
+
+    /**
+     * Cycle to next/previous body in the list
+     * @param {number} direction - 1 for next, -1 for previous
+     */
+    cycleBody(direction = 1) {
+        const simulation = getSimulation();
+        const state = getState();
+        const bodies = simulation.getBodies();
+        
+        if (bodies.length === 0) return;
+        
+        let currentIndex = bodies.findIndex(b => b.id === state.selectedBodyId);
+        if (currentIndex === -1) {
+            currentIndex = direction > 0 ? -1 : bodies.length;
+        }
+        
+        const nextIndex = (currentIndex + direction + bodies.length) % bodies.length;
+        const nextBody = bodies[nextIndex];
+        
+        state.selectBody(nextBody.id);
+        this.refreshInspector();
+        
+        // Focus camera on selected body
+        const renderer = getRenderer();
+        renderer.focusOnBody(nextBody);
     }
 
     /**
