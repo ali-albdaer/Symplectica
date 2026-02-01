@@ -1,0 +1,33 @@
+THREE.OrbitControls is not a constructor<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Celestial Mechanics Simulator</title>
+    <link rel="stylesheet" href="style.css">
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js",
+                    "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/controls/OrbitControls.js"
+                }
+            }
+        </script>
+</head>
+<body>
+    <div id="ui-container">
+        <div id="menu-bar">
+            <button id="spawn-btn">Spawn Object</button>
+            <button id="presets-btn">Presets</button>
+            <button id="settings-btn">Settings</button>
+            <span id="view-mode">TOP VIEW</span>
+        </div>
+        <div id="error-bar" style="display:none;"></div>
+        <div id="spawn-menu" class="modal-menu" style="display:none;"></div>
+        <div id="presets-menu" class="modal-menu" style="display:none;"></div>
+        <div id="settings-menu" class="modal-menu" style="display:none;"></div>
+    </div>
+    <canvas id="main-canvas"></canvas>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
