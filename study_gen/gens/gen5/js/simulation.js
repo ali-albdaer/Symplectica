@@ -87,6 +87,9 @@ export class Simulation {
         
         /** @type {number} Relative energy error */
         this.energyError = 0;
+        
+        /** @type {Object|null} Initial conservation quantities (for diagnostics) */
+        this.initialConservation = null;
 
         // ========== Adaptive Timestep State (for RK45) ==========
         /** @type {number} Suggested next timestep from adaptive integrator */
@@ -192,6 +195,7 @@ export class Simulation {
         if (this.bodies.length === 0) {
             this.initialEnergy = null;
             this.initialAngularMomentum = null;
+            this.initialConservation = null;
             return;
         }
         
@@ -201,6 +205,13 @@ export class Simulation {
         this.currentEnergy = this.initialEnergy;
         this.currentAngularMomentum = this.initialAngularMomentum.clone();
         this.energyError = 0;
+        
+        // Store full conservation quantities for diagnostics
+        this.initialConservation = {
+            totalEnergy: this.initialEnergy,
+            totalMomentum: totalMomentum(this.bodies),
+            angularMomentum: this.initialAngularMomentum.clone(),
+        };
     }
 
     /**
@@ -286,6 +297,17 @@ export class Simulation {
             this._handleError('Integration step failed: ' + error.message);
             return { dt: 0, time: this.time, error: error.message };
         }
+    }
+
+    /**
+     * Perform simulation step(s) for a given time delta
+     * This is the main update method called from the render loop
+     * @param {number} deltaTime - Frame delta time in seconds
+     * @returns {Object} Step result
+     */
+    step(deltaTime) {
+        // Use multiStep if we have multiple substeps configured
+        return this.multiStep(this.substeps);
     }
 
     /**
@@ -534,6 +556,14 @@ export function getSimulation() {
 }
 
 /**
+ * Initialize the global simulation (alias for getSimulation for consistency)
+ * @returns {Simulation} Global simulation
+ */
+export function initSimulation() {
+    return getSimulation();
+}
+
+/**
  * Reset the global simulation instance
  * @returns {Simulation} New simulation instance
  */
@@ -545,5 +575,6 @@ export function resetSimulation() {
 export default {
     Simulation,
     getSimulation,
+    initSimulation,
     resetSimulation,
 };

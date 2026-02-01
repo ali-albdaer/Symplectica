@@ -41,13 +41,7 @@
             <div class="key-hint"><span>WASD</span> Move Camera</div>
             <div class="key-hint"><span>Hold Shift</span> Move Down</div>
             <div class="key-hint"><span>Space</span> Move Up</div>
-        </div>
-
-        <!-- Bottom Left: Spawn Menu -->
-        <div id="spawn-panel" class="panel">
-            <h3>Spawn & Presets</h3>
-            <div class="control-group">
-                <label>Preset:</label>
+            <div class="key-hint" id="speed-hint"><span>Scroll</span> Zoom (Edit) / Speed (Free)</div>
                 <select id="preset-selector">
                     <option value="">-- Load Preset --</option>
                     <option value="solar_system">Solar System (Accurate)</option>
@@ -84,8 +78,9 @@
         <div id="settings-panel" class="panel">
             <h3>Simulation Settings</h3>
             <div class="control-group">
-                <label>Time Speed:</label>
-                <input type="range" id="time-scale" min="0" max="100000" step="100" value="1">
+                <label>Time Speed (x Realtime):</label>
+                <!-- Default to 1 week/sec approx = 604800 -->
+                <input type="range" id="time-scale" min="0" max="2500000" step="1000" value="604800">
             </div>
             <div class="control-group">
                 <label>Integrator:</label>

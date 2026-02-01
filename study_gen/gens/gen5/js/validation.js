@@ -7,9 +7,9 @@
 
 import { Vec3 } from './vector3.js';
 import { Body, BodyType } from './body.js';
-import { computeConservationQuantities, computeAllAccelerations } from './gravity.js';
+import { computeConservationQuantities } from './gravity.js';
 import { velocityVerletStep, rk4Step, rk45Step } from './integrators.js';
-import { G, C, AU, SOLAR_MASS } from './constants.js';
+import { G, AU, SOLAR_MASS } from './constants.js';
 
 /**
  * Test results structure

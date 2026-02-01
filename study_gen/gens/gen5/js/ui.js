@@ -9,14 +9,11 @@ import { getState, AppMode } from './state.js';
 import { getSimulation } from './simulation.js';
 import { getRenderer } from './renderer.js';
 import { getInputManager } from './input.js';
-import { getCameraController } from './camera.js';
 import { syncBodyVisuals } from './bodyVisuals.js';
-import { loadPreset, getDefaultBodyParams } from './presets.js';
+import { loadPreset } from './presets.js';
 import { exportToFile, importFromFile } from './serialization.js';
-import { Body, BodyType } from './body.js';
-import { PhysicsMode, setPhysicsMode } from './gravity.js';
-import { IntegratorType, setIntegrator } from './integrators.js';
-import { Units, PerformancePresets, AU } from './constants.js';
+import { Body } from './body.js';
+import { Units, PerformancePresets } from './constants.js';
 
 /**
  * UI Manager class

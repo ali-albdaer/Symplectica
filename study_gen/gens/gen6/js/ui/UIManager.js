@@ -11,6 +11,8 @@ export class UIManager {
         this.elFPS = document.getElementById('fps-counter');
         this.elBodyCount = document.getElementById('body-count');
         this.elEnergy = document.getElementById('energy-stat');
+        this.elIntegrator = document.getElementById('integrator-stat'); // Added
+        this.elTimestep = document.getElementById('timestep-stat');     // Added
         this.elTimer = document.getElementById('time-stat');
         this.elMode = document.getElementById('mode-indicator');
         
@@ -92,6 +94,13 @@ export class UIManager {
     update(dt, diagnostics) {
         this.elBodyCount.innerText = `Bodies: ${diagnostics.count}`;
         this.elEnergy.innerText = `Energy: ${diagnostics.totalEnergy.toExponential(4)} J`;
+        
+        // Update Integrator and Timestep from physics engine via hacky access or passed diagnostics
+        // It's cleaner to access via physicsEngine instance passed in constructor
+        this.elIntegrator.innerText = `Integrator: ${this.physicsEngine.integrator.type}`;
+        this.elTimestep.innerText = `dt: ${dt.toFixed(3)} s (Sim)`; // Showing frame dt. 
+        // Ideally show physics step dt if fixed, but we use variable. 
+
         this.elFPS.innerText = `FPS: ${(1/dt).toFixed(1)}`;
         this.elTimer.innerText = `Sim Time: ${(this.stateManager.time / 31536000).toFixed(4)} yrs`;
         

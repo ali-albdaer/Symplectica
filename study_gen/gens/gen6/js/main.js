@@ -82,6 +82,8 @@ function loop(now) {
     // Diagnostics
     const diag = physicsEngine.getDiagnostics(stateManager.bodies);
     uiManager.update(browserDt, diag);
+    // Also pass the effective sim dt for the UI to display
+    uiManager.elTimestep.innerText = `Speed: ${timeScale.toExponential(1)}x`; // Updating generic dt field to serve as speed indicator/dt
 }
 
 // Start

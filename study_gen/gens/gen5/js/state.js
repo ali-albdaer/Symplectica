@@ -125,6 +125,16 @@ class AppState {
      * @param {Function} callback - Callback function
      * @returns {Function} Unsubscribe function
      */
+    subscribe(event, callback) {
+        return this.on(event, callback);
+    }
+
+    /**
+     * Subscribe to state changes
+     * @param {string} event - Event name
+     * @param {Function} callback - Callback function
+     * @returns {Function} Unsubscribe function
+     */
     on(event, callback) {
         if (!this._listeners.has(event)) {
             this._listeners.set(event, new Set());
@@ -384,6 +394,14 @@ export function getState() {
 }
 
 /**
+ * Initialize the global state (alias for getState for consistency)
+ * @returns {AppState} Global state
+ */
+export function initState() {
+    return getState();
+}
+
+/**
  * Reset the global state
  * @returns {AppState} New state instance
  */
@@ -397,5 +415,6 @@ export default {
     CursorState,
     AppState,
     getState,
+    initState,
     resetState,
 };

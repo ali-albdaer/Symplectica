@@ -18,8 +18,7 @@ import { getCameraController } from './camera.js';
 import { syncBodyVisuals } from './bodyVisuals.js';
 import { Body } from './body.js';
 import { getDefaultBodyParams, loadPreset } from './presets.js';
-import { exportToFile, importFromFile } from './serialization.js';
-import { Vec3 } from './vector3.js';
+import { exportToFile } from './serialization.js';
 
 /**
  * Input manager class
@@ -689,6 +688,28 @@ export class InputManager {
      */
     setMouseOverUI(over) {
         getState().mouseOverUI = over;
+    }
+
+    /**
+     * Handle mode change (called when switching between edit/free view)
+     * @param {string} mode - New mode
+     */
+    handleModeChange(mode) {
+        const state = getState();
+        
+        // Reset movement keys
+        getCameraController().resetMovementKeys();
+        
+        // Handle pointer lock for free view
+        if (mode === AppMode.FREE_VIEW && this.canvas) {
+            // Request pointer lock when entering free view
+            this.canvas.requestPointerLock();
+        } else {
+            // Exit pointer lock when entering edit mode
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
+            }
+        }
     }
 }
 

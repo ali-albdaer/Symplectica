@@ -10,7 +10,7 @@
  * All values in SI units (meters, kg, m/s)
  */
 
-import { Body, BodyType, createStar, createPlanet, createBlackHole, createNeutronStar, createPulsar } from './body.js';
+import { Body, BodyType } from './body.js';
 import { Vec3 } from './vector3.js';
 import { 
     AU, SOLAR_MASS, EARTH_MASS, MOON_MASS, SOLAR_RADIUS, EARTH_RADIUS,

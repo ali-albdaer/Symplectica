@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { getRenderer } from './renderer.js';
-import { getState, AppMode, CursorState } from './state.js';
+import { getState, AppMode } from './state.js';
 import { AU } from './constants.js';
 
 /**
@@ -302,6 +302,20 @@ export class CameraController {
             const direction = pos.clone().sub(this.targetPosition).normalize();
             this.freeViewRotation.x = Math.asin(-direction.y);
             this.freeViewRotation.y = Math.atan2(direction.x, direction.z);
+        }
+    }
+
+    /**
+     * Set camera mode (called on mode switch)
+     * @param {string} mode - New mode
+     */
+    setMode(mode) {
+        // Reset movement keys when switching modes
+        this.resetMovementKeys();
+        
+        // Update renderer camera selection
+        if (this.renderer) {
+            this.renderer.updateVisibility();
         }
     }
 

@@ -419,6 +419,35 @@ export class Renderer {
     }
 
     /**
+     * Handle window resize (public method)
+     */
+    handleResize() {
+        this._onResize();
+    }
+
+    /**
+     * Update selection visual on a body
+     * @param {number|null} bodyId - ID of selected body or null to clear
+     */
+    updateSelection(bodyId) {
+        // Reset all selection visuals
+        this.bodyMeshes.forEach((mesh) => {
+            if (mesh.userData.selectionIndicator) {
+                mesh.remove(mesh.userData.selectionIndicator);
+                mesh.userData.selectionIndicator = null;
+            }
+        });
+        
+        // Add selection indicator to selected body
+        if (bodyId !== null && this.bodyMeshes.has(bodyId)) {
+            const mesh = this.bodyMeshes.get(bodyId);
+            // Add a simple scale or outline effect
+            // For now, just mark it
+            mesh.userData.isSelected = true;
+        }
+    }
+
+    /**
      * Dispose of all resources
      */
     dispose() {

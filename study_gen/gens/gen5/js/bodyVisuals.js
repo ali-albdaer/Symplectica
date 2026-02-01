@@ -579,6 +579,39 @@ export function syncBodyVisuals() {
     }
 }
 
+/**
+ * Initialize body visuals system (no-op for now, but provides consistent interface)
+ */
+export function initBodyVisuals() {
+    // Future: could pre-cache geometries and materials here
+}
+
+/**
+ * Update all trails (call each frame when trails are visible)
+ */
+export function updateTrails() {
+    const renderer = getRenderer();
+    const simulation = getSimulation();
+    const state = getState();
+    const viewScale = renderer.viewScale;
+    
+    for (const body of simulation.bodies) {
+        if (body.trail.length >= 2) {
+            let trail = renderer.trailLines.get(body.id);
+            
+            if (!trail) {
+                trail = createTrailLine(body, viewScale);
+                if (trail) {
+                    renderer.trailsGroup.add(trail);
+                    renderer.trailLines.set(body.id, trail);
+                }
+            } else {
+                updateTrailLine(trail, body, viewScale);
+            }
+        }
+    }
+}
+
 export default {
     createBodyMesh,
     updateBodyMeshPosition,
@@ -586,4 +619,6 @@ export default {
     createTrailLine,
     updateTrailLine,
     syncBodyVisuals,
+    initBodyVisuals,
+    updateTrails,
 };

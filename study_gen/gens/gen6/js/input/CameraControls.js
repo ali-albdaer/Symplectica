@@ -109,10 +109,20 @@ export class CameraControls {
          // In edit mode, change Y height
          if (this.mode === 'EDIT') {
              const zoomSpeed = this.renderEngine.cameraPhysPos.y * 0.1; // Proportional zoom
-             this.renderEngine.cameraPhysPos.y += deltaY * 0.01 * (Math.abs(this.renderEngine.cameraPhysPos.y) + 1000); // 
+             this.renderEngine.cameraPhysPos.y += deltaY * 0.01 * (Math.abs(this.renderEngine.cameraPhysPos.y) + 1000); 
              
              // Clamp min height
              if (this.renderEngine.cameraPhysPos.y < 1000) this.renderEngine.cameraPhysPos.y = 1000;
+         } else if (this.mode === 'FREE') {
+             // In FREE VIEW, scroll adjusts movement speed
+             if (deltaY < 0) this.speed *= 1.2;
+             else this.speed /= 1.2;
+             
+             // Clamp
+             if (this.speed < 1) this.speed = 1;
+             if (this.speed > 1e14) this.speed = 1e14;
+             
+             console.log("Cam Speed:", this.speed);
          }
     }
 }

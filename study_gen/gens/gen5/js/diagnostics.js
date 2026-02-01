@@ -6,10 +6,8 @@
  */
 
 import { getSimulation } from './simulation.js';
-import { getState } from './state.js';
-import { getRenderer } from './renderer.js';
 import { computeConservationQuantities } from './gravity.js';
-import { Units, C, AU } from './constants.js';
+import { Units, C } from './constants.js';
 
 /**
  * Diagnostics system for monitoring simulation health

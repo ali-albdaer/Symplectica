@@ -59,16 +59,20 @@ class Application {
             this.simulation = initSimulation();
             
             console.log('Initializing renderer...');
-            this.renderer = initRenderer();
+            const container = document.getElementById('canvas-container');
+            if (!container) {
+                throw new Error('Container element not found');
+            }
+            this.renderer = initRenderer(container);
             
             console.log('Initializing body visuals...');
             initBodyVisuals();
             
             console.log('Initializing camera controller...');
-            this.camera = initCameraController();
+            this.camera = initCameraController(this.renderer);
             
             console.log('Initializing input manager...');
-            this.input = initInputManager();
+            this.input = initInputManager(this.renderer.getCanvas());
             
             console.log('Initializing UI manager...');
             this.ui = initUIManager();
@@ -78,7 +82,7 @@ class Application {
             
             // Load default preset
             console.log('Loading default preset...');
-            loadPreset('solar_system');
+            loadPreset('solar-system');
             syncBodyVisuals();
             
             // Subscribe to state changes
@@ -268,7 +272,7 @@ class Application {
             getReport: () => getDiagnostics().getReport(),
             
             // Quick actions
-            pause: () => getSimulation().pause(),
+            pause: () => getSimulation().stop(),
             play: () => getSimulation().start(),
             step: () => getSimulation().singleStep(),
             reset: () => getSimulation().reset(),

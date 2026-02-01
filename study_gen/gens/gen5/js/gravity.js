@@ -421,6 +421,22 @@ export function totalMomentum(bodies) {
 }
 
 /**
+ * Compute all conservation quantities at once
+ * Returns an object containing total energy, momentum, and angular momentum
+ * 
+ * @param {Body[]} bodies - Array of all bodies
+ * @param {number} softening - Softening parameter
+ * @returns {{totalEnergy: number, totalMomentum: Vec3, angularMomentum: Vec3}}
+ */
+export function computeConservationQuantities(bodies, softening = 0) {
+    return {
+        totalEnergy: totalEnergy(bodies, softening),
+        totalMomentum: totalMomentum(bodies),
+        angularMomentum: totalAngularMomentum(bodies),
+    };
+}
+
+/**
  * Compute center of mass position
  * 
  * @param {Body[]} bodies - Array of all bodies
@@ -486,6 +502,7 @@ export default {
     totalPotentialEnergy,
     totalAngularMomentum,
     totalMomentum,
+    computeConservationQuantities,
     centerOfMass,
     detectCollisions,
 };
