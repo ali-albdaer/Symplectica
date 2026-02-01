@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Celestial Mechanics Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Main 3D Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Top Bar: Mode Indicator & Quick Controls -->
+    <div id="top-bar" class="ui-panel">
+        <div id="mode-indicator">
+            <span id="mode-label">EDIT MODE</span>
+            <span id="time-state">[PAUSED]</span>
+        </div>
+        <div id="quick-controls">
+            <button id="btn-play-pause" title="Start/Stop (T)">▶ Play</button>
+            <button id="btn-step" title="Single Step (.)">⏭ Step</button>
+            <button id="btn-reset" title="Reset (R)">↺ Reset</button>
+        </div>
+    </div>
+
+    <!-- Left Panel: Spawn Menu -->
+    <div id="spawn-panel" class="ui-panel side-panel">
+        <h3>Spawn Bodies</h3>
+        <div id="body-type-list">
+            <button class="spawn-btn" data-type="star">★ Star</button>
+            <button class="spawn-btn" data-type="planet">● Planet</button>
+            <button class="spawn-btn" data-type="moon">○ Moon</button>
+            <button class="spawn-btn" data-type="comet">☄ Comet</button>
+            <button class="spawn-btn" data-type="spaceship">▲ Spaceship</button>
+            <button class="spawn-btn" data-type="blackhole">◉ Black Hole</button>
+            <button class="spawn-btn" data-type="neutronstar">✦ Neutron Star</button>
+            <button class="spawn-btn" data-type="pulsar">✧ Pulsar</button>
+            <button class="spawn-btn" data-type="magnetar">✴ Magnetar</button>
+        </div>
+
+        <h3>Presets</h3>
+        <div id="preset-list">
+            <button class="preset-btn" data-preset="solar-system">Solar System</button>
+            <button class="preset-btn" data-preset="sun-earth-moon">Sun-Earth-Moon</button>
+            <button class="preset-btn" data-preset="binary-stars">Binary Stars</button>
+            <button class="preset-btn" data-preset="triple-star">Triple Star</button>
+            <button class="preset-btn" data-preset="figure-eight">Figure-8 (3-body)</button>
+        </div>
+
+        <h3>Scene</h3>
+        <div id="scene-controls">
+            <button id="btn-export">📤 Export JSON</button>
+            <button id="btn-import">📥 Import JSON</button>
+            <input type="file" id="import-file" accept=".json" style="display:none;">
+            <button id="btn-clear">🗑 Clear All</button>
+        </div>
+    </div>
+
+    <!-- Right Panel: Inspector -->
+    <div id="inspector-panel" class="ui-panel side-panel">
+        <h3>Inspector</h3>
+        <div id="inspector-content">
+            <p class="hint">Select a body to inspect</p>
+        </div>
+    </div>
+
+    <!-- Bottom Panel: Diagnostics -->
+    <div id="diagnostics-panel" class="ui-panel">
+        <div class="diag-group">
+            <span class="diag-label">FPS:</span>
+            <span id="diag-fps">0</span>
+        </div>
+        <div class="diag-group">
+            <span class="diag-label">Bodies:</span>
+            <span id="diag-bodies">0</span>
+        </div>
+        <div class="diag-group">
+            <span class="diag-label">Timestep:</span>
+            <span id="diag-timestep">0</span>
+            <span class="diag-unit">s</span>
+        </div>
+        <div class="diag-group">
+            <span class="diag-label">Sim Time:</span>
+            <span id="diag-simtime">0</span>
+            <span class="diag-unit">days</span>
+        </div>
+        <div class="diag-group">
+            <span class="diag-label">Total Energy:</span>
+            <span id="diag-energy">0</span>
+            <span class="diag-unit">J</span>
+        </div>
+        <div class="diag-group">
+            <span class="diag-label">Energy Error:</span>
+            <span id="diag-energy-error">0</span>
+            <span class="diag-unit">%</span>
+        </div>
+        <div class="diag-group">
+            <span class="diag-label">Angular Mom:</span>
+            <span id="diag-angular">0</span>
+            <span class="diag-unit">kg·m²/s</span>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="ui-panel side-panel" style="display:none;">
+        <h3>Settings</h3>
+        
+        <div class="setting-group">
+            <label>Performance Preset:</label>
+            <select id="perf-preset">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="ultra">Ultra</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <label>Integrator:</label>
+            <select id="integrator-select">
+                <option value="verlet" selected>Velocity Verlet (Symplectic)</option>
+                <option value="rk4">Runge-Kutta 4</option>
+                <option value="rk45">RK45 Adaptive</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <label>Physics Mode:</label>
+            <select id="physics-mode">
+                <option value="newtonian" selected>Newtonian</option>
+                <option value="pseudo-newtonian">Pseudo-Newtonian (Paczyński-Wiita)</option>
+                <option value="1pn">1PN Post-Newtonian</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <label>Base Timestep (s):</label>
+            <input type="number" id="timestep-input" value="3600" min="1" step="100">
+        </div>
+
+        <div class="setting-group">
+            <label>Time Scale:</label>
+            <input type="range" id="timescale-slider" min="0.1" max="100" value="1" step="0.1">
+            <span id="timescale-value">1x</span>
+        </div>
+
+        <div class="setting-group">
+            <label>Softening (m):</label>
+            <input type="number" id="softening-input" value="1000000" min="0" step="100000">
+        </div>
+
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="show-trails"> Show Trails
+            </label>
+        </div>
+
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="show-vectors"> Show Velocity Vectors
+            </label>
+        </div>
+
+        <div class="setting-group">
+            <label>
+                <input type="checkbox" id="show-grid" checked> Show Grid
+            </label>
+        </div>
+    </div>
+
+    <!-- Warning/Error Display -->
+    <div id="error-panel" class="ui-panel" style="display:none;">
+        <span id="error-icon">⚠️</span>
+        <span id="error-message"></span>
+        <button id="error-dismiss">✕</button>
+    </div>
+
+    <!-- Controls Help Overlay -->
+    <div id="controls-help" class="ui-panel" style="display:none;">
+        <h3>Controls</h3>
+        <div class="controls-grid">
+            <div class="control-key">T</div><div class="control-desc">Play/Pause simulation</div>
+            <div class="control-key">V</div><div class="control-desc">Toggle Edit/Free View</div>
+            <div class="control-key">H</div><div class="control-desc">Hide/Show UI</div>
+            <div class="control-key">R</div><div class="control-desc">Reset simulation</div>
+            <div class="control-key">.</div><div class="control-desc">Single step (paused)</div>
+            <div class="control-key">C</div><div class="control-desc">Re-center camera</div>
+            <div class="control-key">ESC</div><div class="control-desc">Release pointer lock</div>
+            <div class="control-key">1-4</div><div class="control-desc">Performance presets</div>
+            <div class="control-key">G</div><div class="control-desc">Toggle settings</div>
+            <div class="control-key">?</div><div class="control-desc">Toggle this help</div>
+        </div>
+        <h4>Edit Mode</h4>
+        <div class="controls-grid">
+            <div class="control-key">WASD</div><div class="control-desc">Pan camera</div>
+            <div class="control-key">Scroll</div><div class="control-desc">Zoom in/out</div>
+            <div class="control-key">Click</div><div class="control-desc">Select body</div>
+            <div class="control-key">Drag</div><div class="control-desc">Move body</div>
+            <div class="control-key">Del</div><div class="control-desc">Delete selected</div>
+        </div>
+        <h4>Free View</h4>
+        <div class="controls-grid">
+            <div class="control-key">WASD</div><div class="control-desc">Move camera</div>
+            <div class="control-key">Space</div><div class="control-desc">Move up</div>
+            <div class="control-key">Shift</div><div class="control-desc">Move down</div>
+            <div class="control-key">Mouse</div><div class="control-desc">Look around</div>
+        </div>
+        <button id="close-help">Close</button>
+    </div>
+
+    <!-- Three.js from CDN (ES Module compatible build) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <!-- Main Application Entry -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

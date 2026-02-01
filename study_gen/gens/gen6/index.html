@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-Body Gravity Simulation</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Import Map for Three.js (No NPM) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        <!-- Top Left: Diagnostics -->
+        <div id="diagnostics-panel" class="panel">
+            <h3>Diagnostics (H to hide)</h3>
+            <div id="fps-counter">FPS: --</div>
+            <div id="body-count">Bodies: 0</div>
+            <div id="energy-stat">Total Energy: --</div>
+            <div id="integrator-stat">Integrator: --</div>
+            <div id="time-stat">Time: 0.00 yrs</div>
+            <div id="timestep-stat">dt: -- s</div>
+        </div>
+
+        <!-- Top Right: Controls & Mode -->
+        <div id="controls-panel" class="panel">
+            <h3>Controls</h3>
+            <div class="key-hint"><span>V</span> Toggle Mode: <span id="mode-indicator" class="highlight">EDIT</span></div>
+            <div class="key-hint"><span>T</span> Pause/Resume</div>
+            <div class="key-hint"><span>WASD</span> Move Camera</div>
+            <div class="key-hint"><span>Hold Shift</span> Move Down</div>
+            <div class="key-hint"><span>Space</span> Move Up</div>
+        </div>
+
+        <!-- Bottom Left: Spawn Menu -->
+        <div id="spawn-panel" class="panel">
+            <h3>Spawn & Presets</h3>
+            <div class="control-group">
+                <label>Preset:</label>
+                <select id="preset-selector">
+                    <option value="">-- Load Preset --</option>
+                    <option value="solar_system">Solar System (Accurate)</option>
+                    <option value="sun_earth_moon">Sun-Earth-Moon</option>
+                    <option value="three_body_stable">Stable 3-Body Figure-8</option>
+                    <option value="black_hole_test">Black Hole Approach</option>
+                </select>
+                <button id="btn-load-preset">Load</button>
+            </div>
+            <hr>
+            <div class="control-group">
+                <label>Type:</label>
+                <select id="spawn-type">
+                    <option value="STAR">Star</option>
+                    <option value="PLANET" selected>Planet</option>
+                    <option value="MOON">Moon</option>
+                    <option value="BLACK_HOLE">Black Hole</option>
+                    <option value="NEUTRON_STAR">Neutron Star</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Mass (kg):</label>
+                <input type="number" id="spawn-mass" value="5.972e24" step="any">
+            </div>
+            <div class="control-group">
+                <label>Radius (km):</label>
+                <input type="number" id="spawn-radius" value="6371" step="any">
+            </div>
+            <button id="btn-spawn">Spawn at Cursor</button>
+            <button id="btn-clear">Clear All</button>
+        </div>
+
+        <!-- Bottom Right: Simulation Settings -->
+        <div id="settings-panel" class="panel">
+            <h3>Simulation Settings</h3>
+            <div class="control-group">
+                <label>Time Speed:</label>
+                <input type="range" id="time-scale" min="0" max="100000" step="100" value="1">
+            </div>
+            <div class="control-group">
+                <label>Integrator:</label>
+                <select id="integrator-select">
+                    <option value="p_sym" selected>Symplectic 4th order (Stable)</option>
+                    <option value="rk4">Runge-Kutta 4 (Precise)</option>
+                    <option value="euler">Euler (Debug)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Physics Model:</label>
+                <select id="physics-model-select">
+                    <option value="newtonian">Newtonian</option>
+                    <option value="gr_approx" selected>GR Approx (Paczynski-Wiita)</option>
+                </select>
+            </div>
+             <div class="control-group">
+                <button id="btn-export">Export State (JSON)</button>
+            </div>
+        </div>
+        
+        <!-- Selection Inspector (Hidden by default) -->
+        <div id="inspector-panel" class="panel hidden">
+            <h3>Inspector</h3>
+            <div id="inspector-content">
+                <!-- Populated via JS -->
+            </div>
+            <button id="btn-close-inspector">Close</button>
+        </div>
+        
+        <!-- Error Overlay -->
+        <div id="error-overlay" class="hidden">
+            <h2 style="color:red">Simulation Alert</h2>
+            <p id="error-message">Energy divergence detected.</p>
+            <button id="btn-dismiss-error">Dismiss</button>
+        </div>
+    </div>
+
+    <!-- Main Entry Point -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
