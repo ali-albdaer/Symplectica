@@ -223,7 +223,7 @@ export class DiagnosticsManager {
                 const bi = bodies[i];
                 const bj = bodies[j];
                 
-                const separation = bi.position.distanceTo(bj.position);
+                const separation = bi.position.distance(bj.position);
                 const combinedRadius = bi.radius + bj.radius;
                 
                 // Warn if within 5 radii
