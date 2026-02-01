@@ -628,6 +628,10 @@ export class UIManager {
             return el ? el.value : '';
         };
         
+        // Track if radius changed (need to rebuild mesh)
+        const oldRadius = body.radius;
+        let radiusChanged = false;
+        
         // Update name
         const name = getStringValue('insp-name');
         if (name) body.name = name;
@@ -638,7 +642,10 @@ export class UIManager {
         
         // Update radius
         const radius = getValue('insp-radius');
-        if (!isNaN(radius) && radius > 0) body.radius = radius;
+        if (!isNaN(radius) && radius > 0) {
+            body.radius = radius;
+            radiusChanged = (radius !== oldRadius);
+        }
         
         // Update position
         const px = getValue('insp-px');
@@ -663,8 +670,28 @@ export class UIManager {
         const simulation = getSimulation();
         simulation._updateInitialConservation();
         
+        // If radius changed, force mesh rebuild by removing old mesh
+        if (radiusChanged) {
+            const renderer = getRenderer();
+            const mesh = renderer.bodyMeshes.get(body.id);
+            if (mesh) {
+                renderer.bodiesGroup.remove(mesh);
+                if (mesh.geometry) mesh.geometry.dispose();
+                if (mesh.material) {
+                    if (Array.isArray(mesh.material)) {
+                        mesh.material.forEach(m => m.dispose());
+                    } else {
+                        mesh.material.dispose();
+                    }
+                }
+                renderer.bodyMeshes.delete(body.id);
+            }
+        }
+        
         syncBodyVisuals();
         this.update();
+        
+        console.log(`Applied changes to ${body.name}: mass=${body.mass.toExponential(2)}, radius=${body.radius.toExponential(2)}`);
     }
 
     /**

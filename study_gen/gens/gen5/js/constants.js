@@ -306,8 +306,12 @@ export const SimDefaults = {
     /** Default timestep in seconds (1 hour) */
     TIMESTEP: 3600,
 
-    /** Default softening parameter in meters */
-    SOFTENING: 1e6,
+    /** 
+     * Default softening parameter in meters 
+     * Prevents singularities when bodies get very close
+     * Set to roughly Earth radius to smooth close approaches
+     */
+    SOFTENING: 1e7,
 
     /** Maximum allowed relative energy error before warning */
     MAX_ENERGY_ERROR: 0.01,
@@ -319,7 +323,7 @@ export const SimDefaults = {
     VIEW_SCALE: AU / 100,
 
     /** Minimum distance to prevent division by zero (meters) */
-    MIN_DISTANCE: 1000,
+    MIN_DISTANCE: 1e6,
 
     /** Maximum bodies for O(n²) pairwise calculation */
     MAX_PAIRWISE_BODIES: 1000,

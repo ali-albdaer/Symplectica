@@ -149,7 +149,7 @@ html, body {
 }
 
 #body-list-panel {
-    right: 10px;
+    left: 10px;
     top: auto;
     bottom: 80px;
     max-height: 200px;

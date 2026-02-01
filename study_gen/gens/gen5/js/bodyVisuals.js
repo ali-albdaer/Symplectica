@@ -16,9 +16,16 @@ import { BodyType, isLuminous, isCompactObject } from './body.js';
 import { AU, SOLAR_RADIUS } from './constants.js';
 
 /**
- * Minimum visual radius to ensure visibility
+ * Minimum visual radius to ensure visibility (in render units)
+ * This is about 0.1% of AU at default view scale, so planets are always visible
  */
-const MIN_VISUAL_RADIUS = 0.001;
+const MIN_VISUAL_RADIUS = 0.05;
+
+/**
+ * Base scale multiplier for body display size
+ * Larger values make bodies more visible without affecting physics
+ */
+const DISPLAY_SCALE_FACTOR = 50;
 
 /**
  * Maximum trail points for performance
@@ -47,18 +54,37 @@ const BODY_COLORS = {
  * @returns {THREE.Object3D} The created mesh or group
  */
 export function createBodyMesh(body, viewScale) {
-    // Calculate visual radius
-    // Scale down large bodies logarithmically for visibility
+    // Get state for user-adjustable scale
+    const state = getState();
+    const userScale = state.bodyScale || 1;
+    
+    // Calculate visual radius with display scaling
+    // Physical radius is preserved in body.radius, this is ONLY for display
     let visualRadius = body.radius / viewScale;
+    
+    // Apply logarithmic scaling to make small bodies visible
+    // This doesn't affect physics, only rendering
+    if (body.type !== BodyType.STAR) {
+        // For planets/moons: use sqrt scaling to compress the huge range
+        // Earth radius (6.4e6m) vs AU (1.5e11m) = 4 orders of magnitude difference
+        const scaledRadius = Math.sqrt(body.radius) * DISPLAY_SCALE_FACTOR / viewScale;
+        visualRadius = Math.max(scaledRadius, MIN_VISUAL_RADIUS);
+    } else {
+        // Stars: also boost but less aggressively
+        visualRadius = Math.max(visualRadius * 10, MIN_VISUAL_RADIUS * 3);
+    }
+    
+    // Apply user scale multiplier
+    visualRadius *= userScale;
     
     // Ensure minimum visibility
     if (visualRadius < MIN_VISUAL_RADIUS) {
         visualRadius = MIN_VISUAL_RADIUS;
     }
     
-    // Cap maximum visual size for stars
-    const maxRadius = AU / viewScale / 10;
-    if (visualRadius > maxRadius && !isCompactObject(body.type)) {
+    // Cap maximum visual size to prevent overwhelming display
+    const maxRadius = AU / viewScale / 5;
+    if (visualRadius > maxRadius) {
         visualRadius = maxRadius;
     }
     

@@ -150,80 +150,113 @@ export const Presets = {
 
     /**
      * Binary star system - Two equal mass stars in circular orbit
+     * 
+     * For circular orbit: v = sqrt(G * M_other / r)
+     * With separation d, each star is at d/2 from center of mass
+     * Orbital velocity: v = sqrt(G * M / (d/2)) for each star around COM
+     * For two equal masses at separation d: v = sqrt(G * M / d) / sqrt(2)
      */
     'binary-stars': {
         name: 'Binary Stars',
         description: 'Two solar-mass stars in stable circular orbit',
         timestep: 3600,
-        bodies: [
-            // Star A
-            {
-                name: 'Star A',
-                type: BodyType.STAR,
-                mass: SOLAR_MASS,
-                radius: SOLAR_RADIUS,
-                x: -0.5 * AU, y: 0, z: 0,
-                vx: 0, vy: -2.1e4, vz: 0,  // Orbital velocity for 1 AU separation
-                color: 0xffdd44,
-                luminosity: 3.828e26,
-            },
-            // Star B
-            {
-                name: 'Star B',
-                type: BodyType.STAR,
-                mass: SOLAR_MASS,
-                radius: SOLAR_RADIUS,
-                x: 0.5 * AU, y: 0, z: 0,
-                vx: 0, vy: 2.1e4, vz: 0,
-                color: 0xff8844,
-                luminosity: 3.828e26,
-            },
-        ],
+        bodies: (() => {
+            const G = 6.67430e-11;
+            const M = SOLAR_MASS;
+            const separation = 1.0 * AU;  // 1 AU separation
+            // For two equal masses orbiting their common center of mass:
+            // v = sqrt(G * M / (2 * separation)) where M is the OTHER star's mass
+            // This simplifies to v = sqrt(G * M / separation) / sqrt(2) for each
+            const orbitalVelocity = Math.sqrt(G * M / separation) / Math.sqrt(2);
+            
+            return [
+                // Star A
+                {
+                    name: 'Star A',
+                    type: BodyType.STAR,
+                    mass: SOLAR_MASS,
+                    radius: SOLAR_RADIUS,
+                    x: -0.5 * AU, y: 0, z: 0,
+                    vx: 0, vy: 0, vz: -orbitalVelocity,
+                    color: 0xffdd44,
+                    luminosity: 3.828e26,
+                },
+                // Star B
+                {
+                    name: 'Star B',
+                    type: BodyType.STAR,
+                    mass: SOLAR_MASS,
+                    radius: SOLAR_RADIUS,
+                    x: 0.5 * AU, y: 0, z: 0,
+                    vx: 0, vy: 0, vz: orbitalVelocity,
+                    color: 0xff8844,
+                    luminosity: 3.828e26,
+                },
+            ];
+        })(),
     },
 
     /**
      * Triple star system - Hierarchical configuration
      * Inner binary + distant third star
+     * 
+     * For stability, outer star should be at least 3-5x the inner binary separation
      */
     'triple-star': {
         name: 'Triple Star',
         description: 'Hierarchical triple: close binary with distant companion',
         timestep: 1800,
-        bodies: [
-            // Inner binary - Star A
-            {
-                name: 'Star A',
-                type: BodyType.STAR,
-                mass: SOLAR_MASS,
-                radius: SOLAR_RADIUS,
-                x: -0.25 * AU, y: 0, z: 0,
-                vx: 0, vy: -3.0e4, vz: 0,
-                color: 0xffdd44,
-                luminosity: 3.828e26,
-            },
-            // Inner binary - Star B
-            {
-                name: 'Star B',
-                type: BodyType.STAR,
-                mass: SOLAR_MASS,
-                radius: SOLAR_RADIUS,
-                x: 0.25 * AU, y: 0, z: 0,
-                vx: 0, vy: 3.0e4, vz: 0,
-                color: 0xff8844,
-                luminosity: 3.828e26,
-            },
-            // Distant companion - Star C
-            {
-                name: 'Star C',
-                type: BodyType.STAR,
-                mass: 0.5 * SOLAR_MASS,
-                radius: 0.7 * SOLAR_RADIUS,
-                x: 5 * AU, y: 0, z: 0,
-                vx: 0, vy: 1.33e4, vz: 0,
-                color: 0xffaaaa,
-                luminosity: 0.5 * 3.828e26,
-            },
-        ],
+        bodies: (() => {
+            const G = 6.67430e-11;
+            const M = SOLAR_MASS;
+            
+            // Inner binary: separation 0.5 AU
+            const innerSep = 0.5 * AU;
+            const innerV = Math.sqrt(G * M / innerSep) / Math.sqrt(2);
+            
+            // Outer star: at 5 AU from center, orbiting total inner mass (2 * M)
+            const outerDist = 5 * AU;
+            const innerTotalMass = 2 * M;
+            const outerMass = 0.5 * M;
+            // Reduced mass orbit: v = sqrt(G * M_inner / r) approximately
+            const outerV = Math.sqrt(G * innerTotalMass / outerDist);
+            
+            return [
+                // Inner binary - Star A
+                {
+                    name: 'Star A',
+                    type: BodyType.STAR,
+                    mass: SOLAR_MASS,
+                    radius: SOLAR_RADIUS,
+                    x: -0.25 * AU, y: 0, z: 0,
+                    vx: 0, vy: 0, vz: -innerV,
+                    color: 0xffdd44,
+                    luminosity: 3.828e26,
+                },
+                // Inner binary - Star B
+                {
+                    name: 'Star B',
+                    type: BodyType.STAR,
+                    mass: SOLAR_MASS,
+                    radius: SOLAR_RADIUS,
+                    x: 0.25 * AU, y: 0, z: 0,
+                    vx: 0, vy: 0, vz: innerV,
+                    color: 0xff8844,
+                    luminosity: 3.828e26,
+                },
+                // Distant companion - Star C
+                {
+                    name: 'Star C',
+                    type: BodyType.STAR,
+                    mass: outerMass,
+                    radius: 0.7 * SOLAR_RADIUS,
+                    x: outerDist, y: 0, z: 0,
+                    vx: 0, vy: 0, vz: outerV,
+                    color: 0xffaaaa,
+                    luminosity: 0.5 * 3.828e26,
+                },
+            ];
+        })(),
     },
 
     /**
