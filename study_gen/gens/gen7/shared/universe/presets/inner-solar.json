@@ -1,0 +1,157 @@
+{
+  "name": "inner-solar",
+  "description": "Inner Solar System: Sun, Mercury, Venus, Earth (with Moon), Mars (with Phobos and Deimos)",
+  "settings": {
+    "integrator": "velocity-verlet"
+  },
+  "bodies": [
+    {
+      "id": "sun",
+      "name": "Sun",
+      "type": "star",
+      "mass": 1.989e30,
+      "radius": 6.957e8,
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "velocity": { "x": 0, "y": 0, "z": 0 },
+      "visual": {
+        "color": "#FDB813",
+        "emissive": 1.0,
+        "coronaScale": 1.5
+      }
+    },
+    {
+      "id": "mercury",
+      "name": "Mercury",
+      "type": "planet",
+      "mass": 3.285e23,
+      "radius": 2.4397e6,
+      "orbit": {
+        "parent": "sun",
+        "semiMajorAxis": 5.791e10,
+        "eccentricity": 0.2056,
+        "inclination": 0.122,
+        "trueAnomaly": 0.5
+      },
+      "visual": {
+        "color": "#8C7853"
+      }
+    },
+    {
+      "id": "venus",
+      "name": "Venus",
+      "type": "planet",
+      "mass": 4.867e24,
+      "radius": 6.0518e6,
+      "orbit": {
+        "parent": "sun",
+        "semiMajorAxis": 1.082e11,
+        "eccentricity": 0.0068,
+        "inclination": 0.059,
+        "trueAnomaly": 1.2
+      },
+      "visual": {
+        "color": "#E6C073",
+        "atmosphere": {
+          "color": "#E8D5A3",
+          "density": 65.0,
+          "scaleHeight": 15900
+        }
+      }
+    },
+    {
+      "id": "earth",
+      "name": "Earth",
+      "type": "planet",
+      "mass": 5.972e24,
+      "radius": 6.371e6,
+      "orbit": {
+        "parent": "sun",
+        "semiMajorAxis": 1.496e11,
+        "eccentricity": 0.0167,
+        "inclination": 0,
+        "trueAnomaly": 2.5
+      },
+      "visual": {
+        "color": "#2E86AB",
+        "atmosphere": {
+          "color": "#87CEEB",
+          "density": 1.225,
+          "scaleHeight": 8500
+        }
+      }
+    },
+    {
+      "id": "moon",
+      "name": "Moon",
+      "type": "moon",
+      "mass": 7.342e22,
+      "radius": 1.7374e6,
+      "orbit": {
+        "parent": "earth",
+        "semiMajorAxis": 3.844e8,
+        "eccentricity": 0.0549,
+        "inclination": 0.0898,
+        "trueAnomaly": 0.8
+      },
+      "visual": {
+        "color": "#A0A0A0"
+      }
+    },
+    {
+      "id": "mars",
+      "name": "Mars",
+      "type": "planet",
+      "mass": 6.39e23,
+      "radius": 3.3895e6,
+      "orbit": {
+        "parent": "sun",
+        "semiMajorAxis": 2.279e11,
+        "eccentricity": 0.0934,
+        "inclination": 0.032,
+        "trueAnomaly": 4.0
+      },
+      "visual": {
+        "color": "#C1440E",
+        "atmosphere": {
+          "color": "#D4A574",
+          "density": 0.020,
+          "scaleHeight": 11100
+        }
+      }
+    },
+    {
+      "id": "phobos",
+      "name": "Phobos",
+      "type": "moon",
+      "mass": 1.0659e16,
+      "radius": 1.1267e4,
+      "orbit": {
+        "parent": "mars",
+        "semiMajorAxis": 9.376e6,
+        "eccentricity": 0.0151,
+        "inclination": 0.0192,
+        "trueAnomaly": 0
+      },
+      "visual": {
+        "color": "#6B5B4F"
+      }
+    },
+    {
+      "id": "deimos",
+      "name": "Deimos",
+      "type": "moon",
+      "mass": 1.4762e15,
+      "radius": 6.2e3,
+      "orbit": {
+        "parent": "mars",
+        "semiMajorAxis": 2.346e7,
+        "eccentricity": 0.0002,
+        "inclination": 0.0316,
+        "trueAnomaly": 3.14
+      },
+      "visual": {
+        "color": "#5A4A42"
+      }
+    }
+  ]
+}
