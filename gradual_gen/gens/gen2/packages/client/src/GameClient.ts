@@ -587,6 +587,9 @@ export class GameClient {
   }
 
   private onWorldState(state: WorldStateMessage): void {
+    console.log('onWorldState received, current UI state:', this.ui.getState());
+    console.log('World:', state.worldName, 'Bodies:', state.bodies.length);
+    
     // Initialize bodies from server state
     for (const bodyDef of state.bodies) {
       let body = this.localBodies.get(bodyDef.id);
@@ -603,8 +606,10 @@ export class GameClient {
 
     // If first world state, show spawn selection
     if (this.ui.getState() === 'connecting') {
+      console.log('Transitioning to spawn-select');
       this.ui.populateSpawnSelection(state.bodies);
       this.ui.setState('spawn-select');
+      console.log('UI state after transition:', this.ui.getState());
     }
   }
 

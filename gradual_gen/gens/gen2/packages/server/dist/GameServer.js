@@ -110,13 +110,17 @@ export class GameServer {
      */
     handleMessage(socket, data) {
         try {
+            console.log('Raw message received, type:', typeof data, 'isBuffer:', data instanceof Buffer);
             // Handle binary messages (input)
-            if (data instanceof Buffer || data instanceof ArrayBuffer) {
+            if (data instanceof ArrayBuffer) {
+                console.log('Handling as ArrayBuffer');
                 this.handleBinaryMessage(socket, data);
                 return;
             }
-            // Parse JSON message
-            const message = JSON.parse(data.toString());
+            // Parse JSON message - Buffer or string
+            const str = data.toString();
+            console.log('Parsing as JSON:', str.substring(0, 100));
+            const message = JSON.parse(str);
             this.handleJSONMessage(socket, message);
         }
         catch (error) {
@@ -129,6 +133,7 @@ export class GameServer {
      */
     handleJSONMessage(socket, message) {
         const session = this.sessions.getSessionBySocket(socket);
+        console.log('Received message:', message.type, message);
         switch (message.type) {
             case MessageType.JOIN:
                 this.handleJoin(socket, message);

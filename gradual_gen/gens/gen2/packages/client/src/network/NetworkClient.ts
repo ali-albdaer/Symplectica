@@ -155,6 +155,7 @@ export class NetworkClient {
 
       // JSON message
       const message: NetworkMessage = JSON.parse(event.data);
+      console.log('Received message:', message.type, message);
 
       switch (message.type) {
         case MessageType.JOINED: {
@@ -227,13 +228,15 @@ export class NetworkClient {
    * Send a message to the server
    */
   send(message: NetworkMessage): void {
-    if (!this.ws || !this.isConnected) {
-      console.warn('Cannot send: not connected');
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('Cannot send: not connected, readyState:', this.ws?.readyState);
       return;
     }
 
     try {
-      this.ws.send(JSON.stringify(message));
+      const json = JSON.stringify(message);
+      console.log('Sending message:', message.type, json.substring(0, 100));
+      this.ws.send(json);
     } catch (error) {
       console.error('Failed to send message:', error);
     }
