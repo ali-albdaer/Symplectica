@@ -10,6 +10,7 @@ import {
   BodyType,
   BodyClass,
   Vector3,
+  Quaternion,
   SOLAR_MASS,
   EARTH_MASS,
   EARTH_RADIUS,
@@ -26,86 +27,86 @@ export interface OrbitalElements {
 
 export interface BodyTemplate {
   type: BodyType;
-  class: BodyClass;
+  bodyClass: BodyClass;
   name: string;
   mass: number;
   radius: number;
-  color: number;
+  color: [number, number, number];
   description?: string;
 }
 
 // Pre-defined templates for common body types
 export const BODY_TEMPLATES: BodyTemplate[] = [
   {
-    type: BodyType.STAR,
-    class: BodyClass.G,
+    type: BodyType.MASSIVE,
+    bodyClass: BodyClass.STAR,
     name: 'Sun-like Star',
     mass: SOLAR_MASS,
     radius: 6.96340e8,
-    color: 0xffff00,
+    color: [1, 1, 0],
     description: 'G-type main sequence star similar to the Sun',
   },
   {
-    type: BodyType.STAR,
-    class: BodyClass.M,
+    type: BodyType.MASSIVE,
+    bodyClass: BodyClass.STAR,
     name: 'Red Dwarf',
     mass: SOLAR_MASS * 0.1,
     radius: 6.96340e8 * 0.3,
-    color: 0xff4400,
+    color: [1, 0.27, 0],
     description: 'Small, cool red dwarf star',
   },
   {
-    type: BodyType.PLANET,
-    class: BodyClass.TERRESTRIAL,
+    type: BodyType.MASSIVE,
+    bodyClass: BodyClass.TERRESTRIAL,
     name: 'Earth-like Planet',
     mass: EARTH_MASS,
     radius: EARTH_RADIUS,
-    color: 0x4488ff,
+    color: [0.27, 0.53, 1],
     description: 'Rocky planet with potential for life',
   },
   {
-    type: BodyType.PLANET,
-    class: BodyClass.GAS_GIANT,
+    type: BodyType.MASSIVE,
+    bodyClass: BodyClass.GAS_GIANT,
     name: 'Gas Giant',
     mass: EARTH_MASS * 318,
     radius: EARTH_RADIUS * 11.2,
-    color: 0xffaa66,
+    color: [1, 0.67, 0.4],
     description: 'Jupiter-like gas giant',
   },
   {
-    type: BodyType.PLANET,
-    class: BodyClass.ICE_GIANT,
+    type: BodyType.MASSIVE,
+    bodyClass: BodyClass.ICE_GIANT,
     name: 'Ice Giant',
     mass: EARTH_MASS * 14.5,
     radius: EARTH_RADIUS * 4,
-    color: 0x66ccff,
+    color: [0.4, 0.8, 1],
     description: 'Neptune-like ice giant',
   },
   {
-    type: BodyType.MOON,
-    class: BodyClass.TERRESTRIAL,
+    type: BodyType.MASSIVE,
+    bodyClass: BodyClass.MOON,
     name: 'Moon',
     mass: EARTH_MASS * 0.0123,
     radius: EARTH_RADIUS * 0.273,
-    color: 0xaaaaaa,
+    color: [0.67, 0.67, 0.67],
     description: 'Rocky natural satellite',
   },
   {
-    type: BodyType.ASTEROID,
-    class: BodyClass.ASTEROID,
+    type: BodyType.MASSIVE,
+    bodyClass: BodyClass.ASTEROID,
     name: 'Asteroid',
     mass: 1e15,
     radius: 5000,
-    color: 0x666666,
+    color: [0.4, 0.4, 0.4],
     description: 'Small rocky body',
   },
   {
-    type: BodyType.BLACK_HOLE,
-    class: BodyClass.BLACK_HOLE,
+    type: BodyType.MASSIVE,
+    bodyClass: BodyClass.BLACK_HOLE,
     name: 'Stellar Black Hole',
     mass: SOLAR_MASS * 10,
     radius: 30000, // Schwarzschild radius for 10 solar masses
-    color: 0x000000,
+    color: [0, 0, 0],
     description: 'Collapsed stellar remnant',
   },
 ];
@@ -135,13 +136,24 @@ export class WorldBuilder {
       id,
       name: template.name,
       type: template.type,
-      class: template.class,
+      bodyClass: template.bodyClass,
       mass: template.mass,
       radius: template.radius,
+      oblateness: 0,
+      rotationPeriod: 86400, // 1 day default
+      axialTilt: 0,
+      softening: Math.max(1000, template.radius * 0.001),
       position,
       velocity,
+      orientation: new Quaternion(),
+      angularVelocity: 0,
+      parentId: parent?.id ?? null,
+      childIds: [],
+      soiRadius: 0,
       color: template.color,
-      parentId: parent?.id,
+      albedo: 0.3,
+      emissive: template.bodyClass === BodyClass.STAR,
+      description: template.description,
     };
 
     this.bodies.push(body);
@@ -370,7 +382,7 @@ export class WorldBuilder {
         // Update nextId to avoid collisions
         for (const body of this.bodies) {
           const match = body.id.match(/custom_body_(\d+)/);
-          if (match) {
+          if (match && match[1]) {
             this.nextId = Math.max(this.nextId, parseInt(match[1], 10) + 1);
           }
         }

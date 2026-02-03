@@ -57,18 +57,18 @@ export class CelestialBody {
   public color: [number, number, number];
   public albedo: number;
   public emissive: boolean;
-  public emissiveColor?: [number, number, number];
-  public emissiveIntensity?: number;
+  public emissiveColor: [number, number, number] | undefined;
+  public emissiveIntensity: number | undefined;
 
   // Extended properties
-  public atmosphere?: AtmosphereProperties;
-  public rings?: RingProperties;
-  public starProperties?: StarProperties;
-  public blackHoleProperties?: BlackHoleProperties;
-  public terrain?: TerrainProperties;
+  public atmosphere: AtmosphereProperties | undefined;
+  public rings: RingProperties | undefined;
+  public starProperties: StarProperties | undefined;
+  public blackHoleProperties: BlackHoleProperties | undefined;
+  public terrain: TerrainProperties | undefined;
 
   // Metadata
-  public description?: string;
+  public description: string | undefined;
   public tags: string[];
   public userData: Record<string, unknown>;
 

@@ -256,8 +256,8 @@ export class BlackHoleShader {
    * Update time uniform for animation
    */
   static updateTime(material: THREE.ShaderMaterial, time: number): void {
-    if (material.uniforms.time) {
-      material.uniforms.time.value = time;
+    if (material.uniforms['time']) {
+      material.uniforms['time'].value = time;
     }
   }
 

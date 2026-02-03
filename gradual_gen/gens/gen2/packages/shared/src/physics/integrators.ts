@@ -367,6 +367,16 @@ export class GaussRadauIntegrator implements Integrator {
     this._minDt = minDt;
   }
 
+  /** Get tolerance for adaptive stepping */
+  get tolerance(): number {
+    return this._tolerance;
+  }
+
+  /** Get minimum timestep */
+  get minDt(): number {
+    return this._minDt;
+  }
+
   step(
     body: CelestialBody,
     dt: number,

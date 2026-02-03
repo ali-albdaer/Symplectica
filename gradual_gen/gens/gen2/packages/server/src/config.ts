@@ -2,7 +2,7 @@
  * Game Server Configuration
  */
 
-import { PhysicsConfig, GravityMethod, DEFAULT_PHYSICS_CONFIG } from '@space-sim/shared';
+import { type PhysicsConfig, DEFAULT_PHYSICS_CONFIG } from '@space-sim/shared';
 
 export interface ServerConfig {
   // Network

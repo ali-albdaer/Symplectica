@@ -260,7 +260,9 @@ export class ProceduralStarfield {
   update(deltaTime: number): void {
     if (this.options.twinkle) {
       this.time += deltaTime;
-      this.material.uniforms.time.value = this.time;
+      if (this.material.uniforms['time']) {
+        this.material.uniforms['time'].value = this.time;
+      }
     }
   }
 
@@ -291,7 +293,9 @@ export class ProceduralStarfield {
    */
   setTwinkle(enabled: boolean): void {
     this.options.twinkle = enabled;
-    this.material.uniforms.enableTwinkle.value = enabled;
+    if (this.material.uniforms['enableTwinkle']) {
+      this.material.uniforms['enableTwinkle'].value = enabled;
+    }
   }
 
   /**

@@ -15,6 +15,7 @@
 import { Vector3 } from '../math/Vector3.js';
 import { CelestialBody } from '../bodies/CelestialBody.js';
 import { BodyType, CelestialBodyDefinition } from '../bodies/types.js';
+import type { WorldState } from '../bodies/presets.js';
 import { 
   G, 
   PHYSICS_TIMESTEP, 

@@ -6,19 +6,16 @@ import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Player,
-  PlayerMode,
-  PlayerState,
-  PlayerInputState,
-  CelestialBody,
-  Vector3,
-  NetworkMessage,
+  type PlayerState,
+  type PlayerInputState,
+  type CelestialBody,
+  type NetworkMessage,
   MessageType,
   createMessage,
-  JoinedMessage,
-  PlayerJoinedMessage,
-  PlayerLeftMessage,
-  ChatMessageMessage,
-  SystemMessageMessage
+  type PlayerJoinedMessage,
+  type PlayerLeftMessage,
+  type ChatMessageMessage,
+  type SystemMessageMessage
 } from '@space-sim/shared';
 
 /**

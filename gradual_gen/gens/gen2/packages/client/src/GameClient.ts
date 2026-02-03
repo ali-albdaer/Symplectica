@@ -19,11 +19,11 @@ import {
   Vector3,
   PHYSICS_DT,
   AU,
-  WorldStateMessage,
-  CelestialBodyDefinition,
-  PRESETS,
+  type WorldStateMessage,
+  type CelestialBodyDefinition,
+  getPresetWorld,
   GravityMethod,
-  BodyType,
+  createPhysicsEngine,
 } from '@space-sim/shared';
 
 import { FloatingOriginCamera } from './rendering/FloatingOriginCamera';
@@ -182,8 +182,8 @@ export class GameClient {
     console.log('Starting in offline mode...');
 
     // Create physics engine with solar system preset
-    const preset = PRESETS.get('sun-earth-moon')!;
-    this.physics = new PhysicsEngine({
+    const preset = getPresetWorld('sun-earth-moon')!;
+    this.physics = createPhysicsEngine({
       gravityMethod: GravityMethod.BARNES_HUT,
       barnesHutTheta: 0.5,
     });
@@ -191,19 +191,19 @@ export class GameClient {
     // Add bodies from preset
     for (const bodyDef of preset.bodies) {
       const body = new CelestialBody(bodyDef);
-      this.physics.addBody(body);
+      this.physics.addBody(bodyDef);
       this.localBodies.set(body.id, body);
       this.celestialRenderer.addBody(body);
     }
 
     // Create player
     this.player = new Player('offline-player', 'Player');
-    this.player.setMode(PlayerMode.SPACE);
+    this.player.mode = PlayerMode.SPACE;
 
     // Spawn at Earth
     const earth = this.localBodies.get('earth');
     if (earth) {
-      const spawnHeight = earth.definition.radius + 10000; // 10km above surface
+      const spawnHeight = earth.radius + 10000; // 10km above surface
       this.player.position.set(
         earth.position.x + spawnHeight,
         earth.position.y,
@@ -288,7 +288,7 @@ export class GameClient {
       }
 
       // Update local bodies from physics
-      for (const body of this.physics.getBodies()) {
+      for (const body of this.physics.getAllBodies()) {
         this.localBodies.set(body.id, body);
       }
     }
@@ -430,8 +430,8 @@ export class GameClient {
       }
 
       if (nearestBody) {
-        const altitude = nearestDist - nearestBody.definition.radius;
-        this.ui.updateAltitude(altitude, nearestBody.definition.name);
+        const altitude = nearestDist - nearestBody.radius;
+        this.ui.updateAltitude(altitude, nearestBody.name);
       }
     }
 
@@ -443,12 +443,17 @@ export class GameClient {
       1 // TODO: Track player count
     );
 
+    // Color array to hex helper
+    const colorToHex = (c: [number, number, number]): number => {
+      return (Math.floor(c[0] * 255) << 16) | (Math.floor(c[1] * 255) << 8) | Math.floor(c[2] * 255);
+    };
+
     // Update minimap
     const minimapBodies = Array.from(this.localBodies.values()).map((body) => ({
       x: body.position.x,
       y: body.position.z, // Top-down view
-      radius: body.definition.radius,
-      color: body.definition.color || 0x888888,
+      radius: body.radius,
+      color: colorToHex(body.color),
     }));
 
     this.ui.updateMinimap(
@@ -491,7 +496,7 @@ export class GameClient {
     } else if (this.config.offlineMode) {
       const body = this.localBodies.get(bodyId);
       if (body && this.player) {
-        const spawnHeight = body.definition.radius + 10000;
+        const spawnHeight = body.radius + 10000;
         this.player.position.set(
           body.position.x + spawnHeight,
           body.position.y,
@@ -571,12 +576,17 @@ export class GameClient {
   }
 
   private onWorldState(state: WorldStateMessage): void {
-    // Update local bodies from server state
-    for (const bodyState of state.bodies) {
-      const body = this.localBodies.get(bodyState.id);
-      if (body) {
-        body.position.set(bodyState.x, bodyState.y, bodyState.z);
-        body.velocity.set(bodyState.vx, bodyState.vy, bodyState.vz);
+    // Initialize bodies from server state
+    for (const bodyDef of state.bodies) {
+      let body = this.localBodies.get(bodyDef.id);
+      if (!body) {
+        body = new CelestialBody(bodyDef);
+        this.localBodies.set(body.id, body);
+        this.celestialRenderer.addBody(body);
+      } else {
+        // Update existing body from definition
+        body.position.set(bodyDef.position.x, bodyDef.position.y, bodyDef.position.z);
+        body.velocity.set(bodyDef.velocity.x, bodyDef.velocity.y, bodyDef.velocity.z);
       }
     }
   }

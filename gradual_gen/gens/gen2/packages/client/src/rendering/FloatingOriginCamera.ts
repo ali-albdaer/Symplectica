@@ -22,21 +22,10 @@ export class FloatingOriginCamera {
   public yaw: number = 0;
   public pitch: number = 0;
 
-  // Camera settings (stored for reference)
-  private _fov: number;
-  private _near: number;
-  private _far: number;
-  private _aspect: number;
-
   // Logarithmic depth buffer scale
   private logDepthC: number;
 
   constructor(fov: number = 75, aspect: number = 1, near: number = 0.1, far: number = 1e16) {
-    this._fov = fov;
-    this._aspect = aspect;
-    this._near = near;
-    this._far = far;
-
     // Create perspective camera at origin
     this.camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
     this.camera.position.set(0, 0, 0);
@@ -173,7 +162,6 @@ export class FloatingOriginCamera {
    * Set aspect ratio
    */
   setAspect(aspect: number): void {
-    this._aspect = aspect;
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
   }
@@ -182,7 +170,6 @@ export class FloatingOriginCamera {
    * Set FOV
    */
   setFOV(fov: number): void {
-    this._fov = fov;
     this.camera.fov = fov;
     this.camera.updateProjectionMatrix();
   }

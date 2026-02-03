@@ -6,40 +6,37 @@
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
-import { v4 as uuidv4 } from 'uuid';
 import {
   PhysicsEngine,
   createPhysicsEngine,
-  WorldState,
+  type WorldState,
   getPresetWorld,
-  CelestialBody,
   Vector3,
   PHYSICS_TIMESTEP,
   NETWORK_TIMESTEP,
-  NetworkMessage,
+  type NetworkMessage,
   MessageType,
   createMessage,
-  JoinMessage,
-  JoinedMessage,
-  PingMessage,
-  PongMessage,
-  PlayerInputMessage,
-  WorldStateMessage,
-  WorldDeltaMessage,
-  PlayerStateMessage,
-  ChatMessageMessage,
-  WorldBuilderActionMessage,
+  type JoinMessage,
+  type JoinedMessage,
+  type PingMessage,
+  type PongMessage,
+  type PlayerInputMessage,
+  type WorldStateMessage,
+  type PlayerStateMessage,
+  type ChatMessageMessage,
+  type WorldBuilderActionMessage,
   WorldBuilderActionType,
-  ConfigUpdateMessage,
-  TimeScaleMessage,
-  ErrorMessage,
+  type ConfigUpdateMessage,
+  type TimeScaleMessage,
+  type ErrorMessage,
   encodeBodyStates,
   buildIdHashMap,
-  BodyNetworkState,
-  CelestialBodyDefinition
+  type BodyNetworkState,
+  type CelestialBodyDefinition
 } from '@space-sim/shared';
 
-import { ServerConfig, DEFAULT_SERVER_CONFIG, loadServerConfig } from './config.js';
+import { type ServerConfig, DEFAULT_SERVER_CONFIG } from './config.js';
 import { SessionManager, ClientSession } from './SessionManager.js';
 
 /**
@@ -447,7 +444,7 @@ export class GameServer {
   /**
    * Handle configuration update
    */
-  private handleConfigUpdate(session: ClientSession, message: ConfigUpdateMessage): void {
+  private handleConfigUpdate(_session: ClientSession, message: ConfigUpdateMessage): void {
     this.physics.setConfig(message.config);
     this.sessions.broadcastSystemMessage('Physics configuration updated', 'info');
   }
@@ -455,7 +452,7 @@ export class GameServer {
   /**
    * Handle time scale change
    */
-  private handleTimeScale(session: ClientSession, message: TimeScaleMessage): void {
+  private handleTimeScale(_session: ClientSession, message: TimeScaleMessage): void {
     this.physics.setTimeScale(message.scale);
     this.sessions.broadcastSystemMessage(`Time scale: ${message.scale}x`, 'info');
   }

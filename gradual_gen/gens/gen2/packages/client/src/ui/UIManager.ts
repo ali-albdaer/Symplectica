@@ -4,7 +4,7 @@
  * Handles all UI elements and state transitions.
  */
 
-import { CelestialBodyDefinition, BodyType, formatDistance, formatMass } from '@space-sim/shared';
+import { CelestialBodyDefinition, BodyClass, formatDistance, formatMass } from '@space-sim/shared';
 
 export type UIState = 'connecting' | 'spawn-select' | 'playing' | 'paused' | 'chat' | 'world-builder';
 
@@ -45,7 +45,10 @@ export class UIManager {
   private elements: UIElements;
   private state: UIState = 'connecting';
   private selectedSpawnBody: string | null = null;
-  private _bodies: CelestialBodyDefinition[] = [];
+
+  // Bodies for spawn selection (used for validation)
+  public getBodies(): CelestialBodyDefinition[] { return this.storedBodies; }
+  private storedBodies: CelestialBodyDefinition[] = [];
 
   // Callbacks
   public onConnect?: (playerName: string) => void;
@@ -216,12 +219,15 @@ export class UIManager {
    * Populate spawn selection with bodies
    */
   populateSpawnSelection(bodies: CelestialBodyDefinition[]): void {
-    this._bodies = bodies;
+    this.storedBodies = bodies;
     this.elements.planetGrid.innerHTML = '';
 
-    // Filter to only planets and moons
+    // Filter to only planets and moons (using bodyClass)
     const spawnableBodies = bodies.filter(
-      (b) => b.type === BodyType.PLANET || b.type === BodyType.MOON
+      (b) => b.bodyClass === BodyClass.TERRESTRIAL || 
+             b.bodyClass === BodyClass.GAS_GIANT ||
+             b.bodyClass === BodyClass.ICE_GIANT ||
+             b.bodyClass === BodyClass.MOON
     );
 
     for (const body of spawnableBodies) {
@@ -231,7 +237,10 @@ export class UIManager {
 
     // Select first by default
     if (spawnableBodies.length > 0 && !this.selectedSpawnBody) {
-      this.selectSpawnBody(spawnableBodies[0].id);
+      const firstBody = spawnableBodies[0];
+      if (firstBody) {
+        this.selectSpawnBody(firstBody.id);
+      }
     }
   }
 
@@ -243,12 +252,17 @@ export class UIManager {
     card.className = 'planet-card';
     card.dataset['bodyId'] = body.id;
 
+    // Convert RGB array to hex color
+    const colorToHex = (c: [number, number, number]): number => {
+      return (Math.floor(c[0] * 255) << 16) | (Math.floor(c[1] * 255) << 8) | Math.floor(c[2] * 255);
+    };
+
     // Color circle
     const colorCircle = document.createElement('div');
     colorCircle.style.width = '60px';
     colorCircle.style.height = '60px';
     colorCircle.style.borderRadius = '50%';
-    colorCircle.style.backgroundColor = `#${(body.color || 0x888888).toString(16).padStart(6, '0')}`;
+    colorCircle.style.backgroundColor = `#${colorToHex(body.color).toString(16).padStart(6, '0')}`;
     colorCircle.style.marginBottom = '0.5rem';
     colorCircle.style.boxShadow = '0 0 20px rgba(255,255,255,0.2)';
     card.appendChild(colorCircle);

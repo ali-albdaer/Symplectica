@@ -234,25 +234,25 @@ export interface CelestialBodyDefinition {
   /** Emissive (self-illuminating) */
   emissive: boolean;
   /** Emissive color RGB (0-1) if applicable */
-  emissiveColor?: [number, number, number];
+  emissiveColor?: [number, number, number] | undefined;
   /** Emissive intensity multiplier */
-  emissiveIntensity?: number;
+  emissiveIntensity?: number | undefined;
   
   // Optional extended properties
-  atmosphere?: AtmosphereProperties;
-  rings?: RingProperties;
-  starProperties?: StarProperties;
-  pulsarProperties?: PulsarProperties;
-  blackHoleProperties?: BlackHoleProperties;
-  terrain?: TerrainProperties;
+  atmosphere?: AtmosphereProperties | undefined;
+  rings?: RingProperties | undefined;
+  starProperties?: StarProperties | undefined;
+  pulsarProperties?: PulsarProperties | undefined;
+  blackHoleProperties?: BlackHoleProperties | undefined;
+  terrain?: TerrainProperties | undefined;
   
   // Metadata
   /** Description for UI */
-  description?: string;
+  description?: string | undefined;
   /** Tags for filtering */
-  tags?: string[];
+  tags?: string[] | undefined;
   /** Custom data */
-  userData?: Record<string, unknown>;
+  userData?: Record<string, unknown> | undefined;
 }
 
 /**

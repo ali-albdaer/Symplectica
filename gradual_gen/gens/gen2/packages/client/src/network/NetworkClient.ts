@@ -7,12 +7,24 @@
 
 import {
   MessageType,
-  NetworkMessage,
-  decodeWorldState,
-  WorldStateMessage,
-  PlayerInputState,
-  CelestialBodyDefinition,
-  Vector3,
+  type NetworkMessage,
+  type JoinMessage,
+  type JoinedMessage,
+  type PlayerJoinedMessage,
+  type PlayerLeftMessage,
+  type ChatMessageMessage,
+  type ErrorMessage,
+  type PingMessage,
+  type PongMessage,
+  type BodyAddMessage,
+  type BodyRemoveMessage,
+  type WorldStateMessage,
+  type PlayerInputMessage,
+  type PlayerInputState,
+  type CelestialBodyDefinition,
+  type Vector3,
+  decodeBodyStates,
+  buildIdHashMap,
 } from '@space-sim/shared';
 
 export interface ServerConfig {
@@ -56,6 +68,9 @@ export class NetworkClient {
   private playerId: string | null = null;
   private playerName: string = 'Player';
 
+  // ID hash map for binary decoding
+  private idHashMap: Map<number, string> = new Map();
+
   constructor(config: ServerConfig, events: NetworkClientEvents = {}) {
     this.config = config;
     this.events = events;
@@ -81,10 +96,12 @@ export class NetworkClient {
           this.reconnectAttempts = 0;
 
           // Send join message
-          this.send({
+          const joinMsg: JoinMessage = {
             type: MessageType.JOIN,
-            payload: { name: playerName },
-          });
+            timestamp: Date.now(),
+            playerName: playerName,
+          };
+          this.send(joinMsg);
 
           // Start ping interval
           this.startPing();
@@ -128,10 +145,11 @@ export class NetworkClient {
    */
   private handleMessage(event: MessageEvent): void {
     try {
-      // Check if binary (world state)
+      // Check if binary (body state updates)
       if (event.data instanceof ArrayBuffer) {
-        const state = decodeWorldState(event.data);
-        this.events.onWorldState?.(state);
+        const result = decodeBodyStates(event.data, this.idHashMap);
+        // Handle binary state update - this is handled separately
+        console.log('Received binary state update:', result.states.length, 'bodies');
         return;
       }
 
@@ -139,53 +157,63 @@ export class NetworkClient {
       const message: NetworkMessage = JSON.parse(event.data);
 
       switch (message.type) {
-        case MessageType.JOIN_ACK:
-          this.playerId = message.payload.playerId;
+        case MessageType.JOINED: {
+          const joined = message as JoinedMessage;
+          this.playerId = joined.playerId;
           console.log('Joined as player:', this.playerId);
           break;
+        }
 
-        case MessageType.PLAYER_JOINED:
-          this.events.onPlayerJoined?.(
-            message.payload.playerId,
-            message.payload.name
-          );
+        case MessageType.PLAYER_JOINED: {
+          const pj = message as PlayerJoinedMessage;
+          this.events.onPlayerJoined?.(pj.playerId, pj.playerName);
           break;
+        }
 
-        case MessageType.PLAYER_LEFT:
-          this.events.onPlayerLeft?.(message.payload.playerId);
+        case MessageType.PLAYER_LEFT: {
+          const pl = message as PlayerLeftMessage;
+          this.events.onPlayerLeft?.(pl.playerId);
           break;
+        }
 
-        case MessageType.CHAT:
-          this.events.onChat?.(
-            message.payload.playerId,
-            message.payload.playerName,
-            message.payload.message
-          );
+        case MessageType.CHAT_MESSAGE: {
+          const chat = message as ChatMessageMessage;
+          this.events.onChat?.(chat.playerId, chat.playerName, chat.message);
           break;
+        }
 
-        case MessageType.BODY_ADDED:
-          this.events.onBodyAdded?.(message.payload.body);
+        case MessageType.BODY_ADD: {
+          const bodyAdd = message as BodyAddMessage;
+          this.events.onBodyAdded?.(bodyAdd.body);
           break;
+        }
 
-        case MessageType.BODY_REMOVED:
-          this.events.onBodyRemoved?.(message.payload.bodyId);
+        case MessageType.BODY_REMOVE: {
+          const bodyRemove = message as BodyRemoveMessage;
+          this.events.onBodyRemoved?.(bodyRemove.bodyId);
           break;
+        }
 
-        case MessageType.SPAWN_CONFIRM:
-          this.events.onSpawnConfirm?.(
-            message.payload.success,
-            message.payload.position
-          );
+        case MessageType.WORLD_STATE: {
+          const worldState = message as WorldStateMessage;
+          // Build ID hash map for binary decoding
+          this.idHashMap = buildIdHashMap(worldState.bodies.map(b => b.id));
+          this.events.onWorldState?.(worldState);
           break;
+        }
 
-        case MessageType.PONG:
-          this.latency = performance.now() - this.lastPingTime;
+        case MessageType.PONG: {
+          const pong = message as PongMessage;
+          this.latency = performance.now() - pong.clientTime;
           this.events.onPing?.(this.latency);
           break;
+        }
 
-        case MessageType.ERROR:
-          console.error('Server error:', message.payload.message);
+        case MessageType.ERROR: {
+          const err = message as ErrorMessage;
+          console.error('Server error:', err.message);
           break;
+        }
 
         default:
           console.warn('Unknown message type:', message.type);
@@ -222,50 +250,59 @@ export class NetworkClient {
       sequence: this.inputSequence++,
     };
 
-    this.send({
-      type: MessageType.INPUT,
-      payload: fullInput,
-    });
+    const msg: PlayerInputMessage = {
+      type: MessageType.PLAYER_INPUT,
+      timestamp: Date.now(),
+      playerId: this.playerId || '',
+      input: fullInput,
+    };
+    this.send(msg);
   }
 
   /**
    * Send chat message
    */
-  sendChat(message: string): void {
-    this.send({
-      type: MessageType.CHAT,
-      payload: { message },
-    });
+  sendChat(text: string): void {
+    const msg: ChatMessageMessage = {
+      type: MessageType.CHAT_MESSAGE,
+      timestamp: Date.now(),
+      playerId: this.playerId || '',
+      playerName: this.playerName,
+      message: text,
+    };
+    this.send(msg);
   }
 
   /**
    * Request spawn at a specific body
    */
-  requestSpawn(bodyId: string): void {
-    this.send({
-      type: MessageType.SPAWN_REQUEST,
-      payload: { bodyId },
-    });
+  requestSpawn(_bodyId: string): void {
+    // TODO: Implement spawn request message type when added to protocol
+    console.log('Spawn request not yet implemented');
   }
 
   /**
    * Add a celestial body (world builder mode)
    */
   addBody(body: CelestialBodyDefinition): void {
-    this.send({
-      type: MessageType.BODY_ADDED,
-      payload: { body },
-    });
+    const msg: BodyAddMessage = {
+      type: MessageType.BODY_ADD,
+      timestamp: Date.now(),
+      body,
+    };
+    this.send(msg);
   }
 
   /**
    * Remove a celestial body
    */
   removeBody(bodyId: string): void {
-    this.send({
-      type: MessageType.BODY_REMOVED,
-      payload: { bodyId },
-    });
+    const msg: BodyRemoveMessage = {
+      type: MessageType.BODY_REMOVE,
+      timestamp: Date.now(),
+      bodyId,
+    };
+    this.send(msg);
   }
 
   /**
@@ -275,7 +312,12 @@ export class NetworkClient {
     this.pingInterval = window.setInterval(() => {
       if (this.isConnected) {
         this.lastPingTime = performance.now();
-        this.send({ type: MessageType.PING, payload: {} });
+        const msg: PingMessage = {
+          type: MessageType.PING,
+          timestamp: Date.now(),
+          clientTime: this.lastPingTime,
+        };
+        this.send(msg);
       }
     }, 1000);
   }
@@ -318,7 +360,6 @@ export class NetworkClient {
     this.stopPing();
 
     if (this.ws) {
-      this.send({ type: MessageType.LEAVE, payload: {} });
       this.ws.close();
       this.ws = null;
     }

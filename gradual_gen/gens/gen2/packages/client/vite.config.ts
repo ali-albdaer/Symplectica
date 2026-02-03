@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import path from 'path';
 
 export default defineConfig({
   root: '.',
@@ -18,7 +19,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@space-sim/shared': '../shared/src'
+      '@space-sim/shared': path.resolve(__dirname, '../shared/dist/index.js')
     }
   }
 });
