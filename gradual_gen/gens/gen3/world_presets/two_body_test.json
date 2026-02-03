@@ -1,0 +1,32 @@
+{
+    "id": "two_body_test",
+    "name": "Two Body Test",
+    "description": "Simple Sun-Earth system for validation testing",
+    "config": {
+        "dt": 0.016666666666666666,
+        "softeningLength": 1000000,
+        "collisionMode": "merge"
+    },
+    "bodies": [
+        {
+            "id": "sun",
+            "name": "Sun",
+            "bodyType": "Star",
+            "mass": 1.989e30,
+            "radius": 6.96e8,
+            "position": { "x": 0, "y": 0, "z": 0 },
+            "velocity": { "x": 0, "y": 0, "z": 0 },
+            "visuals": { "color": 16776960, "emission": 1 }
+        },
+        {
+            "id": "earth",
+            "name": "Earth",
+            "bodyType": "Planet",
+            "mass": 5.972e24,
+            "radius": 6371000,
+            "position": { "x": 149597870700, "y": 0, "z": 0 },
+            "velocity": { "x": 0, "y": 29784.8, "z": 0 },
+            "visuals": { "color": 7050198 }
+        }
+    ]
+}

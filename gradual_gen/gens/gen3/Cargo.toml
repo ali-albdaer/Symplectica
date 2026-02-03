@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "packages/physics",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["N-Body Simulator Team"]
+license = "MIT"
+repository = "https://github.com/example/nbody-simulator"
+
+[workspace.dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+web-sys = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+getrandom = { version = "0.2", features = ["js"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

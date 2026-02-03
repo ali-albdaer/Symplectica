@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        #hud {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: #0f0;
+            font-size: 12px;
+            line-height: 1.6;
+            z-index: 100;
+            pointer-events: none;
+            text-shadow: 0 0 2px #000;
+        }
+        #hud-right {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            color: #0f0;
+            font-size: 12px;
+            text-align: right;
+            z-index: 100;
+            pointer-events: none;
+            text-shadow: 0 0 2px #000;
+        }
+        #chat-container {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            width: 400px;
+            z-index: 100;
+        }
+        #chat-log {
+            height: 150px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            padding: 5px;
+            color: #fff;
+            font-size: 12px;
+        }
+        #chat-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #555;
+            border-top: none;
+            color: #fff;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 12px;
+            outline: none;
+        }
+        #chat-input:focus {
+            border-color: #0f0;
+        }
+        #login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #login-box {
+            background: #111;
+            border: 1px solid #333;
+            padding: 30px;
+            text-align: center;
+        }
+        #login-box h1 {
+            color: #0f0;
+            margin-bottom: 20px;
+        }
+        #login-box input {
+            width: 200px;
+            padding: 10px;
+            background: #000;
+            border: 1px solid #555;
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        #login-box input:focus {
+            border-color: #0f0;
+            outline: none;
+        }
+        #login-box button {
+            padding: 10px 30px;
+            background: #0f0;
+            border: none;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        #login-box button:hover {
+            background: #0c0;
+        }
+        #connection-status {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f00;
+            font-size: 18px;
+            z-index: 500;
+            display: none;
+        }
+        .chat-system { color: #ff0; }
+        .chat-player { color: #0ff; }
+        .chat-message { color: #fff; }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="hud">
+        <div>Position: <span id="hud-position">0, 0, 0</span></div>
+        <div>Velocity: <span id="hud-velocity">0 m/s</span></div>
+        <div>Near Body: <span id="hud-near-body">None</span></div>
+        <div>SOI: <span id="hud-soi">N/A</span></div>
+    </div>
+    
+    <div id="hud-right">
+        <div>FPS: <span id="hud-fps">0</span></div>
+        <div>Ping: <span id="hud-ping">0</span> ms</div>
+        <div>Tick: <span id="hud-tick">0</span></div>
+        <div>Bodies: <span id="hud-bodies">0</span></div>
+    </div>
+    
+    <div id="chat-container">
+        <div id="chat-log"></div>
+        <input type="text" id="chat-input" placeholder="Press Enter to chat...">
+    </div>
+    
+    <div id="login-overlay">
+        <div id="login-box">
+            <h1>SPACE SIMULATOR</h1>
+            <input type="text" id="player-name" placeholder="Enter your name" maxlength="16">
+            <br>
+            <button id="join-btn">JOIN</button>
+        </div>
+    </div>
+    
+    <div id="connection-status">Connection Lost - Reconnecting...</div>
+    
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

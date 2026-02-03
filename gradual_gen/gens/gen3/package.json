@@ -1,0 +1,44 @@
+{
+  "name": "nbody-space-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "High-Fidelity Multiplayer N-Body Space Simulator",
+  "workspaces": [
+    "packages/physics",
+    "packages/server",
+    "packages/client",
+    "tests"
+  ],
+  "scripts": {
+    "build:wasm": "cd packages/physics && wasm-pack build --target web --release --out-dir pkg",
+    "build:server": "cd packages/server && npm run build",
+    "build:client": "cd packages/client && npm run build",
+    "build": "npm run build:wasm && npm run build:server && npm run build:client",
+    "dev:server": "cd packages/server && npm run dev",
+    "dev:client": "cd packages/client && npm run dev",
+    "start:server": "cd packages/server && npm start",
+    "test": "npm run test:rust && npm run test:ts",
+    "test:rust": "cd packages/physics && cargo test",
+    "test:ts": "cd tests && npm test",
+    "test:two-body": "cd tests && npm run test:two-body",
+    "test:energy": "cd tests && npm run test:energy",
+    "test:prng": "cd tests && npm run test:prng"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "keywords": [
+    "n-body",
+    "simulation",
+    "physics",
+    "space",
+    "multiplayer",
+    "wasm",
+    "webgl"
+  ],
+  "author": "N-Body Simulator Team",
+  "license": "MIT"
+}

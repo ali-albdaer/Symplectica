@@ -1,0 +1,28 @@
+[package]
+name = "physics"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["wasm"]
+wasm = ["wasm-bindgen", "js-sys", "web-sys", "getrandom/js"]
+native = []
+
+[dependencies]
+wasm-bindgen = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = ["console"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+getrandom = { workspace = true, optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O4"]

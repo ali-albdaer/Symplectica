@@ -1,0 +1,32 @@
+{
+    "id": "earth_moon",
+    "name": "Earth-Moon System",
+    "description": "Earth with its Moon in circular orbit",
+    "config": {
+        "dt": 0.016666666666666666,
+        "softeningLength": 1000,
+        "collisionMode": "merge"
+    },
+    "bodies": [
+        {
+            "id": "earth",
+            "name": "Earth",
+            "bodyType": "Planet",
+            "mass": 5.972e24,
+            "radius": 6371000,
+            "position": { "x": 0, "y": 0, "z": 0 },
+            "velocity": { "x": 0, "y": 0, "z": 0 },
+            "visuals": { "color": 7050198 }
+        },
+        {
+            "id": "moon",
+            "name": "Moon",
+            "bodyType": "Moon",
+            "mass": 7.342e22,
+            "radius": 1737400,
+            "position": { "x": 384400000, "y": 0, "z": 0 },
+            "velocity": { "x": 0, "y": 1022, "z": 0 },
+            "visuals": { "color": 11184810 }
+        }
+    ]
+}
