@@ -228,8 +228,7 @@ export class Renderer {
     switch (body.celestialType) {
       case 'star':
         material = new THREE.MeshBasicMaterial({
-          color: 0xffff80,
-          emissive: new THREE.Color(0xffff00)
+          color: 0xffff80
         });
         break;
         
@@ -377,6 +376,33 @@ export class Renderer {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+  }
+  
+  /**
+   * Public resize method
+   */
+  resize(): void {
+    this.onResize();
+  }
+  
+  /**
+   * Set camera offset from follow target
+   */
+  setCameraOffset(offset: [number, number, number]): void {
+    this.camera.position.set(offset[0], offset[1], offset[2]);
+  }
+  
+  /**
+   * Set follow target (body position to center on)
+   */
+  setFollowTarget(position: [number, number, number]): void {
+    // Update origin offset so target is at center
+    this.originOffset.x = position[0];
+    this.originOffset.y = position[1];
+    this.originOffset.z = position[2];
+    
+    // Camera looks at origin (which is target)
+    this.camera.lookAt(0, 0, 0);
   }
   
   /**

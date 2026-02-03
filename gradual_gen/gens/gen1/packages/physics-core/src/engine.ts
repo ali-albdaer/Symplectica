@@ -20,10 +20,8 @@ import {
   PHYSICS_DT,
   PHYSICS_TICK_RATE,
   FLOATING_ORIGIN_THRESHOLD,
-  SOI_SWITCH_FACTOR,
   Vec3,
   SimulationError,
-  validateNumber,
   type PhysicsConfig,
   type CelestialBody,
   type BodyId,
@@ -76,7 +74,7 @@ interface EngineState {
 /**
  * Energy tracking for validation
  */
-interface EnergyState {
+export interface EnergyState {
   /** Total kinetic energy in J */
   kinetic: number;
   

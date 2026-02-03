@@ -268,6 +268,37 @@ export class InputManager {
   }
   
   /**
+   * Enable input handling
+   */
+  enable(): void {
+    this.requestPointerLock();
+  }
+  
+  /**
+   * Update input state (call each frame)
+   */
+  update(_deltaTime: number): void {
+    // Reset one-frame actions
+    this.state.jump = false;
+    this.state.interact = false;
+    this.resetDeltas();
+  }
+  
+  /**
+   * Get current yaw
+   */
+  getYaw(): number {
+    return this.state.yaw;
+  }
+  
+  /**
+   * Get current pitch
+   */
+  getPitch(): number {
+    return this.state.pitch;
+  }
+  
+  /**
    * Reset delta values (call after processing)
    */
   resetDeltas(): void {

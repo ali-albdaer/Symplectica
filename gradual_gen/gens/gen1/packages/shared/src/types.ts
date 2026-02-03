@@ -363,6 +363,8 @@ export type MessageType =
   | 'disconnect'
   | 'ping'
   | 'pong'
+  | 'identify'
+  | 'identified'
   // State sync
   | 'world-state'
   | 'state-delta'
@@ -370,11 +372,17 @@ export type MessageType =
   | 'player-update'
   // Player actions
   | 'player-join'
+  | 'player-joined'
   | 'player-leave'
+  | 'player-left'
   | 'player-input'
   | 'player-spawn'
+  | 'player-spawned'
   | 'player-teleport'
+  | 'spawn'
+  | 'input'
   // Chat
+  | 'chat'
   | 'chat-message'
   | 'system-message'
   // World builder

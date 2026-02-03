@@ -16,7 +16,7 @@
  * @module gravity/barnes-hut
  */
 
-import { Vec3, G, BARNES_HUT_THETA, MIN_FORCE_DISTANCE } from '@nbody/shared';
+import { Vec3, BARNES_HUT_THETA, MIN_FORCE_DISTANCE } from '@nbody/shared';
 import type { MutableVector3D, Vector3D } from '@nbody/shared';
 
 /**

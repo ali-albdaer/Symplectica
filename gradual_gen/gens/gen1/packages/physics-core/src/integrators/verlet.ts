@@ -18,7 +18,6 @@
  * @module integrators/verlet
  */
 
-import { Vec3 } from '@nbody/shared';
 import type { MutableVector3D } from '@nbody/shared';
 import type { IntegrationState, Integrator, AccelerationFunction } from './types.js';
 

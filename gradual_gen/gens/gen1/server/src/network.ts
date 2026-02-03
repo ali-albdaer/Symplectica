@@ -439,7 +439,7 @@ export class GameServer {
     const bodies = this.world.getAllBodies();
     const players = this.world.getAllPlayers();
     
-    const message = {
+    const message: ServerMessage = {
       type: 'world-state',
       timestamp: Date.now(),
       tick: this.world.getTick(),
@@ -458,7 +458,7 @@ export class GameServer {
     const bodies = this.world.getAllBodies();
     const players = this.world.getAllPlayers();
     
-    const message = {
+    const message: ServerMessage = {
       type: 'world-state',
       timestamp: Date.now(),
       tick: this.world.getTick(),

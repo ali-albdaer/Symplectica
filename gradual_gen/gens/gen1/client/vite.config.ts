@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'path';
 
 export default defineConfig({
   root: '.',
@@ -14,7 +15,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@nbody/shared': '../packages/shared/src'
+      '@nbody/shared': resolve(__dirname, '../packages/shared/src/index.ts')
     }
   }
 });
