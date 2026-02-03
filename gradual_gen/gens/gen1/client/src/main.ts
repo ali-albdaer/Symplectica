@@ -53,7 +53,7 @@ const state: AppState = {
   players: new Map(),
   
   followBodyId: null,
-  cameraDistance: 1e8 // 100,000 km default
+  cameraDistance: 50 // 50 meters default (third person view)
 };
 
 // Systems
@@ -317,27 +317,28 @@ function gameLoop(time: number): void {
             velocity: velocityMag,
             bodyName: body.name
           });
+          
+          // Update camera position relative to player
+          const yaw = inputManager.getYaw();
+          const pitch = inputManager.getPitch();
+          
+          // Calculate camera position (orbital around player)
+          const dist = state.cameraDistance;
+          
+          // Spherical coordinates: camera orbits around player based on yaw/pitch
+          // yaw = horizontal rotation, pitch = vertical angle
+          const camX = dist * Math.cos(pitch) * Math.sin(yaw);
+          const camY = dist * Math.sin(pitch);
+          const camZ = dist * Math.cos(pitch) * Math.cos(yaw);
+          
+          const camOffset: [number, number, number] = [camX, camY, camZ];
+          
+          renderer.setCameraOffset(camOffset);
+          // Camera origin is at player position
+          renderer.setFollowTarget(player.position as [number, number, number]);
+          // Camera looks at player (origin after setFollowTarget)
+          renderer.lookAtOrigin();
         }
-        
-        // Update camera position relative to followed body
-        const yaw = inputManager.getYaw();
-        const pitch = inputManager.getPitch();
-        
-        // Calculate camera position
-        const dist = state.cameraDistance;
-        const cy = Math.cos(yaw);
-        const sy = Math.sin(yaw);
-        const cp = Math.cos(pitch);
-        const sp = Math.sin(pitch);
-        
-        const camOffset: [number, number, number] = [
-          dist * cp * sy,
-          dist * sp,
-          dist * cp * cy
-        ];
-        
-        renderer.setCameraOffset(camOffset);
-        renderer.setFollowTarget(body.position as [number, number, number]);
       }
     }
   }
@@ -355,9 +356,9 @@ document.addEventListener('wheel', (e) => {
   
   const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
   state.cameraDistance = Math.max(
-    1e4,  // 10 km min
+    5,       // 5 meters min (close third person)
     Math.min(
-      1e12, // 1 billion km max
+      1e9,   // 1 million km max
       state.cameraDistance * zoomFactor
     )
   );

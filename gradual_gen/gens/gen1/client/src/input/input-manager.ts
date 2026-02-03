@@ -153,9 +153,9 @@ export class InputManager {
     this.state.mouseDeltaX = event.movementX;
     this.state.mouseDeltaY = event.movementY;
     
-    // Update look direction
-    this.state.yaw -= event.movementX * this.sensitivity;
-    this.state.pitch -= event.movementY * this.sensitivity;
+    // Update look direction (positive = camera moves right/up relative to view)
+    this.state.yaw += event.movementX * this.sensitivity;
+    this.state.pitch += event.movementY * this.sensitivity;
     
     // Clamp pitch to prevent flipping
     this.state.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.state.pitch));
@@ -177,6 +177,13 @@ export class InputManager {
    * Request pointer lock
    */
   requestPointerLock(): void {
+    // Don't lock if clicking on UI elements
+    const uiOverlay = document.getElementById('ui-overlay');
+    const activeModal = uiOverlay?.querySelector('.modal:not(.hidden)');
+    if (activeModal) {
+      return; // Don't capture pointer when modal is open
+    }
+    
     if (!this.pointerLocked) {
       this.canvas.requestPointerLock();
     }

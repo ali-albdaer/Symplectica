@@ -333,7 +333,7 @@ export class Renderer {
   /**
    * Render frame
    */
-  render(alpha: number = 0): void {
+  render(alpha: number = 1): void {
     // Update FPS counter
     const now = performance.now();
     this.frameCount++;
@@ -345,10 +345,10 @@ export class Renderer {
     
     // Update body mesh positions (convert to camera-relative Float32)
     for (const body of this.bodies.values()) {
-      // Interpolate between previous and current position
-      const x = body.previousPosition.x + (body.absolutePosition.x - body.previousPosition.x) * alpha;
-      const y = body.previousPosition.y + (body.absolutePosition.y - body.previousPosition.y) * alpha;
-      const z = body.previousPosition.z + (body.absolutePosition.z - body.previousPosition.z) * alpha;
+      // Use current absolute position (interpolation disabled for now)
+      const x = body.absolutePosition.x;
+      const y = body.absolutePosition.y;
+      const z = body.absolutePosition.z;
       
       // Convert to camera-relative (Float32 precision is fine for rendering)
       body.mesh.position.set(
@@ -400,9 +400,24 @@ export class Renderer {
     this.originOffset.x = position[0];
     this.originOffset.y = position[1];
     this.originOffset.z = position[2];
-    
-    // Camera looks at origin (which is target)
+  }
+  
+  /**
+   * Make camera look at origin (player position)
+   */
+  lookAtOrigin(): void {
     this.camera.lookAt(0, 0, 0);
+  }
+  
+  /**
+   * Make camera look at body center (relative to current origin)
+   */
+  lookAtBodyCenter(bodyCenter: [number, number, number]): void {
+    // Body center in camera-relative coordinates
+    const relX = bodyCenter[0] - this.originOffset.x;
+    const relY = bodyCenter[1] - this.originOffset.y;
+    const relZ = bodyCenter[2] - this.originOffset.z;
+    this.camera.lookAt(relX, relY, relZ);
   }
   
   /**

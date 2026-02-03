@@ -426,7 +426,7 @@ export class GameServer {
       type: 'world-state',
       timestamp: Date.now(),
       tick: this.world.getTick(),
-      julianDate: this.world.getTime(),
+      julianDate: this.world.getJulianDate(),
       bodies: bodies.map(b => this.serializeBody(b)),
       players: players.map(p => this.serializePlayer(p))
     });
@@ -443,7 +443,7 @@ export class GameServer {
       type: 'world-state',
       timestamp: Date.now(),
       tick: this.world.getTick(),
-      julianDate: this.world.getTime(),
+      julianDate: this.world.getJulianDate(),
       bodies: bodies.map(b => this.serializeBody(b)),
       players: players.map(p => this.serializePlayer(p))
     };
@@ -462,7 +462,7 @@ export class GameServer {
       type: 'world-state',
       timestamp: Date.now(),
       tick: this.world.getTick(),
-      julianDate: this.world.getTime(),
+      julianDate: this.world.getJulianDate(),
       bodies: bodies.map(b => this.serializeBody(b)),
       players: players.map(p => this.serializePlayer(p))
     };
