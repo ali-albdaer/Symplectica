@@ -21,6 +21,7 @@ import {
   AU,
   type WorldStateMessage,
   type CelestialBodyDefinition,
+  type PlayerState,
   getPresetWorld,
   GravityMethod,
   createPhysicsEngine,
@@ -149,6 +150,7 @@ export class GameClient {
           onBodyAdded: (body) => this.onBodyAdded(body),
           onBodyRemoved: (id) => this.onBodyRemoved(id),
           onSpawnConfirm: (success, pos) => this.onSpawnConfirm(success, pos),
+          onPlayerStateUpdate: (players) => this.onPlayerStateUpdate(players),
           onPing: (latency) => this.onPing(latency),
         }
       );
@@ -610,6 +612,35 @@ export class GameClient {
       this.ui.populateSpawnSelection(state.bodies);
       this.ui.setState('spawn-select');
       console.log('UI state after transition:', this.ui.getState());
+    }
+  }
+
+  private onPlayerStateUpdate(players: PlayerState[]): void {
+    console.log('onPlayerStateUpdate received:', players.length, 'players');
+    
+    // Find our player in the state update
+    if (!this.player && this.network) {
+      const ourPlayerId = this.network.getPlayerId();
+      const ourState = players.find(p => p.playerId === ourPlayerId);
+      
+      if (ourState) {
+        // Initialize our player if not already done
+        if (!this.player) {
+          this.player = new Player(ourPlayerId);
+        }
+        
+        // Update player position and state
+        this.player.position.set(ourState.position[0], ourState.position[1], ourState.position[2]);
+        this.player.velocity.set(ourState.velocity[0], ourState.velocity[1], ourState.velocity[2]);
+        this.player.currentBodyId = ourState.currentBodyId;
+        
+        // Transition to playing state if we're in spawn-select
+        if (this.ui.getState() === 'spawn-select') {
+          console.log('Player spawned, transitioning to playing');
+          this.ui.setState('playing');
+          this.ui.showControlsModal();
+        }
+      }
     }
   }
 

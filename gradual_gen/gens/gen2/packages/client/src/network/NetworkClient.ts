@@ -21,6 +21,8 @@ import {
   type WorldStateMessage,
   type PlayerInputMessage,
   type PlayerInputState,
+  type PlayerStateMessage,
+  type PlayerState,
   type CelestialBodyDefinition,
   type Vector3,
   decodeBodyStates,
@@ -44,6 +46,7 @@ export interface NetworkClientEvents {
   onBodyAdded?: (body: CelestialBodyDefinition) => void;
   onBodyRemoved?: (bodyId: string) => void;
   onSpawnConfirm?: (success: boolean, spawnPoint: Vector3) => void;
+  onPlayerStateUpdate?: (players: PlayerState[]) => void;
   onPing?: (latency: number) => void;
 }
 
@@ -200,6 +203,12 @@ export class NetworkClient {
           // Build ID hash map for binary decoding
           this.idHashMap = buildIdHashMap(worldState.bodies.map(b => b.id));
           this.events.onWorldState?.(worldState);
+          break;
+        }
+
+        case MessageType.PLAYER_STATE: {
+          const playerState = message as PlayerStateMessage;
+          this.events.onPlayerStateUpdate?.(playerState.players);
           break;
         }
 
