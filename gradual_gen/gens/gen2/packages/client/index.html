@@ -34,6 +34,7 @@
           <div id="planet-grid" class="planet-grid">
             <!-- Populated dynamically -->
           </div>
+          <button id="spawn-btn" class="btn-primary" disabled>Select a Planet</button>
         </div>
       </div>
 
@@ -65,7 +66,15 @@
               <div class="control-row"><kbd>Esc</kbd><span>Menu</span></div>
             </div>
           </div>
-          <button id="start-btn" class="btn-primary">Start</button>
+          <button id="controls-ok-btn" class="btn-primary">Start</button>
+        </div>
+      </div>
+
+      <!-- Pause Overlay -->
+      <div id="pause-overlay" class="modal hidden">
+        <div class="modal-content">
+          <h2>Paused</h2>
+          <p>Click anywhere to resume</p>
         </div>
       </div>
 
@@ -73,18 +82,20 @@
       <div id="hud" class="hidden">
         <!-- Coordinates -->
         <div id="coordinates" class="hud-panel top-left">
-          <div class="coord-line">Position: <span id="pos-display">0, 0, 0</span> m</div>
-          <div class="coord-line">Velocity: <span id="vel-display">0</span> m/s</div>
-          <div class="coord-line">Altitude: <span id="alt-display">0</span> m</div>
-          <div class="coord-line">SOI: <span id="soi-display">-</span></div>
+          <div class="coord-line">X: <span id="pos-x">0</span> m</div>
+          <div class="coord-line">Y: <span id="pos-y">0</span> m</div>
+          <div class="coord-line">Z: <span id="pos-z">0</span> m</div>
+          <div class="coord-line">Velocity: <span id="vel-mag">0</span> m/s</div>
+          <div class="coord-line">Altitude: <span id="altitude-value">0</span> m</div>
+          <div class="coord-line">SOI: <span id="nearest-body">-</span></div>
         </div>
 
         <!-- Diagnostics -->
         <div id="diagnostics" class="hud-panel top-right">
-          <div class="diag-line">FPS: <span id="fps-display">0</span></div>
-          <div class="diag-line">Ping: <span id="ping-display">0</span> ms</div>
-          <div class="diag-line">Tick: <span id="tick-display">0</span></div>
-          <div class="diag-line">Time: <span id="time-display">0</span> s</div>
+          <div class="diag-line">FPS: <span id="fps-value">0</span></div>
+          <div class="diag-line">Ping: <span id="latency-value">0</span> ms</div>
+          <div class="diag-line">Bodies: <span id="bodies-value">0</span></div>
+          <div class="diag-line">Players: <span id="players-value">0</span></div>
         </div>
 
         <!-- Chat -->
@@ -95,6 +106,9 @@
 
         <!-- Crosshair -->
         <div id="crosshair">+</div>
+
+        <!-- Minimap -->
+        <canvas id="minimap" class="hud-panel bottom-right" width="200" height="200"></canvas>
       </div>
     </div>
   </div>

@@ -480,10 +480,19 @@ export class GameClient {
    */
   private async handleConnect(playerName: string): Promise<void> {
     if (this.network) {
+      // Show loading state
+      this.ui.setConnectButtonLoading(true);
+      
       const success = await this.network.connect(playerName);
+      
+      this.ui.setConnectButtonLoading(false);
+      
       if (!success) {
-        this.ui.showConnectionError('Failed to connect to server');
+        this.ui.showConnectionError('Failed to connect to server. Is the server running?');
       }
+    } else {
+      // No network configured - shouldn't happen in online mode
+      this.ui.showConnectionError('Network not configured');
     }
   }
 
@@ -568,6 +577,8 @@ export class GameClient {
 
   private onNetworkConnect(): void {
     console.log('Connected to server');
+    this.ui.addChatMessage('System', 'Connected to server!', true);
+    // Transition to spawn selection - server will send world state
   }
 
   private onNetworkDisconnect(reason: string): void {
@@ -588,6 +599,12 @@ export class GameClient {
         body.position.set(bodyDef.position.x, bodyDef.position.y, bodyDef.position.z);
         body.velocity.set(bodyDef.velocity.x, bodyDef.velocity.y, bodyDef.velocity.z);
       }
+    }
+
+    // If first world state, show spawn selection
+    if (this.ui.getState() === 'connecting') {
+      this.ui.populateSpawnSelection(state.bodies);
+      this.ui.setState('spawn-select');
     }
   }
 

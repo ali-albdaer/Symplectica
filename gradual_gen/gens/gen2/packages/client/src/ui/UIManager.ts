@@ -209,6 +209,21 @@ export class UIManager {
   }
 
   /**
+   * Set connect button loading state
+   */
+  setConnectButtonLoading(loading: boolean): void {
+    if (loading) {
+      this.elements.connectBtn.textContent = 'Connecting...';
+      this.elements.connectBtn.setAttribute('disabled', 'true');
+      (this.elements.connectBtn as HTMLButtonElement).style.opacity = '0.7';
+    } else {
+      this.elements.connectBtn.textContent = 'Connect';
+      this.elements.connectBtn.removeAttribute('disabled');
+      (this.elements.connectBtn as HTMLButtonElement).style.opacity = '1';
+    }
+  }
+
+  /**
    * Hide controls modal
    */
   hideControlsModal(): void {
