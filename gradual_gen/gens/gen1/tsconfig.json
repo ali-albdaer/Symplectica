@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@nbody/shared": ["packages/shared/src"],
+      "@nbody/physics-core": ["packages/physics-core/src"]
+    }
+  },
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/physics-core" },
+    { "path": "server" },
+    { "path": "client" }
+  ],
+  "exclude": ["node_modules", "**/dist"]
+}
