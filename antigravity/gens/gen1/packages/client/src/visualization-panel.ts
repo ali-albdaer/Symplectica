@@ -11,12 +11,8 @@
 
 export interface VisualizationOptions {
     showOrbitTrails: boolean;
-    showVelocityVectors: boolean;
-    showAccelerationVectors: boolean;
     showLabels: boolean;
-    showGrid: boolean;
     orbitTrailLength: number;
-    vectorScale: number;
     realScale: boolean;
     bodyScale: number; // multiplier for body sizes (1 = real scale)
 }
@@ -26,14 +22,10 @@ export class VisualizationPanel {
     private isOpen = false;
     private options: VisualizationOptions = {
         showOrbitTrails: true,
-        showVelocityVectors: false,
-        showAccelerationVectors: false,
         showLabels: false,
-        showGrid: false,
         orbitTrailLength: 50,
-        vectorScale: 1e-4,
-        realScale: false,
-        bodyScale: 1000, // default 1000x for visibility
+        realScale: true, // default to 1:1 actual size
+        bodyScale: 1, // 1x = real scale
     };
     private onChange: (options: VisualizationOptions) => void;
 
@@ -66,23 +58,8 @@ export class VisualizationPanel {
                     </label>
                     
                     <label class="viz-toggle">
-                        <input type="checkbox" id="viz-velocity">
-                        <span class="viz-toggle-label">Velocity Vectors</span>
-                    </label>
-                    
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-accel">
-                        <span class="viz-toggle-label">Acceleration Vectors</span>
-                    </label>
-                    
-                    <label class="viz-toggle">
                         <input type="checkbox" id="viz-labels">
                         <span class="viz-toggle-label">Body Labels</span>
-                    </label>
-                    
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-grid">
-                        <span class="viz-toggle-label">Reference Grid</span>
                     </label>
                 </section>
                 
@@ -97,27 +74,17 @@ export class VisualizationPanel {
                 </section>
                 
                 <section class="viz-section">
-                    <h3>Vector Settings</h3>
-                    
-                    <div class="viz-field">
-                        <label>Vector Scale</label>
-                        <input type="range" id="viz-vector-scale" min="-8" max="-2" step="0.5" value="-4">
-                        <span id="viz-vector-scale-value">10⁻⁴</span>
-                    </div>
-                </section>
-                
-                <section class="viz-section">
                     <h3>Body Scale</h3>
                     
                     <label class="viz-toggle">
-                        <input type="checkbox" id="viz-real-scale">
+                        <input type="checkbox" id="viz-real-scale" checked>
                         <span class="viz-toggle-label">Real Scale (1:1)</span>
                     </label>
                     
-                    <div class="viz-field" id="viz-body-scale-field">
+                    <div class="viz-field" id="viz-body-scale-field" style="opacity: 0.3">
                         <label>Size Multiplier</label>
-                        <input type="range" id="viz-body-scale" min="1" max="4" step="0.1" value="3">
-                        <span id="viz-body-scale-value">1000×</span>
+                        <input type="range" id="viz-body-scale" min="1" max="4" step="0.1" value="1" disabled>
+                        <span id="viz-body-scale-value">1×</span>
                     </div>
                     
                     <div class="viz-hint">Real scale: bodies are extremely small relative to distances</div>
@@ -265,33 +232,15 @@ export class VisualizationPanel {
 
         // Checkboxes
         const orbits = container.querySelector('#viz-orbits') as HTMLInputElement;
-        const velocity = container.querySelector('#viz-velocity') as HTMLInputElement;
-        const accel = container.querySelector('#viz-accel') as HTMLInputElement;
         const labels = container.querySelector('#viz-labels') as HTMLInputElement;
-        const grid = container.querySelector('#viz-grid') as HTMLInputElement;
 
         orbits?.addEventListener('change', () => {
             this.options.showOrbitTrails = orbits.checked;
             this.notifyChange();
         });
 
-        velocity?.addEventListener('change', () => {
-            this.options.showVelocityVectors = velocity.checked;
-            this.notifyChange();
-        });
-
-        accel?.addEventListener('change', () => {
-            this.options.showAccelerationVectors = accel.checked;
-            this.notifyChange();
-        });
-
         labels?.addEventListener('change', () => {
             this.options.showLabels = labels.checked;
-            this.notifyChange();
-        });
-
-        grid?.addEventListener('change', () => {
-            this.options.showGrid = grid.checked;
             this.notifyChange();
         });
 
@@ -302,16 +251,6 @@ export class VisualizationPanel {
         trailLength?.addEventListener('input', () => {
             this.options.orbitTrailLength = parseInt(trailLength.value);
             trailLengthValue.textContent = `${trailLength.value} points`;
-            this.notifyChange();
-        });
-
-        const vectorScale = container.querySelector('#viz-vector-scale') as HTMLInputElement;
-        const vectorScaleValue = container.querySelector('#viz-vector-scale-value') as HTMLElement;
-
-        vectorScale?.addEventListener('input', () => {
-            const exp = parseFloat(vectorScale.value);
-            this.options.vectorScale = Math.pow(10, exp);
-            vectorScaleValue.textContent = `10^${exp}`;
             this.notifyChange();
         });
 
