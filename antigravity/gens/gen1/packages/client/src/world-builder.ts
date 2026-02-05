@@ -462,6 +462,10 @@ export class WorldBuilder {
                 break;
         }
 
+        // IMPORTANT: Reset physics timestep after creating new simulation
+        // Without this, the new simulation won't move
+        this.physics.setTimeStep(3600); // 1 hour per step
+
         this.updateBodyList();
         this.onUpdate();
     }

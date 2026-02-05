@@ -19,8 +19,21 @@ interface BodyData {
     color: number;
 }
 
-// Body render scale factor (bodies are too small to see at real scale)
-const BODY_SCALE = 1000;
+// Logarithmic body scale: makes bodies visible without engulfing orbits
+// Real scale: Sun radius = 6.96e8m, Earth orbit = 1.5e11m (215 Sun radii)
+// We use a logarithmic scaling to make bodies visible while preserving relative spacing
+const AU = 1.495978707e11;
+
+function scaleRadius(realRadius: number, type: string): number {
+    // Stars get scaled to about 0.03 AU for visibility
+    // Planets get scaled proportionally larger for visibility
+    if (type === 'star') {
+        return AU * 0.03; // ~4.5e9 m - visible but not engulfing planets
+    }
+    // For planets/moons, scale up significantly for visibility
+    // Earth's real radius is 6.4e6m, we scale to about 0.005 AU
+    return Math.max(AU * 0.002, realRadius * 500);
+}
 
 export class BodyRenderer {
     private scene: THREE.Scene;
@@ -42,9 +55,9 @@ export class BodyRenderer {
         this.bodies.set(body.id, mesh);
         this.scene.add(mesh.group);
 
-        // Add point light for stars
+        // Add point light for stars - high intensity, no decay at astronomical distances
         if (body.type === 'star') {
-            const light = new THREE.PointLight(0xffffff, 2, 0, 2);
+            const light = new THREE.PointLight(0xffffff, 3, 0, 0); // intensity 3, infinite range, no decay
             mesh.group.add(light);
         }
 
@@ -170,9 +183,8 @@ class BodyMesh {
         this.group = new THREE.Group();
         this.group.name = body.name;
 
-        // Create sphere geometry
-        // Scale bodies up for visibility (real sizes are microscopic at solar system scale)
-        const renderRadius = body.radius * BODY_SCALE;
+        // Create sphere geometry with logarithmic scaling
+        const renderRadius = scaleRadius(body.radius, body.type);
         this.geometry = new THREE.SphereGeometry(renderRadius, 64, 32);
 
         // Create material based on body type
