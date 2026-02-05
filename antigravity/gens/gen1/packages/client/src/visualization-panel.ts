@@ -28,7 +28,7 @@ export class VisualizationPanel {
         showAccelerationVectors: false,
         showLabels: false,
         showGrid: false,
-        orbitTrailLength: 500,
+        orbitTrailLength: 50,
         vectorScale: 1e-4,
     };
     private onChange: (options: VisualizationOptions) => void;
@@ -87,8 +87,8 @@ export class VisualizationPanel {
                     
                     <div class="viz-field">
                         <label>Trail Length</label>
-                        <input type="range" id="viz-trail-length" min="50" max="2000" value="500">
-                        <span id="viz-trail-length-value">500 points</span>
+                        <input type="range" id="viz-trail-length" min="10" max="2000" value="50">
+                        <span id="viz-trail-length-value">50 points</span>
                     </div>
                 </section>
                 

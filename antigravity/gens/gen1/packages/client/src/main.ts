@@ -57,8 +57,9 @@ class NBodyClient {
     private running = false;
 
     // Time warp
-    private timeWarpIndex = 3; // Start at 1000x
+    private timeWarpIndex = 0; // Start at 1x (was 3 = 1000x which caused instability)
     private paused = false;
+    private uiHidden = false;
 
     // Body following
     private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
@@ -143,9 +144,10 @@ class NBodyClient {
         // Use local simulation for now
         this.physics.createSunEarthMoon();
 
-        // Set physics timestep for faster visible orbits
-        // At 1 day per step with 1000x warp, we get ~1000 days per second at 60fps
-        this.physics.setTimeStep(3600); // 1 hour per physics step
+        // Set physics timestep - use smaller step for stable moon orbit
+        // Moon orbit is ~27 days, need many steps per orbit for stability
+        // 60s per step = 1440 steps per day = ~39,000 steps per lunar orbit
+        this.physics.setTimeStep(60); // 1 minute per physics step (was 3600 = 1 hour)
 
         this.state.bodyCount = this.physics.bodyCount();
         this.updateUIBodyCount();
@@ -164,7 +166,15 @@ class NBodyClient {
 
         // Add all bodies from physics
         const bodies = this.physics.getBodies();
-        for (const body of bodies) {
+        const positions = this.physics.getPositions();
+
+        console.log('🔍 Body positions:');
+        for (let i = 0; i < bodies.length; i++) {
+            const body = bodies[i];
+            const x = positions[i * 3];
+            const y = positions[i * 3 + 1];
+            const z = positions[i * 3 + 2];
+            console.log(`  ${body.name}: (${(x / 1.496e11).toFixed(4)} AU, ${(y / 1.496e11).toFixed(4)} AU, ${(z / 1.496e11).toFixed(4)} AU)`);
             this.bodyRenderer.addBody(body);
         }
 
@@ -225,10 +235,22 @@ class NBodyClient {
                         this.followPreviousBody();
                     }
                     break;
+                case 'h':
+                case 'H':
+                    this.toggleUIVisibility();
+                    break;
             }
         });
 
         this.updateTimeWarpUI();
+    }
+
+    private toggleUIVisibility(): void {
+        this.uiHidden = !this.uiHidden;
+        const uiElements = document.querySelectorAll('#stats-overlay, #chat-panel, #world-builder, #admin-panel, #viz-panel');
+        uiElements.forEach(el => {
+            (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
+        });
     }
 
     private followNextBody(): void {

@@ -302,4 +302,30 @@ mod tests {
             assert!(energy < 0.0, "Preset {:?} has positive energy", preset);
         }
     }
+    
+    #[test]
+    fn test_sun_earth_moon_positions() {
+        let sim = create_sun_earth_moon(42);
+        let bodies = sim.bodies();
+        
+        // Sun should be at origin
+        let sun = &bodies[0];
+        assert_eq!(sun.name, "Sun");
+        assert!(sun.position.x.abs() < 1.0, "Sun X not at origin: {}", sun.position.x);
+        
+        // Earth should be at ~1 AU
+        let earth = &bodies[1];
+        assert_eq!(earth.name, "Earth");
+        let earth_dist = earth.position.length();
+        println!("Earth position: {:?}, distance: {} AU", earth.position, earth_dist / AU);
+        assert!((earth_dist - AU).abs() < 1e6, "Earth not at 1 AU: {}", earth_dist / AU);
+        
+        // Moon should be ~384,400 km from Earth
+        let moon = &bodies[2];
+        assert_eq!(moon.name, "Moon");
+        let moon_to_earth = (moon.position - earth.position).length();
+        println!("Moon position: {:?}", moon.position);
+        println!("Moon distance from Earth: {} km", moon_to_earth / 1000.0);
+        assert!((moon_to_earth - 3.844e8).abs() < 1e6, "Moon not at correct distance: {} km", moon_to_earth / 1000.0);
+    }
 }

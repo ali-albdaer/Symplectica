@@ -162,10 +162,11 @@ impl WasmSimulation {
         self.inner.velocities_flat()
     }
 
-    /// Get body data as JSON
+    /// Get body data as JSON (only active bodies)
     #[wasm_bindgen(js_name = getBodiesJson)]
     pub fn get_bodies_json(&self) -> String {
-        serde_json::to_string(self.inner.bodies()).unwrap_or_default()
+        let active_bodies: Vec<_> = self.inner.bodies().iter().filter(|b| b.is_active).collect();
+        serde_json::to_string(&active_bodies).unwrap_or_default()
     }
 
     /// Export full state as JSON snapshot

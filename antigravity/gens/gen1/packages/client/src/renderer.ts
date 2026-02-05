@@ -21,18 +21,22 @@ interface BodyData {
 
 // Logarithmic body scale: makes bodies visible without engulfing orbits
 // Real scale: Sun radius = 6.96e8m, Earth orbit = 1.5e11m (215 Sun radii)
-// We use a logarithmic scaling to make bodies visible while preserving relative spacing
+// Moon orbit from Earth = 3.84e8m = 0.00257 AU
+// CRITICAL: Bodies must be smaller than orbital distances!
 const AU = 1.495978707e11;
 
 function scaleRadius(realRadius: number, type: string): number {
-    // Stars get scaled to about 0.03 AU for visibility
-    // Planets get scaled proportionally larger for visibility
+    // Stars get scaled to about 0.01 AU for visibility
     if (type === 'star') {
-        return AU * 0.03; // ~4.5e9 m - visible but not engulfing planets
+        return AU * 0.01; // ~1.5e9 m - visible but not engulfing planets
     }
-    // For planets/moons, scale up significantly for visibility
-    // Earth's real radius is 6.4e6m, we scale to about 0.005 AU
-    return Math.max(AU * 0.002, realRadius * 500);
+    // For planets/moons, scale up but MUST be smaller than Moon's Earth distance (~0.0026 AU)
+    // Earth's real radius is 6.4e6m
+    // Moon distance is 3.84e8m = 0.00257 AU
+    // So planets can be at most ~0.001 AU (half the Moon distance)
+    const scaledRadius = realRadius * 30; // More modest scale
+    const maxRadius = AU * 0.001; // Max 0.001 AU to not engulf Moon
+    return Math.min(maxRadius, Math.max(AU * 0.0001, scaledRadius));
 }
 
 export class BodyRenderer {
