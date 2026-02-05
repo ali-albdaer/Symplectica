@@ -81,6 +81,38 @@ export class BodyRenderer {
             this.orbitLines.set(body.id, line);
             this.scene.add(line);
         }
+
+        // Create text label sprite
+        const label = this.createLabelSprite(body.name);
+        label.visible = this.showLabels;
+        this.bodyLabels.set(body.id, label);
+        this.scene.add(label);
+    }
+
+    private createLabelSprite(text: string): THREE.Sprite {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        canvas.width = 256;
+        canvas.height = 64;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.font = 'bold 32px Arial';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            depthTest: false,
+        });
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.set(AU * 0.15, AU * 0.0375, 1); // Scale for visibility at AU distances
+        return sprite;
     }
 
     removeBody(id: number): void {
@@ -100,6 +132,14 @@ export class BodyRenderer {
         }
 
         this.orbitHistory.delete(id);
+
+        const label = this.bodyLabels.get(id);
+        if (label) {
+            this.scene.remove(label);
+            (label.material as THREE.SpriteMaterial).map?.dispose();
+            label.material.dispose();
+            this.bodyLabels.delete(id);
+        }
     }
 
     /** Update body positions using floating origin */
@@ -115,11 +155,17 @@ export class BodyRenderer {
                 const worldZ = positions[i * 3 + 2];
 
                 // Apply floating origin - shift all positions relative to camera origin
-                mesh.group.position.set(
-                    worldX - origin.x,
-                    worldY - origin.y,
-                    worldZ - origin.z
-                );
+                const localX = worldX - origin.x;
+                const localY = worldY - origin.y;
+                const localZ = worldZ - origin.z;
+
+                mesh.group.position.set(localX, localY, localZ);
+
+                // Update label position (offset above body)
+                const label = this.bodyLabels.get(id);
+                if (label) {
+                    label.position.set(localX, localY + AU * 0.05, localZ);
+                }
 
                 // Update orbit trail
                 if (shouldSample && this.orbitHistory.has(id)) {
@@ -156,6 +202,82 @@ export class BodyRenderer {
         line.geometry.setDrawRange(0, history.length);
     }
 
+    // Visualization options
+    private showOrbitTrails = true;
+    private showVelocityVectors = false;
+    private showLabels = false;
+    private velocityVectors: Map<number, THREE.ArrowHelper> = new Map();
+    private bodyLabels: Map<number, THREE.Sprite> = new Map();
+    private vectorScale = 1e6; // Scale velocity (m/s) to render units
+    private maxTrailPoints = 500;
+
+    setShowOrbitTrails(show: boolean): void {
+        this.showOrbitTrails = show;
+        for (const line of this.orbitLines.values()) {
+            line.visible = show;
+        }
+    }
+
+    setShowVelocityVectors(show: boolean): void {
+        this.showVelocityVectors = show;
+        for (const arrow of this.velocityVectors.values()) {
+            arrow.visible = show;
+        }
+    }
+
+    setShowLabels(show: boolean): void {
+        this.showLabels = show;
+        for (const label of this.bodyLabels.values()) {
+            label.visible = show;
+        }
+    }
+
+    setVectorScale(scale: number): void {
+        this.vectorScale = scale;
+    }
+
+    setMaxTrailPoints(points: number): void {
+        this.maxTrailPoints = points;
+    }
+
+    /** Update velocity vectors (call with velocities array) */
+    updateVelocityVectors(velocities: Float64Array, origin: { x: number; y: number; z: number }): void {
+        if (!this.showVelocityVectors) return;
+
+        let i = 0;
+        for (const [id, mesh] of this.bodies) {
+            if (i * 3 + 2 < velocities.length) {
+                const vx = velocities[i * 3];
+                const vy = velocities[i * 3 + 1];
+                const vz = velocities[i * 3 + 2];
+
+                const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+                if (speed > 0) {
+                    let arrow = this.velocityVectors.get(id);
+
+                    // Vector length: scale so typical orbital velocity ~30km/s shows as ~0.1 AU
+                    const arrowLength = speed * this.vectorScale;
+                    const headLength = arrowLength * 0.2;
+                    const headWidth = headLength * 0.5;
+
+                    if (!arrow) {
+                        const dir = new THREE.Vector3(vx, vy, vz).normalize();
+                        arrow = new THREE.ArrowHelper(dir, mesh.group.position, arrowLength, 0x00ff00, headLength, headWidth);
+                        this.velocityVectors.set(id, arrow);
+                        this.scene.add(arrow);
+                    }
+
+                    // Update arrow
+                    arrow.position.copy(mesh.group.position);
+                    arrow.setDirection(new THREE.Vector3(vx, vy, vz).normalize());
+                    arrow.setLength(arrowLength, headLength, headWidth);
+                    arrow.visible = this.showVelocityVectors;
+                }
+            }
+            i++;
+        }
+    }
+
     dispose(): void {
         for (const mesh of this.bodies.values()) {
             this.scene.remove(mesh.group);
@@ -170,6 +292,18 @@ export class BodyRenderer {
         }
         this.orbitLines.clear();
         this.orbitHistory.clear();
+
+        for (const arrow of this.velocityVectors.values()) {
+            this.scene.remove(arrow);
+        }
+        this.velocityVectors.clear();
+
+        for (const label of this.bodyLabels.values()) {
+            this.scene.remove(label);
+            (label.material as THREE.SpriteMaterial).map?.dispose();
+            label.material.dispose();
+        }
+        this.bodyLabels.clear();
     }
 }
 

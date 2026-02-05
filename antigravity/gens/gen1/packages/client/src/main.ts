@@ -16,6 +16,7 @@ import { PhysicsClient } from './physics';
 import { WorldBuilder } from './world-builder';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
+import { VisualizationPanel, VisualizationOptions } from './visualization-panel';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -41,6 +42,7 @@ class NBodyClient {
     private worldBuilder!: WorldBuilder;
     private chat!: Chat;
     private adminPanel!: AdminPanel;
+    private vizPanel!: VisualizationPanel;
 
     private state: SimState = {
         tick: 0,
@@ -58,6 +60,9 @@ class NBodyClient {
     private timeWarpIndex = 3; // Start at 1000x
     private paused = false;
 
+    // Body following
+    private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
+
     async init(): Promise<void> {
         this.updateLoadingStatus('Initializing renderer...');
         this.initRenderer();
@@ -73,6 +78,15 @@ class NBodyClient {
 
         // Initialize Admin Panel
         this.adminPanel = new AdminPanel(this.physics);
+
+        // Initialize Visualization Panel
+        this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
+            this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
+            this.bodyRenderer.setShowVelocityVectors(options.showVelocityVectors);
+            this.bodyRenderer.setShowLabels(options.showLabels);
+            this.bodyRenderer.setVectorScale(options.vectorScale);
+            this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
+        });
 
         this.hideLoading();
         this.start();
@@ -160,10 +174,13 @@ class NBodyClient {
 
     private initControls(): void {
         window.addEventListener('keydown', (e) => {
+            // Skip if typing in input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return;
+            }
+
             switch (e.key) {
                 case ' ':
-                case 'p':
-                case 'P':
                     this.paused = !this.paused;
                     this.updateTimeWarpUI();
                     break;
@@ -197,10 +214,53 @@ class NBodyClient {
                     this.timeWarpIndex = 6;
                     this.updateTimeWarpUI();
                     break;
+                case 'n':
+                case 'N':
+                    this.followNextBody();
+                    break;
+                case 'p':
+                case 'P':
+                    // Only handle P for previous if not pausing (space handles pause)
+                    if (!e.shiftKey) {
+                        this.followPreviousBody();
+                    }
+                    break;
             }
         });
 
         this.updateTimeWarpUI();
+    }
+
+    private followNextBody(): void {
+        const bodyCount = this.physics.bodyCount();
+        if (bodyCount === 0) return;
+
+        this.followBodyIndex++;
+        if (this.followBodyIndex >= bodyCount) {
+            this.followBodyIndex = -1; // Back to origin
+        }
+        this.updateFollowUI();
+    }
+
+    private followPreviousBody(): void {
+        const bodyCount = this.physics.bodyCount();
+        if (bodyCount === 0) return;
+
+        this.followBodyIndex--;
+        if (this.followBodyIndex < -1) {
+            this.followBodyIndex = bodyCount - 1; // Wrap to last body
+        }
+        this.updateFollowUI();
+    }
+
+    private updateFollowUI(): void {
+        const bodies = this.physics.getBodies();
+        let followName = 'Origin';
+        if (this.followBodyIndex >= 0 && this.followBodyIndex < bodies.length) {
+            followName = bodies[this.followBodyIndex].name;
+        }
+        const el = document.getElementById('follow-target');
+        if (el) el.textContent = followName;
     }
 
     private updateTimeWarpUI(): void {
@@ -322,9 +382,23 @@ class NBodyClient {
         // Update camera
         this.camera.update(delta);
 
+        // Calculate camera origin based on followed body
+        let cameraOrigin = this.camera.getWorldOrigin();
+        if (this.followBodyIndex >= 0 && this.followBodyIndex * 3 + 2 < this.state.positions.length) {
+            // Center on followed body
+            cameraOrigin = {
+                x: this.state.positions[this.followBodyIndex * 3],
+                y: this.state.positions[this.followBodyIndex * 3 + 1],
+                z: this.state.positions[this.followBodyIndex * 3 + 2],
+            };
+        }
+
         // Update body positions with floating origin
-        const cameraOrigin = this.camera.getWorldOrigin();
         this.bodyRenderer.update(this.state.positions, cameraOrigin);
+
+        // Update velocity vectors (if enabled)
+        const velocities = this.physics.getVelocities();
+        this.bodyRenderer.updateVelocityVectors(velocities, cameraOrigin);
 
         // Render
         this.renderer.render(this.scene, this.camera);
