@@ -19,29 +19,48 @@ interface BodyData {
     color: number;
 }
 
-// Logarithmic body scale: makes bodies visible without engulfing orbits
-// Real scale: Sun radius = 6.96e8m, Earth orbit = 1.5e11m (215 Sun radii)
-// Moon orbit from Earth = 3.84e8m = 0.00257 AU
-// CRITICAL: Bodies must be smaller than orbital distances!
+// Body scaling for visualization
+// Real world: Sun radius = 6.96e8m, Earth = 6.37e6m, Moon = 1.74e6m
+// Moon-Earth distance = 3.84e8m, Earth-Sun distance = 1.496e11m (1 AU)
+// 
+// Standard approaches for large-scale visualization:
+// 1. Linear: preserves relative sizes exactly (used here)
+// 2. Logarithmic: compresses huge range, loses proportions
+// 3. Power-law: compromise between linear and log
 const AU = 1.495978707e11;
 
-function scaleRadius(realRadius: number, type: string): number {
-    // Stars get scaled to about 0.01 AU for visibility
-    if (type === 'star') {
-        return AU * 0.01; // ~1.5e9 m - visible but not engulfing planets
+function scaleRadius(realRadius: number, type: string, bodyScale: number, realScale: boolean): number {
+    if (realScale) {
+        // Use exact real-world radius (will be very small relative to orbits)
+        return realRadius;
     }
-    // For planets/moons, scale up but MUST be smaller than Moon's Earth distance (~0.0026 AU)
-    // Earth's real radius is 6.4e6m
-    // Moon distance is 3.84e8m = 0.00257 AU
-    // So planets can be at most ~0.001 AU (half the Moon distance)
-    const scaledRadius = realRadius * 30; // More modest scale
-    const maxRadius = AU * 0.001; // Max 0.001 AU to not engulf Moon
-    return Math.min(maxRadius, Math.max(AU * 0.0001, scaledRadius));
+
+    // UNIFORM LINEAR SCALING
+    // All bodies scaled by the same multiplier, preserving relative size ratios
+    // This means: Earth/Moon ratio stays constant at all scales
+    // At scale 1000x: Earth=6.37e9m, Moon=1.74e9m (ratio preserved)
+
+    // Stars get a separate treatment for visual balance (not physically accurate)
+    // Sun is 109x Earth radius, at high scales it would dominate
+    if (type === 'star') {
+        // Use logarithmic scaling for stars to keep them visible but not overwhelming
+        // At scale 1: star uses real radius
+        // At scale 1000: star grows ~3x slower than planets
+        const logScale = Math.log10(bodyScale) / 3; // 0 at scale=1, 1 at scale=1000
+        return realRadius * (1 + logScale * 10);
+    }
+
+    // Planets, moons, asteroids: pure linear scaling
+    return realRadius * bodyScale;
 }
 
 export class BodyRenderer {
     private scene: THREE.Scene;
     private bodies: Map<number, BodyMesh> = new Map();
+
+    // Scale settings
+    private bodyScale = 1000;
+    private realScale = false;
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
@@ -54,10 +73,31 @@ export class BodyRenderer {
         this.scene = scene;
     }
 
+    setBodyScale(scale: number): void {
+        this.bodyScale = scale;
+        this.updateBodySizes();
+    }
+
+    setRealScale(real: boolean): void {
+        this.realScale = real;
+        this.updateBodySizes();
+    }
+
+    private updateBodySizes(): void {
+        for (const [_, mesh] of this.bodies) {
+            const newRadius = scaleRadius(mesh.realRadius, mesh.type, this.bodyScale, this.realScale);
+            mesh.setScale(newRadius);
+        }
+    }
+
     addBody(body: BodyData): void {
         const mesh = new BodyMesh(body);
         this.bodies.set(body.id, mesh);
         this.scene.add(mesh.group);
+
+        // Apply current scale settings to new body
+        const radius = scaleRadius(body.radius, body.type, this.bodyScale, this.realScale);
+        mesh.setScale(radius);
 
         // Add point light for stars - high intensity, no decay at astronomical distances
         if (body.type === 'star') {
@@ -317,13 +357,20 @@ class BodyMesh {
     private geometry: THREE.SphereGeometry;
     private material: THREE.Material;
 
+    // Expose for dynamic rescaling
+    readonly realRadius: number;
+    readonly type: string;
+
     constructor(body: BodyData) {
+        this.realRadius = body.radius;
+        this.type = body.type;
+
         this.group = new THREE.Group();
         this.group.name = body.name;
 
-        // Create sphere geometry with logarithmic scaling
-        const renderRadius = scaleRadius(body.radius, body.type);
-        this.geometry = new THREE.SphereGeometry(renderRadius, 64, 32);
+        // Create sphere geometry - initially at default scale (will be set by renderer)
+        const initialRadius = 1; // Placeholder, will be scaled
+        this.geometry = new THREE.SphereGeometry(initialRadius, 64, 32);
 
         // Create material based on body type
         if (body.type === 'star') {
@@ -344,12 +391,25 @@ class BodyMesh {
 
         // Add glow effect for stars
         if (body.type === 'star') {
-            this.addStarGlow(renderRadius, body.color || 0xffdd44);
+            this.addStarGlow(body.color || 0xffdd44);
         }
     }
 
-    private addStarGlow(radius: number, color: number): void {
-        // Create glow sprite
+    setScale(radius: number): void {
+        // Scale the mesh to the desired radius
+        // Since geometry is created with radius=1, we scale by the target radius
+        this.mesh.scale.setScalar(radius);
+
+        // Also scale glow sprites for stars
+        for (const child of this.group.children) {
+            if (child instanceof THREE.Sprite) {
+                child.scale.set(radius * 8, radius * 8, 1);
+            }
+        }
+    }
+
+    private addStarGlow(color: number): void {
+        // Create glow sprite - initial scale will be set by setScale
         const spriteMaterial = new THREE.SpriteMaterial({
             map: this.createGlowTexture(),
             color: color,
@@ -359,7 +419,7 @@ class BodyMesh {
         });
 
         const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(radius * 8, radius * 8, 1);
+        sprite.scale.set(1, 1, 1); // Will be scaled by setScale
         this.group.add(sprite);
     }
 

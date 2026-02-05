@@ -17,6 +17,8 @@ export interface VisualizationOptions {
     showGrid: boolean;
     orbitTrailLength: number;
     vectorScale: number;
+    realScale: boolean;
+    bodyScale: number; // multiplier for body sizes (1 = real scale)
 }
 
 export class VisualizationPanel {
@@ -30,6 +32,8 @@ export class VisualizationPanel {
         showGrid: false,
         orbitTrailLength: 50,
         vectorScale: 1e-4,
+        realScale: false,
+        bodyScale: 1000, // default 1000x for visibility
     };
     private onChange: (options: VisualizationOptions) => void;
 
@@ -100,6 +104,23 @@ export class VisualizationPanel {
                         <input type="range" id="viz-vector-scale" min="-8" max="-2" step="0.5" value="-4">
                         <span id="viz-vector-scale-value">10⁻⁴</span>
                     </div>
+                </section>
+                
+                <section class="viz-section">
+                    <h3>Body Scale</h3>
+                    
+                    <label class="viz-toggle">
+                        <input type="checkbox" id="viz-real-scale">
+                        <span class="viz-toggle-label">Real Scale (1:1)</span>
+                    </label>
+                    
+                    <div class="viz-field" id="viz-body-scale-field">
+                        <label>Size Multiplier</label>
+                        <input type="range" id="viz-body-scale" min="1" max="4" step="0.1" value="3">
+                        <span id="viz-body-scale-value">1000×</span>
+                    </div>
+                    
+                    <div class="viz-hint">Real scale: bodies are extremely small relative to distances</div>
                 </section>
             </div>
         `;
@@ -220,6 +241,13 @@ export class VisualizationPanel {
                 font-size: 11px;
                 color: rgba(255, 255, 255, 0.5);
             }
+            
+            .viz-hint {
+                font-size: 10px;
+                color: rgba(255, 255, 255, 0.35);
+                font-style: italic;
+                margin-top: 8px;
+            }
         `;
         document.head.appendChild(style);
 
@@ -284,6 +312,29 @@ export class VisualizationPanel {
             const exp = parseFloat(vectorScale.value);
             this.options.vectorScale = Math.pow(10, exp);
             vectorScaleValue.textContent = `10^${exp}`;
+            this.notifyChange();
+        });
+
+        // Body Scale controls
+        const realScale = container.querySelector('#viz-real-scale') as HTMLInputElement;
+        const bodyScaleField = container.querySelector('#viz-body-scale-field') as HTMLElement;
+        const bodyScale = container.querySelector('#viz-body-scale') as HTMLInputElement;
+        const bodyScaleValue = container.querySelector('#viz-body-scale-value') as HTMLElement;
+
+        realScale?.addEventListener('change', () => {
+            this.options.realScale = realScale.checked;
+            // Hide/show body scale slider when real scale is toggled
+            if (bodyScaleField) {
+                bodyScaleField.style.opacity = realScale.checked ? '0.3' : '1';
+                bodyScale.disabled = realScale.checked;
+            }
+            this.notifyChange();
+        });
+
+        bodyScale?.addEventListener('input', () => {
+            const exp = parseFloat(bodyScale.value);
+            this.options.bodyScale = Math.pow(10, exp);
+            bodyScaleValue.textContent = `${Math.round(this.options.bodyScale)}×`;
             this.notifyChange();
         });
     }

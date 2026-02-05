@@ -87,6 +87,8 @@ class NBodyClient {
             this.bodyRenderer.setShowLabels(options.showLabels);
             this.bodyRenderer.setVectorScale(options.vectorScale);
             this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
+            this.bodyRenderer.setBodyScale(options.bodyScale);
+            this.bodyRenderer.setRealScale(options.realScale);
         });
 
         this.hideLoading();
