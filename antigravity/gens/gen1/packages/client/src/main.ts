@@ -29,11 +29,8 @@ interface SimState {
     bodyCount: number;
 }
 
-// Time warp multipliers - each step is 60 seconds sim time
-// At 60 FPS: 1x = 60 sim-seconds per real-second (1 step/frame)
-// Display shows sim-time multiplier relative to real-time
-const TIME_WARPS = [1, 10, 60, 600, 3600, 36000, 360000]; // steps per frame
-const TIME_WARP_LABELS = ['1min/s', '10min/s', '1hr/s', '10hr/s', '1day/s', '10day/s', '100day/s'];
+// Time warp multipliers
+const TIME_WARPS = [1, 10, 100, 1000, 10000, 100000, 1000000];
 
 class NBodyClient {
     private scene!: THREE.Scene;
@@ -86,7 +83,9 @@ class NBodyClient {
         // Initialize Visualization Panel
         this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
             this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
+            this.bodyRenderer.setShowVelocityVectors(options.showVelocityVectors);
             this.bodyRenderer.setShowLabels(options.showLabels);
+            this.bodyRenderer.setVectorScale(options.vectorScale);
             this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
             this.bodyRenderer.setBodyScale(options.bodyScale);
             this.bodyRenderer.setRealScale(options.realScale);
@@ -250,7 +249,7 @@ class NBodyClient {
 
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
-        const uiElements = document.querySelectorAll('#ui-overlay, #stats-overlay, #chat-panel, #world-builder, #admin-panel, #viz-panel');
+        const uiElements = document.querySelectorAll('#stats-overlay, #chat-panel, #world-builder, #admin-panel, #viz-panel');
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
@@ -289,12 +288,17 @@ class NBodyClient {
     }
 
     private updateTimeWarpUI(): void {
+        const warp = TIME_WARPS[this.timeWarpIndex];
         const warpEl = document.getElementById('time-warp');
         if (warpEl) {
             if (this.paused) {
                 warpEl.textContent = '⏸ PAUSED';
+            } else if (warp >= 1000000) {
+                warpEl.textContent = `${(warp / 1000000).toFixed(0)}M×`;
+            } else if (warp >= 1000) {
+                warpEl.textContent = `${(warp / 1000).toFixed(0)}K×`;
             } else {
-                warpEl.textContent = TIME_WARP_LABELS[this.timeWarpIndex];
+                warpEl.textContent = `${warp}×`;
             }
         }
     }
@@ -385,12 +389,10 @@ class NBodyClient {
 
         // Step local physics simulation with time warp
         if (!this.paused) {
-            const stepsPerFrame = TIME_WARPS[this.timeWarpIndex];
-            // For high warp levels, cap visual updates but increase physics steps
-            // This prevents frame drops while maintaining speed
-            const maxStepsPerFrame = 1000; // Reasonable cap for performance
-            const actualSteps = Math.min(stepsPerFrame, maxStepsPerFrame);
-            for (let i = 0; i < actualSteps; i++) {
+            const warp = TIME_WARPS[this.timeWarpIndex];
+            // Step multiple times based on warp
+            const stepsPerFrame = Math.min(warp, 100); // Cap at 100 steps per frame
+            for (let i = 0; i < stepsPerFrame; i++) {
                 this.physics.step();
             }
         }
