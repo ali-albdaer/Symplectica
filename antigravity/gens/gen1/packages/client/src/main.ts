@@ -5,7 +5,7 @@
  * - Floating origin for large-scale precision
  * - Logarithmic depth buffer
  * - Orbital camera controls
- * - Client-side prediction with server reconciliation
+ * - Time warp for fast-forwarding simulation
  */
 
 import * as THREE from 'three';
@@ -13,6 +13,9 @@ import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
 import { NetworkClient } from './network';
 import { PhysicsClient } from './physics';
+import { WorldBuilder } from './world-builder';
+import { Chat } from './chat';
+import { AdminPanel } from './admin-panel';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -25,6 +28,9 @@ interface SimState {
     bodyCount: number;
 }
 
+// Time warp multipliers
+const TIME_WARPS = [1, 10, 100, 1000, 10000, 100000, 1000000];
+
 class NBodyClient {
     private scene!: THREE.Scene;
     private renderer!: THREE.WebGLRenderer;
@@ -32,6 +38,9 @@ class NBodyClient {
     private bodyRenderer!: BodyRenderer;
     private network!: NetworkClient;
     private physics!: PhysicsClient;
+    private worldBuilder!: WorldBuilder;
+    private chat!: Chat;
+    private adminPanel!: AdminPanel;
 
     private state: SimState = {
         tick: 0,
@@ -45,6 +54,10 @@ class NBodyClient {
     private fpsHistory: number[] = [];
     private running = false;
 
+    // Time warp
+    private timeWarpIndex = 3; // Start at 1000x
+    private paused = false;
+
     async init(): Promise<void> {
         this.updateLoadingStatus('Initializing renderer...');
         this.initRenderer();
@@ -52,9 +65,14 @@ class NBodyClient {
         this.updateLoadingStatus('Loading physics engine...');
         await this.initPhysics();
 
-        this.updateLoadingStatus('Connecting to server...');
-        // Skip network for now - run standalone
-        // await this.initNetwork();
+        this.updateLoadingStatus('Setting up controls...');
+        this.initControls();
+
+        // Initialize Chat
+        this.chat = new Chat();
+
+        // Initialize Admin Panel
+        this.adminPanel = new AdminPanel(this.physics);
 
         this.hideLoading();
         this.start();
@@ -80,14 +98,15 @@ class NBodyClient {
         const container = document.getElementById('canvas-container')!;
         container.appendChild(this.renderer.domElement);
 
-        // Create camera
+        // Create camera - start further out and elevated
         this.camera = new OrbitCamera(
             75,
             window.innerWidth / window.innerHeight,
             1e3,     // 1 km near plane
             1e15     // ~1000 AU far plane
         );
-        this.camera.setDistance(3 * AU); // Start at 3 AU distance
+        this.camera.setDistance(2.5 * AU); // Start at 2.5 AU distance
+        this.camera.setElevation(0.5); // Look down at system
 
         // Create body renderer
         this.bodyRenderer = new BodyRenderer(this.scene);
@@ -96,7 +115,7 @@ class NBodyClient {
         this.createStarfield();
 
         // Add ambient light (space is dark but we need some fill)
-        const ambient = new THREE.AmbientLight(0x111122, 0.1);
+        const ambient = new THREE.AmbientLight(0x111122, 0.3);
         this.scene.add(ambient);
 
         // Handle resize
@@ -110,13 +129,93 @@ class NBodyClient {
         // Use local simulation for now
         this.physics.createSunEarthMoon();
 
+        // Set physics timestep for faster visible orbits
+        // At 1 day per step with 1000x warp, we get ~1000 days per second at 60fps
+        this.physics.setTimeStep(3600); // 1 hour per physics step
+
         this.state.bodyCount = this.physics.bodyCount();
         this.updateUIBodyCount();
 
         // Initialize body meshes
+        this.refreshBodies();
+
+        // Initialize World Builder
+        this.worldBuilder = new WorldBuilder(this.physics, () => this.refreshBodies());
+    }
+
+    private refreshBodies(): void {
+        // Clear existing bodies from renderer
+        this.bodyRenderer.dispose();
+        this.bodyRenderer = new BodyRenderer(this.scene);
+
+        // Add all bodies from physics
         const bodies = this.physics.getBodies();
         for (const body of bodies) {
             this.bodyRenderer.addBody(body);
+        }
+
+        this.state.bodyCount = this.physics.bodyCount();
+        this.updateUIBodyCount();
+    }
+
+    private initControls(): void {
+        window.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case ' ':
+                case 'p':
+                case 'P':
+                    this.paused = !this.paused;
+                    this.updateTimeWarpUI();
+                    break;
+                case '.':
+                case '>':
+                    if (this.timeWarpIndex < TIME_WARPS.length - 1) {
+                        this.timeWarpIndex++;
+                        this.updateTimeWarpUI();
+                    }
+                    break;
+                case ',':
+                case '<':
+                    if (this.timeWarpIndex > 0) {
+                        this.timeWarpIndex--;
+                        this.updateTimeWarpUI();
+                    }
+                    break;
+                case '1':
+                    this.timeWarpIndex = 0;
+                    this.updateTimeWarpUI();
+                    break;
+                case '2':
+                    this.timeWarpIndex = 2;
+                    this.updateTimeWarpUI();
+                    break;
+                case '3':
+                    this.timeWarpIndex = 4;
+                    this.updateTimeWarpUI();
+                    break;
+                case '4':
+                    this.timeWarpIndex = 6;
+                    this.updateTimeWarpUI();
+                    break;
+            }
+        });
+
+        this.updateTimeWarpUI();
+    }
+
+    private updateTimeWarpUI(): void {
+        const warp = TIME_WARPS[this.timeWarpIndex];
+        const warpEl = document.getElementById('time-warp');
+        if (warpEl) {
+            if (this.paused) {
+                warpEl.textContent = '⏸ PAUSED';
+            } else if (warp >= 1000000) {
+                warpEl.textContent = `${(warp / 1000000).toFixed(0)}M×`;
+            } else if (warp >= 1000) {
+                warpEl.textContent = `${(warp / 1000).toFixed(0)}K×`;
+            } else {
+                warpEl.textContent = `${warp}×`;
+            }
         }
     }
 
@@ -204,8 +303,15 @@ class NBodyClient {
         this.fpsHistory.push(fps);
         if (this.fpsHistory.length > 60) this.fpsHistory.shift();
 
-        // Step local physics simulation
-        this.physics.step();
+        // Step local physics simulation with time warp
+        if (!this.paused) {
+            const warp = TIME_WARPS[this.timeWarpIndex];
+            // Step multiple times based on warp
+            const stepsPerFrame = Math.min(warp, 100); // Cap at 100 steps per frame
+            for (let i = 0; i < stepsPerFrame; i++) {
+                this.physics.step();
+            }
+        }
 
         // Update state from physics
         this.state.tick = this.physics.tick();

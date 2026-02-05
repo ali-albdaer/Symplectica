@@ -216,6 +216,11 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         this.updatePosition();
     }
 
+    setElevation(angle: number): void {
+        this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, angle));
+        this.updatePosition();
+    }
+
     /** Get world origin for floating origin rendering */
     getWorldOrigin(): { x: number; y: number; z: number } {
         return { x: this.originX, y: this.originY, z: this.originZ };

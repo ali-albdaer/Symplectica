@@ -36,6 +36,13 @@ interface PhysicsModule {
     default: (input?: RequestInfo | BufferSource | WebAssembly.Module) => Promise<unknown>;
     WasmSimulation: new (seed: bigint) => WasmSimulation;
     createSunEarthMoon: (seed: bigint) => WasmSimulation;
+    createInnerSolarSystem: (seed: bigint) => WasmSimulation;
+    createFullSolarSystem: (seed: bigint) => WasmSimulation;
+    createJupiterSystem: (seed: bigint) => WasmSimulation;
+    createSaturnSystem: (seed: bigint) => WasmSimulation;
+    createAlphaCentauri: (seed: bigint) => WasmSimulation;
+    createTrappist1: (seed: bigint) => WasmSimulation;
+    createBinaryPulsar: (seed: bigint) => WasmSimulation;
     getG: () => number;
     getAU: () => number;
     getSolarMass: () => number;
@@ -83,12 +90,15 @@ export class PhysicsClient {
         console.log('📦 Loading WASM physics...');
 
         try {
-            // Load WASM from public folder
-            this.module = await import('/physics_core.js') as PhysicsModule;
+            // Import WASM module and binary URL
+            const physicsModule = await import('./wasm/physics_core.js');
+            const wasmUrl = new URL('./wasm/physics_core_bg.wasm', import.meta.url).href;
 
-            // Initialize WASM
-            await this.module.default('/physics_core_bg.wasm');
-            this.module.init();
+            // Initialize WASM with the binary
+            await physicsModule.default(wasmUrl);
+            physicsModule.init();
+
+            this.module = physicsModule as PhysicsModule;
 
             // Cache constants
             this.G = this.module.getG();
@@ -135,6 +145,12 @@ export class PhysicsClient {
     stepN(n: number): void {
         if (this.simulation) {
             this.simulation.stepN(BigInt(n));
+        }
+    }
+
+    setTimeStep(dt: number): void {
+        if (this.simulation) {
+            this.simulation.setDt(dt);
         }
     }
 
@@ -207,6 +223,80 @@ export class PhysicsClient {
     /** Export snapshot to JSON */
     getSnapshot(): string {
         return this.simulation?.toJson() ?? '{}';
+    }
+
+    /** Create a preset simulation */
+    createPreset(preset: string, seed: bigint): void {
+        if (!this.initialized || !this.module) throw new Error('Physics not initialized');
+
+        switch (preset) {
+            case 'innerSolarSystem':
+                this.simulation = this.module.createInnerSolarSystem(seed);
+                break;
+            case 'fullSolarSystem':
+                this.simulation = this.module.createFullSolarSystem(seed);
+                break;
+            case 'jupiterSystem':
+                this.simulation = this.module.createJupiterSystem(seed);
+                break;
+            case 'saturnSystem':
+                this.simulation = this.module.createSaturnSystem(seed);
+                break;
+            case 'alphaCentauri':
+                this.simulation = this.module.createAlphaCentauri(seed);
+                break;
+            case 'trappist1':
+                this.simulation = this.module.createTrappist1(seed);
+                break;
+            case 'binaryPulsar':
+                this.simulation = this.module.createBinaryPulsar(seed);
+                break;
+            default:
+                this.simulation = this.module.createSunEarthMoon(seed);
+        }
+
+        console.log(`🌍 Loaded preset: ${preset} (${this.simulation.bodyCount()} bodies)`);
+    }
+
+    /** Add a custom body */
+    addBody(body: {
+        name: string;
+        type: 'star' | 'planet' | 'moon' | 'asteroid';
+        mass: number;
+        radius: number;
+        x: number;
+        y: number;
+        z: number;
+        vx: number;
+        vy: number;
+        vz: number;
+    }): number {
+        if (!this.simulation) throw new Error('No simulation');
+
+        let id: number;
+        if (body.type === 'star') {
+            id = this.simulation.addStar(body.name, body.mass, body.radius);
+        } else {
+            // Calculate orbital velocity from position for simple cases
+            id = this.simulation.addPlanet(
+                body.name,
+                body.mass,
+                body.radius,
+                Math.sqrt(body.x * body.x + body.z * body.z), // distance
+                Math.sqrt(body.vx * body.vx + body.vz * body.vz)  // velocity magnitude
+            );
+        }
+
+        console.log(`➕ Added body: ${body.name} (id: ${id})`);
+        return id;
+    }
+
+    /** Remove a body by ID */
+    removeBody(id: number): void {
+        if (!this.simulation) return;
+
+        // Note: WASM doesn't have remove yet, would need to rebuild
+        console.log(`➖ Remove body ${id} - not implemented in WASM yet`);
     }
 
     dispose(): void {

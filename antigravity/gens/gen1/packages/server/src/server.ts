@@ -119,13 +119,16 @@ class SimulationServer {
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = dirname(__filename);
 
-        // Load the WASM module - in production this would be a proper import
-        const wasmPath = join(__dirname, '../../physics-core/pkg/physics_core.js');
+        // Load the WASM module
+        const wasmJsPath = join(__dirname, '../../physics-core/pkg/physics_core.js');
         const wasmBinaryPath = join(__dirname, '../../physics-core/pkg/physics_core_bg.wasm');
 
         try {
+            // Convert Windows path to file:// URL for dynamic import
+            const wasmJsUrl = `file://${wasmJsPath.replace(/\\/g, '/')}`;
+
             // Dynamic import for ESM
-            const module = await import(wasmPath);
+            const module = await import(wasmJsUrl);
 
             // Read WASM binary
             const wasmBinary = readFileSync(wasmBinaryPath);

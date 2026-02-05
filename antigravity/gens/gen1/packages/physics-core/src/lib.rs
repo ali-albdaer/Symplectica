@@ -32,6 +32,7 @@ pub mod constants;
 pub mod force;
 pub mod integrator;
 pub mod octree;
+pub mod presets;
 pub mod prng;
 pub mod simulation;
 pub mod snapshot;
@@ -43,6 +44,7 @@ pub mod prelude {
     pub use crate::constants::*;
     pub use crate::force::ForceConfig;
     pub use crate::integrator::{IntegratorConfig, IntegratorType};
+    pub use crate::presets::Preset;
     pub use crate::prng::Pcg32;
     pub use crate::simulation::{ForceMethod, Simulation, SimulationConfig};
     pub use crate::snapshot::Snapshot;
@@ -286,6 +288,48 @@ pub fn get_earth_mass() -> f64 {
 #[wasm_bindgen(js_name = circularVelocity)]
 pub fn circular_velocity(mass: f64, distance: f64) -> f64 {
     (constants::G * mass / distance).sqrt()
+}
+
+/// Create Inner Solar System preset (Sun, Mercury, Venus, Earth+Moon, Mars)
+#[wasm_bindgen(js_name = createInnerSolarSystem)]
+pub fn create_inner_solar_system(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_inner_solar_system(seed) }
+}
+
+/// Create Full Solar System preset (all 8 planets + Pluto)
+#[wasm_bindgen(js_name = createFullSolarSystem)]
+pub fn create_full_solar_system(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_full_solar_system(seed) }
+}
+
+/// Create Jupiter system preset (Jupiter + Galilean moons)
+#[wasm_bindgen(js_name = createJupiterSystem)]
+pub fn create_jupiter_system(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_jupiter_system(seed) }
+}
+
+/// Create Saturn system preset (Saturn + major moons)
+#[wasm_bindgen(js_name = createSaturnSystem)]
+pub fn create_saturn_system(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_saturn_system(seed) }
+}
+
+/// Create Alpha Centauri binary star system
+#[wasm_bindgen(js_name = createAlphaCentauri)]
+pub fn create_alpha_centauri(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_alpha_centauri(seed) }
+}
+
+/// Create TRAPPIST-1 exoplanet system (7 Earth-like planets)
+#[wasm_bindgen(js_name = createTrappist1)]
+pub fn create_trappist1(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_trappist1(seed) }
+}
+
+/// Create Binary Pulsar system (PSR J0737-3039)
+#[wasm_bindgen(js_name = createBinaryPulsar)]
+pub fn create_binary_pulsar(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_binary_pulsar(seed) }
 }
 
 #[cfg(test)]

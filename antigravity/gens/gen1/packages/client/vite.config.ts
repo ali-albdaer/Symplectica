@@ -10,7 +10,8 @@ export default defineConfig({
     server: {
         port: 3000,
     },
+    assetsInclude: ['**/*.wasm'],
     optimizeDeps: {
-        exclude: ['physics-core'],
+        exclude: ['./src/wasm/physics_core.js'],
     },
 });

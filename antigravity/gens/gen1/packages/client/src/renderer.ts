@@ -26,8 +26,12 @@ export class BodyRenderer {
     private scene: THREE.Scene;
     private bodies: Map<number, BodyMesh> = new Map();
 
-    // Circular orbit trails
+    // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
+    private orbitHistory: Map<number, Array<{ x: number; y: number; z: number }>> = new Map();
+    private readonly MAX_TRAIL_POINTS = 500;
+    private readonly TRAIL_SAMPLE_INTERVAL = 10; // Sample every N frames
+    private frameCount = 0;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
@@ -42,6 +46,27 @@ export class BodyRenderer {
         if (body.type === 'star') {
             const light = new THREE.PointLight(0xffffff, 2, 0, 2);
             mesh.group.add(light);
+        }
+
+        // Initialize orbit trail for non-stars
+        if (body.type !== 'star') {
+            this.orbitHistory.set(body.id, []);
+
+            // Create orbit line
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(this.MAX_TRAIL_POINTS * 3);
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setDrawRange(0, 0);
+
+            const material = new THREE.LineBasicMaterial({
+                color: body.color || 0x4488ff,
+                transparent: true,
+                opacity: 0.4,
+            });
+
+            const line = new THREE.Line(geometry, material);
+            this.orbitLines.set(body.id, line);
+            this.scene.add(line);
         }
     }
 
@@ -60,10 +85,15 @@ export class BodyRenderer {
             (orbit.material as THREE.Material).dispose();
             this.orbitLines.delete(id);
         }
+
+        this.orbitHistory.delete(id);
     }
 
     /** Update body positions using floating origin */
     update(positions: Float64Array, origin: { x: number; y: number; z: number }): void {
+        this.frameCount++;
+        const shouldSample = this.frameCount % this.TRAIL_SAMPLE_INTERVAL === 0;
+
         let i = 0;
         for (const [id, mesh] of this.bodies) {
             if (i * 3 + 2 < positions.length) {
@@ -77,9 +107,40 @@ export class BodyRenderer {
                     worldY - origin.y,
                     worldZ - origin.z
                 );
+
+                // Update orbit trail
+                if (shouldSample && this.orbitHistory.has(id)) {
+                    const history = this.orbitHistory.get(id)!;
+                    history.push({ x: worldX, y: worldY, z: worldZ });
+
+                    // Limit history size
+                    if (history.length > this.MAX_TRAIL_POINTS) {
+                        history.shift();
+                    }
+
+                    // Update orbit line geometry
+                    this.updateOrbitLine(id, history, origin);
+                }
             }
             i++;
         }
+    }
+
+    private updateOrbitLine(id: number, history: Array<{ x: number; y: number; z: number }>, origin: { x: number; y: number; z: number }): void {
+        const line = this.orbitLines.get(id);
+        if (!line || history.length < 2) return;
+
+        const positions = line.geometry.attributes.position as THREE.BufferAttribute;
+        const arr = positions.array as Float32Array;
+
+        for (let i = 0; i < history.length; i++) {
+            arr[i * 3] = history[i].x - origin.x;
+            arr[i * 3 + 1] = history[i].y - origin.y;
+            arr[i * 3 + 2] = history[i].z - origin.z;
+        }
+
+        positions.needsUpdate = true;
+        line.geometry.setDrawRange(0, history.length);
     }
 
     dispose(): void {
@@ -95,6 +156,7 @@ export class BodyRenderer {
             (orbit.material as THREE.Material).dispose();
         }
         this.orbitLines.clear();
+        this.orbitHistory.clear();
     }
 }
 
@@ -115,9 +177,9 @@ class BodyMesh {
 
         // Create material based on body type
         if (body.type === 'star') {
+            // MeshBasicMaterial is unlit - perfect for stars
             this.material = new THREE.MeshBasicMaterial({
                 color: body.color || 0xffdd44,
-                emissive: new THREE.Color(body.color || 0xffdd44),
             });
         } else {
             this.material = new THREE.MeshStandardMaterial({
