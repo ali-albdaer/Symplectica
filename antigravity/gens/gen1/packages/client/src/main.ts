@@ -17,6 +17,7 @@ import { WorldBuilder } from './world-builder';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
 import { VisualizationPanel, VisualizationOptions } from './visualization-panel';
+import { TimeController } from './time-controller';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -29,17 +30,7 @@ interface SimState {
     bodyCount: number;
 }
 
-// Time scale: simulation seconds per real second
-// e.g. 3600 = 1 hour of simulation per real second
-const TIME_SCALES = [
-    { sim: 1, label: '1s/s' },           // 1 second per second (real-time)
-    { sim: 60, label: '1min/s' },        // 1 minute per second
-    { sim: 3600, label: '1hr/s' },       // 1 hour per second  
-    { sim: 86400, label: '1day/s' },     // 1 day per second
-    { sim: 604800, label: '1wk/s' },     // 1 week per second
-    { sim: 2592000, label: '1mo/s' },    // 1 month per second (~30 days)
-    { sim: 31536000, label: '1yr/s' },   // 1 year per second
-];
+
 
 class NBodyClient {
     private scene!: THREE.Scene;
@@ -65,9 +56,8 @@ class NBodyClient {
     private fpsHistory: number[] = [];
     private running = false;
 
-    // Time scale
-    private timeScaleIndex = 0; // Start at real-time (1s/s)
-    private paused = false;
+    // Time control (centralized)
+    private timeController = new TimeController();
     private uiHidden = false;
 
     // Body following
@@ -87,7 +77,7 @@ class NBodyClient {
         this.chat = new Chat();
 
         // Initialize Admin Panel
-        this.adminPanel = new AdminPanel(this.physics);
+        this.adminPanel = new AdminPanel(this.physics, this.timeController);
 
         // Initialize Visualization Panel
         this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
@@ -206,37 +196,33 @@ class NBodyClient {
 
             switch (e.key) {
                 case ' ':
-                    this.paused = !this.paused;
+                    this.timeController.togglePause();
                     this.updateTimeScaleUI();
                     break;
                 case '.':
                 case '>':
-                    if (this.timeScaleIndex < TIME_SCALES.length - 1) {
-                        this.timeScaleIndex++;
-                        this.updateTimeScaleUI();
-                    }
+                    this.timeController.increaseSpeed();
+                    this.updateTimeScaleUI();
                     break;
                 case ',':
                 case '<':
-                    if (this.timeScaleIndex > 0) {
-                        this.timeScaleIndex--;
-                        this.updateTimeScaleUI();
-                    }
+                    this.timeController.decreaseSpeed();
+                    this.updateTimeScaleUI();
                     break;
                 case '1':
-                    this.timeScaleIndex = 0; // 1s/s
+                    this.timeController.setSpeedIndex(0); // 1s/s
                     this.updateTimeScaleUI();
                     break;
                 case '2':
-                    this.timeScaleIndex = 2; // 1hr/s
+                    this.timeController.setSpeedIndex(2); // 1hr/s
                     this.updateTimeScaleUI();
                     break;
                 case '3':
-                    this.timeScaleIndex = 4; // 1wk/s
+                    this.timeController.setSpeedIndex(4); // 1wk/s
                     this.updateTimeScaleUI();
                     break;
                 case '4':
-                    this.timeScaleIndex = 6; // 1yr/s
+                    this.timeController.setSpeedIndex(6); // 1yr/s
                     this.updateTimeScaleUI();
                     break;
                 case 'n':
@@ -307,14 +293,9 @@ class NBodyClient {
     }
 
     private updateTimeScaleUI(): void {
-        const scale = TIME_SCALES[this.timeScaleIndex];
         const scaleEl = document.getElementById('time-warp');
         if (scaleEl) {
-            if (this.paused) {
-                scaleEl.textContent = '⏸ PAUSED';
-            } else {
-                scaleEl.textContent = `⏱ ${scale.label}`;
-            }
+            scaleEl.textContent = this.timeController.getDisplayLabel();
         }
     }
 
@@ -402,22 +383,11 @@ class NBodyClient {
         this.fpsHistory.push(fps);
         if (this.fpsHistory.length > 60) this.fpsHistory.shift();
 
-        // Step local physics simulation based on time scale
-        // TIME_SCALES[n].sim = simulation seconds per real second
-        // physics timestep = 60 seconds per step
-        // We need to step (simSecondsPerFrame / 60) times per frame
-        if (!this.paused) {
-            const scale = TIME_SCALES[this.timeScaleIndex];
-            const simSecondsPerFrame = scale.sim * delta; // How many sim seconds to advance this frame
-            const physicsTimestep = 60; // seconds per physics step
-            const stepsNeeded = Math.ceil(simSecondsPerFrame / physicsTimestep);
-            // Cap steps to prevent frame drops (at 1yr/s we need ~525k steps/s, ~8750/frame at 60fps)
-            // We'll cap at 1000 steps/frame which allows up to ~1year/sec at 60fps with some precision
-            const maxStepsPerFrame = 1000;
-            const steps = Math.min(stepsNeeded, maxStepsPerFrame);
-            for (let i = 0; i < steps; i++) {
-                this.physics.step();
-            }
+        // Step physics using TimeController's accumulator pattern
+        // This ensures deterministic simulation at any framerate
+        const steps = this.timeController.update(delta);
+        for (let i = 0; i < steps; i++) {
+            this.physics.step();
         }
 
         // Update state from physics
@@ -492,8 +462,18 @@ class NBodyClient {
         const loading = document.getElementById('loading');
         if (loading) loading.classList.add('hidden');
     }
+
+    /** Expose for testing */
+    getPhysics() { return this.physics; }
+    getTimeController() { return this.timeController; }
 }
 
 // Start application
 const client = new NBodyClient();
-client.init().catch(console.error);
+client.init().then(() => {
+    // Expose for browser console testing
+    (window as any).physics = client.getPhysics();
+    (window as any).timeController = client.getTimeController();
+    console.log('🧪 Test mode: window.physics and window.timeController available');
+    console.log('   Run: import("./src/time-tests.ts").then(t => t.runAllTests(physics, timeController))');
+}).catch(console.error);

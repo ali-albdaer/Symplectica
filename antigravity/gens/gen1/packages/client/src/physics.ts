@@ -121,8 +121,9 @@ export class PhysicsClient {
 
         this.simulation = this.module.createSunEarthMoon(BigInt(Date.now()));
 
-        // Configure for smooth 60fps rendering
-        this.simulation.setDt(1.0 / 60.0);
+        // Use proper orbital mechanics timestep (1 hour = 3600s)
+        // This is set by the TimeController, but we need a default here
+        this.simulation.setDt(3600);
         this.simulation.setSubsteps(4);
 
         console.log(`🌍 Created Sun-Earth-Moon system (${this.simulation.bodyCount()} bodies)`);
@@ -132,7 +133,7 @@ export class PhysicsClient {
         if (!this.initialized) throw new Error('Physics not initialized');
 
         this.simulation = new this.module.WasmSimulation(seed ?? BigInt(Date.now()));
-        this.simulation.setDt(1.0 / 60.0);
+        this.simulation.setDt(3600); // 1 hour timestep for orbital mechanics
         this.simulation.setSubsteps(4);
     }
 

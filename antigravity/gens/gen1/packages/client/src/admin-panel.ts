@@ -10,6 +10,7 @@
  */
 
 import { PhysicsClient } from './physics';
+import { TimeController } from './time-controller';
 
 interface ServerConfig {
     tickRate: number;
@@ -21,6 +22,7 @@ interface ServerConfig {
 export class AdminPanel {
     private container: HTMLElement;
     private physics: PhysicsClient;
+    private timeController: TimeController;
     private isOpen = false;
     private config: ServerConfig = {
         tickRate: 60,
@@ -29,8 +31,9 @@ export class AdminPanel {
         substeps: 4,
     };
 
-    constructor(physics: PhysicsClient) {
+    constructor(physics: PhysicsClient, timeController: TimeController) {
         this.physics = physics;
+        this.timeController = timeController;
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
@@ -316,8 +319,9 @@ export class AdminPanel {
         const forceMethod = (document.getElementById('admin-force-method') as HTMLSelectElement).value;
         const theta = parseFloat((document.getElementById('admin-theta') as HTMLInputElement).value);
 
-        // Apply to physics
+        // Apply timestep to both physics and TimeController
         this.physics.setTimeStep(dt);
+        this.timeController.setPhysicsTimestep(dt);
 
         // Note: substeps/forceMethod/theta would need WASM methods
         console.log(`⚙️ Applied settings: dt=${dt}s, substeps=${substeps}, method=${forceMethod}, θ=${theta}`);
@@ -338,6 +342,6 @@ export class AdminPanel {
 
         if (bodyCount) bodyCount.textContent = this.physics.bodyCount().toString();
         if (tick) tick.textContent = this.physics.tick().toLocaleString();
-        if (currentDt) currentDt.textContent = '3600'; // Would need getter from physics
+        if (currentDt) currentDt.textContent = this.timeController.getPhysicsTimestep().toString();
     }
 }
