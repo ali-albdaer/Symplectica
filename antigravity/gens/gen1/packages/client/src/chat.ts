@@ -258,8 +258,11 @@ export class Chat {
         });
 
         // Send to server
-        // TODO: Implement server messaging
-        // this.network?.sendChat(text);
+        if (this.network?.isConnected()) {
+            this.network.sendChat(this.USERNAME, text);
+        } else {
+            console.warn('Chat message not sent: not connected to server');
+        }
 
         this.input.value = '';
     }

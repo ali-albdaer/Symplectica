@@ -49,13 +49,13 @@ interface WasmSimulation {
 
 // Message types
 interface ClientMessage {
-    type: 'join' | 'input' | 'ping' | 'request_snapshot';
+    type: 'join' | 'input' | 'ping' | 'request_snapshot' | 'chat';
     payload?: unknown;
     clientTick?: number;
 }
 
 interface ServerMessage {
-    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error';
+    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat';
     payload: unknown;
     serverTick?: number;
     timestamp?: number;
@@ -66,6 +66,11 @@ interface StatePayload {
     time: number;
     positions: number[];
     energy: number;
+}
+
+interface ChatPayload {
+    sender: string;
+    text: string;
 }
 
 interface Client {
@@ -237,6 +242,19 @@ class SimulationServer {
                 // For now, just acknowledge
                 break;
 
+            case 'chat': {
+                const payload = message.payload as Partial<ChatPayload> | undefined;
+                const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
+                if (!text) return;
+
+                const sender = typeof payload?.sender === 'string' && payload.sender.trim().length > 0
+                    ? payload.sender.trim().slice(0, 32)
+                    : client.id;
+
+                this.broadcastChat({ sender, text: text.slice(0, 200) });
+                break;
+            }
+
             default:
                 console.warn(`Unknown message type: ${message.type}`);
         }
@@ -305,6 +323,23 @@ class SimulationServer {
         const message: ServerMessage = {
             type: 'snapshot',
             payload: this.simulation.toJson(),
+            serverTick: Number(this.simulation.tick()),
+            timestamp: Date.now(),
+        };
+
+        const data = JSON.stringify(message);
+
+        for (const client of this.clients.values()) {
+            if (client.ws.readyState === WebSocket.OPEN) {
+                client.ws.send(data);
+            }
+        }
+    }
+
+    private broadcastChat(payload: ChatPayload): void {
+        const message: ServerMessage = {
+            type: 'chat',
+            payload,
             serverTick: Number(this.simulation.tick()),
             timestamp: Date.now(),
         };

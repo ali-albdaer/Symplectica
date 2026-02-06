@@ -30,6 +30,13 @@ interface SimState {
     bodyCount: number;
 }
 
+interface NetworkStatePayload {
+    tick: number;
+    time: number;
+    positions: number[];
+    energy: number;
+}
+
 
 
 class NBodyClient {
@@ -56,6 +63,9 @@ class NBodyClient {
     private fpsHistory: number[] = [];
     private running = false;
 
+    private lastServerState?: NetworkStatePayload;
+    private lastServerPositions = new Float64Array(0);
+
     // Time control (centralized)
     private timeController = new TimeController();
     private uiHidden = false;
@@ -73,8 +83,18 @@ class NBodyClient {
         this.updateLoadingStatus('Setting up controls...');
         this.initControls();
 
+        this.updateLoadingStatus('Connecting to server...');
+        await this.initNetwork();
+
         // Initialize Chat
-        this.chat = new Chat();
+        this.chat = new Chat(this.network);
+        this.setupNetworkHandlers();
+
+        try {
+            await this.network.connect();
+        } catch (error) {
+            console.warn('⚠️ Multiplayer server unavailable, running in local mode.', error);
+        }
 
         // Initialize Admin Panel
         this.adminPanel = new AdminPanel(this.physics, this.timeController);
@@ -90,6 +110,60 @@ class NBodyClient {
 
         this.hideLoading();
         this.start();
+    }
+
+    private async initNetwork(): Promise<void> {
+        const host = window.location.hostname || 'localhost';
+        const url = `ws://${host}:8080`;
+        this.network = new NetworkClient(url);
+    }
+
+    private setupNetworkHandlers(): void {
+        this.network.on('welcome', (message) => {
+            const payload = message.payload as { snapshot: string };
+            if (payload?.snapshot) {
+                this.applySnapshot(payload.snapshot);
+            }
+        });
+
+        this.network.on('snapshot', (message) => {
+            const snapshot = message.payload as string;
+            if (snapshot) {
+                this.applySnapshot(snapshot);
+            }
+        });
+
+        this.network.on('state', (message) => {
+            const state = message.payload as NetworkStatePayload;
+            if (state?.positions) {
+                this.applyServerState(state);
+            }
+        });
+
+        this.network.on('chat', (message) => {
+            const payload = message.payload as { sender: string; text: string };
+            if (payload?.sender && payload?.text) {
+                this.chat.onServerMessage(payload.sender, payload.text);
+            }
+        });
+    }
+
+    private applySnapshot(snapshot: string): void {
+        const restored = this.physics.restoreSnapshot(snapshot);
+        if (!restored) {
+            console.warn('⚠️ Failed to apply server snapshot');
+            return;
+        }
+
+        this.refreshBodies();
+        this.state.bodyCount = this.physics.bodyCount();
+        this.updateUIBodyCount();
+        this.timeController.resetAccumulator();
+    }
+
+    private applyServerState(state: NetworkStatePayload): void {
+        this.lastServerState = state;
+        this.lastServerPositions = new Float64Array(state.positions);
     }
 
     private initRenderer(): void {
@@ -380,18 +454,28 @@ class NBodyClient {
         this.fpsHistory.push(fps);
         if (this.fpsHistory.length > 60) this.fpsHistory.shift();
 
-        // Step physics using TimeController's accumulator pattern
-        // This ensures deterministic simulation at any framerate
-        const steps = this.timeController.update(delta);
-        for (let i = 0; i < steps; i++) {
-            this.physics.step();
-        }
+        const useServerState = this.network?.isConnected() && this.lastServerState;
 
-        // Update state from physics
-        this.state.tick = this.physics.tick();
-        this.state.time = this.physics.time();
-        this.state.positions = this.physics.getPositions();
-        this.state.energy = this.physics.totalEnergy();
+        if (useServerState) {
+            this.state.tick = this.lastServerState!.tick;
+            this.state.time = this.lastServerState!.time;
+            this.state.positions = this.lastServerPositions;
+            this.state.energy = this.lastServerState!.energy;
+            this.state.bodyCount = Math.floor(this.lastServerPositions.length / 3);
+        } else {
+            // Step physics using TimeController's accumulator pattern
+            // This ensures deterministic simulation at any framerate
+            const steps = this.timeController.update(delta);
+            for (let i = 0; i < steps; i++) {
+                this.physics.step();
+            }
+
+            // Update state from physics
+            this.state.tick = this.physics.tick();
+            this.state.time = this.physics.time();
+            this.state.positions = this.physics.getPositions();
+            this.state.energy = this.physics.totalEnergy();
+        }
 
         // Update camera
         this.camera.update(delta);
@@ -421,6 +505,7 @@ class NBodyClient {
         document.getElementById('sim-time')!.textContent = this.formatTime(this.state.time);
         document.getElementById('sim-tick')!.textContent = this.state.tick.toLocaleString();
         document.getElementById('sim-energy')!.textContent = this.formatEnergy(this.state.energy);
+        document.getElementById('sim-bodies')!.textContent = this.state.bodyCount.toString();
 
         const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
         document.getElementById('render-fps')!.textContent = avgFps.toFixed(0);

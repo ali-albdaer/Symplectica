@@ -8,7 +8,7 @@
  */
 
 interface ServerMessage {
-    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error';
+    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat';
     payload: unknown;
     serverTick?: number;
     timestamp?: number;
@@ -28,6 +28,11 @@ interface WelcomePayload {
         tickRate: number;
         serverTick: number;
     };
+}
+
+interface ChatPayload {
+    sender: string;
+    text: string;
 }
 
 type MessageHandler = (message: ServerMessage) => void;
@@ -113,6 +118,7 @@ export class NetworkClient {
 
             case 'state':
             case 'snapshot':
+            case 'chat':
             case 'error':
                 // Dispatch to registered handlers
                 const handlers = this.handlers.get(message.type) || [];
@@ -187,6 +193,10 @@ export class NetworkClient {
         if (this.ws?.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify({ type, payload }));
         }
+    }
+
+    sendChat(sender: string, text: string): void {
+        this.send('chat', { sender, text } as ChatPayload);
     }
 
     ping(): void {
