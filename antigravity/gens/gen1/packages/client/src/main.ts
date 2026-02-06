@@ -140,13 +140,10 @@ class NBodyClient {
         this.physics = new PhysicsClient();
         await this.physics.init();
 
-        // Use local simulation for now
+        // Use local simulation for now - createSunEarthMoon sets dt=3600s
         this.physics.createSunEarthMoon();
 
-        // Set physics timestep - use smaller step for stable moon orbit
-        // Moon orbit is ~27 days, need many steps per orbit for stability
-        // 60s per step = 1440 steps per day = ~39,000 steps per lunar orbit
-        this.physics.setTimeStep(60); // 1 minute per physics step (was 3600 = 1 hour)
+        // TimeController manages simulation speed; physics dt is set by createSunEarthMoon
 
         this.state.bodyCount = this.physics.bodyCount();
         this.updateUIBodyCount();

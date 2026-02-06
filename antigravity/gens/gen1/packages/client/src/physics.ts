@@ -256,7 +256,11 @@ export class PhysicsClient {
                 this.simulation = this.module.createSunEarthMoon(seed);
         }
 
-        console.log(`🌍 Loaded preset: ${preset} (${this.simulation.bodyCount()} bodies)`);
+        // Set proper orbital mechanics timestep for all presets
+        this.simulation.setDt(3600); // 1 hour per step
+        this.simulation.setSubsteps(4);
+
+        console.log(`🌍 Loaded preset: ${preset} (${this.simulation.bodyCount()} bodies, dt=3600s)`);
     }
 
     /** Add a custom body */
