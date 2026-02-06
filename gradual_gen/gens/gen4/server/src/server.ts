@@ -100,8 +100,54 @@ class PhysicsEngine {
   // Active thrusts applied across multiple ticks
   activeThrusts: ActiveThrust[] = [];
 
+  // Reference energy for computing relative error
+  private referenceEnergy: number | null = null;
+
   addThrust(thrust: ActiveThrust): void {
     this.activeThrusts.push(thrust);
+  }
+
+  /** Compute total mechanical energy (kinetic + gravitational potential) */
+  private computeTotalEnergy(): number {
+    const bodies = this.state.bodies;
+    const n = bodies.length;
+    let kinetic = 0;
+    let potential = 0;
+
+    for (const b of bodies) {
+      const v2 = b.velocity.x ** 2 + b.velocity.y ** 2 + b.velocity.z ** 2;
+      kinetic += 0.5 * b.mass * v2;
+    }
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const bi = bodies[i], bj = bodies[j];
+        const dx = bj.position.x - bi.position.x;
+        const dy = bj.position.y - bi.position.y;
+        const dz = bj.position.z - bi.position.z;
+        const r = Math.sqrt(dx * dx + dy * dy + dz * dz + this.state.config.softening_length ** 2);
+        if (r > 0) {
+          potential -= G * bi.mass * bj.mass / r;
+        }
+      }
+    }
+    return kinetic + potential;
+  }
+
+  /** Compute total momentum magnitude */
+  private computeTotalMomentum(): number {
+    let px = 0, py = 0, pz = 0;
+    for (const b of this.state.bodies) {
+      px += b.mass * b.velocity.x;
+      py += b.mass * b.velocity.y;
+      pz += b.mass * b.velocity.z;
+    }
+    return Math.sqrt(px * px + py * py + pz * pz);
+  }
+
+  /** Reset reference energy (call when bodies change) */
+  resetReferenceEnergy(): void {
+    this.referenceEnergy = null;
   }
 
   constructor(preset: string, seed: number, useWasm: boolean) {
@@ -392,16 +438,26 @@ class PhysicsEngine {
     this.state.config.time += dt;
     this.state.config.tick += 1;
 
+    // Compute conservation errors
+    const currentEnergy = this.computeTotalEnergy();
+    if (this.referenceEnergy === null) {
+      this.referenceEnergy = currentEnergy;
+    }
+    const energyError = this.referenceEnergy !== 0
+      ? Math.abs((currentEnergy - this.referenceEnergy) / this.referenceEnergy)
+      : 0;
+    const momentum = this.computeTotalMomentum();
+
     return {
       tick: this.state.config.tick,
       time: this.state.config.time,
       dt,
       body_count: n,
-      energy_error: 0,
-      momentum_error: 0,
+      energy_error: energyError,
+      momentum_error: momentum,
       collisions: 0,
-      integrator: 'VelocityVerlet',
-      solver: 'Direct',
+      integrator: this.state.config.integrator_type || 'VelocityVerlet',
+      solver: this.state.config.solver_type || 'Direct',
     };
   }
 
@@ -446,6 +502,7 @@ class PhysicsEngine {
 
   /** Reload preset (e.g. from admin command) */
   loadPreset(preset: string, seed: number): void {
+    this.referenceEnergy = null;  // Reset energy tracking for new preset
     if (this.wasmEngine) {
       try {
         this.wasmEngine.free();

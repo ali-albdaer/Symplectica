@@ -172,9 +172,7 @@ export class Renderer {
     if (isStar) {
       material = new THREE.MeshBasicMaterial({
         color,
-        emissive: color,
-        emissiveIntensity: 2,
-      } as any);
+      });
 
       // Add point light at star
       const light = new THREE.PointLight(color, body.luminosity > 0 ? 2 : 0.5, 0, 2);

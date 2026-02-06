@@ -172,6 +172,7 @@ export class App {
 
   private startOfflineMode(): void {
     this.offlineMode = true;
+    this.offlineReferenceEnergy = null;  // Reset energy tracking
     this.hudConnection.style.color = '#FFA500';
 
     if (this.useWasm) {
@@ -365,6 +366,55 @@ export class App {
 
     this.state.config.time += dt;
     this.state.config.tick += 1;
+
+    // Update diagnostics for TS fallback path
+    this.updateOfflineDiagnostics(dt);
+  }
+
+  /** Reference energy for computing relative conservation error (client offline) */
+  private offlineReferenceEnergy: number | null = null;
+
+  /** Compute and display diagnostics for the TS offline path */
+  private updateOfflineDiagnostics(dt: number): void {
+    if (!this.state) return;
+    const bodies = this.offlineBodies;
+    const n = bodies.length;
+    const softening2 = this.state.config.softening_length ** 2;
+
+    // Kinetic + potential energy
+    let kinetic = 0;
+    let potential = 0;
+    let px = 0, py = 0, pz = 0;
+    for (const b of bodies) {
+      const v2 = b.velocity.x ** 2 + b.velocity.y ** 2 + b.velocity.z ** 2;
+      kinetic += 0.5 * b.mass * v2;
+      px += b.mass * b.velocity.x;
+      py += b.mass * b.velocity.y;
+      pz += b.mass * b.velocity.z;
+    }
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const bi = bodies[i], bj = bodies[j];
+        const dx = bj.position.x - bi.position.x;
+        const dy = bj.position.y - bi.position.y;
+        const dz = bj.position.z - bi.position.z;
+        const r = Math.sqrt(dx * dx + dy * dy + dz * dz + softening2);
+        if (r > 0) potential -= G * bi.mass * bj.mass / r;
+      }
+    }
+    const totalEnergy = kinetic + potential;
+    if (this.offlineReferenceEnergy === null) {
+      this.offlineReferenceEnergy = totalEnergy;
+    }
+    const energyError = this.offlineReferenceEnergy !== 0
+      ? Math.abs((totalEnergy - this.offlineReferenceEnergy) / this.offlineReferenceEnergy)
+      : 0;
+    const momentumMag = Math.sqrt(px * px + py * py + pz * pz);
+
+    this.diagEnergy.textContent = energyError.toExponential(2);
+    this.diagMomentum.textContent = momentumMag.toExponential(2);
+    this.diagSolver.textContent = this.state.config.solver_type || 'Direct';
+    this.diagDt.textContent = dt.toFixed(1) + 's';
   }
 
   private handleSnapshot(snapshot: any): void {
@@ -527,18 +577,33 @@ export class App {
         if (this.wasmSim) {
           this.wasmSim.setPaused(this.state.config.paused);
         }
+        if (!this.offlineMode) {
+          this.network.sendInput({ SetPaused: { paused: this.state.config.paused } }, this.state.config.tick);
+        }
       }
     });
 
     // Step
     document.getElementById('btn-step')!.addEventListener('click', () => {
-      if (this.state && this.offlineMode) {
-        const wasPaused = this.state.config.paused;
-        this.state.config.paused = false;
-        if (this.wasmSim) this.wasmSim.setPaused(false);
-        this.offlineStep();
-        this.state.config.paused = wasPaused;
-        if (this.wasmSim) this.wasmSim.setPaused(wasPaused);
+      if (this.state) {
+        if (this.offlineMode) {
+          const wasPaused = this.state.config.paused;
+          this.state.config.paused = false;
+          if (this.wasmSim) this.wasmSim.setPaused(false);
+          this.offlineStep();
+          this.state.config.paused = wasPaused;
+          if (this.wasmSim) this.wasmSim.setPaused(wasPaused);
+        } else {
+          // Tell server to unpause for one tick then re-pause
+          this.network.sendInput({ SetPaused: { paused: false } }, this.state.config.tick);
+          setTimeout(() => {
+            if (this.state) {
+              this.network.sendInput({ SetPaused: { paused: true } }, this.state.config.tick);
+              this.state.config.paused = true;
+              btnPause.textContent = '▶ Play';
+            }
+          }, 50);
+        }
       }
     });
 
@@ -551,6 +616,9 @@ export class App {
       if (this.state) {
         this.state.config.time_scale = scale;
         if (this.wasmSim) this.wasmSim.setTimeScale(scale);
+        if (!this.offlineMode) {
+          this.network.sendInput({ SetTimeScale: { scale } }, this.state.config.tick);
+        }
       }
       timeScaleLabel.textContent = scale >= 1 ? `${scale.toFixed(0)}x` : `${scale.toFixed(2)}x`;
     });
@@ -570,6 +638,12 @@ export class App {
           };
           this.wasmSim.setSolver(solverMap[this.state.config.solver_type] || 'direct');
         }
+        if (!this.offlineMode) {
+          this.network.sendInput(
+            { SetConfig: { key: 'solver_type', value: this.state.config.solver_type } },
+            this.state.config.tick,
+          );
+        }
       }
     });
 
@@ -583,6 +657,12 @@ export class App {
           };
           this.wasmSim.setIntegrator(intMap[this.state.config.integrator_type] || 'verlet');
         }
+        if (!this.offlineMode) {
+          this.network.sendInput(
+            { SetConfig: { key: 'integrator_type', value: this.state.config.integrator_type } },
+            this.state.config.tick,
+          );
+        }
       }
     });
 
@@ -591,6 +671,7 @@ export class App {
       btn.addEventListener('click', () => {
         const preset = (btn as HTMLElement).dataset.preset!;
         if (this.offlineMode) {
+          this.offlineReferenceEnergy = null;  // Reset energy tracking for new preset
           if (this.wasmSim) {
             // Dispose old WASM sim and create new one from preset
             this.wasmSim.dispose();
