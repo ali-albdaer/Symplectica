@@ -1,7 +1,6 @@
 /**
  * Main game server: manages simulation loop, player connections, state sync.
- * Uses a simple in-process physics engine (TypeScript fallback) until
- * native Rust FFI bridge is set up. Can also run the WASM module for parity.
+ * Uses Rust WASM physics engine when available, TypeScript Velocity Verlet as fallback.
  */
 interface ServerOptions {
     port: number;
@@ -19,6 +18,9 @@ export declare class GameServer {
     private tickCount;
     private lastTickTime;
     private avgTickDuration;
+    private previousPositions;
+    private previousBodyCount;
+    private readonly DELTA_THRESHOLD;
     constructor(options: ServerOptions);
     start(): Promise<void>;
     stop(): void;

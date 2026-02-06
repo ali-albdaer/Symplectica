@@ -1,11 +1,13 @@
 /**
- * WebSocket network client with auto-reconnect, ping/pong, and message handling.
+ * WebSocket network client with auto-reconnect, ping/pong, message handling,
+ * and client-side prediction / server reconciliation support.
  */
 
-import type { SimulationState, StepResult } from '@solar-sim/shared';
+import type { SimulationState, StepResult, InputAction } from '@solar-sim/shared';
 import {
   type ClientMessage,
   type ServerMessage,
+  type InputMessage,
   ClientMessageType,
   ServerMessageType,
   PROTOCOL_VERSION,
@@ -16,6 +18,15 @@ import {
 const RECONNECT_DELAY = 2000;
 const PING_INTERVAL = 5000;
 const MAX_RECONNECT_ATTEMPTS = 10;
+const MAX_PREDICTION_BUFFER = 300;
+
+/** Stored input for prediction reconciliation */
+export interface PendingInput {
+  seq: number;
+  tick: number;
+  action: InputAction;
+  timestamp: number;
+}
 
 export class NetworkClient {
   private ws: WebSocket | null = null;
@@ -26,11 +37,21 @@ export class NetworkClient {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private latency = 0;
 
+  // Client prediction state
+  private inputSeq = 0;
+  private pendingInputs: PendingInput[] = [];
+  private lastAckedSeq = 0;
+  private serverTick = 0;
+
   // Callbacks
   onSnapshot: ((snapshot: any) => void) | null = null;
   onPositionUpdate: ((tick: number, positions: Float64Array) => void) | null = null;
   onStepResult: ((result: StepResult) => void) | null = null;
   onConnectionChange: ((connected: boolean) => void) | null = null;
+  /** Called after reconciliation with unacked inputs to replay */
+  onReconcile: ((serverState: SimulationState, pendingInputs: PendingInput[]) => void) | null = null;
+  /** Called on delta updates */
+  onDelta: ((delta: any) => void) | null = null;
 
   async connect(url: string, playerName: string): Promise<void> {
     this.url = url;
@@ -86,6 +107,52 @@ export class NetworkClient {
     }
   }
 
+  /**
+   * Send a player input with sequence tracking for prediction/reconciliation.
+   * The input is buffered locally so it can be replayed after server correction.
+   */
+  sendInput(action: InputAction, clientTick: number): number {
+    const seq = ++this.inputSeq;
+    const pending: PendingInput = {
+      seq,
+      tick: clientTick,
+      action,
+      timestamp: Date.now(),
+    };
+
+    this.pendingInputs.push(pending);
+
+    // Trim old inputs to prevent unbounded growth
+    if (this.pendingInputs.length > MAX_PREDICTION_BUFFER) {
+      this.pendingInputs = this.pendingInputs.slice(-MAX_PREDICTION_BUFFER);
+    }
+
+    // Send to server
+    this.send({
+      type: ClientMessageType.Input,
+      seq,
+      tick: clientTick,
+      action,
+    });
+
+    return seq;
+  }
+
+  /** Get current latency */
+  getLatency(): number {
+    return this.latency;
+  }
+
+  /** Get the last acknowledged server tick */
+  getServerTick(): number {
+    return this.serverTick;
+  }
+
+  /** Get count of unacknowledged inputs */
+  getPendingInputCount(): number {
+    return this.pendingInputs.length;
+  }
+
   disconnect(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -113,8 +180,27 @@ export class NetworkClient {
       const msg = decodeMessage<ServerMessage>(event.data);
 
       switch (msg.type) {
-        case ServerMessageType.Snapshot:
-          this.onSnapshot?.(msg);
+        case ServerMessageType.Snapshot: {
+          const snapshot = msg as any;
+          this.serverTick = snapshot.serverTick || 0;
+
+          // Discard pending inputs that the server has already processed
+          this.pendingInputs = this.pendingInputs.filter(
+            (input) => input.tick > this.serverTick
+          );
+
+          // Notify for reconciliation: app should reset to server state
+          // and replay pending inputs
+          if (this.onReconcile && this.pendingInputs.length > 0) {
+            this.onReconcile(snapshot.state, [...this.pendingInputs]);
+          }
+
+          this.onSnapshot?.(snapshot);
+          break;
+        }
+
+        case ServerMessageType.Delta:
+          this.onDelta?.(msg);
           break;
 
         case ServerMessageType.StepResult:

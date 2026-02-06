@@ -2,6 +2,7 @@
 ///! Exact pairwise computation — canonical reference implementation.
 
 use crate::body::Body;
+use crate::softening::KSRegularization;
 use crate::units::G;
 use crate::vector::Vec3;
 use super::{ForceResult, GravitySolver, SolverType};
@@ -19,6 +20,13 @@ impl GravitySolver for DirectSolver {
         let mut force_evaluations: u64 = 0;
         let eps2 = softening_length * softening_length;
 
+        // KS regularization activates at 10× the softening length for close encounters
+        let ks = if softening_length > 0.0 {
+            Some(KSRegularization::new(softening_length * 10.0))
+        } else {
+            None
+        };
+
         for i in 0..n {
             if !bodies[i].is_active { continue; }
 
@@ -27,13 +35,31 @@ impl GravitySolver for DirectSolver {
                 if bodies[j].is_massless { continue; }
 
                 let rij = bodies[j].position - bodies[i].position;
-                let r2 = rij.magnitude_squared() + eps2;
+                let r2_raw = rij.magnitude_squared();
+                let r_raw = r2_raw.sqrt();
+
+                // Standard Plummer-softened force factor
+                let r2 = r2_raw + eps2;
                 let r = r2.sqrt();
                 let r3 = r2 * r;
+                let softened_factor = if r3 > 0.0 { 1.0 / r3 } else { 0.0 };
 
-                // a_i += G * m_j * r_ij / |r_ij + eps|³
-                if r3 > 0.0 {
-                    accelerations[i] += rij * (G * bodies[j].mass.value() / r3);
+                // For close encounters, blend with KS regularization
+                // KS provides smoother force transitions; take the minimum
+                // to ensure softening guarantee is never violated
+                let force_factor = if let Some(ref ks) = ks {
+                    if r_raw < ks.activation_radius && r_raw > 0.0 {
+                        let ks_factor = ks.regularized_force_factor(r_raw);
+                        softened_factor.min(ks_factor)
+                    } else {
+                        softened_factor
+                    }
+                } else {
+                    softened_factor
+                };
+
+                if force_factor > 0.0 {
+                    accelerations[i] += rij * (G * bodies[j].mass.value() * force_factor);
                 }
 
                 force_evaluations += 1;

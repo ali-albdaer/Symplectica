@@ -28,6 +28,9 @@ import {
 import { Renderer } from './rendering/renderer.js';
 import { CameraController } from './camera/camera-controller.js';
 import { NetworkClient } from './networking/client.js';
+import { initWasm, isWasmReady, WasmSimulation } from './wasm/wasm-bridge.js';
+import { WorldBuilder } from './ui/world-builder.js';
+import { Onboarding } from './ui/onboarding.js';
 
 export class App {
   private renderer!: Renderer;
@@ -38,6 +41,10 @@ export class App {
   private state: SimulationState | null = null;
   private latestPositions: Float64Array | null = null;
   private latestTick = 0;
+
+  // WASM physics engine for offline mode
+  private wasmSim: WasmSimulation | null = null;
+  private useWasm = false;
 
   // HUD elements
   private hudTick!: HTMLElement;
@@ -74,6 +81,10 @@ export class App {
     this.diagSolver = document.getElementById('diag-solver')!;
     this.diagDt = document.getElementById('diag-dt')!;
 
+    // Try loading WASM physics engine
+    this.useWasm = await initWasm();
+    console.log(`[App] WASM physics: ${this.useWasm ? 'available' : 'unavailable (TS fallback)'}`);
+
     // Initialize renderer
     const container = document.getElementById('canvas-container')!;
     this.renderer = new Renderer(container);
@@ -86,6 +97,15 @@ export class App {
     this.network.onSnapshot = (snapshot) => this.handleSnapshot(snapshot);
     this.network.onPositionUpdate = (tick, positions) => this.handlePositionUpdate(tick, positions);
     this.network.onStepResult = (result) => this.handleStepResult(result);
+    this.network.onDelta = (delta) => this.handleDelta(delta);
+    this.network.onReconcile = (serverState, pending) => {
+      // Server correction: set authoritative state and replay unacked inputs
+      this.state = serverState;
+      this.offlineBodies = serverState.bodies;
+      this.renderer.updateBodies(serverState.bodies);
+      // In a full implementation, we'd replay pending inputs here
+      console.log(`[Reconcile] Server tick ${serverState.config.tick}, ${pending.length} inputs to replay`);
+    };
     this.network.onConnectionChange = (connected) => {
       this.hudConnection.textContent = connected ? 'Online' : 'Offline';
       this.hudConnection.style.color = connected ? '#4CAF50' : '';
@@ -104,11 +124,17 @@ export class App {
 
     // Setup UI
     this.setupControls();
+    this.setupWorldBuilder();
 
     // Hide loading screen
     const loading = document.getElementById('loading')!;
     loading.classList.add('hidden');
-    setTimeout(() => loading.remove(), 500);
+    setTimeout(() => {
+      loading.remove();
+      // Show onboarding flow on first visit
+      const onboarding = new Onboarding();
+      onboarding.show();
+    }, 500);
 
     // Start render loop
     this.lastFpsUpdate = performance.now();
@@ -117,14 +143,36 @@ export class App {
 
   private startOfflineMode(): void {
     this.offlineMode = true;
-    this.hudConnection.textContent = 'Offline (Local)';
     this.hudConnection.style.color = '#FFA500';
 
-    // Build a default solar system locally
-    this.offlineBodies = this.buildSolarSystem();
-    this.state = {
+    if (this.useWasm) {
+      // Use WASM physics engine with built-in preset
+      this.wasmSim = WasmSimulation.fromPreset('solar_system', 42);
+      if (this.wasmSim) {
+        this.hudConnection.textContent = 'Offline (WASM)';
+        this.state = this.wasmSim.getState();
+        this.offlineBodies = this.state!.bodies;
+      } else {
+        // WASM preset failed — fall back to TS
+        this.useWasm = false;
+        this.hudConnection.textContent = 'Offline (Local)';
+        this.offlineBodies = this.buildSolarSystem();
+        this.state = this.buildDefaultState(this.offlineBodies);
+      }
+    } else {
+      this.hudConnection.textContent = 'Offline (Local)';
+      this.offlineBodies = this.buildSolarSystem();
+      this.state = this.buildDefaultState(this.offlineBodies);
+    }
+
+    this.renderer.updateBodies(this.offlineBodies);
+    this.updateBodyList(this.offlineBodies);
+  }
+
+  private buildDefaultState(bodies: Body[]): SimulationState {
+    return {
       config: {
-        dt: 86400, // 1 day
+        dt: 86400,
         time: 0,
         tick: 0,
         solver_type: SolverType.Direct,
@@ -145,7 +193,7 @@ export class App {
         paused: false,
         seed: 42,
       },
-      bodies: this.offlineBodies,
+      bodies,
       conserved: {
         tick: 0, total_energy: 0, kinetic_energy: 0, potential_energy: 0,
         linear_momentum: vec3(), angular_momentum: vec3(), total_mass: 0,
@@ -155,9 +203,6 @@ export class App {
       ticks_since_integrator_switch: 0,
       integrator_switch_cooldown: 100,
     };
-
-    this.renderer.updateBodies(this.offlineBodies);
-    this.updateBodyList(this.offlineBodies);
   }
 
   private buildSolarSystem(): Body[] {
@@ -192,9 +237,35 @@ export class App {
     ];
   }
 
-  /** Run one offline physics step (Velocity Verlet O(N²)) */
+  /** Run one offline physics step — WASM if available, TS Velocity Verlet fallback */
   private offlineStep(): void {
     if (!this.state || this.state.config.paused) return;
+
+    if (this.wasmSim) {
+      // WASM physics path
+      const result = this.wasmSim.step();
+      if (result) {
+        this.diagEnergy.textContent = result.energy_error.toExponential(2);
+        this.diagMomentum.textContent = result.momentum_error.toExponential(2);
+        this.diagSolver.textContent = result.solver;
+        this.diagDt.textContent = result.dt.toFixed(1) + 's';
+      }
+
+      // Pull positions from WASM (zero-copy Float64Array)
+      const positions = this.wasmSim.getPositions();
+      for (let i = 0; i < this.offlineBodies.length && i * 3 + 2 < positions.length; i++) {
+        this.offlineBodies[i].position.x = positions[i * 3];
+        this.offlineBodies[i].position.y = positions[i * 3 + 1];
+        this.offlineBodies[i].position.z = positions[i * 3 + 2];
+      }
+
+      // Sync tick/time from WASM state
+      this.state.config.tick = this.wasmSim.tick;
+      this.state.config.time = this.wasmSim.time;
+      return;
+    }
+
+    // TS fallback: Velocity Verlet O(N²)
 
     const dt = this.state.config.dt * this.state.config.time_scale;
     const bodies = this.offlineBodies;
@@ -280,6 +351,45 @@ export class App {
     this.diagDt.textContent = result.dt.toFixed(1) + 's';
   }
 
+  /** Handle delta compression updates from server */
+  private handleDelta(delta: any): void {
+    if (!this.state) return;
+
+    for (const d of delta.deltas || []) {
+      const body = this.state.bodies.find((b) => b.id === d.bodyId);
+      if (body) {
+        if (d.position) {
+          body.position.x = d.position.x;
+          body.position.y = d.position.y;
+          body.position.z = d.position.z;
+        }
+        if (d.velocity) {
+          body.velocity.x = d.velocity.x;
+          body.velocity.y = d.velocity.y;
+          body.velocity.z = d.velocity.z;
+        }
+        if (d.removed) {
+          this.state.bodies = this.state.bodies.filter((b) => b.id !== d.bodyId);
+        }
+      }
+    }
+
+    // Handle newly added bodies
+    if (delta.newBodies) {
+      for (const body of delta.newBodies) {
+        if (!this.state.bodies.find((b) => b.id === body.id)) {
+          this.state.bodies.push(body);
+        }
+      }
+      this.renderer.updateBodies(this.state.bodies);
+      this.updateBodyList(this.state.bodies);
+    }
+
+    // Sync tick/time
+    if (delta.tick !== undefined) this.state.config.tick = delta.tick;
+    if (delta.time !== undefined) this.state.config.time = delta.time;
+  }
+
   private animate = (): void => {
     requestAnimationFrame(this.animate);
 
@@ -360,6 +470,9 @@ export class App {
       if (this.state) {
         this.state.config.paused = !this.state.config.paused;
         btnPause.textContent = this.state.config.paused ? '▶ Play' : '⏸ Pause';
+        if (this.wasmSim) {
+          this.wasmSim.setPaused(this.state.config.paused);
+        }
       }
     });
 
@@ -368,8 +481,10 @@ export class App {
       if (this.state && this.offlineMode) {
         const wasPaused = this.state.config.paused;
         this.state.config.paused = false;
+        if (this.wasmSim) this.wasmSim.setPaused(false);
         this.offlineStep();
         this.state.config.paused = wasPaused;
+        if (this.wasmSim) this.wasmSim.setPaused(wasPaused);
       }
     });
 
@@ -381,6 +496,7 @@ export class App {
       const scale = Math.pow(10, power);
       if (this.state) {
         this.state.config.time_scale = scale;
+        if (this.wasmSim) this.wasmSim.setTimeScale(scale);
       }
       timeScaleLabel.textContent = scale >= 1 ? `${scale.toFixed(0)}x` : `${scale.toFixed(2)}x`;
     });
@@ -394,6 +510,12 @@ export class App {
     document.getElementById('solver-select')!.addEventListener('change', (e) => {
       if (this.state) {
         this.state.config.solver_type = (e.target as HTMLSelectElement).value as SolverType;
+        if (this.wasmSim) {
+          const solverMap: Record<string, string> = {
+            'Direct': 'direct', 'BarnesHut': 'barnes_hut', 'FMM': 'fmm'
+          };
+          this.wasmSim.setSolver(solverMap[this.state.config.solver_type] || 'direct');
+        }
       }
     });
 
@@ -401,6 +523,12 @@ export class App {
     document.getElementById('integrator-select')!.addEventListener('change', (e) => {
       if (this.state) {
         this.state.config.integrator_type = (e.target as HTMLSelectElement).value as IntegratorType;
+        if (this.wasmSim) {
+          const intMap: Record<string, string> = {
+            'VelocityVerlet': 'verlet', 'RK45': 'rk45', 'GaussRadau15': 'gauss_radau'
+          };
+          this.wasmSim.setIntegrator(intMap[this.state.config.integrator_type] || 'verlet');
+        }
       }
     });
 
@@ -409,15 +537,33 @@ export class App {
       btn.addEventListener('click', () => {
         const preset = (btn as HTMLElement).dataset.preset!;
         if (this.offlineMode) {
-          // Rebuild locally
-          this.offlineBodies = this.buildSolarSystem(); // TODO: support all presets
-          if (this.state) {
-            this.state.bodies = this.offlineBodies;
-            this.state.config.tick = 0;
-            this.state.config.time = 0;
-            this.renderer.updateBodies(this.offlineBodies);
-            this.updateBodyList(this.offlineBodies);
+          if (this.wasmSim) {
+            // Dispose old WASM sim and create new one from preset
+            this.wasmSim.dispose();
+            this.wasmSim = WasmSimulation.fromPreset(preset, 42);
+            if (this.wasmSim) {
+              this.state = this.wasmSim.getState();
+              this.offlineBodies = this.state!.bodies;
+            } else {
+              // Fallback
+              this.offlineBodies = this.buildSolarSystem();
+              if (this.state) {
+                this.state.bodies = this.offlineBodies;
+                this.state.config.tick = 0;
+                this.state.config.time = 0;
+              }
+            }
+          } else {
+            // TS fallback — only supports solar system
+            this.offlineBodies = this.buildSolarSystem();
+            if (this.state) {
+              this.state.bodies = this.offlineBodies;
+              this.state.config.tick = 0;
+              this.state.config.time = 0;
+            }
           }
+          this.renderer.updateBodies(this.offlineBodies);
+          this.updateBodyList(this.offlineBodies);
         } else {
           // Tell server to load preset
           this.network.send({
@@ -445,6 +591,66 @@ export class App {
             document.getElementById('hud')!.style.display === 'none' ? '' : 'none';
           break;
       }
+    });
+  }
+
+  private setupWorldBuilder(): void {
+    new WorldBuilder({
+      getState: () => this.state,
+      addBody: (body) => {
+        if (this.wasmSim) {
+          this.wasmSim.addBody(body);
+          this.state = this.wasmSim.getState();
+          this.offlineBodies = this.state!.bodies;
+        } else if (this.offlineMode && this.state) {
+          this.offlineBodies.push(body);
+          this.state.bodies = this.offlineBodies;
+        } else {
+          // Online: tell server
+          this.network.send({
+            type: ClientMessageType.Input,
+            seq: 0,
+            tick: this.state?.config.tick || 0,
+            action: {
+              SpawnBody: {
+                name: body.name,
+                mass: body.mass,
+                radius: body.radius,
+                position: [body.position.x, body.position.y, body.position.z],
+                velocity: [body.velocity.x, body.velocity.y, body.velocity.z],
+              },
+            },
+          });
+        }
+        this.renderer.updateBodies(this.state?.bodies || []);
+        this.updateBodyList(this.state?.bodies || []);
+      },
+      deleteBody: (id) => {
+        if (this.wasmSim) {
+          this.wasmSim.removeBody(id);
+          this.state = this.wasmSim.getState();
+          this.offlineBodies = this.state!.bodies;
+        } else if (this.offlineMode && this.state) {
+          this.offlineBodies = this.offlineBodies.filter((b) => b.id !== id);
+          this.state.bodies = this.offlineBodies;
+        } else {
+          this.network.send({
+            type: ClientMessageType.Input,
+            seq: 0,
+            tick: this.state?.config.tick || 0,
+            action: { DeleteBody: { body_id: id } },
+          });
+        }
+        this.renderer.updateBodies(this.state?.bodies || []);
+        this.updateBodyList(this.state?.bodies || []);
+        if (this.selectedBodyId === id) this.selectedBodyId = null;
+      },
+      getSelectedBodyId: () => this.selectedBodyId,
+      getNextBodyId: () => {
+        if (this.wasmSim) return this.wasmSim.nextBodyId();
+        const ids = this.state?.bodies.map((b) => b.id) || [0];
+        return Math.max(...ids) + 1;
+      },
     });
   }
 }

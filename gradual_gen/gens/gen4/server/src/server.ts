@@ -1,7 +1,6 @@
 /**
  * Main game server: manages simulation loop, player connections, state sync.
- * Uses a simple in-process physics engine (TypeScript fallback) until
- * native Rust FFI bridge is set up. Can also run the WASM module for parity.
+ * Uses Rust WASM physics engine when available, TypeScript Velocity Verlet as fallback.
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
@@ -54,12 +53,58 @@ interface ConnectedPlayer {
   inputSeq: number;
 }
 
-// ── Simple TypeScript Physics (fallback until native Rust bridge) ─────────────
+// ── WASM Engine Wrapper (with TS fallback) ────────────────────────────────────
+
+let WasmSimEngine: any = null;
+
+/** Try to load the Node.js WASM module at startup */
+async function tryLoadWasm(): Promise<boolean> {
+  try {
+    const wasmPkg = await import('./wasm/pkg/solar_sim_wasm.js');
+    WasmSimEngine = wasmPkg.SimEngine;
+    console.log('[Server] WASM physics engine loaded');
+    return true;
+  } catch (err) {
+    console.warn('[Server] WASM not available, using TS physics fallback:', (err as Error).message);
+    return false;
+  }
+}
 
 class PhysicsEngine {
   state: SimulationState;
+  private wasmEngine: any = null;
+  private useWasm: boolean;
 
-  constructor(preset: string, seed: number) {
+  constructor(preset: string, seed: number, useWasm: boolean) {
+    this.useWasm = useWasm;
+
+    if (this.useWasm && WasmSimEngine) {
+      try {
+        const presetMap: Record<string, string> = {
+          'solar_system': 'solar_system',
+          'two_body': 'two_body',
+          'kepler': 'two_body',
+          'sun_earth_moon': 'sun_earth_moon',
+          'binary_star': 'binary_star',
+          'alpha_centauri': 'alpha_centauri',
+          'rogue_planet': 'rogue_planet',
+          'asteroid_belt': 'asteroid_belt',
+          'extreme': 'extreme',
+          'empty': 'empty',
+        };
+        const wasmPreset = presetMap[preset] || 'solar_system';
+        this.wasmEngine = WasmSimEngine.fromPreset(wasmPreset, BigInt(seed));
+        // Sync state from WASM
+        this.state = JSON.parse(this.wasmEngine.getState());
+        console.log(`[Physics] WASM engine initialized with preset '${preset}' (${this.state.bodies.length} bodies)`);
+        return;
+      } catch (err) {
+        console.warn('[Physics] WASM init failed, falling back to TS:', (err as Error).message);
+        this.useWasm = false;
+      }
+    }
+
+    // TS fallback
     this.state = this.createFromPreset(preset, seed);
   }
 
@@ -186,11 +231,32 @@ class PhysicsEngine {
     }
   }
 
-  /** Velocity Verlet integration step (O(N²) direct gravity) */
+  /** Step physics — WASM if available, TS Velocity Verlet fallback */
   step(): StepResult {
     if (this.state.config.paused) {
       return this.emptyResult();
     }
+
+    if (this.wasmEngine) {
+      // WASM path
+      const resultJson = this.wasmEngine.step();
+      if (!resultJson || resultJson === '{}') return this.emptyResult();
+      const result: StepResult = JSON.parse(resultJson);
+
+      // Sync positions from WASM -> local state
+      const positions: Float64Array = this.wasmEngine.getPositions();
+      for (let i = 0; i < this.state.bodies.length && i * 3 + 2 < positions.length; i++) {
+        this.state.bodies[i].position.x = positions[i * 3];
+        this.state.bodies[i].position.y = positions[i * 3 + 1];
+        this.state.bodies[i].position.z = positions[i * 3 + 2];
+      }
+      this.state.config.tick = Number(this.wasmEngine.tick);
+      this.state.config.time = this.wasmEngine.time;
+
+      return result;
+    }
+
+    // TS fallback: Velocity Verlet integration step (O(N²) direct gravity)
 
     const dt = this.state.config.dt * this.state.config.time_scale;
     const bodies = this.state.bodies;
@@ -265,6 +331,9 @@ class PhysicsEngine {
   }
 
   getPositions(): Float64Array {
+    if (this.wasmEngine) {
+      return this.wasmEngine.getPositions();
+    }
     const result = new Float64Array(this.state.bodies.length * 3);
     for (let i = 0; i < this.state.bodies.length; i++) {
       result[i * 3 + 0] = this.state.bodies[i].position.x;
@@ -275,10 +344,16 @@ class PhysicsEngine {
   }
 
   addBody(body: Body): void {
+    if (this.wasmEngine) {
+      this.wasmEngine.addBody(JSON.stringify(body));
+    }
     this.state.bodies.push(body);
   }
 
   removeBody(id: BodyId): boolean {
+    if (this.wasmEngine) {
+      this.wasmEngine.removeBody(BigInt(id));
+    }
     const idx = this.state.bodies.findIndex((b) => b.id === id);
     if (idx >= 0) {
       this.state.bodies.splice(idx, 1);
@@ -288,7 +363,25 @@ class PhysicsEngine {
   }
 
   nextBodyId(): number {
+    if (this.wasmEngine) {
+      return Number(this.wasmEngine.nextBodyId());
+    }
     return Math.max(0, ...this.state.bodies.map((b) => b.id)) + 1;
+  }
+
+  /** Reload preset (e.g. from admin command) */
+  loadPreset(preset: string, seed: number): void {
+    if (this.wasmEngine) {
+      try {
+        this.wasmEngine.free();
+        this.wasmEngine = WasmSimEngine.fromPreset(preset, BigInt(seed));
+        this.state = JSON.parse(this.wasmEngine.getState());
+        return;
+      } catch {
+        // fall through to TS
+      }
+    }
+    this.state = this.createFromPreset(preset, seed);
   }
 
   private emptyResult(): StepResult {
@@ -311,7 +404,7 @@ class PhysicsEngine {
 export class GameServer {
   private options: ServerOptions;
   private wss: WebSocketServer | null = null;
-  private physics: PhysicsEngine;
+  private physics!: PhysicsEngine;
   private players: Map<number, ConnectedPlayer> = new Map();
   private nextPlayerId = 1;
   private tickInterval: ReturnType<typeof setInterval> | null = null;
@@ -319,12 +412,22 @@ export class GameServer {
   private lastTickTime = 0;
   private avgTickDuration = 0;
 
+  // Delta compression: track previous state for change detection
+  private previousPositions: Float64Array | null = null;
+  private previousBodyCount = 0;
+  // Threshold for position change detection (in meters)
+  private readonly DELTA_THRESHOLD = 1.0;
+
   constructor(options: ServerOptions) {
     this.options = options;
-    this.physics = new PhysicsEngine(options.preset, options.seed);
+    // PhysicsEngine initialized in start() after WASM probe
   }
 
   async start(): Promise<void> {
+    // Try loading WASM before creating physics
+    const wasmAvailable = await tryLoadWasm();
+    this.physics = new PhysicsEngine(this.options.preset, this.options.seed, wasmAvailable);
+
     this.wss = new WebSocketServer({ port: this.options.port });
 
     this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
@@ -585,8 +688,19 @@ export class GameServer {
           bodies: this.physics.state.bodies.length,
           players: this.players.size,
           avgTickMs: this.avgTickDuration.toFixed(2),
+          wasmEnabled: !!(this.physics as any).wasmEngine,
         };
         break;
+      case 'load_preset': {
+        const preset = (args.preset as string) || 'solar_system';
+        this.physics.loadPreset(preset, this.options.seed);
+        // Send fresh snapshot to all players
+        for (const [, player] of this.players) {
+          this.sendSnapshot(player.ws, player.player.id);
+        }
+        data = { preset, bodies: this.physics.state.bodies.length };
+        break;
+      }
       default:
         success = false;
         data = `Unknown command: ${command}`;
@@ -606,15 +720,79 @@ export class GameServer {
     const result = this.physics.step();
     this.tickCount++;
 
-    // Send position updates (binary) to all connected players
-    const positions = this.physics.getPositions();
-    const buffer = encodePositions(this.physics.state.config.tick, positions);
+    const currentPositions = this.physics.getPositions();
+    const bodyCount = this.physics.state.bodies.length;
+    const currentTick = this.physics.state.config.tick;
 
-    for (const [, player] of this.players) {
-      if (player.ws.readyState === WebSocket.OPEN) {
-        player.ws.send(buffer);
+    // Determine if we should send a full binary update or delta
+    const bodiesChanged = bodyCount !== this.previousBodyCount;
+
+    if (bodiesChanged || !this.previousPositions || this.tickCount % 300 === 0) {
+      // Full position update (binary) — when body count changes or periodic snapshot
+      const buffer = encodePositions(currentTick, currentPositions);
+      for (const [, player] of this.players) {
+        if (player.ws.readyState === WebSocket.OPEN) {
+          player.ws.send(buffer);
+        }
+      }
+
+      // Full snapshot every 300 ticks
+      if (this.tickCount % 300 === 0) {
+        for (const [, player] of this.players) {
+          this.sendSnapshot(player.ws, player.player.id);
+        }
+      }
+    } else {
+      // Delta compression: find bodies whose positions changed significantly
+      const deltas: Array<{ bodyId: number; position: Vec3; velocity?: Vec3 }> = [];
+      const bodies = this.physics.state.bodies;
+
+      for (let i = 0; i < bodyCount; i++) {
+        const idx = i * 3;
+        if (idx + 2 >= currentPositions.length || idx + 2 >= this.previousPositions.length) break;
+
+        const dx = currentPositions[idx] - this.previousPositions[idx];
+        const dy = currentPositions[idx + 1] - this.previousPositions[idx + 1];
+        const dz = currentPositions[idx + 2] - this.previousPositions[idx + 2];
+        const dist2 = dx * dx + dy * dy + dz * dz;
+
+        if (dist2 > this.DELTA_THRESHOLD * this.DELTA_THRESHOLD) {
+          deltas.push({
+            bodyId: bodies[i].id,
+            position: bodies[i].position,
+            velocity: bodies[i].velocity,
+          });
+        }
+      }
+
+      if (deltas.length > 0) {
+        // Send as DeltaMessage (JSON) if fewer bodies changed than total
+        if (deltas.length < bodyCount * 0.7) {
+          this.broadcastJson({
+            type: ServerMessageType.Delta,
+            tick: currentTick,
+            time: this.physics.state.config.time,
+            deltas: deltas.map((d) => ({
+              bodyId: d.bodyId,
+              position: d.position,
+              velocity: d.velocity,
+            })),
+          });
+        } else {
+          // Most bodies changed — send full binary update
+          const buffer = encodePositions(currentTick, currentPositions);
+          for (const [, player] of this.players) {
+            if (player.ws.readyState === WebSocket.OPEN) {
+              player.ws.send(buffer);
+            }
+          }
+        }
       }
     }
+
+    // Update previous state for next comparison
+    this.previousPositions = new Float64Array(currentPositions);
+    this.previousBodyCount = bodyCount;
 
     // Send step diagnostics every 60 ticks
     if (this.tickCount % 60 === 0) {
@@ -622,13 +800,6 @@ export class GameServer {
         type: ServerMessageType.StepResult,
         result,
       });
-    }
-
-    // Full snapshot every SNAPSHOT_INTERVAL ticks
-    if (this.tickCount % 300 === 0) {
-      for (const [, player] of this.players) {
-        this.sendSnapshot(player.ws, player.player.id);
-      }
     }
 
     const duration = performance.now() - start;
