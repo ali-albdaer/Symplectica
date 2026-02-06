@@ -65,8 +65,8 @@ export class BodyRenderer {
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
     private orbitHistory: Map<number, Array<{ x: number; y: number; z: number }>> = new Map();
-    private readonly MAX_TRAIL_POINTS = 500;
-    private readonly TRAIL_SAMPLE_INTERVAL = 10; // Sample every N frames
+    private maxTrailPoints = 50; // Configurable via setMaxTrailPoints
+    private readonly TRAIL_SAMPLE_INTERVAL = 5; // Sample every N frames
     private frameCount = 0;
 
     constructor(scene: THREE.Scene) {
@@ -111,7 +111,7 @@ export class BodyRenderer {
 
             // Create orbit line
             const geometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(this.MAX_TRAIL_POINTS * 3);
+            const positions = new Float32Array(2000 * 3); // Max allocation for trail buffer
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             geometry.setDrawRange(0, 0);
 
@@ -216,8 +216,8 @@ export class BodyRenderer {
                     const history = this.orbitHistory.get(id)!;
                     history.push({ x: worldX, y: worldY, z: worldZ });
 
-                    // Limit history size
-                    if (history.length > this.MAX_TRAIL_POINTS) {
+                    // Limit history size to user-configured max
+                    while (history.length > this.maxTrailPoints) {
                         history.shift();
                     }
 
@@ -248,24 +248,13 @@ export class BodyRenderer {
 
     // Visualization options
     private showOrbitTrails = true;
-    private showVelocityVectors = false;
     private showLabels = false;
-    private velocityVectors: Map<number, THREE.ArrowHelper> = new Map();
     private bodyLabels: Map<number, THREE.Sprite> = new Map();
-    private vectorScale = 1e6; // Scale velocity (m/s) to render units
-    private maxTrailPoints = 500;
 
     setShowOrbitTrails(show: boolean): void {
         this.showOrbitTrails = show;
         for (const line of this.orbitLines.values()) {
             line.visible = show;
-        }
-    }
-
-    setShowVelocityVectors(show: boolean): void {
-        this.showVelocityVectors = show;
-        for (const arrow of this.velocityVectors.values()) {
-            arrow.visible = show;
         }
     }
 
@@ -276,49 +265,13 @@ export class BodyRenderer {
         }
     }
 
-    setVectorScale(scale: number): void {
-        this.vectorScale = scale;
-    }
-
     setMaxTrailPoints(points: number): void {
         this.maxTrailPoints = points;
-    }
-
-    /** Update velocity vectors (call with velocities array) */
-    updateVelocityVectors(velocities: Float64Array, origin: { x: number; y: number; z: number }): void {
-        if (!this.showVelocityVectors) return;
-
-        let i = 0;
-        for (const [id, mesh] of this.bodies) {
-            if (i * 3 + 2 < velocities.length) {
-                const vx = velocities[i * 3];
-                const vy = velocities[i * 3 + 1];
-                const vz = velocities[i * 3 + 2];
-
-                const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-                if (speed > 0) {
-                    let arrow = this.velocityVectors.get(id);
-
-                    // Vector length: scale so typical orbital velocity ~30km/s shows as ~0.1 AU
-                    const arrowLength = speed * this.vectorScale;
-                    const headLength = arrowLength * 0.2;
-                    const headWidth = headLength * 0.5;
-
-                    if (!arrow) {
-                        const dir = new THREE.Vector3(vx, vy, vz).normalize();
-                        arrow = new THREE.ArrowHelper(dir, mesh.group.position, arrowLength, 0x00ff00, headLength, headWidth);
-                        this.velocityVectors.set(id, arrow);
-                        this.scene.add(arrow);
-                    }
-
-                    // Update arrow
-                    arrow.position.copy(mesh.group.position);
-                    arrow.setDirection(new THREE.Vector3(vx, vy, vz).normalize());
-                    arrow.setLength(arrowLength, headLength, headWidth);
-                    arrow.visible = this.showVelocityVectors;
-                }
+        // Trim existing histories if needed
+        for (const history of this.orbitHistory.values()) {
+            while (history.length > points) {
+                history.shift();
             }
-            i++;
         }
     }
 
@@ -336,11 +289,6 @@ export class BodyRenderer {
         }
         this.orbitLines.clear();
         this.orbitHistory.clear();
-
-        for (const arrow of this.velocityVectors.values()) {
-            this.scene.remove(arrow);
-        }
-        this.velocityVectors.clear();
 
         for (const label of this.bodyLabels.values()) {
             this.scene.remove(label);

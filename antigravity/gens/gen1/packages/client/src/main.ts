@@ -29,8 +29,17 @@ interface SimState {
     bodyCount: number;
 }
 
-// Time warp multipliers
-const TIME_WARPS = [1, 10, 100, 1000, 10000, 100000, 1000000];
+// Time scale: simulation seconds per real second
+// e.g. 3600 = 1 hour of simulation per real second
+const TIME_SCALES = [
+    { sim: 1, label: '1s/s' },           // 1 second per second (real-time)
+    { sim: 60, label: '1min/s' },        // 1 minute per second
+    { sim: 3600, label: '1hr/s' },       // 1 hour per second  
+    { sim: 86400, label: '1day/s' },     // 1 day per second
+    { sim: 604800, label: '1wk/s' },     // 1 week per second
+    { sim: 2592000, label: '1mo/s' },    // 1 month per second (~30 days)
+    { sim: 31536000, label: '1yr/s' },   // 1 year per second
+];
 
 class NBodyClient {
     private scene!: THREE.Scene;
@@ -56,8 +65,8 @@ class NBodyClient {
     private fpsHistory: number[] = [];
     private running = false;
 
-    // Time warp
-    private timeWarpIndex = 0; // Start at 1x (was 3 = 1000x which caused instability)
+    // Time scale
+    private timeScaleIndex = 0; // Start at real-time (1s/s)
     private paused = false;
     private uiHidden = false;
 
@@ -83,9 +92,7 @@ class NBodyClient {
         // Initialize Visualization Panel
         this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
             this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
-            this.bodyRenderer.setShowVelocityVectors(options.showVelocityVectors);
             this.bodyRenderer.setShowLabels(options.showLabels);
-            this.bodyRenderer.setVectorScale(options.vectorScale);
             this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
             this.bodyRenderer.setBodyScale(options.bodyScale);
             this.bodyRenderer.setRealScale(options.realScale);
@@ -186,6 +193,12 @@ class NBodyClient {
 
     private initControls(): void {
         window.addEventListener('keydown', (e) => {
+            // Escape blurs any focused element to restore keyboard control
+            if (e.key === 'Escape') {
+                (document.activeElement as HTMLElement)?.blur();
+                return;
+            }
+
             // Skip if typing in input
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
                 return;
@@ -194,37 +207,37 @@ class NBodyClient {
             switch (e.key) {
                 case ' ':
                     this.paused = !this.paused;
-                    this.updateTimeWarpUI();
+                    this.updateTimeScaleUI();
                     break;
                 case '.':
                 case '>':
-                    if (this.timeWarpIndex < TIME_WARPS.length - 1) {
-                        this.timeWarpIndex++;
-                        this.updateTimeWarpUI();
+                    if (this.timeScaleIndex < TIME_SCALES.length - 1) {
+                        this.timeScaleIndex++;
+                        this.updateTimeScaleUI();
                     }
                     break;
                 case ',':
                 case '<':
-                    if (this.timeWarpIndex > 0) {
-                        this.timeWarpIndex--;
-                        this.updateTimeWarpUI();
+                    if (this.timeScaleIndex > 0) {
+                        this.timeScaleIndex--;
+                        this.updateTimeScaleUI();
                     }
                     break;
                 case '1':
-                    this.timeWarpIndex = 0;
-                    this.updateTimeWarpUI();
+                    this.timeScaleIndex = 0; // 1s/s
+                    this.updateTimeScaleUI();
                     break;
                 case '2':
-                    this.timeWarpIndex = 2;
-                    this.updateTimeWarpUI();
+                    this.timeScaleIndex = 2; // 1hr/s
+                    this.updateTimeScaleUI();
                     break;
                 case '3':
-                    this.timeWarpIndex = 4;
-                    this.updateTimeWarpUI();
+                    this.timeScaleIndex = 4; // 1wk/s
+                    this.updateTimeScaleUI();
                     break;
                 case '4':
-                    this.timeWarpIndex = 6;
-                    this.updateTimeWarpUI();
+                    this.timeScaleIndex = 6; // 1yr/s
+                    this.updateTimeScaleUI();
                     break;
                 case 'n':
                 case 'N':
@@ -244,11 +257,17 @@ class NBodyClient {
             }
         });
 
-        this.updateTimeWarpUI();
+        // Clicking on the canvas blurs any focused UI element
+        document.getElementById('canvas-container')?.addEventListener('click', () => {
+            (document.activeElement as HTMLElement)?.blur();
+        });
+
+        this.updateTimeScaleUI();
     }
 
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
+        // Include ALL UI elements including stats-overlay (Simulation panel)
         const uiElements = document.querySelectorAll('#stats-overlay, #chat-panel, #world-builder, #admin-panel, #viz-panel');
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
@@ -287,18 +306,14 @@ class NBodyClient {
         if (el) el.textContent = followName;
     }
 
-    private updateTimeWarpUI(): void {
-        const warp = TIME_WARPS[this.timeWarpIndex];
-        const warpEl = document.getElementById('time-warp');
-        if (warpEl) {
+    private updateTimeScaleUI(): void {
+        const scale = TIME_SCALES[this.timeScaleIndex];
+        const scaleEl = document.getElementById('time-warp');
+        if (scaleEl) {
             if (this.paused) {
-                warpEl.textContent = '⏸ PAUSED';
-            } else if (warp >= 1000000) {
-                warpEl.textContent = `${(warp / 1000000).toFixed(0)}M×`;
-            } else if (warp >= 1000) {
-                warpEl.textContent = `${(warp / 1000).toFixed(0)}K×`;
+                scaleEl.textContent = '⏸ PAUSED';
             } else {
-                warpEl.textContent = `${warp}×`;
+                scaleEl.textContent = `⏱ ${scale.label}`;
             }
         }
     }
@@ -387,12 +402,20 @@ class NBodyClient {
         this.fpsHistory.push(fps);
         if (this.fpsHistory.length > 60) this.fpsHistory.shift();
 
-        // Step local physics simulation with time warp
+        // Step local physics simulation based on time scale
+        // TIME_SCALES[n].sim = simulation seconds per real second
+        // physics timestep = 60 seconds per step
+        // We need to step (simSecondsPerFrame / 60) times per frame
         if (!this.paused) {
-            const warp = TIME_WARPS[this.timeWarpIndex];
-            // Step multiple times based on warp
-            const stepsPerFrame = Math.min(warp, 100); // Cap at 100 steps per frame
-            for (let i = 0; i < stepsPerFrame; i++) {
+            const scale = TIME_SCALES[this.timeScaleIndex];
+            const simSecondsPerFrame = scale.sim * delta; // How many sim seconds to advance this frame
+            const physicsTimestep = 60; // seconds per physics step
+            const stepsNeeded = Math.ceil(simSecondsPerFrame / physicsTimestep);
+            // Cap steps to prevent frame drops (at 1yr/s we need ~525k steps/s, ~8750/frame at 60fps)
+            // We'll cap at 1000 steps/frame which allows up to ~1year/sec at 60fps with some precision
+            const maxStepsPerFrame = 1000;
+            const steps = Math.min(stepsNeeded, maxStepsPerFrame);
+            for (let i = 0; i < steps; i++) {
                 this.physics.step();
             }
         }
@@ -419,10 +442,6 @@ class NBodyClient {
 
         // Update body positions with floating origin
         this.bodyRenderer.update(this.state.positions, cameraOrigin);
-
-        // Update velocity vectors (if enabled)
-        const velocities = this.physics.getVelocities();
-        this.bodyRenderer.updateVelocityVectors(velocities, cameraOrigin);
 
         // Render
         this.renderer.render(this.scene, this.camera);
