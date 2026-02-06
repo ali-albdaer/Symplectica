@@ -103,8 +103,35 @@ export class App {
       this.state = serverState;
       this.offlineBodies = serverState.bodies;
       this.renderer.updateBodies(serverState.bodies);
-      // In a full implementation, we'd replay pending inputs here
-      console.log(`[Reconcile] Server tick ${serverState.config.tick}, ${pending.length} inputs to replay`);
+
+      // Replay unacknowledged inputs on top of server state
+      for (const input of pending) {
+        this.applyInputLocally(input.action);
+      }
+      console.log(`[Reconcile] Server tick ${serverState.config.tick}, replayed ${pending.length} inputs`);
+    };
+    this.network.onEvent = (event) => {
+      // Handle simulation events (body added/removed, collision, etc.)
+      if (event.type === 'body_added' && event.data?.body) {
+        if (this.state && !this.state.bodies.find((b: Body) => b.id === event.data.body.id)) {
+          this.state.bodies.push(event.data.body as Body);
+          this.renderer.updateBodies(this.state.bodies);
+          this.updateBodyList(this.state.bodies);
+        }
+        this.showToast(`Body added: ${(event.data.body as Body).name}`);
+      } else if (event.type === 'body_removed' && event.data?.body_id != null) {
+        if (this.state) {
+          this.state.bodies = this.state.bodies.filter((b: Body) => b.id !== event.data.body_id);
+          this.renderer.updateBodies(this.state.bodies);
+          this.updateBodyList(this.state.bodies);
+        }
+        this.showToast(`Body removed: #${event.data.body_id}`);
+      } else if (event.type === 'collision') {
+        this.showToast(`Collision detected at tick ${event.tick}`, 'warn');
+      }
+    };
+    this.network.onError = (code, message) => {
+      this.showToast(`Server error: ${message}`, 'error');
     };
     this.network.onConnectionChange = (connected) => {
       this.hudConnection.textContent = connected ? 'Online' : 'Offline';
@@ -606,21 +633,21 @@ export class App {
           this.offlineBodies.push(body);
           this.state.bodies = this.offlineBodies;
         } else {
-          // Online: tell server
-          this.network.send({
-            type: ClientMessageType.Input,
-            seq: 0,
-            tick: this.state?.config.tick || 0,
-            action: {
-              SpawnBody: {
-                name: body.name,
-                mass: body.mass,
-                radius: body.radius,
-                position: [body.position.x, body.position.y, body.position.z],
-                velocity: [body.velocity.x, body.velocity.y, body.velocity.z],
-              },
+          // Online: send via prediction-tracked input
+          const action = {
+            SpawnBody: {
+              name: body.name,
+              mass: body.mass,
+              radius: body.radius,
+              position: [body.position.x, body.position.y, body.position.z] as [number, number, number],
+              velocity: [body.velocity.x, body.velocity.y, body.velocity.z] as [number, number, number],
             },
-          });
+          };
+          this.network.sendInput(action, this.state?.config.tick || 0);
+          // Optimistic local add (will be reconciled on next snapshot)
+          if (this.state) {
+            this.state.bodies.push(body);
+          }
         }
         this.renderer.updateBodies(this.state?.bodies || []);
         this.updateBodyList(this.state?.bodies || []);
@@ -634,12 +661,11 @@ export class App {
           this.offlineBodies = this.offlineBodies.filter((b) => b.id !== id);
           this.state.bodies = this.offlineBodies;
         } else {
-          this.network.send({
-            type: ClientMessageType.Input,
-            seq: 0,
-            tick: this.state?.config.tick || 0,
-            action: { DeleteBody: { body_id: id } },
-          });
+          this.network.sendInput({ DeleteBody: { body_id: id } }, this.state?.config.tick || 0);
+          // Optimistic local remove
+          if (this.state) {
+            this.state.bodies = this.state.bodies.filter((b) => b.id !== id);
+          }
         }
         this.renderer.updateBodies(this.state?.bodies || []);
         this.updateBodyList(this.state?.bodies || []);
@@ -652,5 +678,92 @@ export class App {
         return Math.max(...ids) + 1;
       },
     });
+  }
+
+  /** Apply an InputAction locally (for prediction/reconciliation replay) */
+  private applyInputLocally(action: any): void {
+    if (!this.state) return;
+
+    if ('SpawnBody' in action) {
+      const d = action.SpawnBody;
+      const id = Math.max(0, ...this.state.bodies.map((b) => b.id)) + 1;
+      const body: Body = {
+        id,
+        name: d.name,
+        body_type: BodyType.Asteroid,
+        position: vec3(d.position[0], d.position[1], d.position[2]),
+        velocity: vec3(d.velocity[0], d.velocity[1], d.velocity[2]),
+        acceleration: vec3(),
+        mass: d.mass,
+        radius: d.radius,
+        rotation_period: 86400,
+        axial_tilt: 0,
+        rotation_angle: 0,
+        collision_shape: { Sphere: { radius: d.radius } },
+        restitution: 0.5,
+        parent_id: null,
+        soi_radius: 0,
+        color: [0.5, 0.5, 0.5],
+        luminosity: 0,
+        albedo: 0.3,
+        atmosphere: null,
+        gravity_harmonics: null,
+        has_rings: false,
+        ring_inner_radius: 0,
+        ring_outer_radius: 0,
+        substep_factor: 1,
+        required_dt: 1,
+        is_active: true,
+        is_massless: false,
+      };
+      this.state.bodies.push(body);
+    } else if ('DeleteBody' in action) {
+      this.state.bodies = this.state.bodies.filter((b) => b.id !== action.DeleteBody.body_id);
+    } else if ('ApplyThrust' in action) {
+      const d = action.ApplyThrust;
+      const body = this.state.bodies.find((b) => b.id === d.body_id);
+      if (body && body.mass > 0) {
+        body.acceleration.x += d.force[0] / body.mass;
+        body.acceleration.y += d.force[1] / body.mass;
+        body.acceleration.z += d.force[2] / body.mass;
+      }
+    } else if ('SetPaused' in action) {
+      this.state.config.paused = action.SetPaused.paused;
+    } else if ('SetTimeScale' in action) {
+      this.state.config.time_scale = action.SetTimeScale.scale;
+    }
+  }
+
+  /** Show a toast notification */
+  private showToast(message: string, level: 'info' | 'warn' | 'error' = 'info'): void {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.style.cssText = `
+        position: fixed; bottom: 16px; right: 16px; z-index: 9999;
+        display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+      `;
+      document.body.appendChild(container);
+    }
+
+    const colors = { info: '#4fc3f7', warn: '#ffa726', error: '#ef5350' };
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      background: rgba(20,20,30,0.92); border: 1px solid ${colors[level]};
+      color: #eee; padding: 8px 16px; border-radius: 6px; font-size: 13px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4); pointer-events: auto;
+      animation: toastIn 0.3s ease-out;
+      max-width: 360px;
+    `;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
   }
 }

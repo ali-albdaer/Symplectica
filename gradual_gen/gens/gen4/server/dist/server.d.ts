@@ -15,6 +15,7 @@ export declare class GameServer {
     private players;
     private nextPlayerId;
     private tickInterval;
+    private staleCheckInterval;
     private tickCount;
     private lastTickTime;
     private avgTickDuration;

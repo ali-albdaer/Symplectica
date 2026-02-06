@@ -42,6 +42,8 @@ export var ServerMessageType;
     ServerMessageType["Error"] = "error";
     /** Admin response */
     ServerMessageType["AdminResponse"] = "admin_response";
+    /** Input acknowledgement (for client prediction reconciliation) */
+    ServerMessageType["InputAck"] = "input_ack";
     /** Binary body positions update (high-frequency) */
     ServerMessageType["PositionUpdate"] = "position_update";
 })(ServerMessageType || (ServerMessageType = {}));

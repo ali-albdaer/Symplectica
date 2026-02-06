@@ -40,6 +40,8 @@ export declare enum ServerMessageType {
     Error = "error",
     /** Admin response */
     AdminResponse = "admin_response",
+    /** Input acknowledgement (for client prediction reconciliation) */
+    InputAck = "input_ack",
     /** Binary body positions update (high-frequency) */
     PositionUpdate = "position_update"
 }
@@ -145,6 +147,12 @@ export interface AdminResponseMessage {
     success: boolean;
     data: unknown;
 }
+export interface InputAckMessage {
+    type: ServerMessageType.InputAck;
+    seq: number;
+    tick: number;
+    playerId: number;
+}
 /** High-frequency binary position update.
  *  Sent as ArrayBuffer: [tick(u32)][bodyCount(u32)][x0,y0,z0,x1,...](f64 each)
  */
@@ -153,7 +161,7 @@ export interface PositionUpdateMessage {
     tick: number;
     positions: Float64Array;
 }
-export type ServerMessage = SnapshotMessage | DeltaMessage | StepResultMessage | PlayerJoinedMessage | PlayerLeftMessage | EventMessage | PongMessage | ErrorMessage | AdminResponseMessage | PositionUpdateMessage;
+export type ServerMessage = SnapshotMessage | DeltaMessage | StepResultMessage | PlayerJoinedMessage | PlayerLeftMessage | EventMessage | PongMessage | ErrorMessage | AdminResponseMessage | InputAckMessage | PositionUpdateMessage;
 export declare const PROTOCOL_VERSION = 1;
 export declare const DEFAULT_PORT = 8080;
 export declare const TICK_RATE = 60;

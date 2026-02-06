@@ -4,21 +4,35 @@
  */
 import { WebSocketServer, WebSocket } from 'ws';
 import { BodyType, SolverType, IntegratorType, vec3, G, SOLAR_MASS, EARTH_MASS, EARTH_RADIUS, AU, SOLAR_LUMINOSITY, } from '@solar-sim/shared';
-import { ClientMessageType, ServerMessageType, encodePositions, } from '@solar-sim/shared';
+import { ClientMessageType, ServerMessageType, SimEventType, PROTOCOL_VERSION, encodePositions, } from '@solar-sim/shared';
 // ── WASM Engine Wrapper (with TS fallback) ────────────────────────────────────
 let WasmSimEngine = null;
 /** Try to load the Node.js WASM module at startup */
 async function tryLoadWasm() {
+    // Attempt 1: ESM dynamic import
     try {
         const wasmPkg = await import('./wasm/pkg/solar_sim_wasm.js');
         WasmSimEngine = wasmPkg.SimEngine;
-        console.log('[Server] WASM physics engine loaded');
+        console.log('[Server] WASM physics engine loaded (ESM)');
         return true;
     }
-    catch (err) {
-        console.warn('[Server] WASM not available, using TS physics fallback:', err.message);
-        return false;
+    catch (_esmErr) {
+        // ESM import failed, try CommonJS require fallback
     }
+    // Attempt 2: CJS require via createRequire
+    try {
+        const { createRequire } = await import('module');
+        const require = createRequire(import.meta.url);
+        const wasmPkg = require('./wasm/pkg/solar_sim_wasm.js');
+        WasmSimEngine = wasmPkg.SimEngine;
+        console.log('[Server] WASM physics engine loaded (CJS fallback)');
+        return true;
+    }
+    catch (_cjsErr) {
+        // Neither worked
+    }
+    console.warn('[Server] WASM not available, using TS physics fallback');
+    return false;
 }
 class PhysicsEngine {
     state;
@@ -171,12 +185,22 @@ class PhysicsEngine {
             if (!resultJson || resultJson === '{}')
                 return this.emptyResult();
             const result = JSON.parse(resultJson);
-            // Sync positions from WASM -> local state
+            // Sync positions and velocities from WASM -> local state
             const positions = this.wasmEngine.getPositions();
+            let velocities = null;
+            try {
+                velocities = this.wasmEngine.getVelocities();
+            }
+            catch { /* optional API */ }
             for (let i = 0; i < this.state.bodies.length && i * 3 + 2 < positions.length; i++) {
                 this.state.bodies[i].position.x = positions[i * 3];
                 this.state.bodies[i].position.y = positions[i * 3 + 1];
                 this.state.bodies[i].position.z = positions[i * 3 + 2];
+                if (velocities && i * 3 + 2 < velocities.length) {
+                    this.state.bodies[i].velocity.x = velocities[i * 3];
+                    this.state.bodies[i].velocity.y = velocities[i * 3 + 1];
+                    this.state.bodies[i].velocity.z = velocities[i * 3 + 2];
+                }
             }
             this.state.config.tick = Number(this.wasmEngine.tick);
             this.state.config.time = this.wasmEngine.time;
@@ -318,6 +342,7 @@ export class GameServer {
     players = new Map();
     nextPlayerId = 1;
     tickInterval = null;
+    staleCheckInterval = null;
     tickCount = 0;
     lastTickTime = 0;
     avgTickDuration = 0;
@@ -344,6 +369,21 @@ export class GameServer {
         this.tickInterval = setInterval(() => {
             this.tick();
         }, tickMs);
+        // Stale connection cleanup every 30 seconds
+        this.staleCheckInterval = setInterval(() => {
+            const now = Date.now();
+            for (const [id, player] of this.players) {
+                if (now - player.lastPing > 60_000) {
+                    console.warn(`Player ${player.player.name} (#${id}) timed out`);
+                    player.ws.close(4002, 'Ping timeout');
+                    this.players.delete(id);
+                    this.broadcastJson({
+                        type: ServerMessageType.PlayerLeft,
+                        playerId: id,
+                    });
+                }
+            }
+        }, 30_000);
         console.log(`Server listening on ws://localhost:${this.options.port}`);
         console.log(`Simulation started with ${this.physics.state.bodies.length} bodies`);
     }
@@ -351,6 +391,10 @@ export class GameServer {
         if (this.tickInterval) {
             clearInterval(this.tickInterval);
             this.tickInterval = null;
+        }
+        if (this.staleCheckInterval) {
+            clearInterval(this.staleCheckInterval);
+            this.staleCheckInterval = null;
         }
         for (const [, player] of this.players) {
             player.ws.close(1001, 'Server shutting down');
@@ -363,11 +407,25 @@ export class GameServer {
         console.log(`New connection from ${ip}`);
         ws.on('message', (data) => {
             try {
-                const msg = JSON.parse(data.toString());
+                // Reject oversized messages (>1MB)
+                const raw = data.toString();
+                if (raw.length > 1_000_000) {
+                    console.warn('Oversized message rejected');
+                    return;
+                }
+                const msg = JSON.parse(raw);
+                if (!msg || typeof msg.type !== 'string') {
+                    throw new Error('Missing message type');
+                }
                 this.handleMessage(ws, msg);
             }
             catch (err) {
-                console.error('Invalid message:', err);
+                console.error('Invalid message:', err.message);
+                this.sendJson(ws, {
+                    type: ServerMessageType.Error,
+                    code: 'INVALID_MESSAGE',
+                    message: 'Failed to parse message',
+                });
             }
         });
         ws.on('close', () => {
@@ -391,7 +449,7 @@ export class GameServer {
     handleMessage(ws, msg) {
         switch (msg.type) {
             case ClientMessageType.Join:
-                this.handleJoin(ws, msg.playerName);
+                this.handleJoin(ws, msg.playerName, msg.protocolVersion);
                 break;
             case ClientMessageType.Input:
                 this.handleInput(ws, msg.seq, msg.action);
@@ -400,6 +458,13 @@ export class GameServer {
                 this.sendSnapshot(ws);
                 break;
             case ClientMessageType.Ping:
+                // Update last ping time for stale detection
+                for (const [, player] of this.players) {
+                    if (player.ws === ws) {
+                        player.lastPing = Date.now();
+                        break;
+                    }
+                }
                 this.sendJson(ws, {
                     type: ServerMessageType.Pong,
                     clientTimestamp: msg.timestamp,
@@ -422,13 +487,25 @@ export class GameServer {
                 break;
         }
     }
-    handleJoin(ws, playerName) {
+    handleJoin(ws, playerName, protocolVersion) {
+        // Validate protocol version
+        if (protocolVersion !== undefined && protocolVersion !== PROTOCOL_VERSION) {
+            this.sendJson(ws, {
+                type: ServerMessageType.Error,
+                code: 'PROTOCOL_MISMATCH',
+                message: `Server uses protocol v${PROTOCOL_VERSION}, client sent v${protocolVersion}`,
+            });
+            ws.close(4001, 'Protocol version mismatch');
+            return;
+        }
+        // Sanitize player name
+        const safeName = (playerName || 'Anonymous').slice(0, 32).replace(/[<>&"]/g, '');
         const playerId = this.nextPlayerId++;
         const player = {
             ws,
             player: {
                 id: playerId,
-                name: playerName,
+                name: safeName,
                 color: [Math.random(), Math.random(), Math.random()],
                 controlledBodyId: null,
                 camera: {
@@ -451,24 +528,65 @@ export class GameServer {
             inputSeq: 0,
         };
         this.players.set(playerId, player);
-        console.log(`Player ${playerName} joined as #${playerId}${player.player.isAdmin ? ' (admin)' : ''}`);
+        console.log(`Player ${safeName} joined as #${playerId}${player.player.isAdmin ? ' (admin)' : ''}`);
         // Send snapshot
         this.sendSnapshot(ws, playerId);
         // Notify others
         this.broadcastJson({
             type: ServerMessageType.PlayerJoined,
             playerId,
-            playerName,
+            playerName: safeName,
         }, ws);
     }
     handleInput(ws, seq, action) {
+        // Find the player for this connection
+        let playerId = 0;
+        for (const [id, p] of this.players) {
+            if (p.ws === ws) {
+                playerId = id;
+                p.inputSeq = seq;
+                break;
+            }
+        }
+        if (playerId === 0) {
+            this.sendJson(ws, {
+                type: ServerMessageType.Error,
+                code: 'NOT_JOINED',
+                message: 'Must join before sending input',
+            });
+            return;
+        }
         // Apply the action on the server (authoritative)
         if ('SpawnBody' in action) {
             const d = action.SpawnBody;
+            // Validate spawn inputs
+            if (!d.name || typeof d.mass !== 'number' || !isFinite(d.mass) || d.mass < 0 ||
+                typeof d.radius !== 'number' || !isFinite(d.radius) || d.radius <= 0 ||
+                !Array.isArray(d.position) || d.position.length !== 3 ||
+                !Array.isArray(d.velocity) || d.velocity.length !== 3 ||
+                d.position.some((v) => !isFinite(v)) ||
+                d.velocity.some((v) => !isFinite(v))) {
+                this.sendJson(ws, {
+                    type: ServerMessageType.Error,
+                    code: 'INVALID_INPUT',
+                    message: 'Invalid SpawnBody parameters',
+                });
+                return;
+            }
+            // Limit body count
+            if (this.physics.state.bodies.length >= 10000) {
+                this.sendJson(ws, {
+                    type: ServerMessageType.Error,
+                    code: 'LIMIT_REACHED',
+                    message: 'Maximum body count (10000) reached',
+                });
+                return;
+            }
+            const safeName = (d.name || 'Body').slice(0, 64);
             const id = this.physics.nextBodyId();
             const body = {
                 id,
-                name: d.name,
+                name: safeName,
                 body_type: BodyType.Asteroid,
                 position: vec3(d.position[0], d.position[1], d.position[2]),
                 velocity: vec3(d.velocity[0], d.velocity[1], d.velocity[2]),
@@ -499,38 +617,77 @@ export class GameServer {
             this.broadcastJson({
                 type: ServerMessageType.Event,
                 event: {
-                    type: 'body_added',
+                    type: SimEventType.BodyAdded,
                     tick: this.physics.state.config.tick,
                     data: { body },
                 },
             });
         }
         else if ('DeleteBody' in action) {
-            this.physics.removeBody(action.DeleteBody.body_id);
-            this.broadcastJson({
-                type: ServerMessageType.Event,
-                event: {
-                    type: 'body_removed',
-                    tick: this.physics.state.config.tick,
-                    data: { body_id: action.DeleteBody.body_id },
-                },
-            });
+            const bodyId = action.DeleteBody.body_id;
+            const existed = this.physics.removeBody(bodyId);
+            if (existed) {
+                this.broadcastJson({
+                    type: ServerMessageType.Event,
+                    event: {
+                        type: SimEventType.BodyRemoved,
+                        tick: this.physics.state.config.tick,
+                        data: { body_id: bodyId },
+                    },
+                });
+            }
         }
         else if ('ApplyThrust' in action) {
             const d = action.ApplyThrust;
-            const body = this.physics.state.bodies.find((b) => b.id === d.body_id);
-            if (body && body.mass > 0) {
-                body.acceleration.x += d.force[0] / body.mass;
-                body.acceleration.y += d.force[1] / body.mass;
-                body.acceleration.z += d.force[2] / body.mass;
+            if (!Array.isArray(d.force) || d.force.length !== 3 ||
+                d.force.some((v) => !isFinite(v)) ||
+                typeof d.duration !== 'number' || d.duration <= 0) {
+                // Skip invalid thrust
+            }
+            else {
+                const body = this.physics.state.bodies.find((b) => b.id === d.body_id);
+                if (body && body.mass > 0) {
+                    body.acceleration.x += d.force[0] / body.mass;
+                    body.acceleration.y += d.force[1] / body.mass;
+                    body.acceleration.z += d.force[2] / body.mass;
+                }
             }
         }
         else if ('SetPaused' in action) {
             this.physics.state.config.paused = action.SetPaused.paused;
         }
         else if ('SetTimeScale' in action) {
-            this.physics.state.config.time_scale = action.SetTimeScale.scale;
+            const scale = action.SetTimeScale.scale;
+            if (typeof scale === 'number' && isFinite(scale) && scale >= 0 && scale <= 1e6) {
+                this.physics.state.config.time_scale = scale;
+            }
         }
+        else if ('SetConfig' in action) {
+            const cfg = this.physics.state.config;
+            const key = action.SetConfig.key;
+            const value = action.SetConfig.value;
+            // Apply known config keys with type coercion
+            if (key in cfg) {
+                if (typeof cfg[key] === 'boolean') {
+                    cfg[key] = value === 'true';
+                }
+                else if (typeof cfg[key] === 'number') {
+                    const num = parseFloat(value);
+                    if (!isNaN(num))
+                        cfg[key] = num;
+                }
+                else {
+                    cfg[key] = value;
+                }
+            }
+        }
+        // ACK the input back to the sender
+        this.sendJson(ws, {
+            type: ServerMessageType.InputAck,
+            seq,
+            tick: this.physics.state.config.tick,
+            playerId,
+        });
     }
     handleAdminCommand(ws, command, args) {
         // Find the player

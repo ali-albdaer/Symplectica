@@ -55,6 +55,8 @@ export enum ServerMessageType {
   Error = 'error',
   /** Admin response */
   AdminResponse = 'admin_response',
+  /** Input acknowledgement (for client prediction reconciliation) */
+  InputAck = 'input_ack',
   /** Binary body positions update (high-frequency) */
   PositionUpdate = 'position_update',
 }
@@ -194,6 +196,13 @@ export interface AdminResponseMessage {
   data: unknown;
 }
 
+export interface InputAckMessage {
+  type: ServerMessageType.InputAck;
+  seq: number;
+  tick: number;
+  playerId: number;
+}
+
 /** High-frequency binary position update.
  *  Sent as ArrayBuffer: [tick(u32)][bodyCount(u32)][x0,y0,z0,x1,...](f64 each)
  */
@@ -213,6 +222,7 @@ export type ServerMessage =
   | PongMessage
   | ErrorMessage
   | AdminResponseMessage
+  | InputAckMessage
   | PositionUpdateMessage;
 
 // ── Protocol Constants ────────────────────────────────────────────────────────

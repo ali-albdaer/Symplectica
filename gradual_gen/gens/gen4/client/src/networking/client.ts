@@ -52,6 +52,10 @@ export class NetworkClient {
   onReconcile: ((serverState: SimulationState, pendingInputs: PendingInput[]) => void) | null = null;
   /** Called on delta updates */
   onDelta: ((delta: any) => void) | null = null;
+  /** Called on simulation events (collision, body added, etc.) */
+  onEvent: ((event: any) => void) | null = null;
+  /** Called on server errors */
+  onError: ((code: string, message: string) => void) | null = null;
 
   async connect(url: string, playerName: string): Promise<void> {
     this.url = url;
@@ -163,8 +167,9 @@ export class NetworkClient {
     this.ws = null;
   }
 
-  getLatency(): number {
-    return this.latency;
+  /** Check if connected */
+  isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
   private handleMessage(event: MessageEvent): void {
@@ -221,10 +226,22 @@ export class NetworkClient {
 
         case ServerMessageType.Event:
           console.log('Sim event:', (msg as any).event);
+          this.onEvent?.((msg as any).event);
           break;
+
+        case ServerMessageType.InputAck: {
+          const ack = msg as any;
+          this.lastAckedSeq = Math.max(this.lastAckedSeq, ack.seq);
+          // Remove acknowledged inputs
+          this.pendingInputs = this.pendingInputs.filter(
+            (input) => input.seq > ack.seq
+          );
+          break;
+        }
 
         case ServerMessageType.Error:
           console.error('Server error:', (msg as any).message);
+          this.onError?.((msg as any).code, (msg as any).message);
           break;
 
         default:
