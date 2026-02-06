@@ -86,10 +86,23 @@ async function tryLoadWasm(): Promise<boolean> {
   return false;
 }
 
+interface ActiveThrust {
+  bodyId: number;
+  forcePerMass: { x: number; y: number; z: number };
+  remainingTicks: number;
+}
+
 class PhysicsEngine {
   state: SimulationState;
   private wasmEngine: any = null;
   private useWasm: boolean;
+
+  // Active thrusts applied across multiple ticks
+  activeThrusts: ActiveThrust[] = [];
+
+  addThrust(thrust: ActiveThrust): void {
+    this.activeThrusts.push(thrust);
+  }
 
   constructor(preset: string, seed: number, useWasm: boolean) {
     this.useWasm = useWasm;
@@ -254,10 +267,32 @@ class PhysicsEngine {
     }
 
     if (this.wasmEngine) {
-      // WASM path
+      // WASM path: re-apply active thrusts each tick before stepping
+      for (const thrust of this.activeThrusts) {
+        const body = this.state.bodies.find((b) => b.id === thrust.bodyId);
+        if (body && body.mass > 0) {
+          // Call WASM applyThrust with a tiny duration (single-tick impulse that we manage externally)
+          this.wasmEngine.applyThrust(
+            BigInt(thrust.bodyId),
+            thrust.forcePerMass.x * body.mass,
+            thrust.forcePerMass.y * body.mass,
+            thrust.forcePerMass.z * body.mass,
+            0.001, // minimal duration — we manage the multi-tick loop
+          );
+        }
+      }
+
       const resultJson = this.wasmEngine.step();
       if (!resultJson || resultJson === '{}') return this.emptyResult();
       const result: StepResult = JSON.parse(resultJson);
+
+      // Decrement active thrust durations and remove expired ones
+      for (let i = this.activeThrusts.length - 1; i >= 0; i--) {
+        this.activeThrusts[i].remainingTicks--;
+        if (this.activeThrusts[i].remainingTicks <= 0) {
+          this.activeThrusts.splice(i, 1);
+        }
+      }
 
       // Sync positions and velocities from WASM -> local state
       const positions: Float64Array = this.wasmEngine.getPositions();
@@ -332,9 +367,25 @@ class PhysicsEngine {
 
     // Second half-kick
     for (const b of bodies) {
+      // Add active thrust accelerations before the second half-kick
+      for (const thrust of this.activeThrusts) {
+        if (b.id === thrust.bodyId) {
+          b.acceleration.x += thrust.forcePerMass.x;
+          b.acceleration.y += thrust.forcePerMass.y;
+          b.acceleration.z += thrust.forcePerMass.z;
+        }
+      }
       b.velocity.x += 0.5 * b.acceleration.x * dt;
       b.velocity.y += 0.5 * b.acceleration.y * dt;
       b.velocity.z += 0.5 * b.acceleration.z * dt;
+    }
+
+    // Decrement active thrust durations and remove expired ones
+    for (let i = this.activeThrusts.length - 1; i >= 0; i--) {
+      this.activeThrusts[i].remainingTicks--;
+      if (this.activeThrusts[i].remainingTicks <= 0) {
+        this.activeThrusts.splice(i, 1);
+      }
     }
 
     // Advance
@@ -766,9 +817,17 @@ export class GameServer {
       } else {
         const body = this.physics.state.bodies.find((b) => b.id === d.body_id);
         if (body && body.mass > 0) {
-          body.acceleration.x += d.force[0] / body.mass;
-          body.acceleration.y += d.force[1] / body.mass;
-          body.acceleration.z += d.force[2] / body.mass;
+          const dt = this.physics.state.config.dt * this.physics.state.config.time_scale;
+          const remainingTicks = Math.max(1, Math.ceil(d.duration / (dt || 1)));
+          this.physics.addThrust({
+            bodyId: d.body_id,
+            forcePerMass: {
+              x: d.force[0] / body.mass,
+              y: d.force[1] / body.mass,
+              z: d.force[2] / body.mass,
+            },
+            remainingTicks,
+          });
         }
       }
     } else if ('SetPaused' in action) {
@@ -890,7 +949,7 @@ export class GameServer {
 
     if (bodiesChanged || !this.previousPositions || this.tickCount % 300 === 0) {
       // Full position update (binary) — when body count changes or periodic snapshot
-      const buffer = encodePositions(currentTick, currentPositions);
+      const buffer = encodePositions(currentTick, currentPositions, this.physics.state.config.time);
       for (const [, player] of this.players) {
         if (player.ws.readyState === WebSocket.OPEN) {
           player.ws.send(buffer);
@@ -941,7 +1000,7 @@ export class GameServer {
           });
         } else {
           // Most bodies changed — send full binary update
-          const buffer = encodePositions(currentTick, currentPositions);
+          const buffer = encodePositions(currentTick, currentPositions, this.physics.state.config.time);
           for (const [, player] of this.players) {
             if (player.ws.readyState === WebSocket.OPEN) {
               player.ws.send(buffer);

@@ -95,7 +95,7 @@ export class App {
     // Try to connect to server
     this.network = new NetworkClient();
     this.network.onSnapshot = (snapshot) => this.handleSnapshot(snapshot);
-    this.network.onPositionUpdate = (tick, positions) => this.handlePositionUpdate(tick, positions);
+    this.network.onPositionUpdate = (tick, positions, time) => this.handlePositionUpdate(tick, positions, time);
     this.network.onStepResult = (result) => this.handleStepResult(result);
     this.network.onDelta = (delta) => this.handleDelta(delta);
     this.network.onReconcile = (serverState, pending) => {
@@ -136,7 +136,9 @@ export class App {
     this.network.onConnectionChange = (connected) => {
       this.hudConnection.textContent = connected ? 'Online' : 'Offline';
       this.hudConnection.style.color = connected ? '#4CAF50' : '';
-      if (!connected) {
+      if (connected) {
+        this.exitOfflineMode();
+      } else {
         this.startOfflineMode();
       }
     };
@@ -194,6 +196,21 @@ export class App {
 
     this.renderer.updateBodies(this.offlineBodies);
     this.updateBodyList(this.offlineBodies);
+  }
+
+  /** Exit offline mode when server reconnects */
+  private exitOfflineMode(): void {
+    if (!this.offlineMode) return;
+    this.offlineMode = false;
+    this.hudConnection.textContent = 'Online';
+    this.hudConnection.style.color = '#4CAF50';
+    // Dispose WASM sim — server is now authoritative
+    if (this.wasmSim) {
+      this.wasmSim.dispose();
+      this.wasmSim = null;
+    }
+    this.showToast('Reconnected to server');
+    console.log('[App] Exited offline mode, server is now authoritative');
   }
 
   private buildDefaultState(bodies: Body[]): SimulationState {
@@ -351,17 +368,27 @@ export class App {
   }
 
   private handleSnapshot(snapshot: any): void {
+    // Server snapshot is authoritative — exit offline mode if still active
+    if (this.offlineMode) {
+      this.exitOfflineMode();
+    }
     this.state = snapshot.state;
     if (this.state) {
+      this.offlineBodies = this.state.bodies;
       this.renderer.updateBodies(this.state.bodies);
       this.updateBodyList(this.state.bodies);
     }
   }
 
-  private handlePositionUpdate(tick: number, positions: Float64Array): void {
+  private handlePositionUpdate(tick: number, positions: Float64Array, time?: number): void {
     this.latestPositions = positions;
     this.latestTick = tick;
     if (this.state) {
+      // Update tick and time so HUD stays current between snapshots
+      this.state.config.tick = tick;
+      if (time !== undefined) {
+        this.state.config.time = time;
+      }
       // Update positions in place
       for (let i = 0; i < this.state.bodies.length && i * 3 + 2 < positions.length; i++) {
         this.state.bodies[i].position.x = positions[i * 3];

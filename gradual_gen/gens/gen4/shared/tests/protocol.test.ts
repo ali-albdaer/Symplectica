@@ -17,10 +17,11 @@ describe('Binary Position Encoding', () => {
     const tick = 42;
     const positions = new Float64Array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
 
-    const buffer = encodePositions(tick, positions);
+    const buffer = encodePositions(tick, positions, 1.5);
     const decoded = decodePositions(buffer);
 
     expect(decoded.tick).toBe(tick);
+    expect(decoded.time).toBe(1.5);
     expect(decoded.positions.length).toBe(positions.length);
     for (let i = 0; i < positions.length; i++) {
       expect(decoded.positions[i]).toBe(positions[i]);
@@ -32,6 +33,7 @@ describe('Binary Position Encoding', () => {
     const decoded = decodePositions(buffer);
 
     expect(decoded.tick).toBe(0);
+    expect(decoded.time).toBe(0);
     expect(decoded.positions.length).toBe(0);
   });
 
@@ -66,9 +68,9 @@ describe('Binary Position Encoding', () => {
     const positions = new Float64Array(bodyCount * 3);
     const buffer = encodePositions(0, positions);
 
-    // Header: 8 bytes (tick u32 + bodyCount u32)
+    // Header: 16 bytes (tick u32 + bodyCount u32 + time f64)
     // Positions: bodyCount * 3 * 8 bytes (f64 each)
-    expect(buffer.byteLength).toBe(8 + bodyCount * 3 * 8);
+    expect(buffer.byteLength).toBe(16 + bodyCount * 3 * 8);
   });
 });
 

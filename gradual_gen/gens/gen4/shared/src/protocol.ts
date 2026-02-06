@@ -236,25 +236,28 @@ export const POSITION_UPDATE_INTERVAL = 1; // every tick
 // ── Binary Encoding Helpers ──────────────────────────────────────────────────
 
 /** Encode body positions to a compact ArrayBuffer for the wire.
- *  Layout: [tick: u32][bodyCount: u32][x0: f64][y0: f64][z0: f64]...
+ *  Layout: [tick: u32][bodyCount: u32][time: f64][x0: f64][y0: f64][z0: f64]...
  */
-export function encodePositions(tick: number, positions: Float64Array): ArrayBuffer {
+export function encodePositions(tick: number, positions: Float64Array, time = 0): ArrayBuffer {
   const bodyCount = positions.length / 3;
-  const buffer = new ArrayBuffer(8 + positions.byteLength);
+  // 8 bytes header (tick + bodyCount) + 8 bytes time + positions
+  const buffer = new ArrayBuffer(16 + positions.byteLength);
   const view = new DataView(buffer);
   view.setUint32(0, tick, true);
   view.setUint32(4, bodyCount, true);
-  new Float64Array(buffer, 8).set(positions);
+  view.setFloat64(8, time, true);
+  new Float64Array(buffer, 16).set(positions);
   return buffer;
 }
 
 /** Decode a binary position update. */
-export function decodePositions(buffer: ArrayBuffer): { tick: number; positions: Float64Array } {
+export function decodePositions(buffer: ArrayBuffer): { tick: number; time: number; positions: Float64Array } {
   const view = new DataView(buffer);
   const tick = view.getUint32(0, true);
   const bodyCount = view.getUint32(4, true);
-  const positions = new Float64Array(buffer, 8, bodyCount * 3);
-  return { tick, positions };
+  const time = view.getFloat64(8, true);
+  const positions = new Float64Array(buffer, 16, bodyCount * 3);
+  return { tick, time, positions };
 }
 
 /** Create a JSON message string. */

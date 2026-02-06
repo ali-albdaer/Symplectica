@@ -45,7 +45,7 @@ export class NetworkClient {
 
   // Callbacks
   onSnapshot: ((snapshot: any) => void) | null = null;
-  onPositionUpdate: ((tick: number, positions: Float64Array) => void) | null = null;
+  onPositionUpdate: ((tick: number, positions: Float64Array, time?: number) => void) | null = null;
   onStepResult: ((result: StepResult) => void) | null = null;
   onConnectionChange: ((connected: boolean) => void) | null = null;
   /** Called after reconciliation with unacked inputs to replay */
@@ -175,8 +175,8 @@ export class NetworkClient {
   private handleMessage(event: MessageEvent): void {
     // Binary message = position update
     if (event.data instanceof ArrayBuffer) {
-      const { tick, positions } = decodePositions(event.data);
-      this.onPositionUpdate?.(tick, positions);
+      const { tick, time, positions } = decodePositions(event.data);
+      this.onPositionUpdate?.(tick, positions, time);
       return;
     }
 
