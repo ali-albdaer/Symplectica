@@ -65,6 +65,7 @@ class NBodyClient {
 
     private lastServerState?: NetworkStatePayload;
     private lastServerPositions = new Float64Array(0);
+    private receivedVisualizationState = false;
 
     // Time control (centralized)
     private timeController = new TimeController();
@@ -111,7 +112,7 @@ class NBodyClient {
             this.bodyRenderer.setBodyScale(options.bodyScale);
             this.bodyRenderer.setRealScale(options.realScale);
 
-            if (this.network?.isConnected()) {
+            if (this.network?.isConnected() && this.receivedVisualizationState) {
                 this.network.sendVisualizationSettings(options);
             }
         });
@@ -192,6 +193,7 @@ class NBodyClient {
         this.bodyRenderer.setRealScale(settings.realScale);
         this.bodyRenderer.setBodyScale(settings.bodyScale);
         this.vizPanel?.applyOptions(settings);
+        this.receivedVisualizationState = true;
     }
 
     private applySnapshot(snapshot: string): void {
@@ -282,13 +284,11 @@ class NBodyClient {
         const bodies = this.physics.getBodies();
         const positions = this.physics.getPositions();
 
-        console.log('🔍 Body positions:');
         for (let i = 0; i < bodies.length; i++) {
             const body = bodies[i];
             const x = positions[i * 3];
             const y = positions[i * 3 + 1];
             const z = positions[i * 3 + 2];
-            console.log(`  ${body.name}: (${(x / 1.496e11).toFixed(4)} AU, ${(y / 1.496e11).toFixed(4)} AU, ${(z / 1.496e11).toFixed(4)} AU)`);
             this.bodyRenderer.addBody(body);
         }
 

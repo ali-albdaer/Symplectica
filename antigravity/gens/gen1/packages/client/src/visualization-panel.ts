@@ -18,6 +18,9 @@ export interface VisualizationOptions {
 export class VisualizationPanel {
     private container: HTMLElement;
     private isOpen = false;
+    private readonly BODY_SCALE_MIN = 1;
+    private readonly BODY_SCALE_MAX = 5000;
+    private readonly RECOMMENDED_SCALE = 25;
     private options: VisualizationOptions = {
         showOrbitTrails: true,
         showLabels: false,
@@ -79,10 +82,15 @@ export class VisualizationPanel {
                         <input type="checkbox" id="viz-real-scale">
                         <span class="viz-toggle-label">Real Scale (1:1)</span>
                     </label>
+
+                    <label class="viz-toggle">
+                        <input type="checkbox" id="viz-recommended-scale">
+                        <span class="viz-toggle-label">Recommended Scale (25×)</span>
+                    </label>
                     
                     <div class="viz-field" id="viz-body-scale-field">
                         <label>Size Multiplier</label>
-                        <input type="range" id="viz-body-scale" min="1" max="4" step="0.1" value="3">
+                        <input type="range" id="viz-body-scale" min="0" max="1" step="0.001" value="0.8">
                         <span id="viz-body-scale-value">1000×</span>
                     </div>
                     
@@ -248,9 +256,13 @@ export class VisualizationPanel {
 
         // Body Scale controls
         const realScale = container.querySelector('#viz-real-scale') as HTMLInputElement;
+        const recommendedScale = container.querySelector('#viz-recommended-scale') as HTMLInputElement;
         const bodyScaleField = container.querySelector('#viz-body-scale-field') as HTMLElement;
         const bodyScale = container.querySelector('#viz-body-scale') as HTMLInputElement;
         const bodyScaleValue = container.querySelector('#viz-body-scale-value') as HTMLElement;
+
+        this.updateBodyScaleUI(bodyScale, bodyScaleValue, this.options.bodyScale);
+        this.updateRecommendedUI(recommendedScale, this.options);
 
         realScale?.addEventListener('change', () => {
             this.options.realScale = realScale.checked;
@@ -259,13 +271,32 @@ export class VisualizationPanel {
                 bodyScaleField.style.opacity = realScale.checked ? '0.3' : '1';
                 bodyScale.disabled = realScale.checked;
             }
+            if (recommendedScale) {
+                recommendedScale.checked = false;
+                recommendedScale.disabled = realScale.checked;
+            }
+            this.notifyChange();
+        });
+
+        recommendedScale?.addEventListener('change', () => {
+            if (recommendedScale.checked) {
+                this.options.realScale = false;
+                this.options.bodyScale = this.RECOMMENDED_SCALE;
+                if (realScale) realScale.checked = false;
+                if (bodyScaleField) bodyScaleField.style.opacity = '1';
+                bodyScale.disabled = false;
+                this.updateBodyScaleUI(bodyScale, bodyScaleValue, this.options.bodyScale);
+            }
             this.notifyChange();
         });
 
         bodyScale?.addEventListener('input', () => {
-            const exp = parseFloat(bodyScale.value);
-            this.options.bodyScale = Math.pow(10, exp);
+            const sliderValue = parseFloat(bodyScale.value);
+            this.options.bodyScale = this.scaleFromSlider(sliderValue);
             bodyScaleValue.textContent = `${Math.round(this.options.bodyScale)}×`;
+            if (recommendedScale) {
+                recommendedScale.checked = this.isRecommendedScale(this.options.bodyScale) && !this.options.realScale;
+            }
             this.notifyChange();
         });
     }
@@ -318,6 +349,7 @@ export class VisualizationPanel {
         const trailLength = this.container.querySelector('#viz-trail-length') as HTMLInputElement | null;
         const trailLengthValue = this.container.querySelector('#viz-trail-length-value') as HTMLElement | null;
         const realScale = this.container.querySelector('#viz-real-scale') as HTMLInputElement | null;
+        const recommendedScale = this.container.querySelector('#viz-recommended-scale') as HTMLInputElement | null;
         const bodyScaleField = this.container.querySelector('#viz-body-scale-field') as HTMLElement | null;
         const bodyScale = this.container.querySelector('#viz-body-scale') as HTMLInputElement | null;
         const bodyScaleValue = this.container.querySelector('#viz-body-scale-value') as HTMLElement | null;
@@ -327,16 +359,53 @@ export class VisualizationPanel {
         if (trailLength) trailLength.value = options.orbitTrailLength.toString();
         if (trailLengthValue) trailLengthValue.textContent = `${options.orbitTrailLength} points`;
         if (realScale) realScale.checked = options.realScale;
-
-        if (bodyScaleField && bodyScale) {
-            bodyScaleField.style.opacity = options.realScale ? '0.3' : '1';
-            bodyScale.disabled = options.realScale;
-            const exp = Math.log10(Math.max(options.bodyScale, 1));
-            bodyScale.value = exp.toFixed(2);
+        if (recommendedScale) {
+            recommendedScale.checked = this.isRecommendedScale(options.bodyScale) && !options.realScale;
+            recommendedScale.disabled = options.realScale;
         }
 
-        if (bodyScaleValue) bodyScaleValue.textContent = `${Math.round(options.bodyScale)}×`;
+        if (bodyScaleField && bodyScale && bodyScaleValue) {
+            bodyScaleField.style.opacity = options.realScale ? '0.3' : '1';
+            bodyScale.disabled = options.realScale;
+            this.updateBodyScaleUI(bodyScale, bodyScaleValue, options.bodyScale);
+        }
 
         this.suppressNotify = false;
+    }
+
+    private scaleFromSlider(value: number): number {
+        const min = Math.log(this.BODY_SCALE_MIN);
+        const max = Math.log(this.BODY_SCALE_MAX);
+        const t = Math.min(Math.max(value, 0), 1);
+        return Math.exp(min + (max - min) * t);
+    }
+
+    private sliderFromScale(scale: number): number {
+        const min = Math.log(this.BODY_SCALE_MIN);
+        const max = Math.log(this.BODY_SCALE_MAX);
+        const safe = Math.min(Math.max(scale, this.BODY_SCALE_MIN), this.BODY_SCALE_MAX);
+        return (Math.log(safe) - min) / (max - min);
+    }
+
+    private updateBodyScaleUI(
+        slider: HTMLInputElement,
+        label: HTMLElement,
+        scale: number
+    ): void {
+        slider.value = this.sliderFromScale(scale).toFixed(3);
+        label.textContent = `${Math.round(scale)}×`;
+    }
+
+    private updateRecommendedUI(
+        checkbox: HTMLInputElement | null,
+        options: VisualizationOptions
+    ): void {
+        if (!checkbox) return;
+        checkbox.checked = this.isRecommendedScale(options.bodyScale) && !options.realScale;
+        checkbox.disabled = options.realScale;
+    }
+
+    private isRecommendedScale(scale: number): boolean {
+        return Math.abs(scale - this.RECOMMENDED_SCALE) < 0.5;
     }
 }
