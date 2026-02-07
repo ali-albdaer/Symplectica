@@ -321,6 +321,19 @@ export class BodyRenderer {
         }
     }
 
+    pickBodyId(raycaster: THREE.Raycaster): number | null {
+        const meshes: THREE.Object3D[] = [];
+        for (const mesh of this.bodies.values()) {
+            meshes.push(mesh.getPickMesh());
+        }
+        if (meshes.length === 0) return null;
+        const hits = raycaster.intersectObjects(meshes, false);
+        if (hits.length === 0) return null;
+        const hit = hits[0].object as THREE.Mesh;
+        const id = hit.userData.bodyId;
+        return typeof id === 'number' ? id : null;
+    }
+
     dispose(): void {
         for (const mesh of this.bodies.values()) {
             this.scene.remove(mesh.group);
@@ -381,6 +394,7 @@ class BodyMesh {
         }
 
         this.mesh = new THREE.Mesh(this.geometry, this.material);
+        this.mesh.userData.bodyId = body.id;
         this.group.add(this.mesh);
 
         // Add glow effect for stars
@@ -444,5 +458,9 @@ class BodyMesh {
     dispose(): void {
         this.geometry.dispose();
         this.material.dispose();
+    }
+
+    getPickMesh(): THREE.Mesh {
+        return this.mesh;
     }
 }

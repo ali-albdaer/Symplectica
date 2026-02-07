@@ -87,6 +87,8 @@ class NBodyClient {
     // Free camera mode
     private freeCamera = false;
     private freeCamSpeedMultiplier = 20;
+    private freeCamCrosshair: HTMLElement | null = null;
+    private raycaster = new THREE.Raycaster();
     private moveKeys: Record<string, boolean> = {
         KeyW: false,
         KeyA: false,
@@ -264,6 +266,7 @@ class NBodyClient {
 
         const container = document.getElementById('canvas-container')!;
         container.appendChild(this.renderer.domElement);
+        this.freeCamCrosshair = document.getElementById('freecam-crosshair');
 
         // Create camera - start further out and elevated
         this.camera = new OrbitCamera(
@@ -432,6 +435,15 @@ class NBodyClient {
             (document.activeElement as HTMLElement)?.blur();
         });
 
+        document.getElementById('canvas-container')?.addEventListener('mousedown', (e) => {
+            if (!this.freeCamera || e.button !== 0) return;
+            const id = this.pickBodyFromCenter();
+            if (id === null) return;
+            const index = this.findBodyIndexById(id);
+            if (index === null) return;
+            this.switchToFollowBody(index);
+        });
+
         this.updateTimeScaleUI();
     }
 
@@ -450,11 +462,7 @@ class NBodyClient {
             this.lastFollowBodyIndex = this.followBodyIndex;
             this.followBodyIndex = -1;
             const origin = this.resolveCameraOrigin(true);
-            const seedWorld = {
-                x: origin.x + this.camera.position.x,
-                y: origin.y + this.camera.position.y,
-                z: origin.z + this.camera.position.z,
-            };
+            const seedWorld = this.camera.getCameraWorldPosition();
             const forward = new THREE.Vector3();
             this.camera.getWorldDirection(forward);
             this.camera.setFreeMode(
@@ -463,11 +471,27 @@ class NBodyClient {
                 { x: forward.x, y: forward.y, z: forward.z },
                 origin
             );
+            this.setFreeCamUI(true);
         } else {
+            const cameraWorld = this.camera.getCameraWorldPosition();
+            const target = this.getFollowTargetPosition(this.lastFollowBodyIndex);
+            const offset = {
+                x: cameraWorld.x - target.x,
+                y: cameraWorld.y - target.y,
+                z: cameraWorld.z - target.z,
+            };
             this.camera.setFreeMode(false);
+            this.camera.setOrbitFromOffset(offset);
             this.followBodyIndex = this.lastFollowBodyIndex;
+            this.setFreeCamUI(false);
         }
         this.updateFollowUI();
+    }
+
+    private setFreeCamUI(active: boolean): void {
+        if (this.freeCamCrosshair) {
+            this.freeCamCrosshair.style.display = active ? 'block' : 'none';
+        }
     }
 
     private resolveCameraOrigin(useFollowTarget: boolean): { x: number; y: number; z: number } {
@@ -480,6 +504,47 @@ class NBodyClient {
             };
         }
         return origin;
+    }
+
+    private getFollowTargetPosition(index: number): { x: number; y: number; z: number } {
+        if (index >= 0 && index * 3 + 2 < this.state.positions.length) {
+            return {
+                x: this.state.positions[index * 3],
+                y: this.state.positions[index * 3 + 1],
+                z: this.state.positions[index * 3 + 2],
+            };
+        }
+        return { x: 0, y: 0, z: 0 };
+    }
+
+    private pickBodyFromCenter(): number | null {
+        const mouse = new THREE.Vector2(0, 0);
+        this.raycaster.setFromCamera(mouse, this.camera);
+        return this.bodyRenderer.pickBodyId(this.raycaster);
+    }
+
+    private findBodyIndexById(id: number): number | null {
+        const bodies = this.physics.getBodies();
+        const index = bodies.findIndex((body) => body.id === id);
+        return index >= 0 ? index : null;
+    }
+
+    private switchToFollowBody(index: number): void {
+        const cameraWorld = this.camera.getCameraWorldPosition();
+        const target = this.getFollowTargetPosition(index);
+        const offset = {
+            x: cameraWorld.x - target.x,
+            y: cameraWorld.y - target.y,
+            z: cameraWorld.z - target.z,
+        };
+
+        this.freeCamera = false;
+        this.camera.setFreeMode(false);
+        this.camera.setOrbitFromOffset(offset);
+        this.followBodyIndex = index;
+        this.lastFollowBodyIndex = index;
+        this.setFreeCamUI(false);
+        this.updateFollowUI();
     }
 
     private setMoveKey(code: string, pressed: boolean): boolean {

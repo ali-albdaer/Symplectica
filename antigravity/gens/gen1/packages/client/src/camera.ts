@@ -259,10 +259,31 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         return this.radius;
     }
 
+    getCameraWorldPosition(): { x: number; y: number; z: number } {
+        if (this.freeMode) {
+            return { x: this.freeX, y: this.freeY, z: this.freeZ };
+        }
+        // In orbit mode, origin is the camera world position.
+        return { x: this.originX, y: this.originY, z: this.originZ };
+    }
+
     setFocus(x: number, y: number, z: number): void {
         this.focusX = x;
         this.focusY = y;
         this.focusZ = z;
+        this.updatePosition();
+    }
+
+    setOrbitFromOffset(offset: { x: number; y: number; z: number }): void {
+        const r = Math.sqrt(offset.x * offset.x + offset.y * offset.y + offset.z * offset.z);
+        if (!Number.isFinite(r) || r <= 0) return;
+        this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, r));
+        this.azimuth = Math.atan2(offset.x, offset.z);
+        const clampedY = Math.max(-1, Math.min(1, offset.y / this.radius));
+        this.elevation = Math.asin(clampedY);
+        this.azimuthVelocity = 0;
+        this.elevationVelocity = 0;
+        this.zoomVelocity = 0;
         this.updatePosition();
     }
 
