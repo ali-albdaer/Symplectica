@@ -30,7 +30,7 @@ export class TimeController {
         { sim: 31536000, label: '1yr/s' },   // 1 year per second
     ];
 
-    private speedIndex = 2; // Default to 1hr/s for better initial experience
+    private speedIndex = 4; // Default to 1wk/s for better initial experience
     private accumulator = 0;
     private paused = false;
 

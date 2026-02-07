@@ -86,7 +86,6 @@ export class VisualizationPanel {
                         <span id="viz-body-scale-value">1000×</span>
                     </div>
                     
-                    <div class="viz-hint">Real scale: bodies are extremely small relative to distances</div>
                 </section>
             </div>
         `;
@@ -208,12 +207,6 @@ export class VisualizationPanel {
                 color: rgba(255, 255, 255, 0.5);
             }
             
-            .viz-hint {
-                font-size: 10px;
-                color: rgba(255, 255, 255, 0.35);
-                font-style: italic;
-                margin-top: 8px;
-            }
         `;
         document.head.appendChild(style);
 

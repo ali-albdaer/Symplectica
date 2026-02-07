@@ -69,6 +69,7 @@ class NBodyClient {
     // Time control (centralized)
     private timeController = new TimeController();
     private uiHidden = false;
+    private hintsVisible = false;
 
     // Body following
     private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
@@ -367,6 +368,10 @@ class NBodyClient {
                 case 'H':
                     this.toggleUIVisibility();
                     break;
+                case 'i':
+                case 'I':
+                    this.toggleHints();
+                    break;
             }
         });
 
@@ -385,6 +390,14 @@ class NBodyClient {
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
+    }
+
+    private toggleHints(): void {
+        this.hintsVisible = !this.hintsVisible;
+        const panel = document.getElementById('hints-panel');
+        if (panel) {
+            panel.style.display = this.hintsVisible ? 'block' : 'none';
+        }
     }
 
     private syncTimeScaleToServer(): void {

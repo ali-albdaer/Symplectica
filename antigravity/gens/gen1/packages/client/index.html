@@ -72,6 +72,40 @@
       font-variant-numeric: tabular-nums;
     }
 
+    #hints-panel {
+      margin-top: 12px;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(10px);
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-width: 320px;
+      display: none;
+    }
+
+    #hints-panel h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #4fc3f7;
+    }
+
+    #hints-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    #hints-panel li span {
+      color: #fff;
+      font-weight: 600;
+      margin-right: 6px;
+    }
+
     #loading {
       position: fixed;
       inset: 0;
@@ -165,11 +199,24 @@
         <span class="value" id="follow-target">Origin</span>
       </div>
       <div style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.4);">
-        <div>Drag: rotate | Scroll: zoom</div>
-        <div>&lt; / &gt;: warp | Space: pause</div>
-        <div>P/N: prev/next body | H: hide UI</div>
-        <div>B: build | T: chat | V: viz | A: admin</div>
+        Press I for hints
       </div>
+    </div>
+
+    <div id="hints-panel">
+      <h3>Quick Hints</h3>
+      <ul>
+        <li><span>Drag</span>Rotate camera</li>
+        <li><span>Scroll</span>Zoom in/out</li>
+        <li><span>&lt; / &gt;</span>Time warp</li>
+        <li><span>Space</span>Pause simulation</li>
+        <li><span>P / N</span>Prev/next body</li>
+        <li><span>H</span>Hide UI</li>
+        <li><span>B</span>World Builder</li>
+        <li><span>T</span>Chat</li>
+        <li><span>V</span>Visualization</li>
+        <li><span>A</span>Admin</li>
+      </ul>
     </div>
   </div>
 

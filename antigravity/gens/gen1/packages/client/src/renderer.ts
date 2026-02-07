@@ -233,19 +233,26 @@ export class BodyRenderer {
 
     private updateOrbitLine(id: number, history: Array<{ x: number; y: number; z: number }>, origin: { x: number; y: number; z: number }): void {
         const line = this.orbitLines.get(id);
-        if (!line || history.length < 2) return;
+        if (!line) return;
 
         const positions = line.geometry.attributes.position as THREE.BufferAttribute;
         const arr = positions.array as Float32Array;
+        const count = Math.min(history.length, this.maxTrailPoints);
 
-        for (let i = 0; i < history.length; i++) {
+        if (count < 2) {
+            line.geometry.setDrawRange(0, 0);
+            return;
+        }
+
+        for (let i = 0; i < count; i++) {
             arr[i * 3] = history[i].x - origin.x;
             arr[i * 3 + 1] = history[i].y - origin.y;
             arr[i * 3 + 2] = history[i].z - origin.z;
         }
 
         positions.needsUpdate = true;
-        line.geometry.setDrawRange(0, history.length);
+        line.geometry.setDrawRange(0, count);
+        line.geometry.computeBoundingSphere();
     }
 
     // Visualization options
