@@ -26,6 +26,7 @@ export class VisualizationPanel {
         bodyScale: 1000, // default 1000x for visibility
     };
     private onChange: (options: VisualizationOptions) => void;
+    private suppressNotify = false;
 
     constructor(onChange: (options: VisualizationOptions) => void) {
         this.onChange = onChange;
@@ -289,6 +290,7 @@ export class VisualizationPanel {
     }
 
     private notifyChange(): void {
+        if (this.suppressNotify) return;
         this.onChange({ ...this.options });
     }
 
@@ -312,5 +314,36 @@ export class VisualizationPanel {
 
     getOptions(): VisualizationOptions {
         return { ...this.options };
+    }
+
+    applyOptions(options: VisualizationOptions): void {
+        this.suppressNotify = true;
+        this.options = { ...options };
+
+        const orbits = this.container.querySelector('#viz-orbits') as HTMLInputElement | null;
+        const labels = this.container.querySelector('#viz-labels') as HTMLInputElement | null;
+        const trailLength = this.container.querySelector('#viz-trail-length') as HTMLInputElement | null;
+        const trailLengthValue = this.container.querySelector('#viz-trail-length-value') as HTMLElement | null;
+        const realScale = this.container.querySelector('#viz-real-scale') as HTMLInputElement | null;
+        const bodyScaleField = this.container.querySelector('#viz-body-scale-field') as HTMLElement | null;
+        const bodyScale = this.container.querySelector('#viz-body-scale') as HTMLInputElement | null;
+        const bodyScaleValue = this.container.querySelector('#viz-body-scale-value') as HTMLElement | null;
+
+        if (orbits) orbits.checked = options.showOrbitTrails;
+        if (labels) labels.checked = options.showLabels;
+        if (trailLength) trailLength.value = options.orbitTrailLength.toString();
+        if (trailLengthValue) trailLengthValue.textContent = `${options.orbitTrailLength} points`;
+        if (realScale) realScale.checked = options.realScale;
+
+        if (bodyScaleField && bodyScale) {
+            bodyScaleField.style.opacity = options.realScale ? '0.3' : '1';
+            bodyScale.disabled = options.realScale;
+            const exp = Math.log10(Math.max(options.bodyScale, 1));
+            bodyScale.value = exp.toFixed(2);
+        }
+
+        if (bodyScaleValue) bodyScaleValue.textContent = `${Math.round(options.bodyScale)}×`;
+
+        this.suppressNotify = false;
     }
 }

@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
-import { AdminStatePayload, NetworkClient } from './network';
+import { AdminStatePayload, NetworkClient, VisualizationStatePayload } from './network';
 import { PhysicsClient } from './physics';
 import { WorldBuilder } from './world-builder';
 import { Chat } from './chat';
@@ -109,6 +109,10 @@ class NBodyClient {
             this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
             this.bodyRenderer.setBodyScale(options.bodyScale);
             this.bodyRenderer.setRealScale(options.realScale);
+
+            if (this.network?.isConnected()) {
+                this.network.sendVisualizationSettings(options);
+            }
         });
 
         this.hideLoading();
@@ -123,12 +127,15 @@ class NBodyClient {
 
     private setupNetworkHandlers(): void {
         this.network.on('welcome', (message) => {
-            const payload = message.payload as { snapshot: string; config?: { adminState?: AdminStatePayload } };
+            const payload = message.payload as { snapshot: string; config?: { adminState?: AdminStatePayload; visualizationState?: VisualizationStatePayload } };
             if (payload?.snapshot) {
                 this.applySnapshot(payload.snapshot);
             }
             if (payload?.config?.adminState) {
                 this.applyAdminState(payload.config.adminState);
+            }
+            if (payload?.config?.visualizationState) {
+                this.applyVisualizationState(payload.config.visualizationState);
             }
         });
 
@@ -159,14 +166,31 @@ class NBodyClient {
                 this.applyAdminState(payload);
             }
         });
+
+        this.network.on('visualization_state', (message) => {
+            const payload = message.payload as VisualizationStatePayload;
+            if (payload) {
+                this.applyVisualizationState(payload);
+            }
+        });
     }
 
     private applyAdminState(settings: AdminStatePayload): void {
         this.physics.setTimeStep(settings.dt);
         this.timeController.setPhysicsTimestep(settings.dt);
         this.timeController.setSpeedBySimRate(settings.timeScale);
+        this.timeController.setPaused(settings.paused);
         this.updateTimeScaleUI();
         this.adminPanel?.applyServerSettings(settings);
+    }
+
+    private applyVisualizationState(settings: VisualizationStatePayload): void {
+        this.bodyRenderer.setShowOrbitTrails(settings.showOrbitTrails);
+        this.bodyRenderer.setShowLabels(settings.showLabels);
+        this.bodyRenderer.setMaxTrailPoints(settings.orbitTrailLength);
+        this.bodyRenderer.setRealScale(settings.realScale);
+        this.bodyRenderer.setBodyScale(settings.bodyScale);
+        this.vizPanel?.applyOptions(settings);
     }
 
     private applySnapshot(snapshot: string): void {
@@ -286,8 +310,15 @@ class NBodyClient {
 
             switch (e.key) {
                 case ' ':
-                    this.timeController.togglePause();
-                    this.updateTimeScaleUI();
+                    if (this.network?.isConnected()) {
+                        const nextPaused = !this.timeController.isPaused();
+                        this.timeController.setPaused(nextPaused);
+                        this.updateTimeScaleUI();
+                        this.network.sendPause(nextPaused);
+                    } else {
+                        this.timeController.togglePause();
+                        this.updateTimeScaleUI();
+                    }
                     break;
                 case '.':
                 case '>':

@@ -68,6 +68,7 @@ export class BodyRenderer {
     private maxTrailPoints = 50; // Configurable via setMaxTrailPoints
     private readonly TRAIL_SAMPLE_INTERVAL = 5; // Sample every N frames
     private frameCount = 0;
+    private lastOrigin = { x: 0, y: 0, z: 0 };
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
@@ -190,6 +191,7 @@ export class BodyRenderer {
     update(positions: Float64Array, origin: { x: number; y: number; z: number }): void {
         this.frameCount++;
         const shouldSample = this.frameCount % this.TRAIL_SAMPLE_INTERVAL === 0;
+        this.lastOrigin = origin;
 
         let i = 0;
         for (const [id, mesh] of this.bodies) {
@@ -217,8 +219,8 @@ export class BodyRenderer {
                     history.push({ x: worldX, y: worldY, z: worldZ });
 
                     // Limit history size to user-configured max
-                    while (history.length > this.maxTrailPoints) {
-                        history.shift();
+                    if (history.length > this.maxTrailPoints) {
+                        history.splice(0, history.length - this.maxTrailPoints);
                     }
 
                     // Update orbit line geometry
@@ -266,11 +268,13 @@ export class BodyRenderer {
     }
 
     setMaxTrailPoints(points: number): void {
-        this.maxTrailPoints = points;
+        const capped = Math.max(2, Math.min(points, 2000));
+        this.maxTrailPoints = capped;
         // Trim existing histories if needed
-        for (const history of this.orbitHistory.values()) {
-            while (history.length > points) {
-                history.shift();
+        for (const [id, history] of this.orbitHistory) {
+            if (history.length > capped) {
+                history.splice(0, history.length - capped);
+                this.updateOrbitLine(id, history, this.lastOrigin);
             }
         }
     }

@@ -49,13 +49,13 @@ interface WasmSimulation {
 
 // Message types
 interface ClientMessage {
-    type: 'join' | 'input' | 'ping' | 'request_snapshot' | 'chat' | 'admin_settings' | 'set_time_scale' | 'apply_snapshot' | 'reset_simulation';
+    type: 'join' | 'input' | 'ping' | 'request_snapshot' | 'chat' | 'admin_settings' | 'set_time_scale' | 'apply_snapshot' | 'reset_simulation' | 'set_visualization' | 'set_pause';
     payload?: unknown;
     clientTick?: number;
 }
 
 interface ServerMessage {
-    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state';
+    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state' | 'visualization_state';
     payload: unknown;
     serverTick?: number;
     timestamp?: number;
@@ -79,6 +79,15 @@ interface AdminStatePayload {
     forceMethod: 'direct' | 'barnes-hut';
     theta: number;
     timeScale: number;
+    paused: boolean;
+}
+
+interface VisualizationStatePayload {
+    showOrbitTrails: boolean;
+    showLabels: boolean;
+    orbitTrailLength: number;
+    realScale: boolean;
+    bodyScale: number;
 }
 
 interface Client {
@@ -111,6 +120,14 @@ class SimulationServer {
         forceMethod: 'direct',
         theta: 0.5,
         timeScale: 1,
+        paused: false,
+    };
+    private visualizationState: VisualizationStatePayload = {
+        showOrbitTrails: true,
+        showLabels: false,
+        orbitTrailLength: 50,
+        realScale: false,
+        bodyScale: 1000,
     };
 
     async start(): Promise<void> {
@@ -182,6 +199,7 @@ class SimulationServer {
             forceMethod: 'direct',
             theta: 0.5,
             timeScale: 1,
+            paused: false,
         };
 
         console.log(`   Bodies: ${this.simulation.bodyCount()}`);
@@ -213,6 +231,7 @@ class SimulationServer {
                         tickRate: CONFIG.tickRate,
                         serverTick: Number(this.simulation.tick()),
                         adminState: this.adminState,
+                        visualizationState: this.visualizationState,
                     },
                 },
                 serverTick: Number(this.simulation.tick()),
@@ -307,8 +326,36 @@ class SimulationServer {
                     forceMethod,
                     theta,
                     timeScale: dt * CONFIG.tickRate,
+                    paused: this.adminState.paused,
                 };
                 this.broadcastAdminState();
+                break;
+            }
+
+            case 'set_pause': {
+                const payload = message.payload as { paused?: boolean } | undefined;
+                if (typeof payload?.paused !== 'boolean') return;
+                this.adminState = {
+                    ...this.adminState,
+                    paused: payload.paused,
+                };
+                this.broadcastAdminState();
+                break;
+            }
+
+            case 'set_visualization': {
+                const payload = message.payload as Partial<VisualizationStatePayload> | undefined;
+                if (!payload) return;
+
+                this.visualizationState = {
+                    showOrbitTrails: typeof payload.showOrbitTrails === 'boolean' ? payload.showOrbitTrails : this.visualizationState.showOrbitTrails,
+                    showLabels: typeof payload.showLabels === 'boolean' ? payload.showLabels : this.visualizationState.showLabels,
+                    orbitTrailLength: typeof payload.orbitTrailLength === 'number' ? payload.orbitTrailLength : this.visualizationState.orbitTrailLength,
+                    realScale: typeof payload.realScale === 'boolean' ? payload.realScale : this.visualizationState.realScale,
+                    bodyScale: typeof payload.bodyScale === 'number' ? payload.bodyScale : this.visualizationState.bodyScale,
+                };
+
+                this.broadcastVisualizationState();
                 break;
             }
 
@@ -357,7 +404,9 @@ class SimulationServer {
             lastTime = now;
 
             // Step simulation
-            this.simulation.step();
+            if (!this.adminState.paused) {
+                this.simulation.step();
+            }
 
             const currentTick = this.simulation.tick();
 
@@ -426,6 +475,23 @@ class SimulationServer {
         const message: ServerMessage = {
             type: 'admin_state',
             payload: this.adminState,
+            serverTick: Number(this.simulation.tick()),
+            timestamp: Date.now(),
+        };
+
+        const data = JSON.stringify(message);
+
+        for (const client of this.clients.values()) {
+            if (client.ws.readyState === WebSocket.OPEN) {
+                client.ws.send(data);
+            }
+        }
+    }
+
+    private broadcastVisualizationState(): void {
+        const message: ServerMessage = {
+            type: 'visualization_state',
+            payload: this.visualizationState,
             serverTick: Number(this.simulation.tick()),
             timestamp: Date.now(),
         };
