@@ -119,7 +119,7 @@ class SimulationServer {
         substeps: 4,
         forceMethod: 'direct',
         theta: 0.5,
-        timeScale: 1,
+        timeScale: 604800, // 1wk/s default
         paused: false,
     };
     private visualizationState: VisualizationStatePayload = {
@@ -198,7 +198,7 @@ class SimulationServer {
             substeps: 4,
             forceMethod: 'direct',
             theta: 0.5,
-            timeScale: 1,
+            timeScale: 604800, // 1wk/s default
             paused: false,
         };
 

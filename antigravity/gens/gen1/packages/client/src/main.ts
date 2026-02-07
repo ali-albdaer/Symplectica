@@ -206,14 +206,20 @@ class NBodyClient {
     }
 
     private applySnapshot(snapshot: string): void {
+        const oldBodyCount = this.physics.bodyCount();
         const restored = this.physics.restoreSnapshot(snapshot);
         if (!restored) {
             console.warn('⚠️ Failed to apply server snapshot');
             return;
         }
 
-        this.refreshBodies();
-        this.state.bodyCount = this.physics.bodyCount();
+        // Only refresh bodies if count changed (preserves orbit trails)
+        const newBodyCount = this.physics.bodyCount();
+        if (newBodyCount !== oldBodyCount) {
+            this.refreshBodies();
+        }
+        
+        this.state.bodyCount = newBodyCount;
         this.updateUIBodyCount();
         this.timeController.resetAccumulator();
     }

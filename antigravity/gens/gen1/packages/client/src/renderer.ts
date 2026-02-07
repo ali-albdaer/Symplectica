@@ -250,9 +250,9 @@ export class BodyRenderer {
                     const history = this.orbitHistory.get(id)!;
                     history.push({ x: worldX, y: worldY, z: worldZ });
 
-                    // Limit history size to user-configured max
-                    if (history.length > this.maxTrailPoints) {
-                        history.splice(0, history.length - this.maxTrailPoints);
+                    // Remove oldest points when exceeding limit (one at a time)
+                    while (history.length > this.maxTrailPoints) {
+                        history.shift();
                     }
 
                     // Update orbit line geometry
@@ -309,12 +309,15 @@ export class BodyRenderer {
     setMaxTrailPoints(points: number): void {
         const capped = Math.max(2, Math.min(points, 2000));
         this.maxTrailPoints = capped;
-        // Trim existing histories if needed
+        // Trim existing histories if needed (keep newest points)
         for (const [id, history] of this.orbitHistory) {
             if (history.length > capped) {
-                history.splice(0, history.length - capped);
-                this.updateOrbitLine(id, history, this.lastOrigin);
+                // Replace with only the newest points
+                const trimmed = history.slice(-capped);
+                history.length = 0;
+                history.push(...trimmed);
             }
+            this.updateOrbitLine(id, history, this.lastOrigin);
         }
     }
 
