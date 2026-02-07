@@ -25,7 +25,9 @@ export class AdminPanel {
     private physics: PhysicsClient;
     private timeController: TimeController;
     private network?: NetworkClient;
+    private onFreeCamSpeedChange?: (speed: number) => void;
     private isOpen = false;
+    private freeCamSpeed = 1;
     private config: ServerConfig = {
         tickRate: 60,
         forceMethod: 'direct',
@@ -33,10 +35,16 @@ export class AdminPanel {
         substeps: 4,
     };
 
-    constructor(physics: PhysicsClient, timeController: TimeController, network?: NetworkClient) {
+    constructor(
+        physics: PhysicsClient,
+        timeController: TimeController,
+        network?: NetworkClient,
+        onFreeCamSpeedChange?: (speed: number) => void
+    ) {
         this.physics = physics;
         this.timeController = timeController;
         this.network = network;
+        this.onFreeCamSpeedChange = onFreeCamSpeedChange;
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
@@ -48,7 +56,7 @@ export class AdminPanel {
         container.innerHTML = `
             <div class="admin-header">
                 <h2>⚙️ Admin Panel</h2>
-                <button class="admin-close" title="Close (A)">&times;</button>
+                <button class="admin-close" title="Close (/)">&times;</button>
             </div>
             
             <div class="admin-content">
@@ -58,6 +66,11 @@ export class AdminPanel {
                     <div class="admin-field">
                         <label>Timestep (seconds)</label>
                         <input type="number" id="admin-dt" value="3600" min="1" max="86400" step="60">
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Free Cam Speed</label>
+                        <input type="number" id="admin-freecam-speed" value="1" min="0.1" max="10" step="0.1">
                     </div>
                     
                     <div class="admin-field">
@@ -273,6 +286,18 @@ export class AdminPanel {
             this.applySettings();
         });
 
+        // Free cam speed
+        const freeCamSpeedInput = container.querySelector('#admin-freecam-speed') as HTMLInputElement | null;
+        freeCamSpeedInput?.addEventListener('input', () => {
+            const value = parseFloat(freeCamSpeedInput.value);
+            if (Number.isFinite(value)) {
+                const clamped = Math.max(0.1, Math.min(10, value));
+                this.freeCamSpeed = clamped;
+                freeCamSpeedInput.value = clamped.toString();
+                this.onFreeCamSpeedChange?.(clamped);
+            }
+        });
+
         // Reset button
         container.querySelector('#admin-reset')?.addEventListener('click', () => {
             if (confirm('Reset simulation to default state?')) {
@@ -287,7 +312,7 @@ export class AdminPanel {
                 return;
             }
 
-            if (e.key === 'a' || e.key === 'A') {
+            if (e.key === '/') {
                 this.toggle();
             }
 
@@ -309,6 +334,9 @@ export class AdminPanel {
         this.isOpen = true;
         this.container.classList.add('open');
         this.updateDebugInfo();
+
+        const freeCamSpeedInput = document.getElementById('admin-freecam-speed') as HTMLInputElement | null;
+        if (freeCamSpeedInput) freeCamSpeedInput.value = this.freeCamSpeed.toString();
     }
 
     close(): void {

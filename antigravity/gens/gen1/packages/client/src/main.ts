@@ -86,6 +86,7 @@ class NBodyClient {
 
     // Free camera mode
     private freeCamera = false;
+    private freeCamSpeedMultiplier = 1;
     private moveKeys: Record<string, boolean> = {
         KeyW: false,
         KeyA: false,
@@ -123,7 +124,9 @@ class NBodyClient {
         this.worldBuilder = new WorldBuilder(this.physics, () => this.refreshBodies(), this.network);
 
         // Initialize Admin Panel
-        this.adminPanel = new AdminPanel(this.physics, this.timeController, this.network);
+        this.adminPanel = new AdminPanel(this.physics, this.timeController, this.network, (speed) => {
+            this.freeCamSpeedMultiplier = speed;
+        });
 
         // Initialize Visualization Panel
         this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
@@ -446,12 +449,30 @@ class NBodyClient {
         if (this.freeCamera) {
             this.lastFollowBodyIndex = this.followBodyIndex;
             this.followBodyIndex = -1;
-            this.camera.setFreeMode(true);
+            const origin = this.resolveCameraOrigin(true);
+            const seedWorld = {
+                x: origin.x + this.camera.position.x,
+                y: origin.y + this.camera.position.y,
+                z: origin.z + this.camera.position.z,
+            };
+            this.camera.setFreeMode(true, seedWorld);
         } else {
             this.camera.setFreeMode(false);
             this.followBodyIndex = this.lastFollowBodyIndex;
         }
         this.updateFollowUI();
+    }
+
+    private resolveCameraOrigin(useFollowTarget: boolean): { x: number; y: number; z: number } {
+        let origin = this.camera.getWorldOrigin();
+        if (useFollowTarget && this.followBodyIndex >= 0 && this.followBodyIndex * 3 + 2 < this.state.positions.length) {
+            origin = {
+                x: this.state.positions[this.followBodyIndex * 3],
+                y: this.state.positions[this.followBodyIndex * 3 + 1],
+                z: this.state.positions[this.followBodyIndex * 3 + 2],
+            };
+        }
+        return origin;
     }
 
     private setMoveKey(code: string, pressed: boolean): boolean {
@@ -645,7 +666,7 @@ class NBodyClient {
 
             const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
-            const speed = Math.max(AU * 0.0002, this.camera.getDistance() * 0.005);
+            const speed = Math.max(AU * 0.0005, this.camera.getDistance() * 0.01) * this.freeCamSpeedMultiplier;
             const step = speed * delta;
 
             const move = new THREE.Vector3(0, 0, 0);
@@ -663,15 +684,7 @@ class NBodyClient {
         }
 
         // Calculate camera origin based on followed body
-        let cameraOrigin = this.camera.getWorldOrigin();
-        if (!this.freeCamera && this.followBodyIndex >= 0 && this.followBodyIndex * 3 + 2 < this.state.positions.length) {
-            // Center on followed body
-            cameraOrigin = {
-                x: this.state.positions[this.followBodyIndex * 3],
-                y: this.state.positions[this.followBodyIndex * 3 + 1],
-                z: this.state.positions[this.followBodyIndex * 3 + 2],
-            };
-        }
+        const cameraOrigin = this.resolveCameraOrigin(!this.freeCamera);
 
         // Update body positions with floating origin
         this.bodyRenderer.update(this.state.positions, cameraOrigin);
