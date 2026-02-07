@@ -455,7 +455,14 @@ class NBodyClient {
                 y: origin.y + this.camera.position.y,
                 z: origin.z + this.camera.position.z,
             };
-            this.camera.setFreeMode(true, seedWorld);
+            const forward = new THREE.Vector3();
+            this.camera.getWorldDirection(forward);
+            this.camera.setFreeMode(
+                true,
+                seedWorld,
+                { x: forward.x, y: forward.y, z: forward.z },
+                origin
+            );
         } else {
             this.camera.setFreeMode(false);
             this.followBodyIndex = this.lastFollowBodyIndex;

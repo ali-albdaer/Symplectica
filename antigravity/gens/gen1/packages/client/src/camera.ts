@@ -28,6 +28,9 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private freeX = 0;
     private freeY = 0;
     private freeZ = 0;
+    private freeOriginX = 0;
+    private freeOriginY = 0;
+    private freeOriginZ = 0;
 
     // Pointer lock
     private canvas?: HTMLElement;
@@ -219,14 +222,17 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         const dirZ = Math.cos(this.elevation) * Math.cos(this.azimuth);
 
         if (this.freeMode) {
-            // Free mode: camera stays at render origin, world shifts via floating origin
-            this.position.set(0, 0, 0);
-            this.lookAt(dirX, dirY, dirZ);
+            // Free mode: camera uses explicit world position and a fixed render origin
+            const renderX = this.freeX - this.freeOriginX;
+            const renderY = this.freeY - this.freeOriginY;
+            const renderZ = this.freeZ - this.freeOriginZ;
+            this.position.set(renderX, renderY, renderZ);
+            this.lookAt(renderX + dirX, renderY + dirY, renderZ + dirZ);
 
-            // Floating origin is the camera world position
-            this.originX = this.freeX;
-            this.originY = this.freeY;
-            this.originZ = this.freeZ;
+            // Floating origin is the chosen render origin
+            this.originX = this.freeOriginX;
+            this.originY = this.freeOriginY;
+            this.originZ = this.freeOriginZ;
             return;
         }
 
@@ -260,7 +266,12 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         this.updatePosition();
     }
 
-    setFreeMode(enabled: boolean, seedWorld?: { x: number; y: number; z: number }): void {
+    setFreeMode(
+        enabled: boolean,
+        seedWorld?: { x: number; y: number; z: number },
+        seedForward?: { x: number; y: number; z: number },
+        seedOrigin?: { x: number; y: number; z: number }
+    ): void {
         this.freeMode = enabled;
         if (enabled) {
             // Seed free position from provided world coordinates
@@ -268,6 +279,23 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 this.freeX = seedWorld.x;
                 this.freeY = seedWorld.y;
                 this.freeZ = seedWorld.z;
+            }
+            if (seedOrigin) {
+                this.freeOriginX = seedOrigin.x;
+                this.freeOriginY = seedOrigin.y;
+                this.freeOriginZ = seedOrigin.z;
+            } else {
+                this.freeOriginX = this.freeX;
+                this.freeOriginY = this.freeY;
+                this.freeOriginZ = this.freeZ;
+            }
+            if (seedForward) {
+                const dir = new THREE.Vector3(seedForward.x, seedForward.y, seedForward.z).normalize();
+                const clampedY = Math.max(-1, Math.min(1, dir.y));
+                this.azimuth = Math.atan2(dir.x, dir.z);
+                this.elevation = Math.asin(clampedY);
+                this.azimuthVelocity = 0;
+                this.elevationVelocity = 0;
             }
             this.isDragging = false;
             this.canvas?.requestPointerLock();
