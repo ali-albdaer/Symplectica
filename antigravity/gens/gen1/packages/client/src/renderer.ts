@@ -59,13 +59,13 @@ export class BodyRenderer {
     private bodies: Map<number, BodyMesh> = new Map();
 
     // Scale settings
-    private bodyScale = 1000;
+    private bodyScale = 25; // Default: recommended scale
     private realScale = false;
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
     private orbitHistory: Map<number, Array<{ x: number; y: number; z: number }>> = new Map();
-    private maxTrailPoints = 50; // Configurable via setMaxTrailPoints
+    private maxTrailPoints = 100; // Default 100 points, configurable via setMaxTrailPoints
     private readonly TRAIL_SAMPLE_INTERVAL = 5; // Sample every N frames
     private frameCount = 0;
     private lastOrigin = { x: 0, y: 0, z: 0 };
@@ -137,26 +137,58 @@ export class BodyRenderer {
     private createLabelSprite(text: string): THREE.Sprite {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d')!;
-        canvas.width = 256;
-        canvas.height = 64;
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.font = 'bold 32px Arial';
-        ctx.fillStyle = 'white';
+        canvas.width = 512;
+        canvas.height = 128;
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Measure text first
+        ctx.font = 'bold 36px "Segoe UI", system-ui, sans-serif';
+        const textMetrics = ctx.measureText(text);
+        const textWidth = textMetrics.width;
+        
+        // Draw pill-shaped background
+        const padding = 24;
+        const bgWidth = textWidth + padding * 2;
+        const bgHeight = 56;
+        const x = (canvas.width - bgWidth) / 2;
+        const y = (canvas.height - bgHeight) / 2;
+        const radius = bgHeight / 2;
+        
+        ctx.beginPath();
+        ctx.roundRect(x, y, bgWidth, bgHeight, radius);
+        ctx.fillStyle = 'rgba(10, 20, 40, 0.85)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(100, 180, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Draw text with subtle shadow
+        ctx.font = 'bold 36px "Segoe UI", system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillText(text, canvas.width / 2 + 1, canvas.height / 2 + 1);
+        
+        // Main text
+        ctx.fillStyle = '#ffffff';
         ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
         const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        
         const material = new THREE.SpriteMaterial({
             map: texture,
             transparent: true,
             depthTest: false,
+            sizeAttenuation: true,
         });
         const sprite = new THREE.Sprite(material);
-        sprite.scale.set(AU * 0.15, AU * 0.0375, 1); // Scale for visibility at AU distances
+        sprite.scale.set(AU * 0.12, AU * 0.03, 1);
         return sprite;
     }
 

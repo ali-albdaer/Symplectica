@@ -1,10 +1,8 @@
 /**
  * Visualization Options Panel
  * 
- * Toggle various visualization features:
- * - Orbit trails
- * - Body labels
- * - Body scale
+ * Clean, simple state management for visualization settings.
+ * Defaults: Scale 25× (recommended), Trail 100 points
  */
 
 export interface VisualizationOptions {
@@ -12,33 +10,51 @@ export interface VisualizationOptions {
     showLabels: boolean;
     orbitTrailLength: number;
     realScale: boolean;
-    bodyScale: number; // multiplier for body sizes (1 = real scale)
+    bodyScale: number;
 }
+
+const DEFAULTS: VisualizationOptions = {
+    showOrbitTrails: true,
+    showLabels: false,
+    orbitTrailLength: 100,
+    realScale: false,
+    bodyScale: 25, // Recommended scale
+};
+
+const SCALE_MIN = 1;
+const SCALE_MAX = 5000;
+const RECOMMENDED_SCALE = 25;
 
 export class VisualizationPanel {
     private container: HTMLElement;
     private isOpen = false;
-    private readonly BODY_SCALE_MIN = 1;
-    private readonly BODY_SCALE_MAX = 5000;
-    private readonly RECOMMENDED_SCALE = 25;
-    private options: VisualizationOptions = {
-        showOrbitTrails: true,
-        showLabels: false,
-        orbitTrailLength: 50,
-        realScale: false,
-        bodyScale: 1000, // default 1000x for visibility
-    };
+    private options: VisualizationOptions;
     private onChange: (options: VisualizationOptions) => void;
-    private suppressNotify = false;
+    private ignoreEvents = false;
+
+    // UI Elements
+    private orbitsCheckbox!: HTMLInputElement;
+    private labelsCheckbox!: HTMLInputElement;
+    private trailSlider!: HTMLInputElement;
+    private trailValue!: HTMLElement;
+    private realScaleCheckbox!: HTMLInputElement;
+    private recommendedCheckbox!: HTMLInputElement;
+    private scaleSlider!: HTMLInputElement;
+    private scaleValue!: HTMLElement;
+    private scaleField!: HTMLElement;
 
     constructor(onChange: (options: VisualizationOptions) => void) {
         this.onChange = onChange;
+        this.options = { ...DEFAULTS };
         this.container = this.createUI();
+        this.cacheElements();
+        this.bindEvents();
+        this.syncUIFromOptions();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
-
+        
         // Notify initial state
-        this.onChange(this.options);
+        this.onChange({ ...this.options });
     }
 
     private createUI(): HTMLElement {
@@ -46,32 +62,30 @@ export class VisualizationPanel {
         container.id = 'viz-panel';
         container.innerHTML = `
             <div class="viz-header">
-                <h2>👁 Visualization</h2>
+                <h2>Visualization</h2>
                 <button class="viz-close" title="Close (V)">&times;</button>
             </div>
             
             <div class="viz-content">
                 <section class="viz-section">
-                    <h3>Display Options</h3>
+                    <h3>Display</h3>
                     
                     <label class="viz-toggle">
-                        <input type="checkbox" id="viz-orbits" checked>
-                        <span class="viz-toggle-label">Orbit Trails</span>
+                        <input type="checkbox" id="viz-orbits">
+                        <span>Orbit Trails</span>
                     </label>
                     
                     <label class="viz-toggle">
                         <input type="checkbox" id="viz-labels">
-                        <span class="viz-toggle-label">Body Labels</span>
+                        <span>Body Labels</span>
                     </label>
                 </section>
                 
                 <section class="viz-section">
-                    <h3>Trail Settings</h3>
-                    
-                    <div class="viz-field">
-                        <label>Trail Length</label>
-                        <input type="range" id="viz-trail-length" min="10" max="2000" value="50">
-                        <span id="viz-trail-length-value">50 points</span>
+                    <h3>Trail Length</h3>
+                    <div class="viz-slider-row">
+                        <input type="range" id="viz-trail-length" min="10" max="2000" step="10">
+                        <span id="viz-trail-value">100</span>
                     </div>
                 </section>
                 
@@ -80,20 +94,18 @@ export class VisualizationPanel {
                     
                     <label class="viz-toggle">
                         <input type="checkbox" id="viz-real-scale">
-                        <span class="viz-toggle-label">Real Scale (1:1)</span>
+                        <span>Real Scale (1:1)</span>
                     </label>
 
                     <label class="viz-toggle">
-                        <input type="checkbox" id="viz-recommended-scale">
-                        <span class="viz-toggle-label">Recommended Scale (25×)</span>
+                        <input type="checkbox" id="viz-recommended">
+                        <span>Recommended (25×)</span>
                     </label>
                     
-                    <div class="viz-field" id="viz-body-scale-field">
-                        <label>Size Multiplier</label>
-                        <input type="range" id="viz-body-scale" min="0" max="1" step="0.001" value="0.8">
-                        <span id="viz-body-scale-value">1000×</span>
+                    <div class="viz-slider-row" id="viz-scale-field">
+                        <input type="range" id="viz-scale" min="0" max="1" step="0.001">
+                        <span id="viz-scale-value">25×</span>
                     </div>
-                    
                 </section>
             </div>
         `;
@@ -105,7 +117,7 @@ export class VisualizationPanel {
                 position: fixed;
                 top: 20px;
                 right: 360px;
-                width: 260px;
+                width: 240px;
                 background: rgba(10, 15, 30, 0.95);
                 backdrop-filter: blur(20px);
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -119,9 +131,7 @@ export class VisualizationPanel {
                 overflow: hidden;
             }
             
-            #viz-panel.open {
-                display: flex;
-            }
+            #viz-panel.open { display: flex; }
             
             .viz-header {
                 display: flex;
@@ -136,6 +146,7 @@ export class VisualizationPanel {
                 font-size: 14px;
                 font-weight: 600;
                 margin: 0;
+                color: #4fc3f7;
             }
             
             .viz-close {
@@ -148,182 +159,214 @@ export class VisualizationPanel {
                 line-height: 1;
             }
             
-            .viz-close:hover {
-                color: #fff;
-            }
+            .viz-close:hover { color: #fff; }
             
-            .viz-content {
-                padding: 15px;
-            }
+            .viz-content { padding: 12px 15px; }
             
             .viz-section {
-                margin-bottom: 15px;
+                margin-bottom: 14px;
             }
             
+            .viz-section:last-child { margin-bottom: 0; }
+            
             .viz-section h3 {
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: 600;
-                color: #4fc3f7;
+                color: rgba(255, 255, 255, 0.5);
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                margin-bottom: 10px;
+                margin: 0 0 8px 0;
             }
             
             .viz-toggle {
                 display: flex;
                 align-items: center;
                 gap: 10px;
-                padding: 8px 0;
+                padding: 6px 0;
                 cursor: pointer;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            }
-            
-            .viz-toggle:last-child {
-                border-bottom: none;
             }
             
             .viz-toggle input[type="checkbox"] {
-                width: 18px;
-                height: 18px;
+                width: 16px;
+                height: 16px;
                 accent-color: #4fc3f7;
+                margin: 0;
             }
             
-            .viz-toggle-label {
-                flex: 1;
+            .viz-toggle span {
                 font-size: 13px;
+                color: rgba(255, 255, 255, 0.9);
             }
             
-            .viz-field {
-                margin-bottom: 12px;
+            .viz-slider-row {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-top: 6px;
             }
             
-            .viz-field label {
-                display: block;
-                font-size: 11px;
-                color: rgba(255, 255, 255, 0.6);
-                margin-bottom: 6px;
-            }
-            
-            .viz-field input[type="range"] {
-                width: 100%;
-                margin-bottom: 4px;
+            .viz-slider-row input[type="range"] {
+                flex: 1;
                 accent-color: #4fc3f7;
+                height: 4px;
             }
             
-            .viz-field span {
-                font-size: 11px;
-                color: rgba(255, 255, 255, 0.5);
+            .viz-slider-row span {
+                min-width: 50px;
+                text-align: right;
+                font-size: 12px;
+                color: rgba(255, 255, 255, 0.7);
+                font-variant-numeric: tabular-nums;
             }
             
+            .viz-slider-row.disabled {
+                opacity: 0.4;
+                pointer-events: none;
+            }
         `;
         document.head.appendChild(style);
-
-        // Setup event listeners
-        this.setupEventListeners(container);
-
         return container;
     }
 
-    private setupEventListeners(container: HTMLElement): void {
+    private cacheElements(): void {
+        this.orbitsCheckbox = this.container.querySelector('#viz-orbits')!;
+        this.labelsCheckbox = this.container.querySelector('#viz-labels')!;
+        this.trailSlider = this.container.querySelector('#viz-trail-length')!;
+        this.trailValue = this.container.querySelector('#viz-trail-value')!;
+        this.realScaleCheckbox = this.container.querySelector('#viz-real-scale')!;
+        this.recommendedCheckbox = this.container.querySelector('#viz-recommended')!;
+        this.scaleSlider = this.container.querySelector('#viz-scale')!;
+        this.scaleValue = this.container.querySelector('#viz-scale-value')!;
+        this.scaleField = this.container.querySelector('#viz-scale-field')!;
+    }
+
+    private bindEvents(): void {
         // Close button
-        container.querySelector('.viz-close')?.addEventListener('click', () => {
-            this.close();
+        this.container.querySelector('.viz-close')?.addEventListener('click', () => this.close());
+
+        // Orbit trails toggle
+        this.orbitsCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showOrbitTrails = this.orbitsCheckbox.checked;
+            this.emitChange();
         });
 
-        // Checkboxes
-        const orbits = container.querySelector('#viz-orbits') as HTMLInputElement;
-        const labels = container.querySelector('#viz-labels') as HTMLInputElement;
-
-        orbits?.addEventListener('change', () => {
-            this.options.showOrbitTrails = orbits.checked;
-            this.notifyChange();
+        // Labels toggle
+        this.labelsCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showLabels = this.labelsCheckbox.checked;
+            this.emitChange();
         });
 
-        labels?.addEventListener('change', () => {
-            this.options.showLabels = labels.checked;
-            this.notifyChange();
+        // Trail length slider
+        this.trailSlider.addEventListener('input', () => {
+            if (this.ignoreEvents) return;
+            this.options.orbitTrailLength = parseInt(this.trailSlider.value);
+            this.trailValue.textContent = this.trailSlider.value;
+            this.emitChange();
         });
 
-        // Sliders
-        const trailLength = container.querySelector('#viz-trail-length') as HTMLInputElement;
-        const trailLengthValue = container.querySelector('#viz-trail-length-value') as HTMLElement;
-
-        trailLength?.addEventListener('input', () => {
-            this.options.orbitTrailLength = parseInt(trailLength.value);
-            trailLengthValue.textContent = `${trailLength.value} points`;
-            this.notifyChange();
-        });
-
-        // Body Scale controls
-        const realScale = container.querySelector('#viz-real-scale') as HTMLInputElement;
-        const recommendedScale = container.querySelector('#viz-recommended-scale') as HTMLInputElement;
-        const bodyScaleField = container.querySelector('#viz-body-scale-field') as HTMLElement;
-        const bodyScale = container.querySelector('#viz-body-scale') as HTMLInputElement;
-        const bodyScaleValue = container.querySelector('#viz-body-scale-value') as HTMLElement;
-
-        this.updateBodyScaleUI(bodyScale, bodyScaleValue, this.options.bodyScale);
-        this.updateRecommendedUI(recommendedScale, this.options);
-
-        realScale?.addEventListener('change', () => {
-            this.options.realScale = realScale.checked;
-            // Hide/show body scale slider when real scale is toggled
-            if (bodyScaleField) {
-                bodyScaleField.style.opacity = realScale.checked ? '0.3' : '1';
-                bodyScale.disabled = realScale.checked;
+        // Real scale checkbox
+        this.realScaleCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.realScale = this.realScaleCheckbox.checked;
+            if (this.options.realScale) {
+                this.recommendedCheckbox.checked = false;
             }
-            if (recommendedScale) {
-                recommendedScale.checked = false;
-                recommendedScale.disabled = realScale.checked;
-            }
-            this.notifyChange();
+            this.updateScaleFieldState();
+            this.emitChange();
         });
 
-        recommendedScale?.addEventListener('change', () => {
-            if (recommendedScale.checked) {
+        // Recommended scale checkbox
+        this.recommendedCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            if (this.recommendedCheckbox.checked) {
                 this.options.realScale = false;
-                this.options.bodyScale = this.RECOMMENDED_SCALE;
-                if (realScale) realScale.checked = false;
-                if (bodyScaleField) bodyScaleField.style.opacity = '1';
-                bodyScale.disabled = false;
-                this.updateBodyScaleUI(bodyScale, bodyScaleValue, this.options.bodyScale);
+                this.options.bodyScale = RECOMMENDED_SCALE;
+                this.realScaleCheckbox.checked = false;
+                this.updateScaleUI();
             }
-            this.notifyChange();
+            this.updateScaleFieldState();
+            this.emitChange();
         });
 
-        bodyScale?.addEventListener('input', () => {
-            const sliderValue = parseFloat(bodyScale.value);
-            this.options.bodyScale = this.scaleFromSlider(sliderValue);
-            bodyScaleValue.textContent = `${Math.round(this.options.bodyScale)}×`;
-            if (recommendedScale) {
-                recommendedScale.checked = this.isRecommendedScale(this.options.bodyScale) && !this.options.realScale;
-            }
-            this.notifyChange();
+        // Scale slider
+        this.scaleSlider.addEventListener('input', () => {
+            if (this.ignoreEvents) return;
+            const t = parseFloat(this.scaleSlider.value);
+            this.options.bodyScale = this.sliderToScale(t);
+            this.scaleValue.textContent = `${Math.round(this.options.bodyScale)}×`;
+            // Update recommended checkbox based on current scale
+            this.recommendedCheckbox.checked = this.isRecommended(this.options.bodyScale);
+            this.emitChange();
         });
     }
 
     private setupKeyboardShortcut(): void {
         window.addEventListener('keydown', (e) => {
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-                return;
-            }
-
-            if (e.key === 'v' || e.key === 'V') {
-                this.toggle();
-            }
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            if (e.key === 'v' || e.key === 'V') this.toggle();
         });
     }
 
-    private notifyChange(): void {
-        if (this.suppressNotify) return;
+    private emitChange(): void {
         this.onChange({ ...this.options });
     }
 
-    toggle(): void {
-        if (this.isOpen) {
-            this.close();
+    /** Sync UI elements to match current options state */
+    private syncUIFromOptions(): void {
+        this.ignoreEvents = true;
+        
+        this.orbitsCheckbox.checked = this.options.showOrbitTrails;
+        this.labelsCheckbox.checked = this.options.showLabels;
+        this.trailSlider.value = String(this.options.orbitTrailLength);
+        this.trailValue.textContent = String(this.options.orbitTrailLength);
+        this.realScaleCheckbox.checked = this.options.realScale;
+        this.recommendedCheckbox.checked = this.isRecommended(this.options.bodyScale) && !this.options.realScale;
+        this.updateScaleUI();
+        this.updateScaleFieldState();
+        
+        this.ignoreEvents = false;
+    }
+
+    private updateScaleUI(): void {
+        this.scaleSlider.value = String(this.scaleToSlider(this.options.bodyScale));
+        this.scaleValue.textContent = `${Math.round(this.options.bodyScale)}×`;
+    }
+
+    private updateScaleFieldState(): void {
+        if (this.options.realScale) {
+            this.scaleField.classList.add('disabled');
+            this.scaleSlider.disabled = true;
+            this.recommendedCheckbox.disabled = true;
         } else {
-            this.open();
+            this.scaleField.classList.remove('disabled');
+            this.scaleSlider.disabled = false;
+            this.recommendedCheckbox.disabled = false;
         }
+    }
+
+    // Logarithmic scale mapping: slider 0-1 -> scale 1-5000
+    private sliderToScale(t: number): number {
+        const minLog = Math.log(SCALE_MIN);
+        const maxLog = Math.log(SCALE_MAX);
+        return Math.exp(minLog + (maxLog - minLog) * Math.max(0, Math.min(1, t)));
+    }
+
+    private scaleToSlider(scale: number): number {
+        const minLog = Math.log(SCALE_MIN);
+        const maxLog = Math.log(SCALE_MAX);
+        const clamped = Math.max(SCALE_MIN, Math.min(SCALE_MAX, scale));
+        return (Math.log(clamped) - minLog) / (maxLog - minLog);
+    }
+
+    private isRecommended(scale: number): boolean {
+        return Math.abs(scale - RECOMMENDED_SCALE) < 1;
+    }
+
+    toggle(): void {
+        if (this.isOpen) this.close();
+        else this.open();
     }
 
     open(): void {
@@ -340,72 +383,9 @@ export class VisualizationPanel {
         return { ...this.options };
     }
 
+    /** Apply options from external source (e.g., server sync) */
     applyOptions(options: VisualizationOptions): void {
-        this.suppressNotify = true;
         this.options = { ...options };
-
-        const orbits = this.container.querySelector('#viz-orbits') as HTMLInputElement | null;
-        const labels = this.container.querySelector('#viz-labels') as HTMLInputElement | null;
-        const trailLength = this.container.querySelector('#viz-trail-length') as HTMLInputElement | null;
-        const trailLengthValue = this.container.querySelector('#viz-trail-length-value') as HTMLElement | null;
-        const realScale = this.container.querySelector('#viz-real-scale') as HTMLInputElement | null;
-        const recommendedScale = this.container.querySelector('#viz-recommended-scale') as HTMLInputElement | null;
-        const bodyScaleField = this.container.querySelector('#viz-body-scale-field') as HTMLElement | null;
-        const bodyScale = this.container.querySelector('#viz-body-scale') as HTMLInputElement | null;
-        const bodyScaleValue = this.container.querySelector('#viz-body-scale-value') as HTMLElement | null;
-
-        if (orbits) orbits.checked = options.showOrbitTrails;
-        if (labels) labels.checked = options.showLabels;
-        if (trailLength) trailLength.value = options.orbitTrailLength.toString();
-        if (trailLengthValue) trailLengthValue.textContent = `${options.orbitTrailLength} points`;
-        if (realScale) realScale.checked = options.realScale;
-        if (recommendedScale) {
-            recommendedScale.checked = this.isRecommendedScale(options.bodyScale) && !options.realScale;
-            recommendedScale.disabled = options.realScale;
-        }
-
-        if (bodyScaleField && bodyScale && bodyScaleValue) {
-            bodyScaleField.style.opacity = options.realScale ? '0.3' : '1';
-            bodyScale.disabled = options.realScale;
-            this.updateBodyScaleUI(bodyScale, bodyScaleValue, options.bodyScale);
-        }
-
-        this.suppressNotify = false;
-    }
-
-    private scaleFromSlider(value: number): number {
-        const min = Math.log(this.BODY_SCALE_MIN);
-        const max = Math.log(this.BODY_SCALE_MAX);
-        const t = Math.min(Math.max(value, 0), 1);
-        return Math.exp(min + (max - min) * t);
-    }
-
-    private sliderFromScale(scale: number): number {
-        const min = Math.log(this.BODY_SCALE_MIN);
-        const max = Math.log(this.BODY_SCALE_MAX);
-        const safe = Math.min(Math.max(scale, this.BODY_SCALE_MIN), this.BODY_SCALE_MAX);
-        return (Math.log(safe) - min) / (max - min);
-    }
-
-    private updateBodyScaleUI(
-        slider: HTMLInputElement,
-        label: HTMLElement,
-        scale: number
-    ): void {
-        slider.value = this.sliderFromScale(scale).toFixed(3);
-        label.textContent = `${Math.round(scale)}×`;
-    }
-
-    private updateRecommendedUI(
-        checkbox: HTMLInputElement | null,
-        options: VisualizationOptions
-    ): void {
-        if (!checkbox) return;
-        checkbox.checked = this.isRecommendedScale(options.bodyScale) && !options.realScale;
-        checkbox.disabled = options.realScale;
-    }
-
-    private isRecommendedScale(scale: number): boolean {
-        return Math.abs(scale - this.RECOMMENDED_SCALE) < 0.5;
+        this.syncUIFromOptions();
     }
 }

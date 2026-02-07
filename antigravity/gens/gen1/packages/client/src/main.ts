@@ -65,7 +65,15 @@ class NBodyClient {
 
     private lastServerState?: NetworkStatePayload;
     private lastServerPositions = new Float64Array(0);
-    private receivedVisualizationState = false;
+    
+    // Track visualization options to restore after body refresh
+    private currentVizOptions: VisualizationOptions = {
+        showOrbitTrails: true,
+        showLabels: false,
+        orbitTrailLength: 100,
+        realScale: false,
+        bodyScale: 25,
+    };
 
     // Time control (centralized)
     private timeController = new TimeController();
@@ -106,13 +114,10 @@ class NBodyClient {
 
         // Initialize Visualization Panel
         this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
-            this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
-            this.bodyRenderer.setShowLabels(options.showLabels);
-            this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
-            this.bodyRenderer.setBodyScale(options.bodyScale);
-            this.bodyRenderer.setRealScale(options.realScale);
+            this.currentVizOptions = { ...options };
+            this.applyVisualizationToRenderer(options);
 
-            if (this.network?.isConnected() && this.receivedVisualizationState) {
+            if (this.network?.isConnected()) {
                 this.network.sendVisualizationSettings(options);
             }
         });
@@ -187,13 +192,17 @@ class NBodyClient {
     }
 
     private applyVisualizationState(settings: VisualizationStatePayload): void {
-        this.bodyRenderer.setShowOrbitTrails(settings.showOrbitTrails);
-        this.bodyRenderer.setShowLabels(settings.showLabels);
-        this.bodyRenderer.setMaxTrailPoints(settings.orbitTrailLength);
-        this.bodyRenderer.setRealScale(settings.realScale);
-        this.bodyRenderer.setBodyScale(settings.bodyScale);
+        this.currentVizOptions = { ...settings };
+        this.applyVisualizationToRenderer(settings);
         this.vizPanel?.applyOptions(settings);
-        this.receivedVisualizationState = true;
+    }
+    
+    private applyVisualizationToRenderer(options: VisualizationOptions): void {
+        this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
+        this.bodyRenderer.setShowLabels(options.showLabels);
+        this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
+        this.bodyRenderer.setRealScale(options.realScale);
+        this.bodyRenderer.setBodyScale(options.bodyScale);
     }
 
     private applySnapshot(snapshot: string): void {
@@ -286,11 +295,11 @@ class NBodyClient {
 
         for (let i = 0; i < bodies.length; i++) {
             const body = bodies[i];
-            const x = positions[i * 3];
-            const y = positions[i * 3 + 1];
-            const z = positions[i * 3 + 2];
             this.bodyRenderer.addBody(body);
         }
+
+        // Reapply visualization settings to the new renderer
+        this.applyVisualizationToRenderer(this.currentVizOptions);
 
         this.state.bodyCount = this.physics.bodyCount();
         this.updateUIBodyCount();

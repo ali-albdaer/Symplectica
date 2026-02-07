@@ -125,9 +125,9 @@ class SimulationServer {
     private visualizationState: VisualizationStatePayload = {
         showOrbitTrails: true,
         showLabels: false,
-        orbitTrailLength: 50,
+        orbitTrailLength: 100,
         realScale: false,
-        bodyScale: 1000,
+        bodyScale: 25,
     };
 
     async start(): Promise<void> {
