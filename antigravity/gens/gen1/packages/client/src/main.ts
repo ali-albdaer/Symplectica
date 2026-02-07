@@ -82,6 +82,19 @@ class NBodyClient {
 
     // Body following
     private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
+    private lastFollowBodyIndex = -1;
+
+    // Free camera mode
+    private freeCamera = false;
+    private moveKeys: Record<string, boolean> = {
+        KeyW: false,
+        KeyA: false,
+        KeyS: false,
+        KeyD: false,
+        Space: false,
+        ShiftLeft: false,
+        ShiftRight: false,
+    };
 
     async init(): Promise<void> {
         this.updateLoadingStatus('Initializing renderer...');
@@ -324,6 +337,14 @@ class NBodyClient {
                 return;
             }
 
+            // Movement keys for free camera
+            if (this.setMoveKey(e.code, true)) {
+                if (this.freeCamera) {
+                    e.preventDefault();
+                    return;
+                }
+            }
+
             switch (e.key) {
                 case ' ':
                     if (this.network?.isConnected()) {
@@ -368,6 +389,10 @@ class NBodyClient {
                     this.updateTimeScaleUI();
                     this.syncTimeScaleToServer();
                     break;
+                case 'c':
+                case 'C':
+                    this.toggleFreeCamera();
+                    break;
                 case 'n':
                 case 'N':
                     this.followNextBody();
@@ -390,6 +415,15 @@ class NBodyClient {
             }
         });
 
+        window.addEventListener('keyup', (e) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return;
+            }
+            if (this.setMoveKey(e.code, false)) {
+                e.preventDefault();
+            }
+        });
+
         // Clicking on the canvas blurs any focused UI element
         document.getElementById('canvas-container')?.addEventListener('click', () => {
             (document.activeElement as HTMLElement)?.blur();
@@ -405,6 +439,27 @@ class NBodyClient {
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
+    }
+
+    private toggleFreeCamera(): void {
+        this.freeCamera = !this.freeCamera;
+        if (this.freeCamera) {
+            this.lastFollowBodyIndex = this.followBodyIndex;
+            this.followBodyIndex = -1;
+            this.camera.setFreeMode(true);
+        } else {
+            this.camera.setFreeMode(false);
+            this.followBodyIndex = this.lastFollowBodyIndex;
+        }
+        this.updateFollowUI();
+    }
+
+    private setMoveKey(code: string, pressed: boolean): boolean {
+        if (code in this.moveKeys) {
+            this.moveKeys[code] = pressed;
+            return true;
+        }
+        return false;
     }
 
     private toggleHints(): void {
@@ -444,6 +499,11 @@ class NBodyClient {
     }
 
     private updateFollowUI(): void {
+        if (this.freeCamera) {
+            const el = document.getElementById('follow-target');
+            if (el) el.textContent = 'Free';
+            return;
+        }
         const bodies = this.physics.getBodies();
         let followName = 'Origin';
         if (this.followBodyIndex >= 0 && this.followBodyIndex < bodies.length) {
@@ -570,9 +630,41 @@ class NBodyClient {
         // Update camera
         this.camera.update(delta);
 
+        // Free camera movement (WASD + Space/Shift)
+        if (this.freeCamera) {
+            const direction = new THREE.Vector3();
+            this.camera.getWorldDirection(direction);
+
+            // Project forward to orbital plane (XZ)
+            const forward = new THREE.Vector3(direction.x, 0, direction.z);
+            if (forward.lengthSq() < 1e-6) {
+                forward.set(0, 0, 1);
+            } else {
+                forward.normalize();
+            }
+
+            const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+            const speed = Math.max(AU * 0.0002, this.camera.getDistance() * 0.005);
+            const step = speed * delta;
+
+            const move = new THREE.Vector3(0, 0, 0);
+            if (this.moveKeys.KeyW) move.add(forward);
+            if (this.moveKeys.KeyS) move.sub(forward);
+            if (this.moveKeys.KeyD) move.add(right);
+            if (this.moveKeys.KeyA) move.sub(right);
+            if (this.moveKeys.Space) move.y += 1;
+            if (this.moveKeys.ShiftLeft || this.moveKeys.ShiftRight) move.y -= 1;
+
+            if (move.lengthSq() > 0) {
+                move.normalize().multiplyScalar(step);
+                this.camera.moveFree(move.x, move.y, move.z);
+            }
+        }
+
         // Calculate camera origin based on followed body
         let cameraOrigin = this.camera.getWorldOrigin();
-        if (this.followBodyIndex >= 0 && this.followBodyIndex * 3 + 2 < this.state.positions.length) {
+        if (!this.freeCamera && this.followBodyIndex >= 0 && this.followBodyIndex * 3 + 2 < this.state.positions.length) {
             // Center on followed body
             cameraOrigin = {
                 x: this.state.positions[this.followBodyIndex * 3],

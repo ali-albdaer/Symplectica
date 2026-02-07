@@ -23,6 +23,12 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private focusY = 0;
     private focusZ = 0;
 
+    // Free camera mode (world coordinates)
+    private freeMode = false;
+    private freeX = 0;
+    private freeY = 0;
+    private freeZ = 0;
+
     // Floating origin offset
     private originX = 0;
     private originY = 0;
@@ -178,19 +184,28 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     }
 
     private updatePosition(): void {
-        // Calculate camera position relative to focus
+        // Direction the camera is facing
+        const dirX = Math.cos(this.elevation) * Math.sin(this.azimuth);
+        const dirY = Math.sin(this.elevation);
+        const dirZ = Math.cos(this.elevation) * Math.cos(this.azimuth);
+
+        if (this.freeMode) {
+            // Free mode: camera position is explicit
+            this.position.set(this.freeX, this.freeY, this.freeZ);
+            this.lookAt(this.freeX + dirX, this.freeY + dirY, this.freeZ + dirZ);
+
+            // Floating origin is the camera position
+            this.originX = this.freeX;
+            this.originY = this.freeY;
+            this.originZ = this.freeZ;
+            return;
+        }
+
+        // Orbit mode: camera position relative to focus
         const x = this.radius * Math.cos(this.elevation) * Math.sin(this.azimuth);
         const y = this.radius * Math.sin(this.elevation);
         const z = this.radius * Math.cos(this.elevation) * Math.cos(this.azimuth);
 
-        // For floating origin: camera stays near origin, world moves opposite
-        // The focus point in world coords is (focusX, focusY, focusZ)
-        // Camera in world coords would be (focusX + x, focusY + y, focusZ + z)
-        // With floating origin at camera, camera position in render coords is (0, 0, 0)?
-        // Actually: origin = camera world position, camera render position = x, y, z relative to focus
-
-        // Set camera relative to its own origin (which follows the camera)
-        // For now, keep it simple: camera orbits origin
         this.position.set(x, y, z);
         this.lookAt(0, 0, 0);
 
@@ -213,6 +228,29 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         this.focusX = x;
         this.focusY = y;
         this.focusZ = z;
+        this.updatePosition();
+    }
+
+    setFreeMode(enabled: boolean): void {
+        this.freeMode = enabled;
+        if (enabled) {
+            // Seed free position from current world origin
+            this.freeX = this.originX;
+            this.freeY = this.originY;
+            this.freeZ = this.originZ;
+        }
+        this.updatePosition();
+    }
+
+    isFreeMode(): boolean {
+        return this.freeMode;
+    }
+
+    moveFree(dx: number, dy: number, dz: number): void {
+        if (!this.freeMode) return;
+        this.freeX += dx;
+        this.freeY += dy;
+        this.freeZ += dz;
         this.updatePosition();
     }
 
