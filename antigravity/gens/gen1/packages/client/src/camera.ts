@@ -29,6 +29,10 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private freeY = 0;
     private freeZ = 0;
 
+    // Pointer lock
+    private canvas?: HTMLElement;
+    private pointerLocked = false;
+
     // Floating origin offset
     private originX = 0;
     private originY = 0;
@@ -65,8 +69,22 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private setupEventListeners(): void {
         const canvas = document.getElementById('canvas-container');
         if (!canvas) return;
+        this.canvas = canvas;
+
+        document.addEventListener('pointerlockchange', () => {
+            this.pointerLocked = document.pointerLockElement === this.canvas;
+            if (!this.pointerLocked) {
+                this.isDragging = false;
+            }
+        });
 
         canvas.addEventListener('mousedown', (e: MouseEvent) => {
+            if (this.freeMode && !this.pointerLocked) {
+                this.canvas?.requestPointerLock();
+                e.preventDefault();
+                return;
+            }
+
             this.isDragging = true;
             this.isRightDrag = e.button === 2;
             this.lastMouseX = e.clientX;
@@ -75,6 +93,17 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         });
 
         canvas.addEventListener('mousemove', (e: MouseEvent) => {
+            if (this.freeMode && this.pointerLocked) {
+                const sensitivity = 0.002;
+                this.azimuthVelocity = -e.movementX * sensitivity;
+                this.elevationVelocity = -e.movementY * sensitivity;
+
+                this.azimuth += this.azimuthVelocity;
+                this.elevation += this.elevationVelocity;
+                this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
+                return;
+            }
+
             if (!this.isDragging) return;
 
             const deltaX = e.clientX - this.lastMouseX;
@@ -239,6 +268,12 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 this.freeX = seedWorld.x;
                 this.freeY = seedWorld.y;
                 this.freeZ = seedWorld.z;
+            }
+            this.isDragging = false;
+            this.canvas?.requestPointerLock();
+        } else {
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
             }
         }
         this.updatePosition();

@@ -27,7 +27,7 @@ export class AdminPanel {
     private network?: NetworkClient;
     private onFreeCamSpeedChange?: (speed: number) => void;
     private isOpen = false;
-    private freeCamSpeed = 1;
+    private freeCamSpeed = 20;
     private config: ServerConfig = {
         tickRate: 60,
         forceMethod: 'direct',
@@ -48,6 +48,7 @@ export class AdminPanel {
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
+        this.onFreeCamSpeedChange?.(this.freeCamSpeed);
     }
 
     private createUI(): HTMLElement {
@@ -70,7 +71,7 @@ export class AdminPanel {
 
                     <div class="admin-field">
                         <label>Free Cam Speed</label>
-                        <input type="number" id="admin-freecam-speed" value="1" min="0.1" max="10" step="0.1">
+                        <input type="number" id="admin-freecam-speed" value="20" min="1" max="100" step="1">
                     </div>
                     
                     <div class="admin-field">
@@ -291,7 +292,7 @@ export class AdminPanel {
         freeCamSpeedInput?.addEventListener('input', () => {
             const value = parseFloat(freeCamSpeedInput.value);
             if (Number.isFinite(value)) {
-                const clamped = Math.max(0.1, Math.min(10, value));
+                const clamped = Math.max(1, Math.min(100, value));
                 this.freeCamSpeed = clamped;
                 freeCamSpeedInput.value = clamped.toString();
                 this.onFreeCamSpeedChange?.(clamped);

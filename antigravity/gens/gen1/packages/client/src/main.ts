@@ -86,7 +86,7 @@ class NBodyClient {
 
     // Free camera mode
     private freeCamera = false;
-    private freeCamSpeedMultiplier = 1;
+    private freeCamSpeedMultiplier = 20;
     private moveKeys: Record<string, boolean> = {
         KeyW: false,
         KeyA: false,
