@@ -248,19 +248,17 @@ export class Chat {
         const text = this.input.value.trim();
         if (!text) return;
 
-        // Add locally
-        this.addMessage({
-            id: this.nextId++,
-            sender: this.USERNAME,
-            text,
-            timestamp: Date.now(),
-            isSystem: false,
-        });
-
-        // Send to server
         if (this.network?.isConnected()) {
             this.network.sendChat(this.USERNAME, text);
         } else {
+            // Add locally in offline mode
+            this.addMessage({
+                id: this.nextId++,
+                sender: this.USERNAME,
+                text,
+                timestamp: Date.now(),
+                isSystem: false,
+            });
             console.warn('Chat message not sent: not connected to server');
         }
 

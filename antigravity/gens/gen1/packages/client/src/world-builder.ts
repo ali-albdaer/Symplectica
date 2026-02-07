@@ -10,6 +10,7 @@
  */
 
 import { PhysicsClient } from './physics';
+import { NetworkClient } from './network';
 
 interface BodyTemplate {
     name: string;
@@ -85,12 +86,14 @@ const PRESETS = [
 export class WorldBuilder {
     private container: HTMLElement;
     private physics: PhysicsClient;
+    private network?: NetworkClient;
     private isOpen = false;
     private onUpdate: () => void;
 
-    constructor(physics: PhysicsClient, onUpdate: () => void) {
+    constructor(physics: PhysicsClient, onUpdate: () => void, network?: NetworkClient) {
         this.physics = physics;
         this.onUpdate = onUpdate;
+        this.network = network;
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
@@ -468,6 +471,7 @@ export class WorldBuilder {
 
         this.updateBodyList();
         this.onUpdate();
+        this.syncToServer();
     }
 
     private addFromTemplate(templateId: string): void {
@@ -492,6 +496,7 @@ export class WorldBuilder {
 
         this.updateBodyList();
         this.onUpdate();
+        this.syncToServer();
     }
 
     private addCustomBody(formData: FormData): void {
@@ -519,6 +524,7 @@ export class WorldBuilder {
 
         this.updateBodyList();
         this.onUpdate();
+        this.syncToServer();
     }
 
     private updateBodyList(): void {
@@ -544,7 +550,14 @@ export class WorldBuilder {
                 this.physics.removeBody(id);
                 this.updateBodyList();
                 this.onUpdate();
+                this.syncToServer();
             });
         });
+    }
+
+    private syncToServer(): void {
+        if (!this.network?.isConnected()) return;
+        const snapshot = this.physics.getSnapshot();
+        this.network.sendSnapshot(snapshot);
     }
 }

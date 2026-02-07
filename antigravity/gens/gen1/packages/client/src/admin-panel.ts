@@ -11,6 +11,7 @@
 
 import { PhysicsClient } from './physics';
 import { TimeController } from './time-controller';
+import { AdminStatePayload, NetworkClient } from './network';
 
 interface ServerConfig {
     tickRate: number;
@@ -23,6 +24,7 @@ export class AdminPanel {
     private container: HTMLElement;
     private physics: PhysicsClient;
     private timeController: TimeController;
+    private network?: NetworkClient;
     private isOpen = false;
     private config: ServerConfig = {
         tickRate: 60,
@@ -31,9 +33,10 @@ export class AdminPanel {
         substeps: 4,
     };
 
-    constructor(physics: PhysicsClient, timeController: TimeController) {
+    constructor(physics: PhysicsClient, timeController: TimeController, network?: NetworkClient) {
         this.physics = physics;
         this.timeController = timeController;
+        this.network = network;
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
@@ -319,6 +322,16 @@ export class AdminPanel {
         const forceMethod = (document.getElementById('admin-force-method') as HTMLSelectElement).value;
         const theta = parseFloat((document.getElementById('admin-theta') as HTMLInputElement).value);
 
+        if (this.network?.isConnected()) {
+            this.network.sendAdminSettings({
+                dt,
+                substeps,
+                forceMethod: forceMethod === 'barnes-hut' ? 'barnes-hut' : 'direct',
+                theta,
+                timeScale: dt * 60,
+            } as AdminStatePayload);
+        }
+
         // Apply timestep to both physics and TimeController
         this.physics.setTimeStep(dt);
         this.timeController.setPhysicsTimestep(dt);
@@ -330,9 +343,27 @@ export class AdminPanel {
     }
 
     private resetSimulation(): void {
-        this.physics.createSunEarthMoon();
-        console.log('🔄 Simulation reset to Sun-Earth-Moon');
+        if (this.network?.isConnected()) {
+            this.network.resetSimulation();
+        } else {
+            this.physics.createSunEarthMoon();
+            console.log('🔄 Simulation reset to Sun-Earth-Moon');
+        }
         this.close();
+    }
+
+    applyServerSettings(settings: AdminStatePayload): void {
+        const dtInput = document.getElementById('admin-dt') as HTMLInputElement | null;
+        const substepsInput = document.getElementById('admin-substeps') as HTMLInputElement | null;
+        const forceMethodSelect = document.getElementById('admin-force-method') as HTMLSelectElement | null;
+        const thetaInput = document.getElementById('admin-theta') as HTMLInputElement | null;
+        const thetaField = document.getElementById('theta-field') as HTMLElement | null;
+
+        if (dtInput) dtInput.value = settings.dt.toString();
+        if (substepsInput) substepsInput.value = settings.substeps.toString();
+        if (forceMethodSelect) forceMethodSelect.value = settings.forceMethod;
+        if (thetaInput) thetaInput.value = settings.theta.toString();
+        if (thetaField) thetaField.classList.toggle('visible', settings.forceMethod === 'barnes-hut');
     }
 
     updateDebugInfo(): void {

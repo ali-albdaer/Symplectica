@@ -49,13 +49,13 @@ interface WasmSimulation {
 
 // Message types
 interface ClientMessage {
-    type: 'join' | 'input' | 'ping' | 'request_snapshot' | 'chat';
+    type: 'join' | 'input' | 'ping' | 'request_snapshot' | 'chat' | 'admin_settings' | 'set_time_scale' | 'apply_snapshot' | 'reset_simulation';
     payload?: unknown;
     clientTick?: number;
 }
 
 interface ServerMessage {
-    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat';
+    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state';
     payload: unknown;
     serverTick?: number;
     timestamp?: number;
@@ -71,6 +71,14 @@ interface StatePayload {
 interface ChatPayload {
     sender: string;
     text: string;
+}
+
+interface AdminStatePayload {
+    dt: number;
+    substeps: number;
+    forceMethod: 'direct' | 'barnes-hut';
+    theta: number;
+    timeScale: number;
 }
 
 interface Client {
@@ -97,6 +105,13 @@ class SimulationServer {
     private tickInterval?: ReturnType<typeof setInterval>;
     private running = false;
     private lastSnapshotTick = 0n;
+    private adminState: AdminStatePayload = {
+        dt: 1 / CONFIG.tickRate,
+        substeps: 4,
+        forceMethod: 'direct',
+        theta: 0.5,
+        timeScale: 1,
+    };
 
     async start(): Promise<void> {
         console.log('🚀 Starting N-Body Simulation Server...');
@@ -161,6 +176,13 @@ class SimulationServer {
         // Configure for 60Hz tick rate
         this.simulation.setDt(1.0 / CONFIG.tickRate);
         this.simulation.setSubsteps(4);
+        this.adminState = {
+            dt: 1.0 / CONFIG.tickRate,
+            substeps: 4,
+            forceMethod: 'direct',
+            theta: 0.5,
+            timeScale: 1,
+        };
 
         console.log(`   Bodies: ${this.simulation.bodyCount()}`);
         console.log(`   Initial energy: ${this.simulation.totalEnergy().toExponential(4)} J`);
@@ -190,6 +212,7 @@ class SimulationServer {
                     config: {
                         tickRate: CONFIG.tickRate,
                         serverTick: Number(this.simulation.tick()),
+                        adminState: this.adminState,
                     },
                 },
                 serverTick: Number(this.simulation.tick()),
@@ -240,6 +263,69 @@ class SimulationServer {
             case 'input':
                 // Handle player input - to be implemented
                 // For now, just acknowledge
+                break;
+
+            case 'set_time_scale': {
+                const payload = message.payload as { simSecondsPerRealSecond?: number } | undefined;
+                const scale = payload?.simSecondsPerRealSecond;
+                if (typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0) {
+                    return;
+                }
+
+                const dt = scale / CONFIG.tickRate;
+                this.simulation.setDt(dt);
+                this.adminState = {
+                    ...this.adminState,
+                    dt,
+                    timeScale: scale,
+                };
+                this.broadcastAdminState();
+                break;
+            }
+
+            case 'admin_settings': {
+                const payload = message.payload as Partial<AdminStatePayload> | undefined;
+                if (!payload) return;
+
+                const dt = typeof payload.dt === 'number' && payload.dt > 0 ? payload.dt : this.adminState.dt;
+                const substeps = typeof payload.substeps === 'number' && payload.substeps > 0 ? payload.substeps : this.adminState.substeps;
+                const forceMethod = payload.forceMethod === 'barnes-hut' ? 'barnes-hut' : 'direct';
+                const theta = typeof payload.theta === 'number' && payload.theta > 0 ? payload.theta : this.adminState.theta;
+
+                this.simulation.setDt(dt);
+                this.simulation.setSubsteps(substeps);
+                if (forceMethod === 'barnes-hut') {
+                    this.simulation.setTheta(theta);
+                    this.simulation.useBarnesHut();
+                } else {
+                    this.simulation.useDirectForce();
+                }
+
+                this.adminState = {
+                    dt,
+                    substeps,
+                    forceMethod,
+                    theta,
+                    timeScale: dt * CONFIG.tickRate,
+                };
+                this.broadcastAdminState();
+                break;
+            }
+
+            case 'apply_snapshot': {
+                const payload = message.payload as { snapshot?: string } | undefined;
+                if (!payload?.snapshot) return;
+                const ok = this.simulation.fromJson(payload.snapshot);
+                if (ok) {
+                    this.broadcastSnapshot();
+                }
+                break;
+            }
+
+            case 'reset_simulation':
+                this.createSimulation();
+                this.broadcastSnapshot();
+                this.broadcastAdminState();
                 break;
 
             case 'chat': {
@@ -323,6 +409,23 @@ class SimulationServer {
         const message: ServerMessage = {
             type: 'snapshot',
             payload: this.simulation.toJson(),
+            serverTick: Number(this.simulation.tick()),
+            timestamp: Date.now(),
+        };
+
+        const data = JSON.stringify(message);
+
+        for (const client of this.clients.values()) {
+            if (client.ws.readyState === WebSocket.OPEN) {
+                client.ws.send(data);
+            }
+        }
+    }
+
+    private broadcastAdminState(): void {
+        const message: ServerMessage = {
+            type: 'admin_state',
+            payload: this.adminState,
             serverTick: Number(this.simulation.tick()),
             timestamp: Date.now(),
         };

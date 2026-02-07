@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
-import { NetworkClient } from './network';
+import { AdminStatePayload, NetworkClient } from './network';
 import { PhysicsClient } from './physics';
 import { WorldBuilder } from './world-builder';
 import { Chat } from './chat';
@@ -96,8 +96,11 @@ class NBodyClient {
             console.warn('⚠️ Multiplayer server unavailable, running in local mode.', error);
         }
 
+        // Initialize World Builder
+        this.worldBuilder = new WorldBuilder(this.physics, () => this.refreshBodies(), this.network);
+
         // Initialize Admin Panel
-        this.adminPanel = new AdminPanel(this.physics, this.timeController);
+        this.adminPanel = new AdminPanel(this.physics, this.timeController, this.network);
 
         // Initialize Visualization Panel
         this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
@@ -120,9 +123,12 @@ class NBodyClient {
 
     private setupNetworkHandlers(): void {
         this.network.on('welcome', (message) => {
-            const payload = message.payload as { snapshot: string };
+            const payload = message.payload as { snapshot: string; config?: { adminState?: AdminStatePayload } };
             if (payload?.snapshot) {
                 this.applySnapshot(payload.snapshot);
+            }
+            if (payload?.config?.adminState) {
+                this.applyAdminState(payload.config.adminState);
             }
         });
 
@@ -146,6 +152,21 @@ class NBodyClient {
                 this.chat.onServerMessage(payload.sender, payload.text);
             }
         });
+
+        this.network.on('admin_state', (message) => {
+            const payload = message.payload as AdminStatePayload;
+            if (payload) {
+                this.applyAdminState(payload);
+            }
+        });
+    }
+
+    private applyAdminState(settings: AdminStatePayload): void {
+        this.physics.setTimeStep(settings.dt);
+        this.timeController.setPhysicsTimestep(settings.dt);
+        this.timeController.setSpeedBySimRate(settings.timeScale);
+        this.updateTimeScaleUI();
+        this.adminPanel?.applyServerSettings(settings);
     }
 
     private applySnapshot(snapshot: string): void {
@@ -225,8 +246,6 @@ class NBodyClient {
         // Initialize body meshes
         this.refreshBodies();
 
-        // Initialize World Builder
-        this.worldBuilder = new WorldBuilder(this.physics, () => this.refreshBodies());
     }
 
     private refreshBodies(): void {
@@ -274,27 +293,33 @@ class NBodyClient {
                 case '>':
                     this.timeController.increaseSpeed();
                     this.updateTimeScaleUI();
+                    this.syncTimeScaleToServer();
                     break;
                 case ',':
                 case '<':
                     this.timeController.decreaseSpeed();
                     this.updateTimeScaleUI();
+                    this.syncTimeScaleToServer();
                     break;
                 case '1':
                     this.timeController.setSpeedIndex(0); // 1s/s
                     this.updateTimeScaleUI();
+                    this.syncTimeScaleToServer();
                     break;
                 case '2':
                     this.timeController.setSpeedIndex(2); // 1hr/s
                     this.updateTimeScaleUI();
+                    this.syncTimeScaleToServer();
                     break;
                 case '3':
                     this.timeController.setSpeedIndex(4); // 1wk/s
                     this.updateTimeScaleUI();
+                    this.syncTimeScaleToServer();
                     break;
                 case '4':
                     this.timeController.setSpeedIndex(6); // 1yr/s
                     this.updateTimeScaleUI();
+                    this.syncTimeScaleToServer();
                     break;
                 case 'n':
                 case 'N':
@@ -325,10 +350,16 @@ class NBodyClient {
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
         // Include ALL UI elements including stats-overlay (Simulation panel)
-        const uiElements = document.querySelectorAll('#stats-overlay, #chat-panel, #world-builder, #admin-panel, #viz-panel');
+        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #world-builder, #admin-panel, #viz-panel');
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
+    }
+
+    private syncTimeScaleToServer(): void {
+        if (!this.network?.isConnected()) return;
+        const simRate = this.timeController.getCurrentSpeed().sim;
+        this.network.sendTimeScale(simRate);
     }
 
     private followNextBody(): void {

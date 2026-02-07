@@ -122,6 +122,25 @@ export class TimeController {
         }
     }
 
+    /** Set speed by simulation seconds per real second (closest match) */
+    setSpeedBySimRate(simSecondsPerRealSecond: number): void {
+        if (!Number.isFinite(simSecondsPerRealSecond) || simSecondsPerRealSecond <= 0) return;
+
+        let closestIndex = 0;
+        let closestDelta = Math.abs(this.SPEED_LEVELS[0].sim - simSecondsPerRealSecond);
+
+        for (let i = 1; i < this.SPEED_LEVELS.length; i++) {
+            const delta = Math.abs(this.SPEED_LEVELS[i].sim - simSecondsPerRealSecond);
+            if (delta < closestDelta) {
+                closestDelta = delta;
+                closestIndex = i;
+            }
+        }
+
+        this.speedIndex = closestIndex;
+        this.onSpeedChange?.(this.getCurrentSpeed());
+    }
+
     /** Toggle pause */
     togglePause(): void {
         this.paused = !this.paused;

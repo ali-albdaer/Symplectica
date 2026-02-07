@@ -8,7 +8,7 @@
  */
 
 interface ServerMessage {
-    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat';
+    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state';
     payload: unknown;
     serverTick?: number;
     timestamp?: number;
@@ -27,12 +27,21 @@ interface WelcomePayload {
     config: {
         tickRate: number;
         serverTick: number;
+        adminState?: AdminStatePayload;
     };
 }
 
 interface ChatPayload {
     sender: string;
     text: string;
+}
+
+export interface AdminStatePayload {
+    dt: number;
+    substeps: number;
+    forceMethod: 'direct' | 'barnes-hut';
+    theta: number;
+    timeScale: number;
 }
 
 type MessageHandler = (message: ServerMessage) => void;
@@ -119,6 +128,7 @@ export class NetworkClient {
             case 'state':
             case 'snapshot':
             case 'chat':
+            case 'admin_state':
             case 'error':
                 // Dispatch to registered handlers
                 const handlers = this.handlers.get(message.type) || [];
@@ -197,6 +207,22 @@ export class NetworkClient {
 
     sendChat(sender: string, text: string): void {
         this.send('chat', { sender, text } as ChatPayload);
+    }
+
+    sendAdminSettings(settings: AdminStatePayload): void {
+        this.send('admin_settings', settings);
+    }
+
+    sendTimeScale(simSecondsPerRealSecond: number): void {
+        this.send('set_time_scale', { simSecondsPerRealSecond });
+    }
+
+    sendSnapshot(snapshot: string): void {
+        this.send('apply_snapshot', { snapshot });
+    }
+
+    resetSimulation(): void {
+        this.send('reset_simulation');
     }
 
     ping(): void {
