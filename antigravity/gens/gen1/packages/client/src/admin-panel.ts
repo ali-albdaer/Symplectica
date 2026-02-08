@@ -64,35 +64,37 @@ export class AdminPanel {
         container.id = 'admin-panel';
         container.innerHTML = `
             <div class="admin-header">
-                <h2>⚙️ Admin Panel</h2>
-                <button class="admin-close" title="Close (/)">&times;</button>
+                <h2>Admin</h2>
+                <button class="admin-close" title="Close (&#96;)">&times;</button>
             </div>
             
             <div class="admin-content">
                 <section class="admin-section">
-                    <h3>Simulation Settings</h3>
+                    <h3>Presets</h3>
+                    <div class="admin-field">
+                        <label>Load Preset</label>
+                        <select id="admin-preset">
+                            <option value="sunEarthMoon">Sun-Earth-Moon</option>
+                            <option value="innerSolarSystem">Inner Solar System</option>
+                            <option value="fullSolarSystem" selected>Full Solar System</option>
+                            <option value="jupiterSystem">Jupiter System</option>
+                            <option value="saturnSystem">Saturn System</option>
+                            <option value="alphaCentauri">Alpha Centauri</option>
+                            <option value="trappist1">TRAPPIST-1</option>
+                            <option value="binaryPulsar">Binary Pulsar</option>
+                        </select>
+                    </div>
+                    <button class="admin-btn" id="admin-load-preset">Load Preset</button>
+                </section>
+                
+                <section class="admin-section">
+                    <h3>Simulation</h3>
                     
                     <div class="admin-field">
                         <label>Timestep (seconds)</label>
                         <input type="number" id="admin-dt" value="3600" min="1" max="86400" step="60">
                     </div>
 
-                    <div class="admin-field">
-                        <label>Free Cam Speed (AU/s)</label>
-                        <div class="admin-slider-row">
-                            <input type="range" id="admin-freecam-speed" min="0" max="1" step="0.001" value="0.5">
-                            <span id="admin-freecam-speed-value">1.000 AU/s</span>
-                        </div>
-                    </div>
-
-                    <div class="admin-field">
-                        <label>Free Cam Sensitivity</label>
-                        <div class="admin-slider-row">
-                            <input type="range" id="admin-freecam-sensitivity" min="0.1" max="5" step="0.1" value="1">
-                            <span id="admin-freecam-sensitivity-value">1.0x</span>
-                        </div>
-                    </div>
-                    
                     <div class="admin-field">
                         <label>Substeps</label>
                         <input type="number" id="admin-substeps" value="4" min="1" max="16">
@@ -111,34 +113,30 @@ export class AdminPanel {
                         <input type="number" id="admin-theta" value="0.5" min="0.1" max="2" step="0.1">
                     </div>
                 </section>
+
+                <section class="admin-section">
+                    <h3>Camera</h3>
+                    <div class="admin-field">
+                        <label>Free Cam Speed (AU/s)</label>
+                        <div class="admin-slider-row">
+                            <input type="range" id="admin-freecam-speed" min="0" max="1" step="0.001" value="0.5">
+                            <span id="admin-freecam-speed-value">1.000 AU/s</span>
+                        </div>
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Free Cam Sensitivity</label>
+                        <div class="admin-slider-row">
+                            <input type="range" id="admin-freecam-sensitivity" min="0.1" max="5" step="0.1" value="1">
+                            <span id="admin-freecam-sensitivity-value">1.0x</span>
+                        </div>
+                    </div>
+                </section>
                 
                 <section class="admin-section">
                     <h3>Actions</h3>
                     <button class="admin-btn" id="admin-apply">Apply Settings</button>
                     <button class="admin-btn admin-btn-warning" id="admin-reset">Reset Simulation</button>
-                    <div class="admin-field" style="margin-top: 10px;">
-                        <label>Load Preset</label>
-                        <select id="admin-preset">
-                            <option value="sunEarthMoon">Sun-Earth-Moon</option>
-                            <option value="innerSolarSystem">Inner Solar System</option>
-                            <option value="fullSolarSystem" selected>Full Solar System</option>
-                            <option value="jupiterSystem">Jupiter System</option>
-                            <option value="saturnSystem">Saturn System</option>
-                            <option value="alphaCentauri">Alpha Centauri</option>
-                            <option value="trappist1">TRAPPIST-1</option>
-                            <option value="binaryPulsar">Binary Pulsar</option>
-                        </select>
-                    </div>
-                    <button class="admin-btn" id="admin-load-preset">Load Preset</button>
-                </section>
-                
-                <section class="admin-section">
-                    <h3>Debug Info</h3>
-                    <div class="admin-debug">
-                        <div>Bodies: <span id="admin-body-count">0</span></div>
-                        <div>Tick: <span id="admin-tick">0</span></div>
-                        <div>dt: <span id="admin-current-dt">0</span>s</div>
-                    </div>
                 </section>
             </div>
         `;
@@ -148,10 +146,9 @@ export class AdminPanel {
         style.textContent = `
             #admin-panel {
                 position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 380px;
+                top: 80px;
+                right: 40px;
+                width: 320px;
                 background: rgba(10, 15, 30, 0.95);
                 backdrop-filter: blur(20px);
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -176,6 +173,8 @@ export class AdminPanel {
                 padding: 12px 15px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 background: rgba(0, 0, 0, 0.3);
+                cursor: move;
+                user-select: none;
             }
             
             .admin-header h2 {
@@ -189,7 +188,7 @@ export class AdminPanel {
                 background: none;
                 border: none;
                 color: rgba(255, 255, 255, 0.5);
-                font-size: 24px;
+                font-size: 20px;
                 cursor: pointer;
                 padding: 0 5px;
                 line-height: 1;
@@ -200,11 +199,11 @@ export class AdminPanel {
             }
             
             .admin-content {
-                padding: 20px;
+                padding: 12px 15px;
             }
             
             .admin-section {
-                margin-bottom: 20px;
+                margin-bottom: 14px;
             }
             
             .admin-section:last-child {
@@ -221,25 +220,25 @@ export class AdminPanel {
             }
             
             .admin-field {
-                margin-bottom: 12px;
+                margin-bottom: 10px;
             }
             
             .admin-field label {
                 display: block;
-                font-size: 12px;
-                color: rgba(255, 255, 255, 0.7);
-                margin-bottom: 5px;
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.6);
+                margin-bottom: 6px;
             }
             
             .admin-field input,
             .admin-field select {
                 width: 100%;
-                background: rgba(0, 0, 0, 0.4);
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 6px;
+                background: rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
                 color: #fff;
-                padding: 10px 12px;
-                font-size: 13px;
+                padding: 6px 8px;
+                font-size: 12px;
             }
 
             .admin-field input[type="range"] {
@@ -256,7 +255,7 @@ export class AdminPanel {
             }
 
             .admin-slider-row span {
-                min-width: 90px;
+                min-width: 70px;
                 text-align: right;
                 font-size: 12px;
                 color: rgba(255, 255, 255, 0.7);
@@ -278,40 +277,26 @@ export class AdminPanel {
             
             .admin-btn {
                 width: 100%;
-                background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
-                border: none;
+                background: rgba(79, 195, 247, 0.2);
+                border: 1px solid rgba(79, 195, 247, 0.6);
                 border-radius: 6px;
-                color: #fff;
-                padding: 12px;
-                font-size: 13px;
+                color: #dff3ff;
+                padding: 10px;
+                font-size: 12px;
                 font-weight: 600;
                 cursor: pointer;
                 margin-bottom: 8px;
-                transition: opacity 0.2s;
+                transition: background 0.2s, border-color 0.2s, color 0.2s;
             }
             
             .admin-btn:hover {
-                opacity: 0.9;
+                background: rgba(79, 195, 247, 0.3);
             }
             
             .admin-btn-warning {
-                background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-            }
-            
-            .admin-debug {
-                background: rgba(0, 0, 0, 0.3);
-                border-radius: 6px;
-                padding: 12px;
-                font-family: 'Consolas', monospace;
-                font-size: 12px;
-            }
-            
-            .admin-debug div {
-                margin-bottom: 4px;
-            }
-            
-            .admin-debug span {
-                color: #4fc3f7;
+                background: rgba(255, 107, 107, 0.2);
+                border-color: rgba(255, 107, 107, 0.6);
+                color: #ffe6e6;
             }
             
             #theta-field {
@@ -335,6 +320,8 @@ export class AdminPanel {
         container.querySelector('.admin-close')?.addEventListener('click', () => {
             this.close();
         });
+
+        this.setupDrag(container);
 
         const freeCamSpeedInput = container.querySelector('#admin-freecam-speed') as HTMLInputElement;
         const freeCamSpeedValue = container.querySelector('#admin-freecam-speed-value') as HTMLElement;
@@ -414,7 +401,7 @@ export class AdminPanel {
                 return;
             }
 
-            if (e.key === '/') {
+            if (e.key === '`' || e.code === 'Backquote') {
                 this.toggle();
             }
 
@@ -435,7 +422,6 @@ export class AdminPanel {
     open(): void {
         this.isOpen = true;
         this.container.classList.add('open');
-        this.updateDebugInfo();
 
         const freeCamSpeedInput = document.getElementById('admin-freecam-speed') as HTMLInputElement | null;
         const freeCamSpeedValue = document.getElementById('admin-freecam-speed-value') as HTMLElement | null;
@@ -502,13 +488,44 @@ export class AdminPanel {
         if (thetaField) thetaField.classList.toggle('visible', settings.forceMethod === 'barnes-hut');
     }
 
-    updateDebugInfo(): void {
-        const bodyCount = document.getElementById('admin-body-count');
-        const tick = document.getElementById('admin-tick');
-        const currentDt = document.getElementById('admin-current-dt');
+    private setupDrag(container: HTMLElement): void {
+        const header = container.querySelector('.admin-header') as HTMLElement | null;
+        if (!header) return;
 
-        if (bodyCount) bodyCount.textContent = this.physics.bodyCount().toString();
-        if (tick) tick.textContent = this.physics.tick().toLocaleString();
-        if (currentDt) currentDt.textContent = this.timeController.getPhysicsTimestep().toString();
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        let dragging = false;
+
+        const onMouseMove = (event: MouseEvent) => {
+            if (!dragging) return;
+            const deltaX = event.clientX - startX;
+            const deltaY = event.clientY - startY;
+            container.style.left = `${startLeft + deltaX}px`;
+            container.style.top = `${startTop + deltaY}px`;
+        };
+
+        const onMouseUp = () => {
+            dragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        header.addEventListener('mousedown', (event) => {
+            if ((event.target as HTMLElement).closest('button')) return;
+            const rect = container.getBoundingClientRect();
+            startX = event.clientX;
+            startY = event.clientY;
+            startLeft = rect.left;
+            startTop = rect.top;
+            container.style.left = `${rect.left}px`;
+            container.style.top = `${rect.top}px`;
+            container.style.right = 'auto';
+            container.style.transform = 'none';
+            dragging = true;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
     }
 }

@@ -182,6 +182,8 @@ export class VisualizationPanel {
                 padding: 12px 15px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 background: rgba(0, 0, 0, 0.3);
+                cursor: move;
+                user-select: none;
             }
 
             .viz-header h2 {
@@ -324,6 +326,8 @@ export class VisualizationPanel {
     private bindEvents(): void {
         this.container.querySelector('.viz-close')?.addEventListener('click', () => this.close());
 
+        this.setupDrag();
+
         this.orbitsCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
             this.options.showOrbitTrails = this.orbitsCheckbox.checked;
@@ -414,6 +418,47 @@ export class VisualizationPanel {
         window.addEventListener('keydown', (e) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
             if (e.key === 'v' || e.key === 'V') this.toggle();
+            if (e.key === 'Escape' && this.isOpen) this.close();
+        });
+    }
+
+    private setupDrag(): void {
+        const header = this.container.querySelector('.viz-header') as HTMLElement | null;
+        if (!header) return;
+
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        let dragging = false;
+
+        const onMouseMove = (event: MouseEvent) => {
+            if (!dragging) return;
+            const deltaX = event.clientX - startX;
+            const deltaY = event.clientY - startY;
+            this.container.style.left = `${startLeft + deltaX}px`;
+            this.container.style.top = `${startTop + deltaY}px`;
+        };
+
+        const onMouseUp = () => {
+            dragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        header.addEventListener('mousedown', (event) => {
+            if ((event.target as HTMLElement).closest('button')) return;
+            const rect = this.container.getBoundingClientRect();
+            startX = event.clientX;
+            startY = event.clientY;
+            startLeft = rect.left;
+            startTop = rect.top;
+            this.container.style.left = `${rect.left}px`;
+            this.container.style.top = `${rect.top}px`;
+            this.container.style.right = 'auto';
+            dragging = true;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         });
     }
 
