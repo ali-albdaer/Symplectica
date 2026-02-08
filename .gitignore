@@ -1,0 +1,9 @@
+.vscode/
+node_modules/
+**/build/
+**/target/
+**/dist/
+**/*prompt*
+**/*spec*
+*.local.*
+Cargo.lock
