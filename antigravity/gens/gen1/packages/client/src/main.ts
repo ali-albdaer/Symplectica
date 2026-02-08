@@ -13,7 +13,6 @@ import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
 import { AdminStatePayload, NetworkClient, VisualizationStatePayload } from './network';
 import { PhysicsClient } from './physics';
-import { WorldBuilder } from './world-builder';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
 import { VisualizationPanel, VisualizationOptions } from './visualization-panel';
@@ -46,7 +45,6 @@ class NBodyClient {
     private bodyRenderer!: BodyRenderer;
     private network!: NetworkClient;
     private physics!: PhysicsClient;
-    private worldBuilder!: WorldBuilder;
     private chat!: Chat;
     private adminPanel!: AdminPanel;
     private vizPanel!: VisualizationPanel;
@@ -127,9 +125,6 @@ class NBodyClient {
             console.warn('⚠️ Multiplayer server unavailable, running in local mode.', error);
         }
 
-        // Initialize World Builder
-        this.worldBuilder = new WorldBuilder(this.physics, () => this.refreshBodies(), this.network);
-
         // Initialize Admin Panel
         this.adminPanel = new AdminPanel(
             this.physics,
@@ -140,6 +135,9 @@ class NBodyClient {
             },
             (sensitivity) => {
                 this.camera.setFreeLookSensitivity(sensitivity);
+            },
+            (presetId) => {
+                this.loadPresetFromAdmin(presetId);
             }
         );
 
@@ -470,10 +468,26 @@ class NBodyClient {
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
         // Include ALL UI elements including stats-overlay (Simulation panel)
-        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #world-builder, #admin-panel, #viz-panel');
+        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #viz-panel');
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
+    }
+
+    private loadPresetFromAdmin(presetId: string): void {
+        if (presetId === 'sunEarthMoon') {
+            this.physics.createSunEarthMoon();
+        } else {
+            this.physics.createPreset(presetId, BigInt(Date.now()));
+        }
+
+        this.refreshBodies();
+        this.timeController.resetAccumulator();
+
+        if (this.network?.isConnected()) {
+            const snapshot = this.physics.getSnapshot();
+            this.network.sendSnapshot(snapshot);
+        }
     }
 
     private toggleFreeCamera(): void {

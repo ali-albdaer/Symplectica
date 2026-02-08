@@ -27,6 +27,7 @@ export class AdminPanel {
     private network?: NetworkClient;
     private onFreeCamSpeedChange?: (speed: number) => void;
     private onFreeCamSensitivityChange?: (sensitivity: number) => void;
+    private onPresetChange?: (presetId: string) => void;
     private isOpen = false;
     private freeCamSpeed = 1; // AU/s
     private freeCamSensitivity = 1.0;
@@ -42,13 +43,15 @@ export class AdminPanel {
         timeController: TimeController,
         network?: NetworkClient,
         onFreeCamSpeedChange?: (speed: number) => void,
-        onFreeCamSensitivityChange?: (sensitivity: number) => void
+        onFreeCamSensitivityChange?: (sensitivity: number) => void,
+        onPresetChange?: (presetId: string) => void
     ) {
         this.physics = physics;
         this.timeController = timeController;
         this.network = network;
         this.onFreeCamSpeedChange = onFreeCamSpeedChange;
         this.onFreeCamSensitivityChange = onFreeCamSensitivityChange;
+        this.onPresetChange = onPresetChange;
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
@@ -113,6 +116,20 @@ export class AdminPanel {
                     <h3>Actions</h3>
                     <button class="admin-btn" id="admin-apply">Apply Settings</button>
                     <button class="admin-btn admin-btn-warning" id="admin-reset">Reset Simulation</button>
+                    <div class="admin-field" style="margin-top: 10px;">
+                        <label>Load Preset</label>
+                        <select id="admin-preset">
+                            <option value="sunEarthMoon">Sun-Earth-Moon</option>
+                            <option value="innerSolarSystem">Inner Solar System</option>
+                            <option value="fullSolarSystem" selected>Full Solar System</option>
+                            <option value="jupiterSystem">Jupiter System</option>
+                            <option value="saturnSystem">Saturn System</option>
+                            <option value="alphaCentauri">Alpha Centauri</option>
+                            <option value="trappist1">TRAPPIST-1</option>
+                            <option value="binaryPulsar">Binary Pulsar</option>
+                        </select>
+                    </div>
+                    <button class="admin-btn" id="admin-load-preset">Load Preset</button>
                 </section>
                 
                 <section class="admin-section">
@@ -357,6 +374,13 @@ export class AdminPanel {
             this.applySettings();
         });
 
+        // Load preset
+        container.querySelector('#admin-load-preset')?.addEventListener('click', () => {
+            const presetSelect = container.querySelector('#admin-preset') as HTMLSelectElement | null;
+            if (!presetSelect) return;
+            this.onPresetChange?.(presetSelect.value);
+        });
+
         // Reset button
         container.querySelector('#admin-reset')?.addEventListener('click', () => {
             if (confirm('Reset simulation to default state?')) {
@@ -457,8 +481,8 @@ export class AdminPanel {
         if (this.network?.isConnected()) {
             this.network.resetSimulation();
         } else {
-            this.physics.createSunEarthMoon();
-            console.log('🔄 Simulation reset to Sun-Earth-Moon');
+            this.physics.createPreset('fullSolarSystem', BigInt(Date.now()));
+            console.log('🔄 Simulation reset to Full Solar System');
         }
         this.close();
     }
