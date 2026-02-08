@@ -82,6 +82,7 @@ export class AdminPanel {
                             <option value="sunEarthMoon">Sun-Earth-Moon</option>
                             <option value="innerSolarSystem">Inner Solar System</option>
                             <option value="fullSolarSystem" selected>Full Solar System</option>
+                            <option value="playableSolarSystem">Playable Solar System</option>
                             <option value="jupiterSystem">Jupiter System</option>
                             <option value="saturnSystem">Saturn System</option>
                             <option value="alphaCentauri">Alpha Centauri</option>

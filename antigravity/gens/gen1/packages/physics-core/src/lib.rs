@@ -303,6 +303,12 @@ pub fn create_full_solar_system(seed: u64) -> WasmSimulation {
     WasmSimulation { inner: presets::create_full_solar_system(seed) }
 }
 
+/// Create Playable Solar System preset (scaled distances/masses/radii)
+#[wasm_bindgen(js_name = createPlayableSolarSystem)]
+pub fn create_playable_solar_system(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_playable_solar_system(seed) }
+}
+
 /// Create Jupiter system preset (Jupiter + Galilean moons)
 #[wasm_bindgen(js_name = createJupiterSystem)]
 pub fn create_jupiter_system(seed: u64) -> WasmSimulation {

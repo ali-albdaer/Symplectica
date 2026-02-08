@@ -26,6 +26,8 @@ pub enum Preset {
     InnerSolarSystem,
     /// Full 8 planets + Pluto
     FullSolarSystem,
+    /// Playable scaled solar system (all planets + Moon)
+    PlayableSolarSystem,
     /// Jupiter and its 4 Galilean moons
     JupiterSystem,
     /// Saturn with rings (modeled as moons)
@@ -45,6 +47,7 @@ impl Preset {
             Preset::SunEarthMoon => create_sun_earth_moon(seed),
             Preset::InnerSolarSystem => create_inner_solar_system(seed),
             Preset::FullSolarSystem => create_full_solar_system(seed),
+            Preset::PlayableSolarSystem => create_playable_solar_system(seed),
             Preset::JupiterSystem => create_jupiter_system(seed),
             Preset::SaturnSystem => create_saturn_system(seed),
             Preset::AlphaCentauri => create_alpha_centauri(seed),
@@ -114,6 +117,49 @@ pub fn create_full_solar_system(seed: u64) -> Simulation {
     // Pluto (dwarf planet)
     sim.add_planet("Pluto", 1.303e22, 1.1883e6, 5.9064e12, 4748.0);
     
+    sim
+}
+
+/// Playable Solar System with scaled distances/masses/radii (all planets + Moon)
+pub fn create_playable_solar_system(seed: u64) -> Simulation {
+    const SCALE: f64 = 0.01;
+
+    let mut sim = Simulation::new(seed);
+
+    sim.add_star("Sun", M_SUN * SCALE, R_SUN * SCALE);
+
+    // Mercury
+    sim.add_planet("Mercury", 3.3011e23 * SCALE, 2.4397e6 * SCALE, 5.791e10 * SCALE, 47362.0);
+
+    // Venus
+    sim.add_planet("Venus", 4.8675e24 * SCALE, 6.0518e6 * SCALE, 1.0821e11 * SCALE, 35020.0);
+
+    // Earth + Moon
+    let earth_id = sim.add_planet("Earth", M_EARTH * SCALE, R_EARTH * SCALE, AU * SCALE, 29784.0);
+    sim.add_moon("Moon", M_MOON * SCALE, R_MOON * SCALE, earth_id, 3.844e8 * SCALE, 1022.0);
+
+    if let Some(earth) = sim.get_body_mut(earth_id) {
+        earth.atmosphere = Some(Atmosphere::earth_like());
+    }
+
+    // Mars
+    sim.add_planet("Mars", 6.4171e23 * SCALE, 3.3895e6 * SCALE, 2.279e11 * SCALE, 24077.0);
+
+    // Jupiter
+    sim.add_planet("Jupiter", 1.8982e27 * SCALE, 6.9911e7 * SCALE, 7.7857e11 * SCALE, 13070.0);
+
+    // Saturn
+    sim.add_planet("Saturn", 5.6834e26 * SCALE, 5.8232e7 * SCALE, 1.4335e12 * SCALE, 9680.0);
+
+    // Uranus
+    sim.add_planet("Uranus", 8.6810e25 * SCALE, 2.5362e7 * SCALE, 2.8725e12 * SCALE, 6810.0);
+
+    // Neptune
+    sim.add_planet("Neptune", 1.02413e26 * SCALE, 2.4622e7 * SCALE, 4.4951e12 * SCALE, 5430.0);
+
+    // Pluto (dwarf planet)
+    sim.add_planet("Pluto", 1.303e22 * SCALE, 1.1883e6 * SCALE, 5.9064e12 * SCALE, 4748.0);
+
     sim
 }
 

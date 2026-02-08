@@ -38,6 +38,7 @@ interface PhysicsModule {
     createSunEarthMoon: (seed: bigint) => WasmSimulation;
     createInnerSolarSystem: (seed: bigint) => WasmSimulation;
     createFullSolarSystem: (seed: bigint) => WasmSimulation;
+    createPlayableSolarSystem: (seed: bigint) => WasmSimulation;
     createJupiterSystem: (seed: bigint) => WasmSimulation;
     createSaturnSystem: (seed: bigint) => WasmSimulation;
     createAlphaCentauri: (seed: bigint) => WasmSimulation;
@@ -254,12 +255,23 @@ export class PhysicsClient {
     createPreset(preset: string, seed: bigint): void {
         if (!this.initialized || !this.module) throw new Error('Physics not initialized');
 
+        let loadedPreset = preset;
+
         switch (preset) {
             case 'innerSolarSystem':
                 this.simulation = this.module.createInnerSolarSystem(seed);
                 break;
             case 'fullSolarSystem':
                 this.simulation = this.module.createFullSolarSystem(seed);
+                break;
+            case 'playableSolarSystem':
+                if (typeof this.module.createPlayableSolarSystem === 'function') {
+                    this.simulation = this.module.createPlayableSolarSystem(seed);
+                } else {
+                    console.warn('⚠️ Playable Solar System preset unavailable in WASM build. Falling back to Full Solar System.');
+                    this.simulation = this.module.createFullSolarSystem(seed);
+                    loadedPreset = 'fullSolarSystem';
+                }
                 break;
             case 'jupiterSystem':
                 this.simulation = this.module.createJupiterSystem(seed);
@@ -284,7 +296,7 @@ export class PhysicsClient {
         this.simulation.setDt(3600); // 1 hour per step
         this.simulation.setSubsteps(4);
 
-        console.log(`🌍 Loaded preset: ${preset} (${this.simulation.bodyCount()} bodies, dt=3600s)`);
+        console.log(`🌍 Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies, dt=3600s)`);
     }
 
     /** Add a custom body */

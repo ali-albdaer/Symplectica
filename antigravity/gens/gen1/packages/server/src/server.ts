@@ -15,6 +15,7 @@ interface PhysicsModule {
     WasmSimulation: new (seed: bigint) => WasmSimulation;
     createSunEarthMoon: (seed: bigint) => WasmSimulation;
     createFullSolarSystem: (seed: bigint) => WasmSimulation;
+    createPlayableSolarSystem: (seed: bigint) => WasmSimulation;
     getG: () => number;
     getAU: () => number;
     getSolarMass: () => number;
