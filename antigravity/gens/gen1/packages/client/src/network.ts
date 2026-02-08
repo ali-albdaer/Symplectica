@@ -23,7 +23,9 @@ interface StatePayload {
 
 interface WelcomePayload {
     clientId: string;
+    displayName?: string;
     snapshot: string;
+    players?: string[];
     config: {
         tickRate: number;
         serverTick: number;

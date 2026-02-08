@@ -30,7 +30,7 @@ export class Chat {
     private isFocused = false;
 
     private readonly MAX_MESSAGES = 10;
-    private readonly USERNAME = `Player${Math.floor(Math.random() * 9999)}`;
+    private localName = `Player${Math.floor(Math.random() * 9000) + 1000}`;
 
     constructor(network?: NetworkClient) {
         this.network = network;
@@ -38,9 +38,8 @@ export class Chat {
         document.body.appendChild(this.container);
         this.setupKeyboardShortcuts();
 
-        // Welcome message
-        this.addSystemMessage('Welcome to the N-Body Space Simulator!');
-        this.addSystemMessage('Press B to open World Builder, T to toggle chat.');
+        // Welcome message (player list will be injected on server welcome)
+        this.addSystemMessage('Welcome to the chat. Type /help for a list of available commands.');
     }
 
     private createUI(): HTMLElement {
@@ -249,12 +248,12 @@ export class Chat {
         if (!text) return;
 
         if (this.network?.isConnected()) {
-            this.network.sendChat(this.USERNAME, text);
+            this.network.sendChat(this.localName, text);
         } else {
             // Add locally in offline mode
             this.addMessage({
                 id: this.nextId++,
-                sender: this.USERNAME,
+                sender: this.localName,
                 text,
                 timestamp: Date.now(),
                 isSystem: false,
@@ -319,7 +318,22 @@ export class Chat {
             sender,
             text,
             timestamp: Date.now(),
-            isSystem: false,
+            isSystem: sender === 'System',
         });
+    }
+
+    setPlayersList(players: string[]): void {
+        if (players.length === 0) {
+            this.addSystemMessage('Current players: none');
+            return;
+        }
+        this.addSystemMessage(`Current players: ${players.join(', ')}`);
+    }
+
+    setLocalName(name: string): void {
+        const trimmed = name.trim();
+        if (trimmed.length > 0) {
+            this.localName = trimmed.slice(0, 20);
+        }
     }
 }

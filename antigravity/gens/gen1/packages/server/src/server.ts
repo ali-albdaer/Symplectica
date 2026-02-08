@@ -99,6 +99,7 @@ interface VisualizationStatePayload {
 interface Client {
     ws: WebSocket;
     id: string;
+    displayName: string;
     lastPing: number;
     latency: number;
 }
@@ -222,9 +223,11 @@ class SimulationServer {
 
         this.wss.on('connection', (ws: WebSocket) => {
             const clientId = this.generateClientId();
+            const displayName = this.generateDisplayName();
             const client: Client = {
                 ws,
                 id: clientId,
+                displayName,
                 lastPing: Date.now(),
                 latency: 0,
             };
@@ -237,7 +240,9 @@ class SimulationServer {
                 type: 'welcome',
                 payload: {
                     clientId,
+                    displayName,
                     snapshot: this.simulation.toJson(),
+                    players: this.getPlayerNames(),
                     config: {
                         tickRate: CONFIG.tickRate,
                         serverTick: Number(this.simulation.tick()),
@@ -247,6 +252,11 @@ class SimulationServer {
                 },
                 serverTick: Number(this.simulation.tick()),
                 timestamp: Date.now(),
+            });
+
+            this.broadcastChat({
+                sender: 'System',
+                text: `${displayName} joined`,
             });
 
             ws.on('message', (data: Buffer) => {
@@ -261,6 +271,10 @@ class SimulationServer {
             ws.on('close', () => {
                 this.clients.delete(clientId);
                 console.log(`👤 Client disconnected: ${clientId} (${this.clients.size} remaining)`);
+                this.broadcastChat({
+                    sender: 'System',
+                    text: `${client.displayName} left`,
+                });
             });
 
             ws.on('error', (error) => {
@@ -396,11 +410,12 @@ class SimulationServer {
                 const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
                 if (!text) return;
 
-                const sender = typeof payload?.sender === 'string' && payload.sender.trim().length > 0
-                    ? payload.sender.trim().slice(0, 32)
-                    : client.id;
+                if (text.startsWith('/')) {
+                    this.handleChatCommand(client, text);
+                    return;
+                }
 
-                this.broadcastChat({ sender, text: text.slice(0, 200) });
+                this.broadcastChat({ sender: client.displayName, text: text.slice(0, 200) });
                 break;
             }
 
@@ -544,8 +559,86 @@ class SimulationServer {
         }
     }
 
+    private sendChatToClient(client: Client, payload: ChatPayload): void {
+        this.sendMessage(client.ws, {
+            type: 'chat',
+            payload,
+            serverTick: Number(this.simulation.tick()),
+            timestamp: Date.now(),
+        });
+    }
+
+    private handleChatCommand(client: Client, text: string): void {
+        const commandText = text.slice(1).trim();
+        const [rawCommand, ...args] = commandText.split(/\s+/);
+        const command = rawCommand?.toLowerCase();
+
+        switch (command) {
+            case 'help':
+                this.sendChatToClient(client, {
+                    sender: 'System',
+                    text: 'Commands: /help, /name <name>, /players',
+                });
+                break;
+
+            case 'name': {
+                const requested = args.join(' ').replace(/\s+/g, ' ').trim();
+                if (!requested) {
+                    this.sendChatToClient(client, {
+                        sender: 'System',
+                        text: 'Usage: /name <name>',
+                    });
+                    break;
+                }
+
+                const normalized = requested.slice(0, 20);
+                const previous = client.displayName;
+                client.displayName = normalized;
+
+                if (previous !== normalized) {
+                    this.broadcastChat({
+                        sender: 'System',
+                        text: `${previous} is now known as ${normalized}`,
+                    });
+                } else {
+                    this.sendChatToClient(client, {
+                        sender: 'System',
+                        text: `Name unchanged (${normalized}).`,
+                    });
+                }
+                break;
+            }
+
+            case 'players': {
+                const players = this.getPlayerNames();
+                const list = players.length > 0 ? players.join(', ') : 'none';
+                this.sendChatToClient(client, {
+                    sender: 'System',
+                    text: `Players: ${list}`,
+                });
+                break;
+            }
+
+            default:
+                this.sendChatToClient(client, {
+                    sender: 'System',
+                    text: 'Unknown command. Type /help for a list of commands.',
+                });
+                break;
+        }
+    }
+
+    private getPlayerNames(): string[] {
+        return Array.from(this.clients.values()).map((client) => client.displayName);
+    }
+
     private generateClientId(): string {
         return `client-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    private generateDisplayName(): string {
+        const number = Math.floor(1000 + Math.random() * 9000);
+        return `Player${number}`;
     }
 
     stop(): void {

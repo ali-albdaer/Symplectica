@@ -163,9 +163,15 @@ class NBodyClient {
 
     private setupNetworkHandlers(): void {
         this.network.on('welcome', (message) => {
-            const payload = message.payload as { snapshot: string; config?: { adminState?: AdminStatePayload; visualizationState?: VisualizationStatePayload } };
+            const payload = message.payload as { snapshot: string; players?: string[]; displayName?: string; config?: { adminState?: AdminStatePayload; visualizationState?: VisualizationStatePayload } };
             if (payload?.snapshot) {
                 this.applySnapshot(payload.snapshot);
+            }
+            if (payload?.displayName) {
+                this.chat.setLocalName(payload.displayName);
+            }
+            if (payload?.players) {
+                this.chat.setPlayersList(payload.players);
             }
             if (payload?.config?.adminState) {
                 this.applyAdminState(payload.config.adminState);
