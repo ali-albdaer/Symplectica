@@ -14,6 +14,7 @@ import { dirname, join } from 'path';
 interface PhysicsModule {
     WasmSimulation: new (seed: bigint) => WasmSimulation;
     createSunEarthMoon: (seed: bigint) => WasmSimulation;
+    createFullSolarSystem: (seed: bigint) => WasmSimulation;
     getG: () => number;
     getAU: () => number;
     getSolarMass: () => number;
@@ -85,9 +86,11 @@ interface AdminStatePayload {
 interface VisualizationStatePayload {
     showOrbitTrails: boolean;
     showLabels: boolean;
-    showGrid: boolean;
-    gridMode: 'cube' | 'plane';
+    showGridXY: boolean;
+    showGridXZ: boolean;
+    showGridYZ: boolean;
     gridSpacing: number;
+    gridSize: number;
     orbitTrailLength: number;
     realScale: boolean;
     bodyScale: number;
@@ -128,9 +131,11 @@ class SimulationServer {
     private visualizationState: VisualizationStatePayload = {
         showOrbitTrails: true,
         showLabels: false,
-        showGrid: false,
-        gridMode: 'plane',
+        showGridXY: false,
+        showGridXZ: false,
+        showGridYZ: false,
         gridSpacing: 1.495978707e11,
+        gridSize: 40 * 1.495978707e11,
         orbitTrailLength: 100,
         realScale: false,
         bodyScale: 25,
@@ -194,7 +199,7 @@ class SimulationServer {
         console.log('🌍 Creating simulation...');
 
         // Use preset for now
-        this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
+        this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
 
         // Configure for 60Hz tick rate
         this.simulation.setDt(1.0 / CONFIG.tickRate);
@@ -356,9 +361,11 @@ class SimulationServer {
                 this.visualizationState = {
                     showOrbitTrails: typeof payload.showOrbitTrails === 'boolean' ? payload.showOrbitTrails : this.visualizationState.showOrbitTrails,
                     showLabels: typeof payload.showLabels === 'boolean' ? payload.showLabels : this.visualizationState.showLabels,
-                    showGrid: typeof payload.showGrid === 'boolean' ? payload.showGrid : this.visualizationState.showGrid,
-                    gridMode: payload.gridMode === 'cube' || payload.gridMode === 'plane' ? payload.gridMode : this.visualizationState.gridMode,
+                    showGridXY: typeof payload.showGridXY === 'boolean' ? payload.showGridXY : this.visualizationState.showGridXY,
+                    showGridXZ: typeof payload.showGridXZ === 'boolean' ? payload.showGridXZ : this.visualizationState.showGridXZ,
+                    showGridYZ: typeof payload.showGridYZ === 'boolean' ? payload.showGridYZ : this.visualizationState.showGridYZ,
                     gridSpacing: typeof payload.gridSpacing === 'number' ? payload.gridSpacing : this.visualizationState.gridSpacing,
+                    gridSize: typeof payload.gridSize === 'number' ? payload.gridSize : this.visualizationState.gridSize,
                     orbitTrailLength: typeof payload.orbitTrailLength === 'number' ? payload.orbitTrailLength : this.visualizationState.orbitTrailLength,
                     realScale: typeof payload.realScale === 'boolean' ? payload.realScale : this.visualizationState.realScale,
                     bodyScale: typeof payload.bodyScale === 'number' ? payload.bodyScale : this.visualizationState.bodyScale,

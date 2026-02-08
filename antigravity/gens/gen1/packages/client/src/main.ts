@@ -70,9 +70,11 @@ class NBodyClient {
     private currentVizOptions: VisualizationOptions = {
         showOrbitTrails: true,
         showLabels: false,
-        showGrid: false,
-        gridMode: 'plane',
+        showGridXY: false,
+        showGridXZ: false,
+        showGridYZ: false,
         gridSpacing: 1.495978707e11,
+        gridSize: 40 * 1.495978707e11,
         orbitTrailLength: 100,
         realScale: false,
         bodyScale: 25,
@@ -224,7 +226,13 @@ class NBodyClient {
         this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
         this.bodyRenderer.setRealScale(options.realScale);
         this.bodyRenderer.setBodyScale(options.bodyScale);
-        this.bodyRenderer.setGridOptions(options.showGrid, options.gridMode, options.gridSpacing);
+        this.bodyRenderer.setGridOptions(
+            options.showGridXY,
+            options.showGridXZ,
+            options.showGridYZ,
+            options.gridSpacing,
+            options.gridSize
+        );
     }
 
     private applySnapshot(snapshot: string): void {
@@ -300,10 +308,10 @@ class NBodyClient {
         this.physics = new PhysicsClient();
         await this.physics.init();
 
-        // Use local simulation for now - createSunEarthMoon sets dt=3600s
-        this.physics.createSunEarthMoon();
+        // Use local simulation for now - default to full solar system
+        this.physics.createPreset('fullSolarSystem', BigInt(Date.now()));
 
-        // TimeController manages simulation speed; physics dt is set by createSunEarthMoon
+        // TimeController manages simulation speed; physics dt is set by createPreset
 
         this.state.bodyCount = this.physics.bodyCount();
         this.updateUIBodyCount();

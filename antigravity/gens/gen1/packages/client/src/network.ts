@@ -49,9 +49,11 @@ export interface AdminStatePayload {
 export interface VisualizationStatePayload {
     showOrbitTrails: boolean;
     showLabels: boolean;
-    showGrid: boolean;
-    gridMode: 'cube' | 'plane';
+    showGridXY: boolean;
+    showGridXZ: boolean;
+    showGridYZ: boolean;
     gridSpacing: number;
+    gridSize: number;
     orbitTrailLength: number;
     realScale: boolean;
     bodyScale: number;

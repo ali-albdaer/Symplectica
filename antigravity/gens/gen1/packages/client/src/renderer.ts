@@ -60,10 +60,11 @@ export class BodyRenderer {
 
     // Grid
     private gridGroup: THREE.Group | null = null;
-    private gridMode: 'cube' | 'plane' = 'plane';
     private gridSpacing = AU;
-    private gridVisible = false;
-    private readonly gridExtent = 20 * AU;
+    private gridSize = 40 * AU;
+    private gridXYVisible = false;
+    private gridXZVisible = false;
+    private gridYZVisible = false;
 
     // Scale settings
     private bodyScale = 25; // Default: recommended scale
@@ -332,10 +333,12 @@ export class BodyRenderer {
         }
     }
 
-    setGridOptions(show: boolean, mode: 'cube' | 'plane', spacing: number): void {
-        this.gridVisible = show;
-        this.gridMode = mode;
+    setGridOptions(showXY: boolean, showXZ: boolean, showYZ: boolean, spacing: number, size: number): void {
+        this.gridXYVisible = showXY;
+        this.gridXZVisible = showXZ;
+        this.gridYZVisible = showYZ;
         this.gridSpacing = Math.max(spacing, 1.0);
+        this.gridSize = Math.max(size, this.gridSpacing * 2);
         this.rebuildGrid();
     }
 
@@ -388,7 +391,7 @@ export class BodyRenderer {
             this.gridGroup = null;
         }
 
-        if (!this.gridVisible) {
+        if (!this.gridXYVisible && !this.gridXZVisible && !this.gridYZVisible) {
             return;
         }
 
@@ -399,56 +402,30 @@ export class BodyRenderer {
             opacity: 0.25,
         });
 
-        if (this.gridMode === 'plane') {
-            const size = this.gridExtent * 2;
-            const divisions = Math.max(2, Math.floor(size / this.gridSpacing));
-            const grid = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);
-            grid.material = material;
-            grid.rotation.x = Math.PI / 2;
-            this.gridGroup.add(grid);
-        } else {
-            const grid = this.createCubeGrid(this.gridExtent, this.gridSpacing, material);
-            this.gridGroup.add(grid);
+        const size = this.gridSize;
+        const divisions = Math.max(2, Math.floor(size / this.gridSpacing));
+
+        if (this.gridXZVisible) {
+            const gridXZ = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);
+            gridXZ.material = material;
+            this.gridGroup.add(gridXZ);
+        }
+
+        if (this.gridXYVisible) {
+            const gridXY = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);
+            gridXY.material = material;
+            gridXY.rotation.x = Math.PI / 2;
+            this.gridGroup.add(gridXY);
+        }
+
+        if (this.gridYZVisible) {
+            const gridYZ = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);
+            gridYZ.material = material;
+            gridYZ.rotation.z = Math.PI / 2;
+            this.gridGroup.add(gridYZ);
         }
 
         this.scene.add(this.gridGroup);
-    }
-
-    private createCubeGrid(extent: number, spacing: number, material: THREE.LineBasicMaterial): THREE.LineSegments {
-        const size = extent * 2;
-        const steps = Math.max(1, Math.floor(size / spacing));
-        const count = steps + 1;
-        const min = -extent;
-
-        const positions: number[] = [];
-
-        for (let yi = 0; yi < count; yi++) {
-            const y = min + yi * spacing;
-            for (let zi = 0; zi < count; zi++) {
-                const z = min + zi * spacing;
-                positions.push(min, y, z, extent, y, z);
-            }
-        }
-
-        for (let xi = 0; xi < count; xi++) {
-            const x = min + xi * spacing;
-            for (let zi = 0; zi < count; zi++) {
-                const z = min + zi * spacing;
-                positions.push(x, min, z, x, extent, z);
-            }
-        }
-
-        for (let xi = 0; xi < count; xi++) {
-            const x = min + xi * spacing;
-            for (let yi = 0; yi < count; yi++) {
-                const y = min + yi * spacing;
-                positions.push(x, y, min, x, y, extent);
-            }
-        }
-
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        return new THREE.LineSegments(geometry, material);
     }
 
     private disposeGrid(group: THREE.Group): void {

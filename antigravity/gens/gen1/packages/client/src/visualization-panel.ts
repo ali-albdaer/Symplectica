@@ -7,9 +7,11 @@
 export interface VisualizationOptions {
     showOrbitTrails: boolean;
     showLabels: boolean;
-    showGrid: boolean;
-    gridMode: 'cube' | 'plane';
+    showGridXY: boolean;
+    showGridXZ: boolean;
+    showGridYZ: boolean;
     gridSpacing: number;
+    gridSize: number;
     orbitTrailLength: number;
     realScale: boolean;
     bodyScale: number;
@@ -23,9 +25,11 @@ const RECOMMENDED_SCALE = 25;
 const DEFAULTS: VisualizationOptions = {
     showOrbitTrails: true,
     showLabels: false,
-    showGrid: false,
-    gridMode: 'plane',
+    showGridXY: false,
+    showGridXZ: false,
+    showGridYZ: false,
     gridSpacing: AU,
+    gridSize: 40 * AU,
     orbitTrailLength: 100,
     realScale: false,
     bodyScale: RECOMMENDED_SCALE,
@@ -41,10 +45,13 @@ export class VisualizationPanel {
     // UI Elements
     private orbitsCheckbox!: HTMLInputElement;
     private labelsCheckbox!: HTMLInputElement;
-    private gridCheckbox!: HTMLInputElement;
-    private gridModeSelect!: HTMLSelectElement;
+    private gridXYCheckbox!: HTMLInputElement;
+    private gridXZCheckbox!: HTMLInputElement;
+    private gridYZCheckbox!: HTMLInputElement;
     private gridSpacingInput!: HTMLInputElement;
     private gridSpacingValue!: HTMLElement;
+    private gridSizeInput!: HTMLInputElement;
+    private gridSizeValue!: HTMLElement;
     private trailSlider!: HTMLInputElement;
     private trailValue!: HTMLElement;
     private realScaleCheckbox!: HTMLInputElement;
@@ -90,22 +97,30 @@ export class VisualizationPanel {
                     </label>
 
                     <label class="viz-toggle">
-                        <input type="checkbox" id="viz-grid">
-                        <span>Reference Grid</span>
+                        <input type="checkbox" id="viz-grid-xy">
+                        <span>Grid XY</span>
                     </label>
 
-                    <div class="viz-field">
-                        <label>Grid Mode</label>
-                        <select id="viz-grid-mode">
-                            <option value="plane">Orbital Plane</option>
-                            <option value="cube">3D Cube</option>
-                        </select>
-                    </div>
+                    <label class="viz-toggle">
+                        <input type="checkbox" id="viz-grid-xz">
+                        <span>Grid XZ</span>
+                    </label>
+
+                    <label class="viz-toggle">
+                        <input type="checkbox" id="viz-grid-yz">
+                        <span>Grid YZ</span>
+                    </label>
 
                     <div class="viz-field">
                         <label>Grid Spacing (AU)</label>
                         <input type="range" id="viz-grid-spacing" min="0.1" max="10" step="0.1" value="1">
                         <span id="viz-grid-spacing-value">1.0 AU</span>
+                    </div>
+
+                    <div class="viz-field">
+                        <label>Grid Size (AU)</label>
+                        <input type="range" id="viz-grid-size" min="1" max="100" step="1" value="40">
+                        <span id="viz-grid-size-value">40 AU</span>
                     </div>
                 </section>
 
@@ -290,10 +305,13 @@ export class VisualizationPanel {
     private cacheElements(): void {
         this.orbitsCheckbox = this.container.querySelector('#viz-orbits')!;
         this.labelsCheckbox = this.container.querySelector('#viz-labels')!;
-        this.gridCheckbox = this.container.querySelector('#viz-grid')!;
-        this.gridModeSelect = this.container.querySelector('#viz-grid-mode')!;
+        this.gridXYCheckbox = this.container.querySelector('#viz-grid-xy')!;
+        this.gridXZCheckbox = this.container.querySelector('#viz-grid-xz')!;
+        this.gridYZCheckbox = this.container.querySelector('#viz-grid-yz')!;
         this.gridSpacingInput = this.container.querySelector('#viz-grid-spacing')!;
         this.gridSpacingValue = this.container.querySelector('#viz-grid-spacing-value')!;
+        this.gridSizeInput = this.container.querySelector('#viz-grid-size')!;
+        this.gridSizeValue = this.container.querySelector('#viz-grid-size-value')!;
         this.trailSlider = this.container.querySelector('#viz-trail-length')!;
         this.trailValue = this.container.querySelector('#viz-trail-value')!;
         this.realScaleCheckbox = this.container.querySelector('#viz-real-scale')!;
@@ -318,15 +336,21 @@ export class VisualizationPanel {
             this.emitChange();
         });
 
-        this.gridCheckbox.addEventListener('change', () => {
+        this.gridXYCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
-            this.options.showGrid = this.gridCheckbox.checked;
+            this.options.showGridXY = this.gridXYCheckbox.checked;
             this.emitChange();
         });
 
-        this.gridModeSelect.addEventListener('change', () => {
+        this.gridXZCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
-            this.options.gridMode = this.gridModeSelect.value as 'cube' | 'plane';
+            this.options.showGridXZ = this.gridXZCheckbox.checked;
+            this.emitChange();
+        });
+
+        this.gridYZCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showGridYZ = this.gridYZCheckbox.checked;
             this.emitChange();
         });
 
@@ -335,6 +359,14 @@ export class VisualizationPanel {
             const spacingAu = parseFloat(this.gridSpacingInput.value);
             this.options.gridSpacing = spacingAu * AU;
             this.gridSpacingValue.textContent = `${spacingAu.toFixed(1)} AU`;
+            this.emitChange();
+        });
+
+        this.gridSizeInput.addEventListener('input', () => {
+            if (this.ignoreEvents) return;
+            const sizeAu = parseFloat(this.gridSizeInput.value);
+            this.options.gridSize = sizeAu * AU;
+            this.gridSizeValue.textContent = `${sizeAu.toFixed(0)} AU`;
             this.emitChange();
         });
 
@@ -393,10 +425,13 @@ export class VisualizationPanel {
 
         this.orbitsCheckbox.checked = this.options.showOrbitTrails;
         this.labelsCheckbox.checked = this.options.showLabels;
-        this.gridCheckbox.checked = this.options.showGrid;
-        this.gridModeSelect.value = this.options.gridMode;
+        this.gridXYCheckbox.checked = this.options.showGridXY;
+        this.gridXZCheckbox.checked = this.options.showGridXZ;
+        this.gridYZCheckbox.checked = this.options.showGridYZ;
         this.gridSpacingInput.value = String(this.options.gridSpacing / AU);
         this.gridSpacingValue.textContent = `${(this.options.gridSpacing / AU).toFixed(1)} AU`;
+        this.gridSizeInput.value = String(this.options.gridSize / AU);
+        this.gridSizeValue.textContent = `${(this.options.gridSize / AU).toFixed(0)} AU`;
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
         this.realScaleCheckbox.checked = this.options.realScale;
