@@ -842,6 +842,13 @@ class NBodyClient {
         document.getElementById('sim-energy')!.textContent = this.formatEnergy(this.state.energy);
         document.getElementById('sim-bodies')!.textContent = this.state.bodyCount.toString();
 
+        const totals = this.computeSystemTotals();
+        if (totals) {
+            document.getElementById('sim-mass')!.textContent = this.formatMass(totals.mass);
+            document.getElementById('sim-linear-momentum')!.textContent = this.formatMomentum(totals.linearMagnitude, 'kg·m/s');
+            document.getElementById('sim-angular-momentum')!.textContent = this.formatMomentum(totals.angularMagnitude, 'kg·m²/s');
+        }
+
         const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
         document.getElementById('render-fps')!.textContent = avgFps.toFixed(0);
 
@@ -887,6 +894,60 @@ class NBodyClient {
         if (abs < 1e9) return (joules / 1e6).toFixed(2) + ' MJ';
         if (abs < 1e12) return (joules / 1e9).toFixed(2) + ' GJ';
         return joules.toExponential(3) + ' J';
+    }
+
+    private formatMomentum(value: number, unit: string): string {
+        if (!Number.isFinite(value)) return `0 ${unit}`;
+        const abs = Math.abs(value);
+        if (abs === 0) return `0 ${unit}`;
+        if (abs < 1e6) return `${value.toFixed(2)} ${unit}`;
+        return `${value.toExponential(3)} ${unit}`;
+    }
+
+    private computeSystemTotals(): { mass: number; linearMagnitude: number; angularMagnitude: number } | null {
+        const bodies = this.physics.getBodies();
+        const velocities = this.physics.getVelocities();
+        const positions = this.state.positions;
+
+        if (bodies.length === 0) return null;
+        if (velocities.length < bodies.length * 3) return null;
+        if (positions.length < bodies.length * 3) return null;
+
+        let mass = 0;
+        let px = 0;
+        let py = 0;
+        let pz = 0;
+        let lx = 0;
+        let ly = 0;
+        let lz = 0;
+
+        for (let i = 0; i < bodies.length; i++) {
+            const bodyMass = bodies[i].mass;
+            const vx = velocities[i * 3];
+            const vy = velocities[i * 3 + 1];
+            const vz = velocities[i * 3 + 2];
+            const rx = positions[i * 3];
+            const ry = positions[i * 3 + 1];
+            const rz = positions[i * 3 + 2];
+
+            const pxi = bodyMass * vx;
+            const pyi = bodyMass * vy;
+            const pzi = bodyMass * vz;
+
+            px += pxi;
+            py += pyi;
+            pz += pzi;
+            mass += bodyMass;
+
+            lx += ry * pzi - rz * pyi;
+            ly += rz * pxi - rx * pzi;
+            lz += rx * pyi - ry * pxi;
+        }
+
+        const linearMagnitude = Math.sqrt(px * px + py * py + pz * pz);
+        const angularMagnitude = Math.sqrt(lx * lx + ly * ly + lz * lz);
+
+        return { mass, linearMagnitude, angularMagnitude };
     }
 
     private formatMass(kg: number): string {
