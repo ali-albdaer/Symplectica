@@ -61,7 +61,7 @@ export class BodyRenderer {
     // Grid
     private gridGroup: THREE.Group | null = null;
     private gridSpacing = AU;
-    private gridSize = 40 * AU;
+    private gridSize = 40;
     private gridXYVisible = false;
     private gridXZVisible = false;
     private gridYZVisible = false;
@@ -338,7 +338,7 @@ export class BodyRenderer {
         this.gridXZVisible = showXZ;
         this.gridYZVisible = showYZ;
         this.gridSpacing = Math.max(spacing, 1.0);
-        this.gridSize = Math.max(size, this.gridSpacing * 2);
+        this.gridSize = Math.max(1, Math.round(size));
         this.rebuildGrid();
     }
 
@@ -402,8 +402,8 @@ export class BodyRenderer {
             opacity: 0.25,
         });
 
-        const size = this.gridSize;
-        const divisions = Math.max(2, Math.floor(size / this.gridSpacing));
+        const divisions = Math.max(2, this.gridSize * 2);
+        const size = divisions * this.gridSpacing;
 
         if (this.gridXZVisible) {
             const gridXZ = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);

@@ -74,7 +74,7 @@ class NBodyClient {
         showGridXZ: false,
         showGridYZ: false,
         gridSpacing: 1.495978707e11,
-        gridSize: 40 * 1.495978707e11,
+        gridSize: 40,
         orbitTrailLength: 100,
         realScale: false,
         bodyScale: 25,

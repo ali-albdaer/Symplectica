@@ -29,7 +29,7 @@ const DEFAULTS: VisualizationOptions = {
     showGridXZ: false,
     showGridYZ: false,
     gridSpacing: AU,
-    gridSize: 40 * AU,
+    gridSize: 40,
     orbitTrailLength: 100,
     realScale: false,
     bodyScale: RECOMMENDED_SCALE,
@@ -359,14 +359,15 @@ export class VisualizationPanel {
             const spacingAu = parseFloat(this.gridSpacingInput.value);
             this.options.gridSpacing = spacingAu * AU;
             this.gridSpacingValue.textContent = `${spacingAu.toFixed(1)} AU`;
+            this.updateGridSizeValue();
             this.emitChange();
         });
 
         this.gridSizeInput.addEventListener('input', () => {
             if (this.ignoreEvents) return;
             const sizeAu = parseFloat(this.gridSizeInput.value);
-            this.options.gridSize = sizeAu * AU;
-            this.gridSizeValue.textContent = `${sizeAu.toFixed(0)} AU`;
+            this.options.gridSize = sizeAu;
+            this.updateGridSizeValue();
             this.emitChange();
         });
 
@@ -430,8 +431,8 @@ export class VisualizationPanel {
         this.gridYZCheckbox.checked = this.options.showGridYZ;
         this.gridSpacingInput.value = String(this.options.gridSpacing / AU);
         this.gridSpacingValue.textContent = `${(this.options.gridSpacing / AU).toFixed(1)} AU`;
-        this.gridSizeInput.value = String(this.options.gridSize / AU);
-        this.gridSizeValue.textContent = `${(this.options.gridSize / AU).toFixed(0)} AU`;
+        this.gridSizeInput.value = String(this.options.gridSize);
+        this.updateGridSizeValue();
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
         this.realScaleCheckbox.checked = this.options.realScale;
@@ -457,6 +458,12 @@ export class VisualizationPanel {
             this.scaleSlider.disabled = false;
             this.recommendedCheckbox.disabled = false;
         }
+    }
+
+    private updateGridSizeValue(): void {
+        const spacingAu = this.options.gridSpacing / AU;
+        const distanceAu = this.options.gridSize * spacingAu;
+        this.gridSizeValue.textContent = `${distanceAu.toFixed(0)} AU`;
     }
 
     private sliderToScale(t: number): number {
