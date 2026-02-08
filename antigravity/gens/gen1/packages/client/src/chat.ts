@@ -42,6 +42,7 @@ export class Chat {
 
         // Welcome message (player list will be injected on server welcome)
         this.addSystemMessage('Welcome to the chat. Type /help for a list of available commands. Press I for keybinds.');
+        this.setOpen(false);
     }
 
     private createUI(): HTMLElement {
@@ -49,7 +50,7 @@ export class Chat {
         container.id = 'chat-panel';
         container.innerHTML = `
             <div class="chat-header">
-                <span class="chat-title">💬 Chat</span>
+                <span class="chat-title">Chat</span>
                 <span class="chat-unread" aria-hidden="true"></span>
                 <button class="chat-toggle" title="Toggle (T)">−</button>
             </div>
@@ -93,7 +94,7 @@ export class Chat {
             
             .chat-header {
                 display: flex;
-                justify-content: space-between;
+                justify-content: flex-start;
                 align-items: center;
                 padding: 7px 10px;
                 gap: 8px;
@@ -137,6 +138,7 @@ export class Chat {
                 cursor: pointer;
                 padding: 0 5px;
                 line-height: 1;
+                margin-left: auto;
             }
             
             .chat-toggle:hover {
