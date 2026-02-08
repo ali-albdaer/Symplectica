@@ -76,14 +76,18 @@ export class AdminPanel {
 
                     <div class="admin-field">
                         <label>Free Cam Speed (AU/s)</label>
-                        <input type="range" id="admin-freecam-speed" min="0" max="1" step="0.001" value="0.5">
-                        <div class="admin-hint" id="admin-freecam-speed-value">1.0 AU/s</div>
+                        <div class="admin-slider-row">
+                            <input type="range" id="admin-freecam-speed" min="0" max="1" step="0.001" value="0.5">
+                            <span id="admin-freecam-speed-value">1.000 AU/s</span>
+                        </div>
                     </div>
 
                     <div class="admin-field">
                         <label>Free Cam Sensitivity</label>
-                        <input type="range" id="admin-freecam-sensitivity" min="0.1" max="5" step="0.1" value="1">
-                        <div class="admin-hint" id="admin-freecam-sensitivity-value">1.0x</div>
+                        <div class="admin-slider-row">
+                            <input type="range" id="admin-freecam-sensitivity" min="0.1" max="5" step="0.1" value="1">
+                            <span id="admin-freecam-sensitivity-value">1.0x</span>
+                        </div>
                     </div>
                     
                     <div class="admin-field">
@@ -220,6 +224,27 @@ export class AdminPanel {
                 font-size: 13px;
             }
 
+            .admin-field input[type="range"] {
+                padding: 0;
+                height: 4px;
+                accent-color: #4fc3f7;
+            }
+
+            .admin-slider-row {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-top: 6px;
+            }
+
+            .admin-slider-row span {
+                min-width: 90px;
+                text-align: right;
+                font-size: 12px;
+                color: rgba(255, 255, 255, 0.7);
+                font-variant-numeric: tabular-nums;
+            }
+
             .admin-hint {
                 margin-top: 6px;
                 font-size: 12px;
@@ -349,6 +374,15 @@ export class AdminPanel {
         return Math.pow(10, minLog + (maxLog - minLog) * clamped);
     }
 
+    private speedToSlider(speed: number): number {
+        const min = 0.001;
+        const max = 1000;
+        const clampedSpeed = Math.max(min, Math.min(max, speed));
+        const minLog = Math.log10(min);
+        const maxLog = Math.log10(max);
+        return (Math.log10(clampedSpeed) - minLog) / (maxLog - minLog);
+    }
+
     private setupKeyboardShortcut(): void {
         window.addEventListener('keydown', (e) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -379,7 +413,13 @@ export class AdminPanel {
         this.updateDebugInfo();
 
         const freeCamSpeedInput = document.getElementById('admin-freecam-speed') as HTMLInputElement | null;
-        if (freeCamSpeedInput) freeCamSpeedInput.value = this.freeCamSpeed.toString();
+        const freeCamSpeedValue = document.getElementById('admin-freecam-speed-value') as HTMLElement | null;
+        if (freeCamSpeedInput) {
+            freeCamSpeedInput.value = this.speedToSlider(this.freeCamSpeed).toString();
+        }
+        if (freeCamSpeedValue) {
+            freeCamSpeedValue.textContent = `${this.freeCamSpeed.toFixed(3)} AU/s`;
+        }
     }
 
     close(): void {
