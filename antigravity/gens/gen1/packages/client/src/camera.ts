@@ -36,6 +36,9 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private canvas?: HTMLElement;
     private pointerLocked = false;
 
+    // Free camera look sensitivity multiplier
+    private freeLookSensitivity = 1.0;
+
     // Floating origin offset
     private originX = 0;
     private originY = 0;
@@ -97,7 +100,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
 
         canvas.addEventListener('mousemove', (e: MouseEvent) => {
             if (this.freeMode && this.pointerLocked) {
-                const sensitivity = 0.002;
+                const sensitivity = 0.002 * this.freeLookSensitivity;
                 this.azimuthVelocity = -e.movementX * sensitivity;
                 this.elevationVelocity = -e.movementY * sensitivity;
 
@@ -193,6 +196,11 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         canvas.addEventListener('touchend', () => {
             this.isDragging = false;
         });
+    }
+
+    setFreeLookSensitivity(multiplier: number): void {
+        if (!Number.isFinite(multiplier) || multiplier <= 0) return;
+        this.freeLookSensitivity = multiplier;
     }
 
     update(delta: number): void {

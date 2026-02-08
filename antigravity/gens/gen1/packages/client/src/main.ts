@@ -91,7 +91,7 @@ class NBodyClient {
 
     // Free camera mode
     private freeCamera = false;
-    private freeCamSpeedMultiplier = 20;
+    private freeCamSpeedAuPerSec = 1;
     private freeCamCrosshair: HTMLElement | null = null;
     private raycaster = new THREE.Raycaster();
     private moveKeys: Record<string, boolean> = {
@@ -131,9 +131,17 @@ class NBodyClient {
         this.worldBuilder = new WorldBuilder(this.physics, () => this.refreshBodies(), this.network);
 
         // Initialize Admin Panel
-        this.adminPanel = new AdminPanel(this.physics, this.timeController, this.network, (speed) => {
-            this.freeCamSpeedMultiplier = speed;
-        });
+        this.adminPanel = new AdminPanel(
+            this.physics,
+            this.timeController,
+            this.network,
+            (speed) => {
+                this.freeCamSpeedAuPerSec = speed;
+            },
+            (sensitivity) => {
+                this.camera.setFreeLookSensitivity(sensitivity);
+            }
+        );
 
         // Initialize Visualization Panel
         this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
@@ -750,7 +758,7 @@ class NBodyClient {
 
             const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
-            const speed = Math.max(AU * 0.0005, this.camera.getDistance() * 0.01) * this.freeCamSpeedMultiplier;
+            const speed = this.freeCamSpeedAuPerSec * AU;
             const step = speed * delta;
 
             const move = new THREE.Vector3(0, 0, 0);
@@ -791,6 +799,25 @@ class NBodyClient {
 
         const cameraDist = this.camera.getDistance();
         document.getElementById('camera-dist')!.textContent = (cameraDist / AU).toFixed(3) + ' AU';
+
+        const coord = this.getReferenceCoords();
+        document.getElementById('sim-x')!.textContent = (coord.x / AU).toFixed(3) + ' AU';
+        document.getElementById('sim-y')!.textContent = (coord.y / AU).toFixed(3) + ' AU';
+        document.getElementById('sim-z')!.textContent = (coord.z / AU).toFixed(3) + ' AU';
+    }
+
+    private getReferenceCoords(): { x: number; y: number; z: number } {
+        if (this.freeCamera) {
+            return this.camera.getCameraWorldPosition();
+        }
+        if (this.followBodyIndex >= 0 && this.followBodyIndex * 3 + 2 < this.state.positions.length) {
+            return {
+                x: this.state.positions[this.followBodyIndex * 3],
+                y: this.state.positions[this.followBodyIndex * 3 + 1],
+                z: this.state.positions[this.followBodyIndex * 3 + 2],
+            };
+        }
+        return { x: 0, y: 0, z: 0 };
     }
 
     private updateUIBodyCount(): void {
