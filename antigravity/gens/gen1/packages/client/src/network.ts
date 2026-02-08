@@ -46,6 +46,7 @@ export interface AdminStatePayload {
     theta: number;
     timeScale: number;
     paused: boolean;
+    simMode: 'tick' | 'accumulator';
 }
 
 export interface VisualizationStatePayload {

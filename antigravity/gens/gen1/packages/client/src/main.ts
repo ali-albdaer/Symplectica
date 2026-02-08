@@ -20,6 +20,9 @@ import { TimeController } from './time-controller';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
+const LOCAL_TICK_RATE = 60;
+
+type SimMode = 'tick' | 'accumulator';
 
 interface SimState {
     tick: number;
@@ -60,6 +63,8 @@ class NBodyClient {
     private lastFrameTime = 0;
     private fpsHistory: number[] = [];
     private running = false;
+    private localTickAccumulator = 0;
+    private localSimMode: SimMode = 'tick';
 
     private lastServerState?: NetworkStatePayload;
     private lastServerPositions = new Float64Array(0);
@@ -140,6 +145,9 @@ class NBodyClient {
             },
             (presetId) => {
                 this.loadPresetFromAdmin(presetId);
+            },
+            (mode) => {
+                this.setLocalSimMode(mode);
             }
         );
 
@@ -224,6 +232,7 @@ class NBodyClient {
         this.timeController.setPhysicsTimestep(settings.dt);
         this.timeController.setSpeedBySimRate(settings.timeScale);
         this.timeController.setPaused(settings.paused);
+        this.setLocalSimMode(settings.simMode);
         this.updateTimeScaleUI();
         this.adminPanel?.applyServerSettings(settings);
     }
@@ -774,11 +783,31 @@ class NBodyClient {
             this.state.energy = this.lastServerState!.energy;
             this.state.bodyCount = Math.floor(this.lastServerPositions.length / 3);
         } else {
-            // Step physics using TimeController's accumulator pattern
-            // This ensures deterministic simulation at any framerate
-            const steps = this.timeController.update(delta);
-            for (let i = 0; i < steps; i++) {
-                this.physics.step();
+            if (!this.timeController.isPaused()) {
+                if (this.localSimMode === 'accumulator') {
+                    const steps = this.timeController.update(delta);
+                    for (let i = 0; i < steps; i++) {
+                        this.physics.step();
+                    }
+                } else {
+                    const tickInterval = 1 / LOCAL_TICK_RATE;
+                    this.localTickAccumulator += delta;
+
+                    let steps = 0;
+                    const maxSteps = 1000;
+                    while (this.localTickAccumulator >= tickInterval && steps < maxSteps) {
+                        const simRate = this.timeController.getCurrentSpeed().sim;
+                        const dt = simRate / LOCAL_TICK_RATE;
+                        this.physics.setTimeStep(dt);
+                        this.physics.step();
+                        this.localTickAccumulator -= tickInterval;
+                        steps++;
+                    }
+
+                    if (steps >= maxSteps) {
+                        this.localTickAccumulator = 0;
+                    }
+                }
             }
 
             // Update state from physics
@@ -948,6 +977,12 @@ class NBodyClient {
         const angularMagnitude = Math.sqrt(lx * lx + ly * ly + lz * lz);
 
         return { mass, linearMagnitude, angularMagnitude };
+    }
+
+    private setLocalSimMode(mode: SimMode): void {
+        this.localSimMode = mode;
+        this.localTickAccumulator = 0;
+        this.timeController.resetAccumulator();
     }
 
     private formatMass(kg: number): string {

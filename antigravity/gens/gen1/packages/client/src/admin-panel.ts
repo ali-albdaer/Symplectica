@@ -18,6 +18,7 @@ interface ServerConfig {
     forceMethod: 'direct' | 'barnes-hut';
     theta: number;
     substeps: number;
+    simMode: 'tick' | 'accumulator';
 }
 
 export class AdminPanel {
@@ -28,6 +29,7 @@ export class AdminPanel {
     private onFreeCamSpeedChange?: (speed: number) => void;
     private onFreeCamSensitivityChange?: (sensitivity: number) => void;
     private onPresetChange?: (presetId: string) => void;
+    private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
     private isOpen = false;
     private freeCamSpeed = 1; // AU/s
     private freeCamSensitivity = 1.0;
@@ -36,6 +38,7 @@ export class AdminPanel {
         forceMethod: 'direct',
         theta: 0.5,
         substeps: 4,
+        simMode: 'tick',
     };
 
     constructor(
@@ -44,7 +47,8 @@ export class AdminPanel {
         network?: NetworkClient,
         onFreeCamSpeedChange?: (speed: number) => void,
         onFreeCamSensitivityChange?: (sensitivity: number) => void,
-        onPresetChange?: (presetId: string) => void
+        onPresetChange?: (presetId: string) => void,
+        onSimModeChange?: (mode: 'tick' | 'accumulator') => void
     ) {
         this.physics = physics;
         this.timeController = timeController;
@@ -52,6 +56,7 @@ export class AdminPanel {
         this.onFreeCamSpeedChange = onFreeCamSpeedChange;
         this.onFreeCamSensitivityChange = onFreeCamSensitivityChange;
         this.onPresetChange = onPresetChange;
+        this.onSimModeChange = onSimModeChange;
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
@@ -93,6 +98,14 @@ export class AdminPanel {
                     <div class="admin-field">
                         <label>Timestep (seconds)</label>
                         <input type="number" id="admin-dt" value="3600" min="1" max="86400" step="60">
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Simulation Mode</label>
+                        <select id="admin-sim-mode">
+                            <option value="tick">Tick-Scaled (Lightweight)</option>
+                            <option value="accumulator">Fixed-Delta (Accurate)</option>
+                        </select>
                     </div>
 
                     <div class="admin-field">
@@ -443,6 +456,8 @@ export class AdminPanel {
         const substeps = parseInt((document.getElementById('admin-substeps') as HTMLInputElement).value);
         const forceMethod = (document.getElementById('admin-force-method') as HTMLSelectElement).value;
         const theta = parseFloat((document.getElementById('admin-theta') as HTMLInputElement).value);
+        const simMode = (document.getElementById('admin-sim-mode') as HTMLSelectElement).value as 'tick' | 'accumulator';
+        const timeScale = this.timeController.getCurrentSpeed().sim;
 
         if (this.network?.isConnected()) {
             this.network.sendAdminSettings({
@@ -450,15 +465,23 @@ export class AdminPanel {
                 substeps,
                 forceMethod: forceMethod === 'barnes-hut' ? 'barnes-hut' : 'direct',
                 theta,
-                timeScale: dt * 60,
+                timeScale,
+                simMode,
             } as AdminStatePayload);
         }
 
         // Apply timestep to both physics and TimeController
         this.physics.setTimeStep(dt);
+        this.physics.setSubsteps(substeps);
+        if (forceMethod === 'barnes-hut') {
+            this.physics.setTheta(theta);
+            this.physics.useBarnesHut();
+        } else {
+            this.physics.useDirectForce();
+        }
         this.timeController.setPhysicsTimestep(dt);
+        this.onSimModeChange?.(simMode);
 
-        // Note: substeps/forceMethod/theta would need WASM methods
         console.log(`⚙️ Applied settings: dt=${dt}s, substeps=${substeps}, method=${forceMethod}, θ=${theta}`);
 
         this.close();
@@ -480,12 +503,14 @@ export class AdminPanel {
         const forceMethodSelect = document.getElementById('admin-force-method') as HTMLSelectElement | null;
         const thetaInput = document.getElementById('admin-theta') as HTMLInputElement | null;
         const thetaField = document.getElementById('theta-field') as HTMLElement | null;
+        const simModeSelect = document.getElementById('admin-sim-mode') as HTMLSelectElement | null;
 
         if (dtInput) dtInput.value = settings.dt.toString();
         if (substepsInput) substepsInput.value = settings.substeps.toString();
         if (forceMethodSelect) forceMethodSelect.value = settings.forceMethod;
         if (thetaInput) thetaInput.value = settings.theta.toString();
         if (thetaField) thetaField.classList.toggle('visible', settings.forceMethod === 'barnes-hut');
+        if (simModeSelect) simModeSelect.value = settings.simMode;
     }
 
     private setupDrag(container: HTMLElement): void {

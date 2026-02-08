@@ -81,6 +81,7 @@ interface AdminStatePayload {
     theta: number;
     timeScale: number;
     paused: boolean;
+    simMode: 'tick' | 'accumulator';
 }
 
 interface VisualizationStatePayload {
@@ -121,6 +122,7 @@ class SimulationServer {
     private tickInterval?: ReturnType<typeof setInterval>;
     private running = false;
     private lastSnapshotTick = 0n;
+    private simAccumulator = 0;
     private adminState: AdminStatePayload = {
         dt: 1 / CONFIG.tickRate,
         substeps: 4,
@@ -128,6 +130,7 @@ class SimulationServer {
         theta: 0.5,
         timeScale: 1, // Matches dt * tickRate (1s/s)
         paused: false,
+        simMode: 'tick',
     };
     private visualizationState: VisualizationStatePayload = {
         showOrbitTrails: true,
@@ -212,6 +215,7 @@ class SimulationServer {
             theta: 0.5,
             timeScale: 1.0 / CONFIG.tickRate * CONFIG.tickRate,
             paused: false,
+            simMode: 'tick',
         };
 
         console.log(`   Bodies: ${this.simulation.bodyCount()}`);
@@ -316,13 +320,18 @@ class SimulationServer {
                     return;
                 }
 
-                const dt = scale / CONFIG.tickRate;
-                this.simulation.setDt(dt);
                 this.adminState = {
                     ...this.adminState,
-                    dt,
                     timeScale: scale,
                 };
+                if (this.adminState.simMode === 'tick') {
+                    const dt = scale / CONFIG.tickRate;
+                    this.simulation.setDt(dt);
+                    this.adminState = {
+                        ...this.adminState,
+                        dt,
+                    };
+                }
                 this.broadcastAdminState();
                 break;
             }
@@ -335,6 +344,10 @@ class SimulationServer {
                 const substeps = typeof payload.substeps === 'number' && payload.substeps > 0 ? payload.substeps : this.adminState.substeps;
                 const forceMethod = payload.forceMethod === 'barnes-hut' ? 'barnes-hut' : 'direct';
                 const theta = typeof payload.theta === 'number' && payload.theta > 0 ? payload.theta : this.adminState.theta;
+                const simMode = payload.simMode === 'accumulator' ? 'accumulator' : 'tick';
+                const timeScale = typeof payload.timeScale === 'number' && payload.timeScale > 0
+                    ? payload.timeScale
+                    : this.adminState.timeScale;
 
                 this.simulation.setDt(dt);
                 this.simulation.setSubsteps(substeps);
@@ -350,9 +363,21 @@ class SimulationServer {
                     substeps,
                     forceMethod,
                     theta,
-                    timeScale: dt * CONFIG.tickRate,
+                    timeScale,
                     paused: this.adminState.paused,
+                    simMode,
                 };
+
+                this.simAccumulator = 0;
+
+                if (this.adminState.simMode === 'tick') {
+                    const tickDt = this.adminState.timeScale / CONFIG.tickRate;
+                    this.simulation.setDt(tickDt);
+                    this.adminState = {
+                        ...this.adminState,
+                        dt: tickDt,
+                    };
+                }
                 this.broadcastAdminState();
                 break;
             }
@@ -436,7 +461,21 @@ class SimulationServer {
 
             // Step simulation
             if (!this.adminState.paused) {
-                this.simulation.step();
+                if (this.adminState.simMode === 'accumulator') {
+                    this.simAccumulator += (delta / 1000) * this.adminState.timeScale;
+                    let steps = 0;
+                    const maxSteps = 1000;
+                    while (this.simAccumulator >= this.adminState.dt && steps < maxSteps) {
+                        this.simulation.step();
+                        this.simAccumulator -= this.adminState.dt;
+                        steps++;
+                    }
+                    if (steps >= maxSteps) {
+                        this.simAccumulator = 0;
+                    }
+                } else {
+                    this.simulation.step();
+                }
             }
 
             const currentTick = this.simulation.tick();

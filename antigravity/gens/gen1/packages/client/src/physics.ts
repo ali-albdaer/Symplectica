@@ -155,6 +155,30 @@ export class PhysicsClient {
         }
     }
 
+    setSubsteps(substeps: number): void {
+        if (this.simulation && substeps > 0) {
+            this.simulation.setSubsteps(substeps);
+        }
+    }
+
+    setTheta(theta: number): void {
+        if (this.simulation && theta > 0) {
+            this.simulation.setTheta(theta);
+        }
+    }
+
+    useDirectForce(): void {
+        if (this.simulation) {
+            this.simulation.useDirectForce();
+        }
+    }
+
+    useBarnesHut(): void {
+        if (this.simulation) {
+            this.simulation.useBarnesHut();
+        }
+    }
+
     time(): number {
         return this.simulation?.time() ?? 0;
     }
