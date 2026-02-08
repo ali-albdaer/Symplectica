@@ -1,7 +1,7 @@
 {
   "name": "@nbody/server",
   "version": "0.1.0",
-  "description": "Authoritative N-body simulation server",
+  "description": "WebSocket server for Symlectica",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
