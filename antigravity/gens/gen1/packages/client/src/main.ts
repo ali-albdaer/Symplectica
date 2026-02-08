@@ -82,6 +82,8 @@ class NBodyClient {
     private timeController = new TimeController();
     private uiHidden = false;
     private hintsVisible = false;
+    private showSimulationParams = false;
+    private showFollowingDetails = true;
 
     // Body following
     private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
@@ -401,24 +403,10 @@ class NBodyClient {
                     this.syncTimeScaleToServer();
                     break;
                 case '1':
-                    this.timeController.setSpeedIndex(0); // 1s/s
-                    this.updateTimeScaleUI();
-                    this.syncTimeScaleToServer();
+                    this.toggleSimulationSection('sim');
                     break;
                 case '2':
-                    this.timeController.setSpeedIndex(2); // 1hr/s
-                    this.updateTimeScaleUI();
-                    this.syncTimeScaleToServer();
-                    break;
-                case '3':
-                    this.timeController.setSpeedIndex(4); // 1wk/s
-                    this.updateTimeScaleUI();
-                    this.syncTimeScaleToServer();
-                    break;
-                case '4':
-                    this.timeController.setSpeedIndex(6); // 1yr/s
-                    this.updateTimeScaleUI();
-                    this.syncTimeScaleToServer();
+                    this.toggleSimulationSection('follow');
                     break;
                 case 'c':
                 case 'C':
@@ -469,6 +457,7 @@ class NBodyClient {
             this.switchToFollowBody(index);
         });
 
+        this.updateSimulationSections();
         this.updateTimeScaleUI();
     }
 
@@ -479,6 +468,26 @@ class NBodyClient {
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
+    }
+
+    private toggleSimulationSection(section: 'sim' | 'follow'): void {
+        if (section === 'sim') {
+            this.showSimulationParams = !this.showSimulationParams;
+        } else {
+            this.showFollowingDetails = !this.showFollowingDetails;
+        }
+        this.updateSimulationSections();
+    }
+
+    private updateSimulationSections(): void {
+        const simSection = document.getElementById('sim-params-section');
+        const followSection = document.getElementById('follow-section');
+        if (simSection) {
+            simSection.style.display = this.showSimulationParams ? '' : 'none';
+        }
+        if (followSection) {
+            followSection.style.display = this.showFollowingDetails ? '' : 'none';
+        }
     }
 
     private loadPresetFromAdmin(presetId: string): void {

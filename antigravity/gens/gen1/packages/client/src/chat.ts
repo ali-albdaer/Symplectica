@@ -41,7 +41,7 @@ export class Chat {
         this.setupKeyboardShortcuts();
 
         // Welcome message (player list will be injected on server welcome)
-        this.addSystemMessage('Welcome to the chat. Type /help for a list of available commands.');
+        this.addSystemMessage('Welcome to the chat. Type /help for a list of available commands. Press I for keybinds.');
     }
 
     private createUI(): HTMLElement {

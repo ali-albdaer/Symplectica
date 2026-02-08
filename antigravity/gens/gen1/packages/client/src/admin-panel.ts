@@ -152,9 +152,9 @@ export class AdminPanel {
                 left: 50%;
                 transform: translate(-50%, -50%);
                 width: 380px;
-                background: rgba(10, 15, 30, 0.98);
+                background: rgba(10, 15, 30, 0.95);
                 backdrop-filter: blur(20px);
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 12px;
                 color: #fff;
                 font-family: 'Segoe UI', system-ui, sans-serif;
@@ -173,15 +173,16 @@ export class AdminPanel {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 15px 20px;
+                padding: 12px 15px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 background: rgba(0, 0, 0, 0.3);
             }
             
             .admin-header h2 {
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: 600;
                 margin: 0;
+                color: #4fc3f7;
             }
             
             .admin-close {
@@ -211,12 +212,12 @@ export class AdminPanel {
             }
             
             .admin-section h3 {
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: 600;
-                color: #4fc3f7;
+                color: rgba(255, 255, 255, 0.5);
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                margin-bottom: 12px;
+                margin-bottom: 8px;
             }
             
             .admin-field {

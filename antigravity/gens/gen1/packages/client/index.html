@@ -42,18 +42,26 @@
     }
 
     #stats {
-      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #stats h3 {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin: 0 0 8px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .stats-card {
+      background: rgba(10, 15, 30, 0.9);
       backdrop-filter: blur(10px);
       padding: 15px 20px;
       border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    #stats h2 {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 10px;
-      color: #4fc3f7;
     }
 
     #stats .stat-row {
@@ -201,65 +209,67 @@
 
   <div id="ui-overlay">
     <div id="stats">
-      <h2>🌌 Simulation</h2>
-      <div class="stat-row">
-        <span class="label">Time</span>
-        <span class="value" id="sim-time">0.00 s</span>
+      <div id="follow-section" class="stats-card">
+        <h3>Following</h3>
+        <div class="stat-row">
+          <span class="label">Camera Dist</span>
+          <span class="value" id="camera-dist">0 AU</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">X</span>
+          <span class="value" id="sim-x">0.000 AU</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Y</span>
+          <span class="value" id="sim-y">0.000 AU</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Z</span>
+          <span class="value" id="sim-z">0.000 AU</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Following</span>
+          <span class="value" id="follow-target">Origin</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Type</span>
+          <span class="value" id="follow-type">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Mass</span>
+          <span class="value" id="follow-mass">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Radius</span>
+          <span class="value" id="follow-radius">—</span>
+        </div>
       </div>
-      <div class="stat-row">
-        <span class="label">Warp</span>
-        <span class="value" id="time-warp">1×</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Tick</span>
-        <span class="value" id="sim-tick">0</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Bodies</span>
-        <span class="value" id="sim-bodies">0</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Energy</span>
-        <span class="value" id="sim-energy">0 J</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">FPS</span>
-        <span class="value" id="render-fps">0</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Camera Dist</span>
-        <span class="value" id="camera-dist">0 AU</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">X</span>
-        <span class="value" id="sim-x">0.000 AU</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Y</span>
-        <span class="value" id="sim-y">0.000 AU</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Z</span>
-        <span class="value" id="sim-z">0.000 AU</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Following</span>
-        <span class="value" id="follow-target">Origin</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Type</span>
-        <span class="value" id="follow-type">—</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Mass</span>
-        <span class="value" id="follow-mass">—</span>
-      </div>
-      <div class="stat-row">
-        <span class="label">Radius</span>
-        <span class="value" id="follow-radius">—</span>
-      </div>
-      <div style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.4);">
-        Press I for hints
+      <div id="sim-params-section" class="stats-card">
+        <h3>Simulation Parameters</h3>
+        <div class="stat-row">
+          <span class="label">Time</span>
+          <span class="value" id="sim-time">0.00 s</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Warp</span>
+          <span class="value" id="time-warp">1×</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Tick</span>
+          <span class="value" id="sim-tick">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Bodies</span>
+          <span class="value" id="sim-bodies">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">Energy</span>
+          <span class="value" id="sim-energy">0 J</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">FPS</span>
+          <span class="value" id="render-fps">0</span>
+        </div>
       </div>
     </div>
 
@@ -275,6 +285,8 @@
         <li><span>T</span>Chat</li>
         <li><span>V</span>Visualization</li>
         <li><span>A</span>Admin</li>
+        <li><span>1</span>Toggle simulation params</li>
+        <li><span>2</span>Toggle follow details</li>
       </ul>
     </div>
   </div>
