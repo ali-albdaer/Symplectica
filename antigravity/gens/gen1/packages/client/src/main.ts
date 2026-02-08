@@ -82,7 +82,7 @@ class NBodyClient {
     private timeController = new TimeController();
     private uiHidden = false;
     private hintsVisible = false;
-    private showSimulationParams = false;
+    private showSimulationParams = true;
     private showFollowingDetails = true;
 
     // Body following
