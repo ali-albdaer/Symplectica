@@ -28,6 +28,8 @@ export class Chat {
     private network?: NetworkClient;
     private isOpen = true;
     private isFocused = false;
+    private unreadCount = 0;
+    private unreadBadge?: HTMLElement;
 
     private readonly MAX_MESSAGES = 10;
     private localName = `Player${Math.floor(Math.random() * 9000) + 1000}`;
@@ -47,7 +49,8 @@ export class Chat {
         container.id = 'chat-panel';
         container.innerHTML = `
             <div class="chat-header">
-                <span>💬 Chat</span>
+                <span class="chat-title">💬 Chat</span>
+                <span class="chat-unread" aria-hidden="true"></span>
                 <button class="chat-toggle" title="Toggle (T)">−</button>
             </div>
             <div class="chat-messages" id="chat-messages"></div>
@@ -61,13 +64,13 @@ export class Chat {
         style.textContent = `
             #chat-panel {
                 position: fixed;
-                bottom: 20px;
-                left: 20px;
-                width: 350px;
-                background: linear-gradient(160deg, rgba(8, 14, 28, 0.7), rgba(12, 24, 40, 0.78));
-                backdrop-filter: blur(12px);
-                border: 1px solid rgba(130, 170, 255, 0.16);
-                box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+                bottom: 16px;
+                left: 16px;
+                width: 300px;
+                background: linear-gradient(160deg, rgba(8, 14, 28, 0.55), rgba(10, 22, 36, 0.62));
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(120, 160, 240, 0.14);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.04);
                 border-radius: 10px;
                 color: #fff;
                 font-family: 'Segoe UI', system-ui, sans-serif;
@@ -80,7 +83,7 @@ export class Chat {
             }
             
             #chat-panel.minimized {
-                height: 38px !important;
+                height: 32px !important;
             }
             
             #chat-panel.minimized .chat-messages,
@@ -92,18 +95,45 @@ export class Chat {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 10px 15px;
-                background: rgba(0, 0, 0, 0.3);
+                padding: 7px 10px;
+                gap: 8px;
+                background: rgba(0, 0, 0, 0.26);
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 font-weight: 500;
                 cursor: pointer;
+            }
+
+            .chat-title {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .chat-unread {
+                display: none;
+                align-items: center;
+                justify-content: center;
+                min-width: 18px;
+                height: 18px;
+                padding: 0 6px;
+                border-radius: 999px;
+                background: rgba(110, 165, 255, 0.9);
+                color: #04121f;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.2px;
+                box-shadow: 0 0 0 1px rgba(4, 18, 31, 0.35), 0 6px 12px rgba(0, 0, 0, 0.3);
+            }
+
+            .chat-unread.is-visible {
+                display: inline-flex;
             }
             
             .chat-toggle {
                 background: none;
                 border: none;
                 color: rgba(255, 255, 255, 0.5);
-                font-size: 18px;
+                font-size: 16px;
                 cursor: pointer;
                 padding: 0 5px;
                 line-height: 1;
@@ -114,9 +144,9 @@ export class Chat {
             }
             
             .chat-messages {
-                height: 200px;
+                height: 170px;
                 overflow-y: auto;
-                padding: 10px 15px;
+                padding: 8px 10px;
                 scrollbar-width: thin;
                 scrollbar-color: rgba(120, 170, 255, 0.6) rgba(0, 0, 0, 0.2);
             }
@@ -141,7 +171,7 @@ export class Chat {
             }
             
             .chat-message {
-                margin-bottom: 8px;
+                margin-bottom: 6px;
                 line-height: 1.4;
                 word-wrap: break-word;
             }
@@ -171,7 +201,7 @@ export class Chat {
             }
             
             .chat-input-container {
-                padding: 10px 15px;
+                padding: 6px 10px 8px;
                 border-top: 1px solid rgba(255, 255, 255, 0.1);
             }
             
@@ -181,7 +211,7 @@ export class Chat {
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 5px;
                 color: #fff;
-                padding: 8px 12px;
+                padding: 4px 8px;
                 font-size: 13px;
             }
             
@@ -199,6 +229,7 @@ export class Chat {
         // Get references
         this.messageList = container.querySelector('#chat-messages')!;
         this.input = container.querySelector('#chat-input')!;
+        this.unreadBadge = container.querySelector('.chat-unread') ?? undefined;
 
         // Setup event listeners
         this.setupEventListeners(container);
@@ -236,6 +267,11 @@ export class Chat {
                 this.sendMessage();
             }
 
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.minimizeAndBlur();
+            }
+
             // Prevent propagation so game controls don't trigger
             e.stopPropagation();
         });
@@ -243,10 +279,17 @@ export class Chat {
 
     private setupKeyboardShortcuts(): void {
         window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isFocused) {
+                this.minimizeAndBlur();
+                return;
+            }
+
             if (this.isFocused) return; // Don't trigger when typing
 
             if (e.key === 't' || e.key === 'T') {
-                this.toggle();
+                e.preventDefault();
+                this.setOpen(true);
+                this.input.focus();
             }
 
             if (e.key === 'Enter' && this.isOpen) {
@@ -256,12 +299,30 @@ export class Chat {
     }
 
     toggle(): void {
-        this.isOpen = !this.isOpen;
+        this.setOpen(!this.isOpen);
+    }
+
+    private setOpen(open: boolean): void {
+        this.isOpen = open;
         this.container.classList.toggle('minimized', !this.isOpen);
+
+        if (this.isOpen) {
+            this.unreadCount = 0;
+            this.updateUnreadBadge();
+        }
 
         const btn = this.container.querySelector('.chat-toggle');
         if (btn) {
             btn.textContent = this.isOpen ? '−' : '+';
+        }
+    }
+
+    private minimizeAndBlur(): void {
+        if (this.isFocused) {
+            this.input.blur();
+        }
+        if (this.isOpen) {
+            this.setOpen(false);
         }
     }
 
@@ -294,7 +355,24 @@ export class Chat {
             this.messages.shift();
         }
 
+        if (!this.isOpen) {
+            this.unreadCount = Math.min(99, this.unreadCount + 1);
+            this.updateUnreadBadge();
+        }
+
         this.renderMessages();
+    }
+
+    private updateUnreadBadge(): void {
+        if (!this.unreadBadge) return;
+        if (this.unreadCount <= 0) {
+            this.unreadBadge.textContent = '';
+            this.unreadBadge.classList.remove('is-visible');
+            return;
+        }
+
+        this.unreadBadge.textContent = this.unreadCount >= 99 ? '99+' : `${this.unreadCount}`;
+        this.unreadBadge.classList.add('is-visible');
     }
 
     addSystemMessage(text: string): void {
