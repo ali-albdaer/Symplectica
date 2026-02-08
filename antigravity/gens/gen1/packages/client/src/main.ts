@@ -70,6 +70,9 @@ class NBodyClient {
     private currentVizOptions: VisualizationOptions = {
         showOrbitTrails: true,
         showLabels: false,
+        showGrid: false,
+        gridMode: 'plane',
+        gridSpacing: 1.495978707e11,
         orbitTrailLength: 100,
         realScale: false,
         bodyScale: 25,
@@ -221,6 +224,7 @@ class NBodyClient {
         this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
         this.bodyRenderer.setRealScale(options.realScale);
         this.bodyRenderer.setBodyScale(options.bodyScale);
+        this.bodyRenderer.setGridOptions(options.showGrid, options.gridMode, options.gridSpacing);
     }
 
     private applySnapshot(snapshot: string): void {

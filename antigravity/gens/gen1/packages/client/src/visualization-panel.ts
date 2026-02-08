@@ -1,29 +1,35 @@
 /**
  * Visualization Options Panel
- * 
- * Clean, simple state management for visualization settings.
- * Defaults: Scale 25× (recommended), Trail 100 points
+ *
+ * Controls display settings for the renderer.
  */
 
 export interface VisualizationOptions {
     showOrbitTrails: boolean;
     showLabels: boolean;
+    showGrid: boolean;
+    gridMode: 'cube' | 'plane';
+    gridSpacing: number;
     orbitTrailLength: number;
     realScale: boolean;
     bodyScale: number;
 }
 
-const DEFAULTS: VisualizationOptions = {
-    showOrbitTrails: true,
-    showLabels: false,
-    orbitTrailLength: 100,
-    realScale: false,
-    bodyScale: 25, // Recommended scale
-};
-
+const AU = 1.495978707e11;
 const SCALE_MIN = 1;
 const SCALE_MAX = 5000;
 const RECOMMENDED_SCALE = 25;
+
+const DEFAULTS: VisualizationOptions = {
+    showOrbitTrails: true,
+    showLabels: false,
+    showGrid: false,
+    gridMode: 'plane',
+    gridSpacing: AU,
+    orbitTrailLength: 100,
+    realScale: false,
+    bodyScale: RECOMMENDED_SCALE,
+};
 
 export class VisualizationPanel {
     private container: HTMLElement;
@@ -35,6 +41,10 @@ export class VisualizationPanel {
     // UI Elements
     private orbitsCheckbox!: HTMLInputElement;
     private labelsCheckbox!: HTMLInputElement;
+    private gridCheckbox!: HTMLInputElement;
+    private gridModeSelect!: HTMLSelectElement;
+    private gridSpacingInput!: HTMLInputElement;
+    private gridSpacingValue!: HTMLElement;
     private trailSlider!: HTMLInputElement;
     private trailValue!: HTMLElement;
     private realScaleCheckbox!: HTMLInputElement;
@@ -52,8 +62,7 @@ export class VisualizationPanel {
         this.syncUIFromOptions();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
-        
-        // Notify initial state
+
         this.onChange({ ...this.options });
     }
 
@@ -65,22 +74,41 @@ export class VisualizationPanel {
                 <h2>Visualization</h2>
                 <button class="viz-close" title="Close (V)">&times;</button>
             </div>
-            
+
             <div class="viz-content">
                 <section class="viz-section">
                     <h3>Display</h3>
-                    
+
                     <label class="viz-toggle">
                         <input type="checkbox" id="viz-orbits">
                         <span>Orbit Trails</span>
                     </label>
-                    
+
                     <label class="viz-toggle">
                         <input type="checkbox" id="viz-labels">
                         <span>Body Labels</span>
                     </label>
+
+                    <label class="viz-toggle">
+                        <input type="checkbox" id="viz-grid">
+                        <span>Reference Grid</span>
+                    </label>
+
+                    <div class="viz-field">
+                        <label>Grid Mode</label>
+                        <select id="viz-grid-mode">
+                            <option value="plane">Orbital Plane</option>
+                            <option value="cube">3D Cube</option>
+                        </select>
+                    </div>
+
+                    <div class="viz-field">
+                        <label>Grid Spacing (AU)</label>
+                        <input type="range" id="viz-grid-spacing" min="0.1" max="10" step="0.1" value="1">
+                        <span id="viz-grid-spacing-value">1.0 AU</span>
+                    </div>
                 </section>
-                
+
                 <section class="viz-section">
                     <h3>Trail Length</h3>
                     <div class="viz-slider-row">
@@ -88,10 +116,10 @@ export class VisualizationPanel {
                         <span id="viz-trail-value">100</span>
                     </div>
                 </section>
-                
+
                 <section class="viz-section">
                     <h3>Body Scale</h3>
-                    
+
                     <label class="viz-toggle">
                         <input type="checkbox" id="viz-real-scale">
                         <span>Real Scale (1:1)</span>
@@ -99,18 +127,17 @@ export class VisualizationPanel {
 
                     <label class="viz-toggle">
                         <input type="checkbox" id="viz-recommended">
-                        <span>Recommended (25×)</span>
+                        <span>Recommended (25x)</span>
                     </label>
-                    
+
                     <div class="viz-slider-row" id="viz-scale-field">
                         <input type="range" id="viz-scale" min="0" max="1" step="0.001">
-                        <span id="viz-scale-value">25×</span>
+                        <span id="viz-scale-value">25x</span>
                     </div>
                 </section>
             </div>
         `;
 
-        // Add styles
         const style = document.createElement('style');
         style.textContent = `
             #viz-panel {
@@ -130,9 +157,9 @@ export class VisualizationPanel {
                 flex-direction: column;
                 overflow: hidden;
             }
-            
+
             #viz-panel.open { display: flex; }
-            
+
             .viz-header {
                 display: flex;
                 justify-content: space-between;
@@ -141,14 +168,14 @@ export class VisualizationPanel {
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 background: rgba(0, 0, 0, 0.3);
             }
-            
+
             .viz-header h2 {
                 font-size: 14px;
                 font-weight: 600;
                 margin: 0;
                 color: #4fc3f7;
             }
-            
+
             .viz-close {
                 background: none;
                 border: none;
@@ -158,17 +185,17 @@ export class VisualizationPanel {
                 padding: 0 5px;
                 line-height: 1;
             }
-            
+
             .viz-close:hover { color: #fff; }
-            
+
             .viz-content { padding: 12px 15px; }
-            
+
             .viz-section {
                 margin-bottom: 14px;
             }
-            
+
             .viz-section:last-child { margin-bottom: 0; }
-            
+
             .viz-section h3 {
                 font-size: 10px;
                 font-weight: 600;
@@ -177,7 +204,7 @@ export class VisualizationPanel {
                 letter-spacing: 0.5px;
                 margin: 0 0 8px 0;
             }
-            
+
             .viz-toggle {
                 display: flex;
                 align-items: center;
@@ -185,32 +212,64 @@ export class VisualizationPanel {
                 padding: 6px 0;
                 cursor: pointer;
             }
-            
+
             .viz-toggle input[type="checkbox"] {
                 width: 16px;
                 height: 16px;
                 accent-color: #4fc3f7;
                 margin: 0;
             }
-            
+
             .viz-toggle span {
                 font-size: 13px;
                 color: rgba(255, 255, 255, 0.9);
             }
-            
+
+            .viz-field {
+                margin: 8px 0 6px 0;
+            }
+
+            .viz-field label {
+                display: block;
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.6);
+                margin-bottom: 6px;
+            }
+
+            .viz-field select {
+                width: 100%;
+                background: rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                color: #fff;
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+
+            .viz-field input[type="range"] {
+                width: 100%;
+                accent-color: #4fc3f7;
+                height: 4px;
+            }
+
+            .viz-field span {
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.6);
+            }
+
             .viz-slider-row {
                 display: flex;
                 align-items: center;
                 gap: 10px;
                 margin-top: 6px;
             }
-            
+
             .viz-slider-row input[type="range"] {
                 flex: 1;
                 accent-color: #4fc3f7;
                 height: 4px;
             }
-            
+
             .viz-slider-row span {
                 min-width: 50px;
                 text-align: right;
@@ -218,7 +277,7 @@ export class VisualizationPanel {
                 color: rgba(255, 255, 255, 0.7);
                 font-variant-numeric: tabular-nums;
             }
-            
+
             .viz-slider-row.disabled {
                 opacity: 0.4;
                 pointer-events: none;
@@ -231,6 +290,10 @@ export class VisualizationPanel {
     private cacheElements(): void {
         this.orbitsCheckbox = this.container.querySelector('#viz-orbits')!;
         this.labelsCheckbox = this.container.querySelector('#viz-labels')!;
+        this.gridCheckbox = this.container.querySelector('#viz-grid')!;
+        this.gridModeSelect = this.container.querySelector('#viz-grid-mode')!;
+        this.gridSpacingInput = this.container.querySelector('#viz-grid-spacing')!;
+        this.gridSpacingValue = this.container.querySelector('#viz-grid-spacing-value')!;
         this.trailSlider = this.container.querySelector('#viz-trail-length')!;
         this.trailValue = this.container.querySelector('#viz-trail-value')!;
         this.realScaleCheckbox = this.container.querySelector('#viz-real-scale')!;
@@ -241,24 +304,40 @@ export class VisualizationPanel {
     }
 
     private bindEvents(): void {
-        // Close button
         this.container.querySelector('.viz-close')?.addEventListener('click', () => this.close());
 
-        // Orbit trails toggle
         this.orbitsCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
             this.options.showOrbitTrails = this.orbitsCheckbox.checked;
             this.emitChange();
         });
 
-        // Labels toggle
         this.labelsCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
             this.options.showLabels = this.labelsCheckbox.checked;
             this.emitChange();
         });
 
-        // Trail length slider
+        this.gridCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showGrid = this.gridCheckbox.checked;
+            this.emitChange();
+        });
+
+        this.gridModeSelect.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.gridMode = this.gridModeSelect.value as 'cube' | 'plane';
+            this.emitChange();
+        });
+
+        this.gridSpacingInput.addEventListener('input', () => {
+            if (this.ignoreEvents) return;
+            const spacingAu = parseFloat(this.gridSpacingInput.value);
+            this.options.gridSpacing = spacingAu * AU;
+            this.gridSpacingValue.textContent = `${spacingAu.toFixed(1)} AU`;
+            this.emitChange();
+        });
+
         this.trailSlider.addEventListener('input', () => {
             if (this.ignoreEvents) return;
             this.options.orbitTrailLength = parseInt(this.trailSlider.value);
@@ -266,7 +345,6 @@ export class VisualizationPanel {
             this.emitChange();
         });
 
-        // Real scale checkbox
         this.realScaleCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
             this.options.realScale = this.realScaleCheckbox.checked;
@@ -277,7 +355,6 @@ export class VisualizationPanel {
             this.emitChange();
         });
 
-        // Recommended scale checkbox
         this.recommendedCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
             if (this.recommendedCheckbox.checked) {
@@ -290,13 +367,11 @@ export class VisualizationPanel {
             this.emitChange();
         });
 
-        // Scale slider
         this.scaleSlider.addEventListener('input', () => {
             if (this.ignoreEvents) return;
             const t = parseFloat(this.scaleSlider.value);
             this.options.bodyScale = this.sliderToScale(t);
-            this.scaleValue.textContent = `${Math.round(this.options.bodyScale)}×`;
-            // Update recommended checkbox based on current scale
+            this.scaleValue.textContent = `${Math.round(this.options.bodyScale)}x`;
             this.recommendedCheckbox.checked = this.isRecommended(this.options.bodyScale);
             this.emitChange();
         });
@@ -313,25 +388,28 @@ export class VisualizationPanel {
         this.onChange({ ...this.options });
     }
 
-    /** Sync UI elements to match current options state */
     private syncUIFromOptions(): void {
         this.ignoreEvents = true;
-        
+
         this.orbitsCheckbox.checked = this.options.showOrbitTrails;
         this.labelsCheckbox.checked = this.options.showLabels;
+        this.gridCheckbox.checked = this.options.showGrid;
+        this.gridModeSelect.value = this.options.gridMode;
+        this.gridSpacingInput.value = String(this.options.gridSpacing / AU);
+        this.gridSpacingValue.textContent = `${(this.options.gridSpacing / AU).toFixed(1)} AU`;
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
         this.realScaleCheckbox.checked = this.options.realScale;
         this.recommendedCheckbox.checked = this.isRecommended(this.options.bodyScale) && !this.options.realScale;
         this.updateScaleUI();
         this.updateScaleFieldState();
-        
+
         this.ignoreEvents = false;
     }
 
     private updateScaleUI(): void {
         this.scaleSlider.value = String(this.scaleToSlider(this.options.bodyScale));
-        this.scaleValue.textContent = `${Math.round(this.options.bodyScale)}×`;
+        this.scaleValue.textContent = `${Math.round(this.options.bodyScale)}x`;
     }
 
     private updateScaleFieldState(): void {
@@ -346,7 +424,6 @@ export class VisualizationPanel {
         }
     }
 
-    // Logarithmic scale mapping: slider 0-1 -> scale 1-5000
     private sliderToScale(t: number): number {
         const minLog = Math.log(SCALE_MIN);
         const maxLog = Math.log(SCALE_MAX);
@@ -383,7 +460,6 @@ export class VisualizationPanel {
         return { ...this.options };
     }
 
-    /** Apply options from external source (e.g., server sync) */
     applyOptions(options: VisualizationOptions): void {
         this.options = { ...options };
         this.syncUIFromOptions();

@@ -85,6 +85,9 @@ interface AdminStatePayload {
 interface VisualizationStatePayload {
     showOrbitTrails: boolean;
     showLabels: boolean;
+    showGrid: boolean;
+    gridMode: 'cube' | 'plane';
+    gridSpacing: number;
     orbitTrailLength: number;
     realScale: boolean;
     bodyScale: number;
@@ -125,6 +128,9 @@ class SimulationServer {
     private visualizationState: VisualizationStatePayload = {
         showOrbitTrails: true,
         showLabels: false,
+        showGrid: false,
+        gridMode: 'plane',
+        gridSpacing: 1.495978707e11,
         orbitTrailLength: 100,
         realScale: false,
         bodyScale: 25,
@@ -350,6 +356,9 @@ class SimulationServer {
                 this.visualizationState = {
                     showOrbitTrails: typeof payload.showOrbitTrails === 'boolean' ? payload.showOrbitTrails : this.visualizationState.showOrbitTrails,
                     showLabels: typeof payload.showLabels === 'boolean' ? payload.showLabels : this.visualizationState.showLabels,
+                    showGrid: typeof payload.showGrid === 'boolean' ? payload.showGrid : this.visualizationState.showGrid,
+                    gridMode: payload.gridMode === 'cube' || payload.gridMode === 'plane' ? payload.gridMode : this.visualizationState.gridMode,
+                    gridSpacing: typeof payload.gridSpacing === 'number' ? payload.gridSpacing : this.visualizationState.gridSpacing,
                     orbitTrailLength: typeof payload.orbitTrailLength === 'number' ? payload.orbitTrailLength : this.visualizationState.orbitTrailLength,
                     realScale: typeof payload.realScale === 'boolean' ? payload.realScale : this.visualizationState.realScale,
                     bodyScale: typeof payload.bodyScale === 'number' ? payload.bodyScale : this.visualizationState.bodyScale,

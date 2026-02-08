@@ -58,6 +58,13 @@ export class BodyRenderer {
     private scene: THREE.Scene;
     private bodies: Map<number, BodyMesh> = new Map();
 
+    // Grid
+    private gridGroup: THREE.Group | null = null;
+    private gridMode: 'cube' | 'plane' = 'plane';
+    private gridSpacing = AU;
+    private gridVisible = false;
+    private readonly gridExtent = 20 * AU;
+
     // Scale settings
     private bodyScale = 25; // Default: recommended scale
     private realScale = false;
@@ -225,6 +232,10 @@ export class BodyRenderer {
         const shouldSample = this.frameCount % this.TRAIL_SAMPLE_INTERVAL === 0;
         this.lastOrigin = origin;
 
+        if (this.gridGroup) {
+            this.gridGroup.position.set(-origin.x, -origin.y, -origin.z);
+        }
+
         let i = 0;
         for (const [id, mesh] of this.bodies) {
             if (i * 3 + 2 < positions.length) {
@@ -321,6 +332,13 @@ export class BodyRenderer {
         }
     }
 
+    setGridOptions(show: boolean, mode: 'cube' | 'plane', spacing: number): void {
+        this.gridVisible = show;
+        this.gridMode = mode;
+        this.gridSpacing = Math.max(spacing, 1.0);
+        this.rebuildGrid();
+    }
+
     pickBodyId(raycaster: THREE.Raycaster): number | null {
         const meshes: THREE.Object3D[] = [];
         for (const mesh of this.bodies.values()) {
@@ -355,6 +373,95 @@ export class BodyRenderer {
             label.material.dispose();
         }
         this.bodyLabels.clear();
+
+        if (this.gridGroup) {
+            this.scene.remove(this.gridGroup);
+            this.disposeGrid(this.gridGroup);
+            this.gridGroup = null;
+        }
+    }
+
+    private rebuildGrid(): void {
+        if (this.gridGroup) {
+            this.scene.remove(this.gridGroup);
+            this.disposeGrid(this.gridGroup);
+            this.gridGroup = null;
+        }
+
+        if (!this.gridVisible) {
+            return;
+        }
+
+        this.gridGroup = new THREE.Group();
+        const material = new THREE.LineBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.25,
+        });
+
+        if (this.gridMode === 'plane') {
+            const size = this.gridExtent * 2;
+            const divisions = Math.max(2, Math.floor(size / this.gridSpacing));
+            const grid = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);
+            grid.material = material;
+            grid.rotation.x = Math.PI / 2;
+            this.gridGroup.add(grid);
+        } else {
+            const grid = this.createCubeGrid(this.gridExtent, this.gridSpacing, material);
+            this.gridGroup.add(grid);
+        }
+
+        this.scene.add(this.gridGroup);
+    }
+
+    private createCubeGrid(extent: number, spacing: number, material: THREE.LineBasicMaterial): THREE.LineSegments {
+        const size = extent * 2;
+        const steps = Math.max(1, Math.floor(size / spacing));
+        const count = steps + 1;
+        const min = -extent;
+
+        const positions: number[] = [];
+
+        for (let yi = 0; yi < count; yi++) {
+            const y = min + yi * spacing;
+            for (let zi = 0; zi < count; zi++) {
+                const z = min + zi * spacing;
+                positions.push(min, y, z, extent, y, z);
+            }
+        }
+
+        for (let xi = 0; xi < count; xi++) {
+            const x = min + xi * spacing;
+            for (let zi = 0; zi < count; zi++) {
+                const z = min + zi * spacing;
+                positions.push(x, min, z, x, extent, z);
+            }
+        }
+
+        for (let xi = 0; xi < count; xi++) {
+            const x = min + xi * spacing;
+            for (let yi = 0; yi < count; yi++) {
+                const y = min + yi * spacing;
+                positions.push(x, y, min, x, y, extent);
+            }
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        return new THREE.LineSegments(geometry, material);
+    }
+
+    private disposeGrid(group: THREE.Group): void {
+        for (const child of group.children) {
+            if (child instanceof THREE.LineSegments || child instanceof THREE.Line) {
+                child.geometry.dispose();
+                if (Array.isArray(child.material)) {
+                    child.material.forEach((mat) => mat.dispose());
+                } else {
+                    child.material.dispose();
+                }
+            }
+        }
     }
 }
 
