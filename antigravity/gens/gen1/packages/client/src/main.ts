@@ -352,6 +352,7 @@ class NBodyClient {
 
         this.state.bodyCount = this.physics.bodyCount();
         this.updateUIBodyCount();
+        this.updateFollowUI();
     }
 
     private initControls(): void {
@@ -632,15 +633,33 @@ class NBodyClient {
     }
 
     private updateFollowUI(): void {
+        const typeEl = document.getElementById('follow-type');
+        const massEl = document.getElementById('follow-mass');
+        const radiusEl = document.getElementById('follow-radius');
+        const setFollowDetails = (type: string, mass: string, radius: string) => {
+            if (typeEl) typeEl.textContent = type;
+            if (massEl) massEl.textContent = mass;
+            if (radiusEl) radiusEl.textContent = radius;
+        };
+
         if (this.freeCamera) {
             const el = document.getElementById('follow-target');
             if (el) el.textContent = 'Free';
+            setFollowDetails('Camera', '—', '—');
             return;
         }
         const bodies = this.physics.getBodies();
         let followName = 'Origin';
         if (this.followBodyIndex >= 0 && this.followBodyIndex < bodies.length) {
-            followName = bodies[this.followBodyIndex].name;
+            const body = bodies[this.followBodyIndex];
+            followName = body.name;
+            setFollowDetails(
+                this.formatBodyType(body.type),
+                this.formatMass(body.mass),
+                this.formatRadius(body.radius)
+            );
+        } else {
+            setFollowDetails('—', '—', '—');
         }
         const el = document.getElementById('follow-target');
         if (el) el.textContent = followName;
@@ -859,6 +878,28 @@ class NBodyClient {
         if (abs < 1e9) return (joules / 1e6).toFixed(2) + ' MJ';
         if (abs < 1e12) return (joules / 1e9).toFixed(2) + ' GJ';
         return joules.toExponential(3) + ' J';
+    }
+
+    private formatMass(kg: number): string {
+        const abs = Math.abs(kg);
+        if (abs === 0) return '0 kg';
+        if (abs < 1e6) return kg.toFixed(2) + ' kg';
+        if (abs < 1e9) return (kg / 1e6).toFixed(2) + ' t';
+        if (abs < 1e12) return (kg / 1e9).toFixed(2) + ' Mt';
+        if (abs < 1e15) return (kg / 1e12).toFixed(2) + ' Gt';
+        return kg.toExponential(3) + ' kg';
+    }
+
+    private formatRadius(meters: number): string {
+        const abs = Math.abs(meters);
+        if (abs < 1e3) return meters.toFixed(0) + ' m';
+        if (abs < 1e6) return (meters / 1e3).toFixed(1) + ' km';
+        if (abs < 1e9) return (meters / 1e6).toFixed(1) + ' Mm';
+        return (meters / 1e9).toFixed(2) + ' Gm';
+    }
+
+    private formatBodyType(type: string): string {
+        return type.charAt(0).toUpperCase() + type.slice(1);
     }
 
     private updateLoadingStatus(status: string): void {
