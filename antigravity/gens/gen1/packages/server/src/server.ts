@@ -125,7 +125,7 @@ class SimulationServer {
         substeps: 4,
         forceMethod: 'direct',
         theta: 0.5,
-        timeScale: 604800, // 1wk/s default
+        timeScale: 1, // Matches dt * tickRate (1s/s)
         paused: false,
     };
     private visualizationState: VisualizationStatePayload = {
@@ -209,7 +209,7 @@ class SimulationServer {
             substeps: 4,
             forceMethod: 'direct',
             theta: 0.5,
-            timeScale: 604800, // 1wk/s default
+            timeScale: 1.0 / CONFIG.tickRate * CONFIG.tickRate,
             paused: false,
         };
 
