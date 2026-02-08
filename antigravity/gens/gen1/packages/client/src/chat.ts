@@ -64,9 +64,10 @@ export class Chat {
                 bottom: 20px;
                 left: 20px;
                 width: 350px;
-                background: rgba(10, 15, 30, 0.9);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: linear-gradient(160deg, rgba(8, 14, 28, 0.7), rgba(12, 24, 40, 0.78));
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(130, 170, 255, 0.16);
+                box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
                 border-radius: 10px;
                 color: #fff;
                 font-family: 'Segoe UI', system-ui, sans-serif;
@@ -116,6 +117,27 @@ export class Chat {
                 height: 200px;
                 overflow-y: auto;
                 padding: 10px 15px;
+                scrollbar-width: thin;
+                scrollbar-color: rgba(120, 170, 255, 0.6) rgba(0, 0, 0, 0.2);
+            }
+
+            .chat-messages::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            .chat-messages::-webkit-scrollbar-track {
+                background: rgba(0, 0, 0, 0.25);
+                border-radius: 999px;
+            }
+
+            .chat-messages::-webkit-scrollbar-thumb {
+                background: linear-gradient(180deg, rgba(120, 170, 255, 0.8), rgba(80, 120, 200, 0.7));
+                border-radius: 999px;
+                border: 1px solid rgba(10, 15, 30, 0.6);
+            }
+
+            .chat-messages::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(180deg, rgba(150, 200, 255, 0.9), rgba(95, 140, 220, 0.85));
             }
             
             .chat-message {
