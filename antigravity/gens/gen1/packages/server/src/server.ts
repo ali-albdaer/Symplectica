@@ -592,6 +592,13 @@ class SimulationServer {
                 }
 
                 const normalized = requested.slice(0, 20);
+                if (normalized.toLowerCase() === 'system') {
+                    this.sendChatToClient(client, {
+                        sender: 'System',
+                        text: 'no.',
+                    });
+                    break;
+                }
                 const previous = client.displayName;
                 client.displayName = normalized;
 
