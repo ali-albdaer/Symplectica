@@ -6,7 +6,7 @@
 use crate::body::{Body, BodyId};
 use crate::collision::process_collisions;
 use crate::force::{compute_accelerations_direct, compute_total_energy};
-use crate::integrator::{step, IntegratorConfig};
+use crate::integrator::{step_with_accel, AccelerationFn, IntegratorConfig, initialize_accelerations_with};
 use crate::octree::compute_accelerations_barnes_hut;
 use crate::prng::Pcg32;
 use crate::snapshot::Snapshot;
@@ -191,13 +191,15 @@ impl Simulation {
 
     /// Advance simulation by one tick
     pub fn step(&mut self) {
+        let accel_fn = self.resolve_accel_fn();
+
         if self.needs_init {
-            self.compute_accelerations();
+            initialize_accelerations_with(&mut self.bodies, &self.config.integrator.force_config, accel_fn);
             self.needs_init = false;
         }
 
         // Advance physics
-        step(&mut self.bodies, &self.config.integrator);
+        step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn);
         
         // Handle collisions
         if self.config.enable_collisions {
@@ -216,22 +218,18 @@ impl Simulation {
         }
     }
 
-    /// Compute accelerations using configured method
-    fn compute_accelerations(&mut self) {
-        // Auto-select method based on body count
-        let method = if self.bodies.len() > self.config.barnes_hut_threshold {
+    fn resolve_force_method(&self) -> ForceMethod {
+        if self.bodies.len() > self.config.barnes_hut_threshold {
             ForceMethod::BarnesHut
         } else {
             self.config.force_method
-        };
+        }
+    }
 
-        match method {
-            ForceMethod::Direct => {
-                compute_accelerations_direct(&mut self.bodies, &self.config.integrator.force_config);
-            }
-            ForceMethod::BarnesHut => {
-                compute_accelerations_barnes_hut(&mut self.bodies, &self.config.integrator.force_config);
-            }
+    fn resolve_accel_fn(&self) -> AccelerationFn {
+        match self.resolve_force_method() {
+            ForceMethod::Direct => compute_accelerations_direct,
+            ForceMethod::BarnesHut => compute_accelerations_barnes_hut,
         }
     }
 
