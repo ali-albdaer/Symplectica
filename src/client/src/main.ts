@@ -1028,6 +1028,5 @@ client.init().then(() => {
     // Expose for browser console testing
     (window as any).physics = client.getPhysics();
     (window as any).timeController = client.getTimeController();
-    console.log('🧪 Test mode: window.physics and window.timeController available');
-    console.log('   Run: import("./src/time-tests.ts").then(t => t.runAllTests(physics, timeController))');
+    console.log('🚀 N-Body Client initialized');
 }).catch(console.error);
