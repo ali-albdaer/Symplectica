@@ -5,3 +5,4 @@ node_modules/
 **/local/
 *.local.*
 Cargo.lock
+package-lock.json
