@@ -54,7 +54,7 @@ Intended features and capabilities of **Symplectica**.
 - Planets:
     - Rocky, gas giant, dwarf planet types.
     - Atmospheres, rings, oblateness.
-- Moons and asteroids with stable orbit initialization.
+- Moons, meteors and asteroids with eccentric and inclined orbits.
 - Relativistic bodies:
     - Black holes:
         - Gravitational lensing (shader-based).
