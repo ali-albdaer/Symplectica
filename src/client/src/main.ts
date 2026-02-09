@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
-import { AdminStatePayload, NetworkClient, VisualizationStatePayload } from './network';
+import { AdminStatePayload, NetworkClient } from './network';
 import { PhysicsClient } from './physics';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
@@ -156,10 +156,6 @@ class NBodyClient {
         this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
             this.currentVizOptions = { ...options };
             this.applyVisualizationToRenderer(options);
-
-            if (this.network?.isConnected()) {
-                this.network.sendVisualizationSettings(options);
-            }
         });
 
         this.hideLoading();
@@ -172,7 +168,7 @@ class NBodyClient {
 
     private setupNetworkHandlers(): void {
         this.network.on('welcome', (message) => {
-            const payload = message.payload as { snapshot: string; players?: string[]; displayName?: string; config?: { adminState?: AdminStatePayload; visualizationState?: VisualizationStatePayload } };
+            const payload = message.payload as { snapshot: string; players?: string[]; displayName?: string; config?: { adminState?: AdminStatePayload } };
             if (payload?.snapshot) {
                 this.applySnapshot(payload.snapshot);
             }
@@ -184,9 +180,6 @@ class NBodyClient {
             }
             if (payload?.config?.adminState) {
                 this.applyAdminState(payload.config.adminState);
-            }
-            if (payload?.config?.visualizationState) {
-                this.applyVisualizationState(payload.config.visualizationState);
             }
         });
 
@@ -218,12 +211,6 @@ class NBodyClient {
             }
         });
 
-        this.network.on('visualization_state', (message) => {
-            const payload = message.payload as VisualizationStatePayload;
-            if (payload) {
-                this.applyVisualizationState(payload);
-            }
-        });
     }
 
     private applyAdminState(settings: AdminStatePayload): void {
@@ -236,12 +223,6 @@ class NBodyClient {
         this.adminPanel?.applyServerSettings(settings);
     }
 
-    private applyVisualizationState(settings: VisualizationStatePayload): void {
-        this.currentVizOptions = { ...settings };
-        this.applyVisualizationToRenderer(settings);
-        this.vizPanel?.applyOptions(settings);
-    }
-    
     private applyVisualizationToRenderer(options: VisualizationOptions): void {
         this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
         this.bodyRenderer.setShowLabels(options.showLabels);

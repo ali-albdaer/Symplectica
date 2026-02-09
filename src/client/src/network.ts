@@ -8,7 +8,7 @@
  */
 
 interface ServerMessage {
-    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state' | 'visualization_state';
+    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state';
     payload: unknown;
     serverTick?: number;
     timestamp?: number;
@@ -30,7 +30,6 @@ interface WelcomePayload {
         tickRate: number;
         serverTick: number;
         adminState?: AdminStatePayload;
-        visualizationState?: VisualizationStatePayload;
     };
 }
 
@@ -49,18 +48,6 @@ export interface AdminStatePayload {
     simMode: 'tick' | 'accumulator';
 }
 
-export interface VisualizationStatePayload {
-    showOrbitTrails: boolean;
-    showLabels: boolean;
-    showGridXY: boolean;
-    showGridXZ: boolean;
-    showGridYZ: boolean;
-    gridSpacing: number;
-    gridSize: number;
-    orbitTrailLength: number;
-    realScale: boolean;
-    bodyScale: number;
-}
 
 type MessageHandler = (message: ServerMessage) => void;
 
@@ -147,7 +134,6 @@ export class NetworkClient {
             case 'snapshot':
             case 'chat':
             case 'admin_state':
-            case 'visualization_state':
             case 'error':
                 // Dispatch to registered handlers
                 const handlers = this.handlers.get(message.type) || [];
@@ -244,9 +230,6 @@ export class NetworkClient {
         this.send('reset_simulation');
     }
 
-    sendVisualizationSettings(settings: VisualizationStatePayload): void {
-        this.send('set_visualization', settings);
-    }
 
     sendPause(paused: boolean): void {
         this.send('set_pause', { paused });
