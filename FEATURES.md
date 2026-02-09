@@ -1,6 +1,6 @@
 # Features
 
-Intended capabilities of **Symplectica**.
+Intended features and capabilities of **Symplectica**.
 
 ---
 
@@ -23,19 +23,20 @@ Intended capabilities of **Symplectica**.
 - Barnes–Hut octree solver.
 - Fast Multipole Method (FMM).
 - Solvers switchable in run-time (in admin-panel).
-- Automated solver-accuracy scripts:
+- Automated solver-accuracy validation scripts:
     - Pairwise vs Barnes-Hut (compare per-body errors).
     - ...
 
 ### 2.2 Time Integration
 - Symplectic Velocity Verlet integrator (default).
-- Tick-based ...
-- Fixed 60 Hz physics timestep using accumulator pattern.
 - Close-encounter integrator switching:
     - Detection via distance + Hill-sphere estimate.
     - Refinement using acceleration / jerk thresholds.
     - Adaptive Runge–Kutta 45.
     - 5th-order Gauss–Radau. 
+    - No visible discontinuities.
+- Tick-based ...
+- Fixed 60 Hz physics timestep using accumulator pattern.
 - Sub-stepping support for stability at high gradients.
 
 ### 2.3 Numerical Stability
@@ -118,9 +119,14 @@ Intended capabilities of **Symplectica**.
 ---
 
 ## 9. Visualization Panel
-- Velocity, acceleration, force vector visualization with magnitude scaling.
-- Velocity, acceleration, gravity, temperature field visualization.
+- Object velocity, acceleration, force vector visualization with magnitude scaling.
+- Gravitational field strength and direction.
+- Potential and gradient fields.
 - Visualization-only object size scaling.
+- Orbit diagnostics:
+    - Trajectory trails.
+    - Apoapsis / periapsis markers.
+    - Hill spheres and SOI boundaries.
 
 ---
 
@@ -156,6 +162,31 @@ Intended capabilities of **Symplectica**.
 
 - Portable telescope with accurate zoom behavior.
 - High-precision clock.
+
+---
+
+## 14. Visual Fidelity
+
+### 14.1 Physically-Grounded Rendering
+- Per-player visual quality presets:
+    - **Low**: prioritizes performance.
+    - **High**: balanced quality and performance.
+    - **Ultra**: maximum visual fidelity.
+- Lighting:
+    - Stellar luminosity determines irradiance.
+    - Distance-based inverse-square falloff.
+- Planet appearance derived from physical parameters (Radius, atmosphere composition, density, albedo, and temperature.)
+- Atmospheric rendering:
+    - Rayleigh and Mie scattering using the Bruneton & Neyret LUT approach.
+    - Cloud layers derived from atmospheric density and procedural noise.
+- Shadows:
+    - Physically plausible shadow casting from stars and major bodies.
+    - Shadow resolution scales with apparent angular size.
+- Reflections:
+    - Reflection models for oceans, ice, and metallic surfaces.
+    - Reflection intensity derived from surface properties and incident light.
+- Exposure and tone mapping:
+    - HDR pipeline with exposure chosen to preserve physical brightness ratios.
 
 ---
 
