@@ -9,6 +9,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { CONFIG } from './config.js';
 
 // Physics WASM module types (will be loaded dynamically)
 interface PhysicsModule {
@@ -105,15 +106,6 @@ interface Client {
     lastPing: number;
     latency: number;
 }
-
-// Server configuration
-const CONFIG = {
-    port: parseInt(process.env.PORT || '8080'),
-    tickRate: 60, // Hz
-    snapshotInterval: 300, // Every 5 seconds at 60Hz
-    seed: BigInt(Date.now()),
-    stateUpdateInterval: 1, // Send state every tick
-};
 
 class SimulationServer {
     private physics!: PhysicsModule;

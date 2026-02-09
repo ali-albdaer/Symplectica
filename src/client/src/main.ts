@@ -17,6 +17,7 @@ import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
 import { VisualizationPanel, VisualizationOptions } from './visualization-panel';
 import { TimeController } from './time-controller';
+import { getWebSocketUrl } from './config';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -166,9 +167,7 @@ class NBodyClient {
     }
 
     private async initNetwork(): Promise<void> {
-        const host = window.location.hostname || 'localhost';
-        const url = `ws://${host}:8080`;
-        this.network = new NetworkClient(url);
+        this.network = new NetworkClient(getWebSocketUrl());
     }
 
     private setupNetworkHandlers(): void {

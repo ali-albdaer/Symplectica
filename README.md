@@ -17,6 +17,10 @@ See [FEATURES.md](FEATURES.md) for a comprehensive list of implemented, in progr
 ## Status
 The project is in early research and development stages.
 
+## Build & Run
+- Install dependencies: `npm install` in root.
+- Run dev server + client: `npm run dev` also in root.
+
 ## Sources
 All sources I used while researching physics, numerical methods, and simulation design will be listed in [SOURCES.md](SOURCES.md).
 
