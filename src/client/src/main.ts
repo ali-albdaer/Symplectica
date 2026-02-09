@@ -80,8 +80,8 @@ class NBodyClient {
         gridSpacing: 1.495978707e11,
         gridSize: 40,
         orbitTrailLength: 100,
-        realScale: false,
-        bodyScale: 25,
+        realScale: true,
+        bodyScale: 1,
     };
 
     // Time control (centralized)
@@ -309,7 +309,7 @@ class NBodyClient {
             1e3,     // 1 km near plane
             1e15     // ~1000 AU far plane
         );
-        this.camera.setDistance(2.5 * AU); // Start at 2.5 AU distance
+        this.camera.setDistance(1 * AU); // Start at 1 AU distance
         this.camera.setElevation(0.5); // Look down at system
 
         // Create body renderer

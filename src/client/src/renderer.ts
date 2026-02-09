@@ -67,8 +67,8 @@ export class BodyRenderer {
     private gridYZVisible = false;
 
     // Scale settings
-    private bodyScale = 25; // Default: recommended scale
-    private realScale = false;
+    private bodyScale = 1; // Default: 1x scale
+    private realScale = true;
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();

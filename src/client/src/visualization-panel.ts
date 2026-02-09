@@ -31,8 +31,8 @@ const DEFAULTS: VisualizationOptions = {
     gridSpacing: AU,
     gridSize: 40,
     orbitTrailLength: 100,
-    realScale: false,
-    bodyScale: RECOMMENDED_SCALE,
+    realScale: true,
+    bodyScale: 1,
 };
 
 export class VisualizationPanel {
