@@ -18,7 +18,7 @@ See [FEATURES.md](FEATURES.md) for a comprehensive list of implemented, in progr
 The project is in early research and development stages.
 
 ## Build & Run
-- Install dependencies: `npm install` in root.
+- Install dependencies and build wasm: `npm install` in root.
 - Run dev server + client: `npm run dev` also in root.
 
 ## Sources
