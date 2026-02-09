@@ -3,6 +3,8 @@ node_modules/
 **/target/
 **/dist/
 **/local/
+.vite/
+src/physics-core/pkg/
 *.local.*
 Cargo.lock
 package-lock.json
