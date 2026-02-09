@@ -90,19 +90,19 @@ export class NetworkClient {
 
     async connect(): Promise<void> {
         return new Promise((resolve, reject) => {
-            console.log(`🌐 Connecting to ${this.url}...`);
+            console.log(`[INFO] Connecting to ${this.url}...`);
 
             this.ws = new WebSocket(this.url);
 
             this.ws.onopen = () => {
-                console.log('✅ Connected to server');
+                console.log('[OK] Connected to server');
                 this.reconnecting = false;
                 this.reconnectAttempts = 0;
                 resolve();
             };
 
             this.ws.onclose = () => {
-                console.log('🔌 Disconnected from server');
+                console.log('[INFO] Disconnected from server');
                 this.handleDisconnect();
             };
 
@@ -162,7 +162,7 @@ export class NetworkClient {
         this.clientId = payload.clientId;
         this.serverTick = payload.config.serverTick;
 
-        console.log(`👋 Welcome! Client ID: ${this.clientId}`);
+        console.log(`[INFO] Welcome! Client ID: ${this.clientId}`);
         console.log(`   Server tick: ${this.serverTick}`);
         console.log(`   Tick rate: ${payload.config.tickRate} Hz`);
 
@@ -192,7 +192,7 @@ export class NetworkClient {
         this.reconnectAttempts++;
 
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000);
-        console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+        console.log(`[INFO] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
 
         setTimeout(() => {
             this.connect().catch(() => {

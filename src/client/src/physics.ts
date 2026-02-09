@@ -88,7 +88,7 @@ export class PhysicsClient {
     M_EARTH = 0;
 
     async init(): Promise<void> {
-        console.log('📦 Loading WASM physics...');
+        console.log('[INFO] Loading WASM physics...');
 
         try {
             // Import WASM module built in physics-core/pkg
@@ -107,11 +107,11 @@ export class PhysicsClient {
             this.M_EARTH = this.module.getEarthMass();
 
             this.initialized = true;
-            console.log('✅ WASM physics loaded');
+            console.log('[OK] WASM physics loaded');
             console.log(`   G = ${this.G} m³/(kg·s²)`);
             console.log(`   AU = ${this.AU} m`);
         } catch (error) {
-            console.error('❌ Failed to load WASM:', error);
+            console.error('[ERROR] Failed to load WASM:', error);
             throw error;
         }
     }
@@ -126,7 +126,7 @@ export class PhysicsClient {
         this.simulation.setDt(3600);
         this.simulation.setSubsteps(4);
 
-        console.log(`🌍 Created Sun-Earth-Moon system (${this.simulation.bodyCount()} bodies)`);
+        console.log(`[INFO] Created Sun-Earth-Moon system (${this.simulation.bodyCount()} bodies)`);
     }
 
     createNew(seed?: bigint): void {
@@ -267,7 +267,7 @@ export class PhysicsClient {
                 if (typeof this.module.createPlayableSolarSystem === 'function') {
                     this.simulation = this.module.createPlayableSolarSystem(seed);
                 } else {
-                    console.warn('⚠️ Playable Solar System preset unavailable in WASM build. Falling back to Full Solar System.');
+                    console.warn('[WARN] Playable Solar System preset unavailable in WASM build. Falling back to Full Solar System.');
                     this.simulation = this.module.createFullSolarSystem(seed);
                     loadedPreset = 'fullSolarSystem';
                 }
@@ -295,7 +295,7 @@ export class PhysicsClient {
         this.simulation.setDt(3600); // 1 hour per step
         this.simulation.setSubsteps(4);
 
-        console.log(`🌍 Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies, dt=3600s)`);
+        console.log(`[INFO] Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies, dt=3600s)`);
     }
 
     /** Add a custom body */
@@ -327,7 +327,7 @@ export class PhysicsClient {
             );
         }
 
-        console.log(`➕ Added body: ${body.name} (id: ${id})`);
+        console.log(`[INFO] Added body: ${body.name} (id: ${id})`);
         return id;
     }
 
@@ -336,7 +336,7 @@ export class PhysicsClient {
         if (!this.simulation) return;
 
         // Note: WASM doesn't have remove yet, would need to rebuild
-        console.log(`➖ Remove body ${id} - not implemented in WASM yet`);
+        console.log(`[WARN] Remove body ${id} - not implemented in WASM yet`);
     }
 
     dispose(): void {

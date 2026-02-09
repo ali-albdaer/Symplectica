@@ -147,7 +147,7 @@ class SimulationServer {
     };
 
     async start(): Promise<void> {
-        console.log('🚀 Starting N-Body Simulation Server...');
+        console.log('[INFO] Starting N-Body Simulation Server...');
 
         // Load WASM module
         await this.loadPhysics();
@@ -161,13 +161,13 @@ class SimulationServer {
         // Start game loop
         this.startGameLoop();
 
-        console.log(`✅ Server running on port ${CONFIG.port}`);
+        console.log(`[OK] Server running on port ${CONFIG.port}`);
         console.log(`   Tick rate: ${CONFIG.tickRate} Hz`);
         console.log(`   Seed: ${CONFIG.seed}`);
     }
 
     private async loadPhysics(): Promise<void> {
-        console.log('📦 Loading WASM physics module...');
+        console.log('[INFO] Loading WASM physics module...');
 
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = dirname(__filename);
@@ -191,17 +191,17 @@ class SimulationServer {
             module.init();
 
             this.physics = module as PhysicsModule;
-            console.log('✅ WASM physics loaded');
+            console.log('[OK] WASM physics loaded');
             console.log(`   G = ${this.physics.getG()} m³/(kg·s²)`);
             console.log(`   AU = ${this.physics.getAU()} m`);
         } catch (error) {
-            console.error('❌ Failed to load WASM:', error);
+            console.error('[ERROR] Failed to load WASM:', error);
             throw error;
         }
     }
 
     private createSimulation(): void {
-        console.log('🌍 Creating simulation...');
+        console.log('[INFO] Creating simulation...');
 
         // Use preset for now
         this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
@@ -238,7 +238,7 @@ class SimulationServer {
             };
 
             this.clients.set(clientId, client);
-            console.log(`👤 Client connected: ${clientId} (${this.clients.size} total)`);
+            console.log(`[INFO] Client connected: ${clientId} (${this.clients.size} total)`);
 
             // Send welcome message with full snapshot
             this.sendMessage(ws, {
@@ -275,7 +275,7 @@ class SimulationServer {
 
             ws.on('close', () => {
                 this.clients.delete(clientId);
-                console.log(`👤 Client disconnected: ${clientId} (${this.clients.size} remaining)`);
+                console.log(`[INFO] Client disconnected: ${clientId} (${this.clients.size} remaining)`);
                 this.broadcastChat({
                     sender: 'System',
                     text: `${client.displayName} left`,
@@ -494,7 +494,7 @@ class SimulationServer {
 
             // Log performance occasionally
             if (Number(currentTick) % (CONFIG.tickRate * 10) === 0) {
-                console.log(`📊 Tick ${currentTick} | Time: ${this.simulation.time().toFixed(2)}s | Energy: ${this.simulation.totalEnergy().toExponential(4)} J | Clients: ${this.clients.size}`);
+                console.log(`[STATS] Tick ${currentTick} | Time: ${this.simulation.time().toFixed(2)}s | Energy: ${this.simulation.totalEnergy().toExponential(4)} J | Clients: ${this.clients.size}`);
             }
         }, tickMs);
     }
@@ -703,7 +703,7 @@ class SimulationServer {
             this.wss.close();
         }
 
-        console.log('🛑 Server stopped');
+        console.log('[INFO] Server stopped');
     }
 }
 
@@ -717,7 +717,7 @@ server.start().catch((error) => {
 
 // Handle shutdown
 process.on('SIGINT', () => {
-    console.log('\n🛑 Shutting down...');
+    console.log('\n[INFO] Shutting down...');
     server.stop();
     process.exit(0);
 });
