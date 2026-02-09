@@ -91,12 +91,11 @@ export class PhysicsClient {
         console.log('📦 Loading WASM physics...');
 
         try {
-            // Import WASM module and binary URL
-            const physicsModule = await import('./wasm/physics_core.js');
-            const wasmUrl = new URL('./wasm/physics_core_bg.wasm', import.meta.url).href;
+            // Import WASM module built in physics-core/pkg
+            const physicsModule = await import('../../physics-core/pkg/physics_core.js');
 
-            // Initialize WASM with the binary
-            await physicsModule.default(wasmUrl);
+            // Initialize WASM using module-local URL resolution
+            await physicsModule.default();
             physicsModule.init();
 
             this.module = physicsModule as PhysicsModule;
