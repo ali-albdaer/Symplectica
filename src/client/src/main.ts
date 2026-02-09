@@ -18,7 +18,7 @@ import { AdminPanel } from './admin-panel';
 import { VisualizationPanel, VisualizationOptions, VisualizationPresetName } from './visualization-panel';
 import { TimeController } from './time-controller';
 import { getWebSocketUrl } from './config';
-import { VisualPresetRegistry } from './visual-preset-registry';
+import { VisualPresetRegistry, VisualPresetsFile } from './visual-preset-registry';
 import visualPresets from './visualPresets.json';
 
 // Physical constants (SI units)
@@ -83,8 +83,6 @@ class NBodyClient {
         gridSpacing: 1.495978707e11,
         gridSize: 40,
         orbitTrailLength: 100,
-        realScale: true,
-        bodyScale: 1,
     };
 
     // Time control (centralized)
@@ -114,7 +112,7 @@ class NBodyClient {
     };
 
     async init(): Promise<void> {
-        VisualPresetRegistry.loadPresets(visualPresets);
+        VisualPresetRegistry.loadPresets(visualPresets as VisualPresetsFile);
         VisualPresetRegistry.setDefaultPreset('Low');
         VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, 'Low');
         VisualPresetRegistry.registerFeature('bodyRenderer', {});

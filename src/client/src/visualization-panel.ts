@@ -13,17 +13,11 @@ export interface VisualizationOptions {
     gridSpacing: number;
     gridSize: number;
     orbitTrailLength: number;
-    realScale: boolean;
-    bodyScale: number;
 }
 
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
 
 const AU = 1.495978707e11;
-const SCALE_MIN = 1;
-const SCALE_MAX = 5000;
-const RECOMMENDED_SCALE = 25;
-
 const DEFAULTS: VisualizationOptions = {
     showOrbitTrails: true,
     showLabels: false,
@@ -33,8 +27,6 @@ const DEFAULTS: VisualizationOptions = {
     gridSpacing: AU,
     gridSize: 40,
     orbitTrailLength: 100,
-    realScale: true,
-    bodyScale: 1,
 };
 
 export class VisualizationPanel {
@@ -58,11 +50,6 @@ export class VisualizationPanel {
     private gridSizeValue!: HTMLElement;
     private trailSlider!: HTMLInputElement;
     private trailValue!: HTMLElement;
-    private realScaleCheckbox!: HTMLInputElement;
-    private recommendedCheckbox!: HTMLInputElement;
-    private scaleSlider!: HTMLInputElement;
-    private scaleValue!: HTMLElement;
-    private scaleField!: HTMLElement;
     private presetSelect!: HTMLSelectElement;
 
     constructor(
@@ -155,24 +142,6 @@ export class VisualizationPanel {
                     </div>
                 </section>
 
-                <section class="viz-section">
-                    <h3>Body Scale</h3>
-
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-real-scale">
-                        <span>Real Scale (1:1)</span>
-                    </label>
-
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-recommended">
-                        <span>Recommended (25x)</span>
-                    </label>
-
-                    <div class="viz-slider-row" id="viz-scale-field">
-                        <input type="range" id="viz-scale" min="0" max="1" step="0.001">
-                        <span id="viz-scale-value">25x</span>
-                    </div>
-                </section>
             </div>
         `;
 
@@ -339,11 +308,6 @@ export class VisualizationPanel {
         this.gridSizeValue = this.container.querySelector('#viz-grid-size-value')!;
         this.trailSlider = this.container.querySelector('#viz-trail-length')!;
         this.trailValue = this.container.querySelector('#viz-trail-value')!;
-        this.realScaleCheckbox = this.container.querySelector('#viz-real-scale')!;
-        this.recommendedCheckbox = this.container.querySelector('#viz-recommended')!;
-        this.scaleSlider = this.container.querySelector('#viz-scale')!;
-        this.scaleValue = this.container.querySelector('#viz-scale-value')!;
-        this.scaleField = this.container.querySelector('#viz-scale-field')!;
         this.presetSelect = this.container.querySelector('#viz-preset')!;
     }
 
@@ -413,36 +377,6 @@ export class VisualizationPanel {
             this.onPresetChange?.(value);
         });
 
-        this.realScaleCheckbox.addEventListener('change', () => {
-            if (this.ignoreEvents) return;
-            this.options.realScale = this.realScaleCheckbox.checked;
-            if (this.options.realScale) {
-                this.recommendedCheckbox.checked = false;
-            }
-            this.updateScaleFieldState();
-            this.emitChange();
-        });
-
-        this.recommendedCheckbox.addEventListener('change', () => {
-            if (this.ignoreEvents) return;
-            if (this.recommendedCheckbox.checked) {
-                this.options.realScale = false;
-                this.options.bodyScale = RECOMMENDED_SCALE;
-                this.realScaleCheckbox.checked = false;
-                this.updateScaleUI();
-            }
-            this.updateScaleFieldState();
-            this.emitChange();
-        });
-
-        this.scaleSlider.addEventListener('input', () => {
-            if (this.ignoreEvents) return;
-            const t = parseFloat(this.scaleSlider.value);
-            this.options.bodyScale = this.sliderToScale(t);
-            this.scaleValue.textContent = `${Math.round(this.options.bodyScale)}x`;
-            this.recommendedCheckbox.checked = this.isRecommended(this.options.bodyScale);
-            this.emitChange();
-        });
     }
 
     private setupKeyboardShortcut(): void {
@@ -512,29 +446,8 @@ export class VisualizationPanel {
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
         this.presetSelect.value = this.presetName;
-        this.realScaleCheckbox.checked = this.options.realScale;
-        this.recommendedCheckbox.checked = this.isRecommended(this.options.bodyScale) && !this.options.realScale;
-        this.updateScaleUI();
-        this.updateScaleFieldState();
 
         this.ignoreEvents = false;
-    }
-
-    private updateScaleUI(): void {
-        this.scaleSlider.value = String(this.scaleToSlider(this.options.bodyScale));
-        this.scaleValue.textContent = `${Math.round(this.options.bodyScale)}x`;
-    }
-
-    private updateScaleFieldState(): void {
-        if (this.options.realScale) {
-            this.scaleField.classList.add('disabled');
-            this.scaleSlider.disabled = true;
-            this.recommendedCheckbox.disabled = true;
-        } else {
-            this.scaleField.classList.remove('disabled');
-            this.scaleSlider.disabled = false;
-            this.recommendedCheckbox.disabled = false;
-        }
     }
 
     private updateGridSizeValue(): void {
@@ -543,22 +456,6 @@ export class VisualizationPanel {
         this.gridSizeValue.textContent = `${distanceAu.toFixed(0)} AU`;
     }
 
-    private sliderToScale(t: number): number {
-        const minLog = Math.log(SCALE_MIN);
-        const maxLog = Math.log(SCALE_MAX);
-        return Math.exp(minLog + (maxLog - minLog) * Math.max(0, Math.min(1, t)));
-    }
-
-    private scaleToSlider(scale: number): number {
-        const minLog = Math.log(SCALE_MIN);
-        const maxLog = Math.log(SCALE_MAX);
-        const clamped = Math.max(SCALE_MIN, Math.min(SCALE_MAX, scale));
-        return (Math.log(clamped) - minLog) / (maxLog - minLog);
-    }
-
-    private isRecommended(scale: number): boolean {
-        return Math.abs(scale - RECOMMENDED_SCALE) < 1;
-    }
 
     toggle(): void {
         if (this.isOpen) this.close();

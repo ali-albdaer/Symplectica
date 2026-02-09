@@ -7,14 +7,16 @@ import {
 
 describe('VisualPresetRegistry', () => {
     it('loads presets and returns the active preset', () => {
-        VisualPresetRegistry.loadPresets(visualPresets as VisualPresetsFile);
+        const presets = visualPresets as VisualPresetsFile;
+        VisualPresetRegistry.loadPresets(presets);
         VisualPresetRegistry.setDefaultPreset('Low');
         const preset = VisualPresetRegistry.getPresetForPlayer('local');
         expect(preset.maxTextureSize).toBe(512);
     });
 
     it('resolves feature params with preset mapping', () => {
-        VisualPresetRegistry.loadPresets(visualPresets as VisualPresetsFile);
+        const presets = visualPresets as VisualPresetsFile;
+        VisualPresetRegistry.loadPresets(presets);
         VisualPresetRegistry.registerFeature('feature', {
             Low: { detail: 1 },
             High: { detail: 2 },
@@ -39,7 +41,8 @@ describe('VisualPresetRegistry', () => {
     });
 
     it('notifies subscribers on preset change', () => {
-        VisualPresetRegistry.loadPresets(visualPresets as VisualPresetsFile);
+        const presets = visualPresets as VisualPresetsFile;
+        VisualPresetRegistry.loadPresets(presets);
         let last: string | null = null;
         VisualPresetRegistry.subscribe('p2', (preset) => {
             last = preset;
@@ -49,12 +52,13 @@ describe('VisualPresetRegistry', () => {
     });
 
     it('updates renderer config on preset change', () => {
+        const presets = visualPresets as VisualPresetsFile;
         const customPresets: VisualPresetsFile = {
             version: '1.0',
             presets: {
-                Low: { ...visualPresets.presets.Low, renderScale: 0.8 },
-                High: { ...visualPresets.presets.High, renderScale: 1.0 },
-                Ultra: { ...visualPresets.presets.Ultra, renderScale: 1.2 },
+                Low: { ...presets.presets.Low, renderScale: 0.8 },
+                High: { ...presets.presets.High, renderScale: 1.0 },
+                Ultra: { ...presets.presets.Ultra, renderScale: 1.2 },
             },
         };
 
@@ -89,9 +93,9 @@ describe('VisualPresetRegistry', () => {
     });
 
     it('has performance budgets defined for all presets', () => {
-        const file = visualPresets as VisualPresetsFile;
-        expect(file.presets.Low.performanceBudgetMs).toBeGreaterThan(0);
-        expect(file.presets.High.performanceBudgetMs).toBeGreaterThan(0);
-        expect(file.presets.Ultra.performanceBudgetMs).toBeGreaterThan(0);
+        const presets = visualPresets as VisualPresetsFile;
+        expect(presets.presets.Low.performanceBudgetMs).toBeGreaterThan(0);
+        expect(presets.presets.High.performanceBudgetMs).toBeGreaterThan(0);
+        expect(presets.presets.Ultra.performanceBudgetMs).toBeGreaterThan(0);
     });
 });
