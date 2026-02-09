@@ -29,29 +29,8 @@ interface BodyData {
 // 3. Power-law: compromise between linear and log
 const AU = 1.495978707e11;
 
-function scaleRadius(realRadius: number, type: string, bodyScale: number, realScale: boolean): number {
-    if (realScale) {
-        // Use exact real-world radius (will be very small relative to orbits)
-        return realRadius;
-    }
-
-    // UNIFORM LINEAR SCALING
-    // All bodies scaled by the same multiplier, preserving relative size ratios
-    // This means: Earth/Moon ratio stays constant at all scales
-    // At scale 1000x: Earth=6.37e9m, Moon=1.74e9m (ratio preserved)
-
-    // Stars get a separate treatment for visual balance (not physically accurate)
-    // Sun is 109x Earth radius, at high scales it would dominate
-    if (type === 'star') {
-        // Use logarithmic scaling for stars to keep them visible but not overwhelming
-        // At scale 1: star uses real radius
-        // At scale 1000: star grows ~3x slower than planets
-        const logScale = Math.log10(bodyScale) / 3; // 0 at scale=1, 1 at scale=1000
-        return realRadius * (1 + logScale * 10);
-    }
-
-    // Planets, moons, asteroids: pure linear scaling
-    return realRadius * bodyScale;
+function scaleRadius(realRadius: number): number {
+    return realRadius;
 }
 
 export class BodyRenderer {
@@ -67,8 +46,7 @@ export class BodyRenderer {
     private gridYZVisible = false;
 
     // Scale settings
-    private bodyScale = 1; // Default: 1x scale
-    private realScale = true;
+    private renderScale = 1;
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
@@ -82,19 +60,15 @@ export class BodyRenderer {
         this.scene = scene;
     }
 
-    setBodyScale(scale: number): void {
-        this.bodyScale = scale;
-        this.updateBodySizes();
-    }
-
-    setRealScale(real: boolean): void {
-        this.realScale = real;
+    setRenderScale(scale: number): void {
+        if (!Number.isFinite(scale) || scale <= 0) return;
+        this.renderScale = scale;
         this.updateBodySizes();
     }
 
     private updateBodySizes(): void {
         for (const [_, mesh] of this.bodies) {
-            const newRadius = scaleRadius(mesh.realRadius, mesh.type, this.bodyScale, this.realScale);
+            const newRadius = scaleRadius(mesh.realRadius * this.renderScale);
             mesh.setScale(newRadius);
         }
     }
@@ -105,7 +79,7 @@ export class BodyRenderer {
         this.scene.add(mesh.group);
 
         // Apply current scale settings to new body
-        const radius = scaleRadius(body.radius, body.type, this.bodyScale, this.realScale);
+        const radius = scaleRadius(body.radius * this.renderScale);
         mesh.setScale(radius);
 
         // Add point light for stars - high intensity, no decay at astronomical distances

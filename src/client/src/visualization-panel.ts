@@ -17,6 +17,8 @@ export interface VisualizationOptions {
     bodyScale: number;
 }
 
+export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
+
 const AU = 1.495978707e11;
 const SCALE_MIN = 1;
 const SCALE_MAX = 5000;
@@ -40,6 +42,8 @@ export class VisualizationPanel {
     private isOpen = false;
     private options: VisualizationOptions;
     private onChange: (options: VisualizationOptions) => void;
+    private onPresetChange?: (preset: VisualizationPresetName) => void;
+    private presetName: VisualizationPresetName;
     private ignoreEvents = false;
 
     // UI Elements
@@ -59,9 +63,16 @@ export class VisualizationPanel {
     private scaleSlider!: HTMLInputElement;
     private scaleValue!: HTMLElement;
     private scaleField!: HTMLElement;
+    private presetSelect!: HTMLSelectElement;
 
-    constructor(onChange: (options: VisualizationOptions) => void) {
+    constructor(
+        onChange: (options: VisualizationOptions) => void,
+        onPresetChange?: (preset: VisualizationPresetName) => void,
+        initialPreset: VisualizationPresetName = 'Low'
+    ) {
         this.onChange = onChange;
+        this.onPresetChange = onPresetChange;
+        this.presetName = initialPreset;
         this.options = { ...DEFAULTS };
         this.container = this.createUI();
         this.cacheElements();
@@ -83,6 +94,18 @@ export class VisualizationPanel {
             </div>
 
             <div class="viz-content">
+                <section class="viz-section">
+                    <h3>Preset</h3>
+                    <div class="viz-field">
+                        <label>Visual Quality</label>
+                        <select id="viz-preset">
+                            <option value="Low">Low</option>
+                            <option value="High">High</option>
+                            <option value="Ultra">Ultra</option>
+                        </select>
+                    </div>
+                </section>
+
                 <section class="viz-section">
                     <h3>Display</h3>
 
@@ -321,6 +344,7 @@ export class VisualizationPanel {
         this.scaleSlider = this.container.querySelector('#viz-scale')!;
         this.scaleValue = this.container.querySelector('#viz-scale-value')!;
         this.scaleField = this.container.querySelector('#viz-scale-field')!;
+        this.presetSelect = this.container.querySelector('#viz-preset')!;
     }
 
     private bindEvents(): void {
@@ -380,6 +404,13 @@ export class VisualizationPanel {
             this.options.orbitTrailLength = parseInt(this.trailSlider.value);
             this.trailValue.textContent = this.trailSlider.value;
             this.emitChange();
+        });
+
+        this.presetSelect.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            const value = this.presetSelect.value as VisualizationPresetName;
+            this.presetName = value;
+            this.onPresetChange?.(value);
         });
 
         this.realScaleCheckbox.addEventListener('change', () => {
@@ -480,6 +511,7 @@ export class VisualizationPanel {
         this.updateGridSizeValue();
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
+        this.presetSelect.value = this.presetName;
         this.realScaleCheckbox.checked = this.options.realScale;
         this.recommendedCheckbox.checked = this.isRecommended(this.options.bodyScale) && !this.options.realScale;
         this.updateScaleUI();
@@ -550,5 +582,12 @@ export class VisualizationPanel {
     applyOptions(options: VisualizationOptions): void {
         this.options = { ...options };
         this.syncUIFromOptions();
+    }
+
+    setPreset(preset: VisualizationPresetName): void {
+        this.ignoreEvents = true;
+        this.presetName = preset;
+        this.presetSelect.value = preset;
+        this.ignoreEvents = false;
     }
 }

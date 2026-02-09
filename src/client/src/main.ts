@@ -15,13 +15,16 @@ import { AdminStatePayload, NetworkClient } from './network';
 import { PhysicsClient } from './physics';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
-import { VisualizationPanel, VisualizationOptions } from './visualization-panel';
+import { VisualizationPanel, VisualizationOptions, VisualizationPresetName } from './visualization-panel';
 import { TimeController } from './time-controller';
 import { getWebSocketUrl } from './config';
+import { VisualPresetRegistry } from './visual-preset-registry';
+import visualPresets from './visualPresets.json';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
 const LOCAL_TICK_RATE = 60;
+const LOCAL_PRESET_PLAYER = 'local';
 
 type SimMode = 'tick' | 'accumulator';
 
@@ -111,8 +114,24 @@ class NBodyClient {
     };
 
     async init(): Promise<void> {
+        VisualPresetRegistry.loadPresets(visualPresets);
+        VisualPresetRegistry.setDefaultPreset('Low');
+        VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, 'Low');
+        VisualPresetRegistry.registerFeature('bodyRenderer', {});
+        VisualPresetRegistry.registerFeatureHooks('bodyRenderer', {
+            defaultParams: { renderScale: 1 },
+            applyPreset: (featureParams, presetParams) => ({
+                ...featureParams,
+                renderScale: presetParams.renderScale,
+            }),
+        });
+        VisualPresetRegistry.subscribe(LOCAL_PRESET_PLAYER, () => {
+            this.applyPresetToRenderer();
+        });
+
         this.updateLoadingStatus('Initializing renderer...');
         this.initRenderer();
+        this.applyPresetToRenderer();
 
         this.updateLoadingStatus('Loading physics engine...');
         await this.initPhysics();
@@ -153,10 +172,16 @@ class NBodyClient {
         );
 
         // Initialize Visualization Panel
-        this.vizPanel = new VisualizationPanel((options: VisualizationOptions) => {
-            this.currentVizOptions = { ...options };
-            this.applyVisualizationToRenderer(options);
-        });
+        this.vizPanel = new VisualizationPanel(
+            (options: VisualizationOptions) => {
+                this.currentVizOptions = { ...options };
+                this.applyVisualizationToRenderer(options);
+            },
+            (preset: VisualizationPresetName) => {
+                VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, preset);
+            },
+            VisualPresetRegistry.getPresetNameForPlayer(LOCAL_PRESET_PLAYER)
+        );
 
         this.hideLoading();
         this.start();
@@ -227,8 +252,6 @@ class NBodyClient {
         this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
         this.bodyRenderer.setShowLabels(options.showLabels);
         this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
-        this.bodyRenderer.setRealScale(options.realScale);
-        this.bodyRenderer.setBodyScale(options.bodyScale);
         this.bodyRenderer.setGridOptions(
             options.showGridXY,
             options.showGridXZ,
@@ -236,6 +259,15 @@ class NBodyClient {
             options.gridSpacing,
             options.gridSize
         );
+    }
+
+    private applyPresetToRenderer(): void {
+        const params = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'bodyRenderer') as {
+            renderScale?: number;
+        };
+        if (typeof params.renderScale === 'number') {
+            this.bodyRenderer.setRenderScale(params.renderScale);
+        }
     }
 
     private applySnapshot(snapshot: string): void {

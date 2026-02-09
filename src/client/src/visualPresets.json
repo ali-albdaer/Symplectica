@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "presets": {
+    "Low": {
+      "renderScale": 1.0,
+      "maxTextureSize": 512,
+      "atmosphereLUTResolution": 32,
+      "cloudQuality": "Off",
+      "shadowQuality": "Low",
+      "reflectionMode": "Off",
+      "granulationEnabled": false,
+      "flareQuality": "Off",
+      "lodBias": 0.5,
+      "maxShaderSamples": 16,
+      "performanceBudgetMs": 8
+    },
+    "High": {
+      "renderScale": 1.0,
+      "maxTextureSize": 2048,
+      "atmosphereLUTResolution": 64,
+      "cloudQuality": "High",
+      "shadowQuality": "Medium",
+      "reflectionMode": "SSR",
+      "granulationEnabled": true,
+      "flareQuality": "Low",
+      "lodBias": 0.0,
+      "maxShaderSamples": 48,
+      "performanceBudgetMs": 12
+    },
+    "Ultra": {
+      "renderScale": 1.0,
+      "maxTextureSize": 4096,
+      "atmosphereLUTResolution": 128,
+      "cloudQuality": "Volumetric",
+      "shadowQuality": "High",
+      "reflectionMode": "SSR+Fallback",
+      "granulationEnabled": true,
+      "flareQuality": "High",
+      "lodBias": -0.5,
+      "maxShaderSamples": 96,
+      "performanceBudgetMs": 16
+    }
+  }
+}
