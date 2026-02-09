@@ -30,6 +30,7 @@ interface WelcomePayload {
         tickRate: number;
         serverTick: number;
         adminState?: AdminStatePayload;
+        visualPresetDefault?: 'Low' | 'High' | 'Ultra';
     };
 }
 

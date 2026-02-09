@@ -20,6 +20,7 @@ import { TimeController } from './time-controller';
 import { getWebSocketUrl } from './config';
 import { VisualPresetRegistry, VisualPresetsFile } from './visual-preset-registry';
 import visualPresets from './visualPresets.json';
+import { registerVisualPresetFeatures } from './visual-preset-features';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -114,7 +115,7 @@ class NBodyClient {
     async init(): Promise<void> {
         VisualPresetRegistry.loadPresets(visualPresets as VisualPresetsFile);
         VisualPresetRegistry.setDefaultPreset('Low');
-        VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, 'Low');
+        registerVisualPresetFeatures();
         VisualPresetRegistry.registerFeature('bodyRenderer', {});
         VisualPresetRegistry.registerFeatureHooks('bodyRenderer', {
             defaultParams: { renderScale: 1 },
@@ -148,6 +149,7 @@ class NBodyClient {
             await this.network.connect();
         } catch (error) {
             console.warn('⚠️ Multiplayer server unavailable, running in local mode.', error);
+            this.ensureLocalPreset('Low');
         }
 
         // Initialize Admin Panel
@@ -191,7 +193,7 @@ class NBodyClient {
 
     private setupNetworkHandlers(): void {
         this.network.on('welcome', (message) => {
-            const payload = message.payload as { snapshot: string; players?: string[]; displayName?: string; config?: { adminState?: AdminStatePayload } };
+            const payload = message.payload as { snapshot: string; players?: string[]; displayName?: string; config?: { adminState?: AdminStatePayload; visualPresetDefault?: VisualizationPresetName } };
             if (payload?.snapshot) {
                 this.applySnapshot(payload.snapshot);
             }
@@ -203,6 +205,9 @@ class NBodyClient {
             }
             if (payload?.config?.adminState) {
                 this.applyAdminState(payload.config.adminState);
+            }
+            if (payload?.config?.visualPresetDefault) {
+                this.ensureLocalPreset(payload.config.visualPresetDefault);
             }
         });
 
@@ -266,6 +271,13 @@ class NBodyClient {
         if (typeof params.renderScale === 'number') {
             this.bodyRenderer.setRenderScale(params.renderScale);
         }
+    }
+
+    private ensureLocalPreset(preset: VisualizationPresetName): void {
+        if (VisualPresetRegistry.hasPlayerPreset(LOCAL_PRESET_PLAYER)) return;
+        VisualPresetRegistry.setDefaultPreset(preset);
+        VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, preset);
+        this.vizPanel?.setPreset(preset);
     }
 
     private applySnapshot(snapshot: string): void {

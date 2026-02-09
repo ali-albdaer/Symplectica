@@ -82,7 +82,14 @@ export class VisualPresetRegistry {
         }
     }
 
+    static hasPlayerPreset(playerId: string): boolean {
+        return this.playerPresets.has(playerId);
+    }
+
     static resolveFeatureParams(playerId: string, featureId: string): FeatureParams {
+        // TODO(determinism): Preserve the selected preset in client-only metadata alongside snapshots for reproducible renders.
+        // TODO(determinism): Ensure procedural noise uses the physics snapshot seed; presets must not alter seeds.
+        // TODO(perf): Implement performanceBudgetMs downgrade pipeline and emit a visual-degrade event when applied.
         const presetName = this.playerPresets.get(playerId) ?? this.defaultPreset;
         const presetParams = this.getPresetByName(presetName);
         const descriptor = this.featureDescriptors.get(featureId) ?? {};
