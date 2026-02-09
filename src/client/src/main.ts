@@ -1028,5 +1028,5 @@ client.init().then(() => {
     // Expose for browser console testing
     (window as any).physics = client.getPhysics();
     (window as any).timeController = client.getTimeController();
-    console.log('🚀 N-Body Client initialized');
+    console.log('Symplectica client initialized');
 }).catch(console.error);
