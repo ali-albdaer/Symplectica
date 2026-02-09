@@ -47,6 +47,7 @@ export class BodyRenderer {
 
     // Scale settings
     private renderScale = 1;
+    private sphereSegments = { width: 64, height: 32 };
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
@@ -74,7 +75,7 @@ export class BodyRenderer {
     }
 
     addBody(body: BodyData): void {
-        const mesh = new BodyMesh(body);
+        const mesh = new BodyMesh(body, this.sphereSegments.width, this.sphereSegments.height);
         this.bodies.set(body.id, mesh);
         this.scene.add(mesh.group);
 
@@ -114,6 +115,18 @@ export class BodyRenderer {
         label.visible = this.showLabels;
         this.bodyLabels.set(body.id, label);
         this.scene.add(label);
+    }
+
+    setSphereSegments(width: number, height: number): void {
+        const clampedWidth = Math.max(8, Math.round(width));
+        const clampedHeight = Math.max(6, Math.round(height));
+        if (clampedWidth === this.sphereSegments.width && clampedHeight === this.sphereSegments.height) {
+            return;
+        }
+        this.sphereSegments = { width: clampedWidth, height: clampedHeight };
+        for (const mesh of this.bodies.values()) {
+            mesh.setSegments(clampedWidth, clampedHeight);
+        }
     }
 
     private createLabelSprite(text: string): THREE.Sprite {
@@ -426,7 +439,7 @@ class BodyMesh {
     readonly realRadius: number;
     readonly type: string;
 
-    constructor(body: BodyData) {
+    constructor(body: BodyData, segmentsWidth: number, segmentsHeight: number) {
         this.realRadius = body.radius;
         this.type = body.type;
 
@@ -435,7 +448,7 @@ class BodyMesh {
 
         // Create sphere geometry - initially at default scale (will be set by renderer)
         const initialRadius = 1; // Placeholder, will be scaled
-        this.geometry = new THREE.SphereGeometry(initialRadius, 64, 32);
+        this.geometry = new THREE.SphereGeometry(initialRadius, segmentsWidth, segmentsHeight);
 
         // Create material based on body type
         if (body.type === 'star') {
@@ -472,6 +485,12 @@ class BodyMesh {
                 child.scale.set(radius * 8, radius * 8, 1);
             }
         }
+    }
+
+    setSegments(segmentsWidth: number, segmentsHeight: number): void {
+        this.geometry.dispose();
+        this.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
+        this.mesh.geometry = this.geometry;
     }
 
     private addStarGlow(color: number): void {

@@ -102,6 +102,7 @@ class NBodyClient {
     private freeCamSpeedAuPerSec = 1;
     private freeCamCrosshair: HTMLElement | null = null;
     private raycaster = new THREE.Raycaster();
+    private starfield?: THREE.Points;
     private moveKeys: Record<string, boolean> = {
         KeyW: false,
         KeyA: false,
@@ -271,6 +272,24 @@ class NBodyClient {
         if (typeof params.renderScale === 'number') {
             this.bodyRenderer.setRenderScale(params.renderScale);
         }
+
+        const planetParams = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'planetRenderer') as {
+            lodBias?: number;
+        };
+        const lodBias = typeof planetParams.lodBias === 'number' ? planetParams.lodBias : 0;
+        const segmentScale = Math.max(0.5, Math.min(2, 1 - lodBias));
+        this.bodyRenderer.setSphereSegments(64 * segmentScale, 32 * segmentScale);
+
+        const starParams = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'starRenderer') as {
+            starCount?: number;
+            starSize?: number;
+            starOpacity?: number;
+        };
+        this.createStarfield({
+            count: starParams.starCount,
+            size: starParams.starSize,
+            opacity: starParams.starOpacity,
+        });
     }
 
     private ensureLocalPreset(preset: VisualizationPresetName): void {
@@ -712,9 +731,18 @@ class NBodyClient {
         }
     }
 
-    private createStarfield(): void {
+    private createStarfield(options?: { count?: number; size?: number; opacity?: number }): void {
+        if (this.starfield) {
+            this.scene.remove(this.starfield);
+            this.starfield.geometry.dispose();
+            (this.starfield.material as THREE.Material).dispose();
+            this.starfield = undefined;
+        }
+
+        const starCount = Math.max(1000, Math.round(options?.count ?? 10000));
+        const starSize = options?.size ?? 1.0e12;
+        const starOpacity = options?.opacity ?? 0.8;
         const starsGeometry = new THREE.BufferGeometry();
-        const starCount = 10000;
         const positions = new Float32Array(starCount * 3);
         const colors = new Float32Array(starCount * 3);
         const sizes = new Float32Array(starCount);
@@ -756,15 +784,15 @@ class NBodyClient {
         starsGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
         const starsMaterial = new THREE.PointsMaterial({
-            size: 1e12,
+            size: starSize,
             sizeAttenuation: true,
             vertexColors: true,
             transparent: true,
-            opacity: 0.8,
+            opacity: starOpacity,
         });
 
-        const stars = new THREE.Points(starsGeometry, starsMaterial);
-        this.scene.add(stars);
+        this.starfield = new THREE.Points(starsGeometry, starsMaterial);
+        this.scene.add(this.starfield);
     }
 
     private onResize(): void {
