@@ -73,6 +73,41 @@ export class VisualPresetRegistry {
         return this.playerPresets.get(playerId) ?? this.defaultPreset;
     }
 
+    static updatePreset(presetName: PresetName, patch: Partial<VisualPresetParams>): void {
+        if (!this.presets) {
+            throw new Error('Visual presets not loaded');
+        }
+        const current = this.presets[presetName];
+        if (!current) {
+            throw new Error(`Unknown visual preset: ${presetName}`);
+        }
+        const updated = { ...current, ...patch };
+        if (!Number.isFinite(updated.renderScale) || updated.renderScale <= 0) {
+            throw new Error('renderScale must be > 0');
+        }
+        if (!Number.isFinite(updated.maxTextureSize) || updated.maxTextureSize <= 0) {
+            throw new Error('maxTextureSize must be > 0');
+        }
+        if (!Number.isFinite(updated.atmosphereLUTResolution) || updated.atmosphereLUTResolution <= 0) {
+            throw new Error('atmosphereLUTResolution must be > 0');
+        }
+        if (!Number.isFinite(updated.maxShaderSamples) || updated.maxShaderSamples <= 0) {
+            throw new Error('maxShaderSamples must be > 0');
+        }
+        if (!Number.isFinite(updated.performanceBudgetMs) || updated.performanceBudgetMs <= 0) {
+            throw new Error('performanceBudgetMs must be > 0');
+        }
+        this.presets[presetName] = updated;
+
+        for (const [playerId, subs] of this.subscribers.entries()) {
+            if (subs.size === 0) continue;
+            const name = this.getPresetNameForPlayer(playerId);
+            for (const cb of subs) {
+                cb(name);
+            }
+        }
+    }
+
     static setPlayerPreset(playerId: string, presetName: PresetName): void {
         this.playerPresets.set(playerId, presetName);
         const subs = this.subscribers.get(playerId);

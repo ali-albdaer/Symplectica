@@ -35,7 +35,9 @@ export class VisualizationPanel {
     private options: VisualizationOptions;
     private onChange: (options: VisualizationOptions) => void;
     private onPresetChange?: (preset: VisualizationPresetName) => void;
+    private onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void;
     private presetName: VisualizationPresetName;
+    private presetRenderScale = 1;
     private ignoreEvents = false;
 
     // UI Elements
@@ -51,14 +53,18 @@ export class VisualizationPanel {
     private trailSlider!: HTMLInputElement;
     private trailValue!: HTMLElement;
     private presetSelect!: HTMLSelectElement;
+    private presetRenderScaleInput!: HTMLInputElement;
+    private presetRenderScaleValue!: HTMLElement;
 
     constructor(
         onChange: (options: VisualizationOptions) => void,
         onPresetChange?: (preset: VisualizationPresetName) => void,
+        onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void,
         initialPreset: VisualizationPresetName = 'Low'
     ) {
         this.onChange = onChange;
         this.onPresetChange = onPresetChange;
+        this.onPresetEdit = onPresetEdit;
         this.presetName = initialPreset;
         this.options = { ...DEFAULTS };
         this.container = this.createUI();
@@ -90,6 +96,15 @@ export class VisualizationPanel {
                             <option value="High">High</option>
                             <option value="Ultra">Ultra</option>
                         </select>
+                    </div>
+                </section>
+
+                <section class="viz-section">
+                    <h3>Preset Tuning</h3>
+                    <div class="viz-field">
+                        <label>Render Scale</label>
+                        <input type="range" id="viz-render-scale" min="0.1" max="5" step="0.05" value="1">
+                        <span id="viz-render-scale-value">1.00x</span>
                     </div>
                 </section>
 
@@ -309,6 +324,8 @@ export class VisualizationPanel {
         this.trailSlider = this.container.querySelector('#viz-trail-length')!;
         this.trailValue = this.container.querySelector('#viz-trail-value')!;
         this.presetSelect = this.container.querySelector('#viz-preset')!;
+        this.presetRenderScaleInput = this.container.querySelector('#viz-render-scale')!;
+        this.presetRenderScaleValue = this.container.querySelector('#viz-render-scale-value')!;
     }
 
     private bindEvents(): void {
@@ -375,6 +392,14 @@ export class VisualizationPanel {
             const value = this.presetSelect.value as VisualizationPresetName;
             this.presetName = value;
             this.onPresetChange?.(value);
+        });
+
+        this.presetRenderScaleInput.addEventListener('input', () => {
+            if (this.ignoreEvents) return;
+            const value = parseFloat(this.presetRenderScaleInput.value);
+            this.presetRenderScale = value;
+            this.presetRenderScaleValue.textContent = `${value.toFixed(2)}x`;
+            this.onPresetEdit?.(this.presetName, { renderScale: value });
         });
 
     }
@@ -446,6 +471,8 @@ export class VisualizationPanel {
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
         this.presetSelect.value = this.presetName;
+        this.presetRenderScaleInput.value = String(this.presetRenderScale);
+        this.presetRenderScaleValue.textContent = `${this.presetRenderScale.toFixed(2)}x`;
 
         this.ignoreEvents = false;
     }
@@ -485,6 +512,14 @@ export class VisualizationPanel {
         this.ignoreEvents = true;
         this.presetName = preset;
         this.presetSelect.value = preset;
+        this.ignoreEvents = false;
+    }
+
+    setPresetRenderScale(scale: number): void {
+        this.ignoreEvents = true;
+        this.presetRenderScale = scale;
+        this.presetRenderScaleInput.value = String(scale);
+        this.presetRenderScaleValue.textContent = `${scale.toFixed(2)}x`;
         this.ignoreEvents = false;
     }
 }

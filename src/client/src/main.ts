@@ -180,8 +180,16 @@ class NBodyClient {
             },
             (preset: VisualizationPresetName) => {
                 VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, preset);
+                const current = VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER);
+                this.vizPanel?.setPresetRenderScale(current.renderScale);
+            },
+            (preset: VisualizationPresetName, patch: { renderScale?: number }) => {
+                VisualPresetRegistry.updatePreset(preset, patch);
             },
             VisualPresetRegistry.getPresetNameForPlayer(LOCAL_PRESET_PLAYER)
+        );
+        this.vizPanel.setPresetRenderScale(
+            VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
         );
 
         this.hideLoading();
@@ -297,6 +305,9 @@ class NBodyClient {
         VisualPresetRegistry.setDefaultPreset(preset);
         VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, preset);
         this.vizPanel?.setPreset(preset);
+        this.vizPanel?.setPresetRenderScale(
+            VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
+        );
     }
 
     private applySnapshot(snapshot: string): void {
