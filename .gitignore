@@ -8,3 +8,4 @@ src/physics-core/pkg/
 *.local.*
 Cargo.lock
 package-lock.json
+.env
