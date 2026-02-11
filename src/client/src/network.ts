@@ -76,13 +76,21 @@ export class NetworkClient {
         this.url = url;
     }
 
-    async connect(): Promise<void> {
+    async connect(timeoutMs: number = 5000): Promise<void> {
         return new Promise((resolve, reject) => {
             console.log(`[INFO] Connecting to ${this.url}...`);
 
             this.ws = new WebSocket(this.url);
 
+            const timer = setTimeout(() => {
+                if (this.ws?.readyState !== WebSocket.OPEN) {
+                    this.ws?.close();
+                    reject(new Error(`Connection timed out after ${timeoutMs}ms`));
+                }
+            }, timeoutMs);
+
             this.ws.onopen = () => {
+                clearTimeout(timer);
                 console.log('[OK] Connected to server');
                 this.reconnecting = false;
                 this.reconnectAttempts = 0;
@@ -97,7 +105,8 @@ export class NetworkClient {
             this.ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
                 if (!this.reconnecting) {
-                    reject(error);
+                    clearTimeout(timer);
+                    reject(new Error('WebSocket connection failed'));
                 }
             };
 

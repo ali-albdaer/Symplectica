@@ -73,7 +73,7 @@ class NBodyClient {
 
     private lastServerState?: NetworkStatePayload;
     private lastServerPositions = new Float64Array(0);
-    
+
     // Track visualization options to restore after body refresh
     private currentVizOptions: VisualizationOptions = {
         showOrbitTrails: true,
@@ -323,7 +323,7 @@ class NBodyClient {
         if (newBodyCount !== oldBodyCount) {
             this.refreshBodies();
         }
-        
+
         this.state.bodyCount = newBodyCount;
         this.updateUIBodyCount();
         this.timeController.resetAccumulator();
@@ -1081,6 +1081,18 @@ class NBodyClient {
     /** Expose for testing */
     getPhysics() { return this.physics; }
     getTimeController() { return this.timeController; }
+
+    showError(message: string): void {
+        const el = document.getElementById('loading-status');
+        const spinner = document.querySelector('.spinner');
+        if (el) {
+            el.textContent = message;
+            el.classList.add('error');
+        }
+        if (spinner) {
+            (spinner as HTMLElement).style.display = 'none';
+        }
+    }
 }
 
 // Start application
@@ -1090,4 +1102,7 @@ client.init().then(() => {
     (window as any).physics = client.getPhysics();
     (window as any).timeController = client.getTimeController();
     console.log('Symplectica client initialized');
-}).catch(console.error);
+}).catch((error) => {
+    console.error('Fatal initialization error:', error);
+    client.showError(`Failed to initialize: ${error.message || 'Unknown error'}`);
+});
