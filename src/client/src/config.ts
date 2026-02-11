@@ -21,6 +21,14 @@ export const CLIENT_CONFIG = {
 };
 
 export const getWebSocketUrl = (): string => {
-    const host = window.location.hostname || 'localhost';
-    return `${resolveProtocol()}://${host}:${CLIENT_CONFIG.wsPort}`;
+    const isDev = import.meta.env.DEV;
+
+    const protocol = resolveProtocol();
+    const hostname = window.location.hostname;
+
+    if (isDev) {
+        return `${protocol}://${hostname}:${CLIENT_CONFIG.wsPort}`;
+    } else {
+        return `${protocol}://${window.location.host}`;
+    }
 };
