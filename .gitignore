@@ -6,6 +6,7 @@ node_modules/
 .vite/
 src/physics-core/pkg/
 *.local.*
-Cargo.lock
-package-lock.json
+## NOTE: Unignoring lock files for consistent development and production builds.
+# Cargo.lock
+# package-lock.json
 .env
