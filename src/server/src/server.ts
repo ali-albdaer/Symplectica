@@ -5,6 +5,8 @@
  * Handles client connections via WebSocket and broadcasts state at 60Hz.
  */
 
+import express from 'express';
+import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -114,6 +116,10 @@ class SimulationServer {
         simMode: 'tick',
     };
 
+    // New properties for HTTP server
+    private app!: express.Express;
+    private httpServer!: http.Server;
+
     async start(): Promise<void> {
         console.log('[INFO] Starting N-Body Simulation Server...');
 
@@ -123,15 +129,27 @@ class SimulationServer {
         // Create simulation
         this.createSimulation();
 
-        // Start WebSocket server
+        // Initialize Express and HTTP server
+        this.app = express();
+        this.httpServer = http.createServer(this.app);
+
+        // Serve static files from client build
+        const clientDist = join(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
+        this.app.use(express.static(clientDist));
+        console.log(`[INFO] Serving static files from: ${clientDist}`);
+
+        // Start WebSocket server (attached to HTTP server)
         this.startWebSocketServer();
 
         // Start game loop
         this.startGameLoop();
 
-        console.log(`[OK] Server running on port ${CONFIG.port}`);
-        console.log(`   Tick rate: ${CONFIG.tickRate} Hz`);
-        console.log(`   Seed: ${CONFIG.seed}`);
+        // Start listening
+        this.httpServer.listen(CONFIG.port, () => {
+            console.log(`[OK] Server running on port ${CONFIG.port}`);
+            console.log(`   Tick rate: ${CONFIG.tickRate} Hz`);
+            console.log(`   Seed: ${CONFIG.seed}`);
+        });
     }
 
     private async loadPhysics(): Promise<void> {
@@ -192,7 +210,8 @@ class SimulationServer {
     }
 
     private startWebSocketServer(): void {
-        this.wss = new WebSocketServer({ port: CONFIG.port });
+        // Create WebSocket server attached to HTTP server
+        this.wss = new WebSocketServer({ server: this.httpServer });
 
         this.wss.on('connection', (ws: WebSocket) => {
             const clientId = this.generateClientId();
@@ -633,6 +652,10 @@ class SimulationServer {
 
         if (this.wss) {
             this.wss.close();
+        }
+
+        if (this.httpServer) {
+            this.httpServer.close();
         }
 
         console.log('[INFO] Server stopped');

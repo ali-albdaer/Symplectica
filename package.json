@@ -10,6 +10,10 @@
         "postinstall": "npm run wasm:build",
         "client:dev": "npm run -w @nbody/client dev",
         "server:dev": "npm run -w @nbody/server dev",
+        "client:build": "npm run -w @nbody/client build",
+        "server:build": "npm run -w @nbody/server build",
+        "build": "npm run wasm:build && npm run client:build && npm run server:build",
+        "start": "npm run -w @nbody/server start",
         "dev": "concurrently -k \"npm:server:dev\" \"npm:client:dev\""
     },
     "devDependencies": {
