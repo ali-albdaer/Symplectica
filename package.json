@@ -17,6 +17,7 @@
         "dev": "concurrently -k \"npm:server:dev\" \"npm:client:dev\""
     },
     "devDependencies": {
-        "concurrently": "^9.1.0"
+        "concurrently": "^9.1.0",
+        "wasm-pack": "^0.14.0"
     }
 }
