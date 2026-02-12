@@ -40,7 +40,7 @@ export class Chat {
         document.body.appendChild(this.container);
         this.setupKeyboardShortcuts();
 
-        // Welcome message (player list will be injected on server welcome)
+        // Welcome message
         this.addSystemMessage('Welcome to the chat. Type /help for a list of available commands. Press I for keybinds.');
         this.setOpen(false);
     }

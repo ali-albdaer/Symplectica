@@ -16,7 +16,6 @@ export interface SpeedLevel {
 
 export class TimeController {
     // Fixed physics timestep (simulation seconds per step)
-    // 1 hour = good balance between accuracy and performance for orbital mechanics
     private physicsTimestep = 3600;
 
     // Speed levels (simulation seconds per real second)
@@ -30,7 +29,7 @@ export class TimeController {
         { sim: 31536000, label: '1yr/s' },   // 1 year per second
     ];
 
-    private speedIndex = 4; // Default to 1wk/s for better initial experience
+    private speedIndex = 4;
     private accumulator = 0;
     private paused = false;
 
@@ -55,11 +54,8 @@ export class TimeController {
             steps++;
         }
 
-        // Cap steps to prevent spiral of death (max ~1000 steps/frame)
-        // This allows up to 1yr/s at reasonable framerates
         const maxSteps = 1000;
         if (steps > maxSteps) {
-            // Discard excess accumulator to prevent falling behind
             this.accumulator = 0;
             return maxSteps;
         }

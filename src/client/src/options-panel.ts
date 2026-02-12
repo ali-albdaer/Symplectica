@@ -111,9 +111,6 @@ export class OptionsPanel {
         this.syncUIFromOptions();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
-
-        // Don't auto-emit change on init to avoid double-firing, unless needed.
-        // this.onChange({ ...this.options }); // Removed to avoid overriding persisted settings if any
     }
 
     private createUI(): HTMLElement {

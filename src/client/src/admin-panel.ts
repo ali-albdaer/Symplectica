@@ -364,11 +364,6 @@ export class AdminPanel {
         // Pause button
         container.querySelector('#admin-pause-btn')?.addEventListener('click', () => {
             this.timeController.togglePause();
-            // Logic to send pause is handled via listener in main.ts or we can do it here. 
-            // Wait, main.ts listens to timeController changes usually? No.
-            // Let's check main.ts. It handles keybinds and sends.
-            // We should probably emit an event or handle it directly here if we want to be self-contained?
-            // Actually, AdminPanel HAS access to NetworkClient.
             if (this.network?.isConnected()) {
                 this.network.sendPause(this.timeController.isPaused());
             }
@@ -482,9 +477,6 @@ export class AdminPanel {
         if (thetaField) thetaField.classList.toggle('visible', settings.forceMethod === 'barnes-hut');
         if (simModeSelect) simModeSelect.value = settings.simMode;
         if (warpSelect) {
-            // Find closest match or add custom? usually predefined
-            // For now just set value if it matches, otherwise we might need logic
-            // Assuming settings.timeScale is one of the options
             warpSelect.value = settings.timeScale.toString();
         }
     }

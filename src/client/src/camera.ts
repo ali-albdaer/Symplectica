@@ -116,7 +116,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             const deltaY = e.clientY - this.lastMouseY;
 
             if (this.isRightDrag) {
-                // Pan (not implemented yet - would move focus point)
+                // UNIMPLEMENTED
             } else {
                 // Rotate
                 const sensitivity = 0.005;

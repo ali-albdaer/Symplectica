@@ -363,9 +363,7 @@ class SimulationServer {
                     : this.adminState.timeScale;
 
                 const changes: string[] = [];
-                // Only announce time warp separately or as special message?
-                // User requirement: "*** Time warp was set to {new_time warp} (e.g. 1wk/s, 1mo/s etc.)"
-
+                
                 if (timeScale !== this.adminState.timeScale) {
                     const label = getSpeedLabel(timeScale);
                     this.broadcastChat({
@@ -373,18 +371,6 @@ class SimulationServer {
                         text: `Time warp was set to ${label}`
                     });
                 }
-
-                // Other changes (dt, substeps etc) might not need broadcast or can be grouped
-                // For now, let's keep other technical changes minimal or remove if user wants ONLY the formatted ones.
-                // User said "Remove the admin updated part, And instead of sending as admin change the messages to something like..."
-                // So I will remove the generic "Admin updated settings: ..." and only send the requested ones.
-
-                /*
-                if (dt !== this.adminState.dt) changes.push(`dt=${dt}`);
-                if (substeps !== this.adminState.substeps) changes.push(`substeps=${substeps}`);
-                if (forceMethod !== this.adminState.forceMethod) changes.push(`method=${forceMethod}`);
-                if (simMode !== this.adminState.simMode) changes.push(`mode=${simMode}`);
-                */
 
                 this.simulation.setDt(dt);
                 this.simulation.setSubsteps(substeps);
