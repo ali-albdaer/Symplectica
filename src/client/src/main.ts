@@ -1101,7 +1101,7 @@ client.init().then(() => {
     // Expose for browser console testing
     (window as any).physics = client.getPhysics();
     (window as any).timeController = client.getTimeController();
-    console.log('Symplectica client initialized');
+    console.log('Space Simulator client initialized');
 }).catch((error) => {
     console.error('Fatal initialization error:', error);
     client.showError(`Failed to initialize: ${error.message || 'Unknown error'}`);
