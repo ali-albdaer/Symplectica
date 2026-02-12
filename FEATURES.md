@@ -23,9 +23,6 @@ Intended features and capabilities of **Symplectica**.
 - Barnes–Hut octree solver.
 - Fast Multipole Method (FMM).
 - Solvers switchable in run-time (in admin-panel).
-- Automated solver-accuracy validation scripts:
-    - Pairwise vs Barnes-Hut (compare per-body errors).
-    - ...
 
 ### 2.2 Time Integration
 - Symplectic Velocity Verlet integrator (default).
@@ -35,7 +32,6 @@ Intended features and capabilities of **Symplectica**.
     - Adaptive Runge–Kutta 45.
     - 5th-order Gauss–Radau. 
     - No visible discontinuities.
-- Tick-based ...
 - Fixed 60 Hz physics timestep using accumulator pattern.
 - Sub-stepping support for stability at high gradients.
 
@@ -67,12 +63,6 @@ Intended features and capabilities of **Symplectica**.
 
 - Serializable world state format.
 - Loadable universes at server startup.
-- Built-in stable system presets:
-    - Empty world.
-    - Sun–Earth–Moon.
-    - Full Solar System.
-    - Alpha Centauri AB.
-    - PSR B1620-26.
 - Admin panel with runtime configuration of Solver type, integrator, and physics timestep.
 - Teleportation with orbital velocity correction. (admin-panel)
 
