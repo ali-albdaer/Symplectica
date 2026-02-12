@@ -24,7 +24,7 @@ const DEFAULTS: VisualizationOptions = {
     showGridXY: false,
     showGridXZ: false,
     showGridYZ: false,
-    gridSpacing: AU,
+    gridSpacing: 0.1 * AU,
     gridSize: 40,
     orbitTrailLength: 100,
 };
@@ -58,11 +58,31 @@ export class OptionsPanel {
     private gridSpacingValue!: HTMLElement;
     private gridSizeInput!: HTMLInputElement;
     private gridSizeValue!: HTMLElement;
+    private gridExtent = 40;
     private trailSlider!: HTMLInputElement;
     private trailValue!: HTMLElement;
     private presetSelect!: HTMLSelectElement;
     private presetRenderScaleInput!: HTMLInputElement;
     private presetRenderScaleValue!: HTMLElement;
+
+    // Grid Spacing Helpers (Logarithmic)
+    private sliderToSpacing(t: number): number {
+        const min = 0.001;
+        const max = 10;
+        const minLog = Math.log10(min);
+        const maxLog = Math.log10(max);
+        const clamped = Math.max(0, Math.min(1, t));
+        return Math.pow(10, minLog + (maxLog - minLog) * clamped);
+    }
+
+    private spacingToSlider(spacing: number): number {
+        const min = 0.001;
+        const max = 10;
+        const minLog = Math.log10(min);
+        const maxLog = Math.log10(max);
+        const clamped = Math.max(min, Math.min(max, spacing));
+        return (Math.log10(clamped) - minLog) / (maxLog - minLog);
+    }
 
     // Camera Elements
     private freeCamSpeedInput!: HTMLInputElement;
@@ -102,7 +122,7 @@ export class OptionsPanel {
         container.innerHTML = `
             <div class="opt-header">
                 <h2>Options</h2>
-                <button class="opt-close" title="Close (V)">&times;</button>
+                <button class="opt-close" title="Close (O)">&times;</button>
             </div>
 
             <div class="opt-tabs">
@@ -163,12 +183,12 @@ export class OptionsPanel {
 
                     <div class="opt-field">
                         <label>Grid Spacing (AU)</label>
-                        <input type="range" id="opt-grid-spacing" min="0.1" max="10" step="0.1" value="1">
-                        <span id="opt-grid-spacing-value">1.0 AU</span>
+                        <input type="range" id="opt-grid-spacing" min="0" max="1" step="0.001" value="0.5">
+                        <span id="opt-grid-spacing-value">0.1 AU</span>
                     </div>
 
                     <div class="opt-field">
-                        <label>Grid Size (AU)</label>
+                        <label>Grid Extent (AU)</label>
                         <input type="range" id="opt-grid-size" min="1" max="5000" step="1" value="40">
                         <span id="opt-grid-size-value">40 AU</span>
                     </div>
@@ -453,18 +473,31 @@ export class OptionsPanel {
 
         this.gridSpacingInput.addEventListener('input', () => {
             if (this.ignoreEvents) return;
-            const spacingAu = parseFloat(this.gridSpacingInput.value);
+            const t = parseFloat(this.gridSpacingInput.value);
+            const spacingAu = this.sliderToSpacing(t);
             this.options.gridSpacing = spacingAu * AU;
-            this.gridSpacingValue.textContent = `${spacingAu.toFixed(1)} AU`;
-            this.updateGridSizeValue();
+            this.gridSpacingValue.textContent = `${spacingAu.toFixed(3)} AU`;
+
+            // Adjust grid size (divisions) to keep extent constant
+            // extent = gridSize * 2 * spacing
+            // gridSize = extent / (2 * spacing)
+            // Clamp to avoid crashing rendering if spacing is tiny
+            const rawSize = this.gridExtent / (2 * spacingAu);
+            this.options.gridSize = Math.max(1, Math.min(5000, Math.round(rawSize)));
+
             this.emitChange();
         });
 
         this.gridSizeInput.addEventListener('input', () => {
             if (this.ignoreEvents) return;
-            const sizeAu = parseFloat(this.gridSizeInput.value);
-            this.options.gridSize = sizeAu;
-            this.updateGridSizeValue();
+            const extentAu = parseFloat(this.gridSizeInput.value);
+            this.gridExtent = extentAu;
+            this.gridSizeValue.textContent = `${extentAu.toFixed(0)} AU`;
+
+            const spacingAu = this.options.gridSpacing / AU;
+            const rawSize = this.gridExtent / (2 * spacingAu);
+            this.options.gridSize = Math.max(1, Math.min(5000, Math.round(rawSize)));
+
             this.emitChange();
         });
 
@@ -529,7 +562,7 @@ export class OptionsPanel {
     private setupKeyboardShortcut(): void {
         window.addEventListener('keydown', (e) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-            if (e.key === 'v' || e.key === 'V') this.toggle();
+            if (e.key === 'o' || e.key === 'O') this.toggle();
             if (e.key === 'Escape' && this.isOpen) this.close();
         });
     }
@@ -586,28 +619,21 @@ export class OptionsPanel {
         this.gridXYCheckbox.checked = this.options.showGridXY;
         this.gridXZCheckbox.checked = this.options.showGridXZ;
         this.gridYZCheckbox.checked = this.options.showGridYZ;
-        this.gridSpacingInput.value = String(this.options.gridSpacing / AU);
-        this.gridSpacingValue.textContent = `${(this.options.gridSpacing / AU).toFixed(1)} AU`;
-        this.gridSizeInput.value = String(this.options.gridSize);
-        this.updateGridSizeValue();
+        this.gridSpacingInput.value = String(this.spacingToSlider(this.options.gridSpacing / AU));
+        this.gridSpacingValue.textContent = `${(this.options.gridSpacing / AU).toFixed(3)} AU`;
+
+        // Calculate extent
+        const currentExtent = this.options.gridSize * 2 * (this.options.gridSpacing / AU);
+        this.gridExtent = currentExtent;
+        this.gridSizeInput.value = String(currentExtent);
+        this.gridSizeValue.textContent = `${currentExtent.toFixed(0)} AU`;
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
         this.presetSelect.value = this.presetName;
         this.presetRenderScaleInput.value = String(this.presetRenderScale);
         this.presetRenderScaleValue.textContent = `${this.presetRenderScale.toFixed(2)}x`;
-
-        // Syn camera sliders too if needed?
-        // Default to set values..
-
         this.ignoreEvents = false;
     }
-
-    private updateGridSizeValue(): void {
-        const spacingAu = this.options.gridSpacing / AU;
-        const distanceAu = this.options.gridSize * spacingAu;
-        this.gridSizeValue.textContent = `${distanceAu.toFixed(0)} AU`;
-    }
-
 
     toggle(): void {
         if (this.isOpen) this.close();
