@@ -175,29 +175,42 @@ export class BodyRenderer {
         mesh.group.add(planeMesh);
         this.refPlanes.set(body.id, planeMesh);
 
-        // Create per-body pole-to-pole reference line (on surface)
-        const northPole = axisDir.clone().multiplyScalar(Math.max(bodyVisRadius, AU * 0.0005));
-        const southPole = axisDir.clone().multiplyScalar(-Math.max(bodyVisRadius, AU * 0.0005));
-        const lineGeo = new THREE.BufferGeometry().setFromPoints([southPole, northPole]);
+        // Create per-body pole-to-pole meridian arc (on surface)
+        // We need an equator direction first (reused for ref point below)
+        const equatorDir = new THREE.Vector3(0, 0, 1).cross(axisDir);
+        if (equatorDir.lengthSq() < 0.001) {
+            equatorDir.set(1, 0, 0).cross(axisDir);
+        }
+        equatorDir.normalize();
+        const surfaceR = Math.max(bodyVisRadius, AU * 0.0005);
+        const meridianSegments = 32;
+        const meridianPoints: THREE.Vector3[] = [];
+        for (let s = 0; s <= meridianSegments; s++) {
+            // Sweep from south pole (θ=π) to north pole (θ=0)
+            const theta = Math.PI * (1 - s / meridianSegments);
+            const sinT = Math.sin(theta);
+            const cosT = Math.cos(theta);
+            // Point on sphere: cosT * axis + sinT * equatorDir
+            meridianPoints.push(
+                axisDir.clone().multiplyScalar(cosT * surfaceR)
+                    .add(equatorDir.clone().multiplyScalar(sinT * surfaceR))
+            );
+        }
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(meridianPoints);
         const lineMat = new THREE.LineBasicMaterial({ color: 0xff6644 });
         const refLine = new THREE.Line(lineGeo, lineMat);
         refLine.visible = this.showRefLineFlag;
         mesh.group.add(refLine);
         this.refLines.set(body.id, refLine);
 
-        // Create per-body equator reference point
-        // Pick a point on the equator perpendicular to the axis
-        const equatorDir = new THREE.Vector3(0, 0, 1).cross(axisDir);
-        if (equatorDir.lengthSq() < 0.001) {
-            // Axis is nearly parallel to Z; pick X cross instead
-            equatorDir.set(1, 0, 0).cross(axisDir);
-        }
-        equatorDir.normalize();
+        // Create per-body equator reference point (reuses equatorDir from meridian arc)
         const dotRadius = Math.max(bodyVisRadius * 0.08, AU * 0.0001);
         const dotGeo = new THREE.SphereGeometry(dotRadius, 8, 6);
         const dotMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
         const dot = new THREE.Mesh(dotGeo, dotMat);
-        dot.position.copy(equatorDir.multiplyScalar(Math.max(bodyVisRadius, AU * 0.0005)));
+        // equatorDir was normalized then mutated by multiplyScalar above, so re-normalize
+        equatorDir.normalize();
+        dot.position.copy(equatorDir.clone().multiplyScalar(surfaceR));
         dot.visible = this.showRefPointFlag;
         mesh.group.add(dot);
         this.refPoints.set(body.id, dot);
