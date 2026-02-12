@@ -160,12 +160,13 @@ class NBodyClient {
             this.network,
             (speed) => {
                 this.freeCamSpeedAuPerSec = speed;
+                // Save preference?
             },
             (sensitivity) => {
                 this.camera.setFreeLookSensitivity(sensitivity);
             },
-            (presetId) => {
-                this.loadPresetFromAdmin(presetId);
+            (presetId, name) => {
+                this.loadPresetFromAdmin(presetId, name);
             },
             (mode) => {
                 this.setLocalSimMode(mode);
@@ -440,29 +441,7 @@ class NBodyClient {
             }
 
             switch (e.key) {
-                case ' ':
-                    if (this.network?.isConnected()) {
-                        const nextPaused = !this.timeController.isPaused();
-                        this.timeController.setPaused(nextPaused);
-                        this.updateTimeScaleUI();
-                        this.network.sendPause(nextPaused);
-                    } else {
-                        this.timeController.togglePause();
-                        this.updateTimeScaleUI();
-                    }
-                    break;
-                case '.':
-                case '>':
-                    this.timeController.increaseSpeed();
-                    this.updateTimeScaleUI();
-                    this.syncTimeScaleToServer();
-                    break;
-                case ',':
-                case '<':
-                    this.timeController.decreaseSpeed();
-                    this.updateTimeScaleUI();
-                    this.syncTimeScaleToServer();
-                    break;
+                // Space keybind removed (moved to Pause button in Admin Panel)
                 case '1':
                     this.toggleSimulationSection('sim');
                     break;
@@ -479,17 +458,14 @@ class NBodyClient {
                     break;
                 case 'p':
                 case 'P':
-                    // Only handle P for previous if not pausing (space handles pause)
-                    if (!e.shiftKey) {
-                        this.followPreviousBody();
-                    }
+                    this.followPreviousBody();
                     break;
                 case 'h':
                 case 'H':
                     this.toggleUIVisibility();
                     break;
-                case 'i':
-                case 'I':
+                case 'k':
+                case 'K':
                     this.toggleHints();
                     break;
             }
@@ -544,14 +520,14 @@ class NBodyClient {
         const simSection = document.getElementById('sim-params-section');
         const followSection = document.getElementById('follow-section');
         if (simSection) {
-            simSection.style.display = this.showSimulationParams ? '' : 'none';
+            simSection.style.display = this.showSimulationParams ? 'block' : 'none';
         }
         if (followSection) {
-            followSection.style.display = this.showFollowingDetails ? '' : 'none';
+            followSection.style.display = this.showFollowingDetails ? 'block' : 'none';
         }
     }
 
-    private loadPresetFromAdmin(presetId: string): void {
+    private loadPresetFromAdmin(presetId: string, name: string): void {
         if (presetId === 'sunEarthMoon') {
             this.physics.createSunEarthMoon();
         } else {
@@ -563,7 +539,7 @@ class NBodyClient {
 
         if (this.network?.isConnected()) {
             const snapshot = this.physics.getSnapshot();
-            this.network.sendSnapshot(snapshot);
+            this.network.sendSnapshot(snapshot, name);
         }
     }
 

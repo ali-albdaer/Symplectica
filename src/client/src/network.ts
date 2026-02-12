@@ -232,8 +232,8 @@ export class NetworkClient {
         this.send('set_time_scale', { simSecondsPerRealSecond });
     }
 
-    sendSnapshot(snapshot: string): void {
-        this.send('apply_snapshot', { snapshot });
+    sendSnapshot(snapshot: string, presetName?: string): void {
+        this.send('apply_snapshot', { snapshot, presetName });
     }
 
     resetSimulation(): void {

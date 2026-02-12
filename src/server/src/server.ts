@@ -27,6 +27,31 @@ interface PhysicsModule {
     init: () => void;
 }
 
+// Speed levels for label lookup (should match time-controller.ts)
+const SPEED_LEVELS = [
+    { sim: 1, label: '1s/s' },
+    { sim: 60, label: '1min/s' },
+    { sim: 3600, label: '1hr/s' },
+    { sim: 86400, label: '1day/s' },
+    { sim: 604800, label: '1wk/s' },
+    { sim: 2592000, label: '1mo/s' },
+    { sim: 31536000, label: '1yr/s' },
+];
+
+function getSpeedLabel(sim: number): string {
+    // Find exact match
+    const exact = SPEED_LEVELS.find(l => Math.abs(l.sim - sim) < 0.001);
+    if (exact) return exact.label;
+
+    // Fallback format
+    if (sim < 60) return `${sim.toFixed(1)}s/s`;
+    if (sim < 3600) return `${(sim / 60).toFixed(1)}min/s`;
+    if (sim < 86400) return `${(sim / 3600).toFixed(1)}hr/s`;
+    if (sim < 604800) return `${(sim / 86400).toFixed(1)}day/s`;
+    if (sim < 31536000) return `${(sim / 604800).toFixed(1)}wk/s`;
+    return `${(sim / 31536000).toFixed(1)}yr/s`;
+}
+
 interface WasmSimulation {
     step(): void;
     stepN(n: bigint): void;
@@ -337,6 +362,30 @@ class SimulationServer {
                     ? payload.timeScale
                     : this.adminState.timeScale;
 
+                const changes: string[] = [];
+                // Only announce time warp separately or as special message?
+                // User requirement: "*** Time warp was set to {new_time warp} (e.g. 1wk/s, 1mo/s etc.)"
+
+                if (timeScale !== this.adminState.timeScale) {
+                    const label = getSpeedLabel(timeScale);
+                    this.broadcastChat({
+                        sender: 'Admin',
+                        text: `Time warp was set to ${label}`
+                    });
+                }
+
+                // Other changes (dt, substeps etc) might not need broadcast or can be grouped
+                // For now, let's keep other technical changes minimal or remove if user wants ONLY the formatted ones.
+                // User said "Remove the admin updated part, And instead of sending as admin change the messages to something like..."
+                // So I will remove the generic "Admin updated settings: ..." and only send the requested ones.
+
+                /*
+                if (dt !== this.adminState.dt) changes.push(`dt=${dt}`);
+                if (substeps !== this.adminState.substeps) changes.push(`substeps=${substeps}`);
+                if (forceMethod !== this.adminState.forceMethod) changes.push(`method=${forceMethod}`);
+                if (simMode !== this.adminState.simMode) changes.push(`mode=${simMode}`);
+                */
+
                 this.simulation.setDt(dt);
                 this.simulation.setSubsteps(substeps);
                 if (forceMethod === 'barnes-hut') {
@@ -367,6 +416,15 @@ class SimulationServer {
                     };
                 }
                 this.broadcastAdminState();
+
+                /*
+                if (changes.length > 0) {
+                    this.broadcastChat({
+                        sender: 'System',
+                        text: `Admin updated settings: ${changes.join(', ')}`
+                    });
+                }
+                */
                 break;
             }
 
@@ -378,16 +436,25 @@ class SimulationServer {
                     paused: payload.paused,
                 };
                 this.broadcastAdminState();
+                this.broadcastChat({
+                    sender: 'System',
+                    text: `Simulation ${payload.paused ? 'paused' : 'resumed'}`
+                });
                 break;
             }
 
 
             case 'apply_snapshot': {
-                const payload = message.payload as { snapshot?: string } | undefined;
+                const payload = message.payload as { snapshot?: string; presetName?: string } | undefined;
                 if (!payload?.snapshot) return;
                 const ok = this.simulation.fromJson(payload.snapshot);
                 if (ok) {
                     this.broadcastSnapshot();
+                    const name = payload.presetName || 'Custom Snapshot';
+                    this.broadcastChat({
+                        sender: 'Admin',
+                        text: `Universe was changed to ${name}`
+                    });
                 }
                 break;
             }
@@ -396,6 +463,10 @@ class SimulationServer {
                 this.createSimulation();
                 this.broadcastSnapshot();
                 this.broadcastAdminState();
+                this.broadcastChat({
+                    sender: 'Admin',
+                    text: 'Universe was changed to Full Solar System (Reset)'
+                });
                 break;
 
             case 'chat': {
@@ -583,7 +654,7 @@ class SimulationServer {
                 }
 
                 const normalized = requested.slice(0, 20);
-                if (normalized.toLowerCase() === 'system') {
+                if (normalized.toLowerCase() === 'system' || normalized.toLowerCase() === 'admin') {
                     this.sendChatToClient(client, {
                         sender: 'System',
                         text: 'no.',

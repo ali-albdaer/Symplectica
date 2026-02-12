@@ -28,7 +28,7 @@ export class AdminPanel {
     private network?: NetworkClient;
     private onFreeCamSpeedChange?: (speed: number) => void;
     private onFreeCamSensitivityChange?: (sensitivity: number) => void;
-    private onPresetChange?: (presetId: string) => void;
+    private onPresetChange?: (presetId: string, name: string) => void;
     private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
     private isOpen = false;
     private freeCamSpeed = 1; // AU/s
@@ -47,7 +47,7 @@ export class AdminPanel {
         network?: NetworkClient,
         onFreeCamSpeedChange?: (speed: number) => void,
         onFreeCamSensitivityChange?: (sensitivity: number) => void,
-        onPresetChange?: (presetId: string) => void,
+        onPresetChange?: (presetId: string, name: string) => void,
         onSimModeChange?: (mode: 'tick' | 'accumulator') => void
     ) {
         this.physics = physics;
@@ -62,6 +62,15 @@ export class AdminPanel {
         this.setupKeyboardShortcut();
         this.onFreeCamSpeedChange?.(this.freeCamSpeed);
         this.onFreeCamSensitivityChange?.(this.freeCamSensitivity);
+    }
+
+    // Public method to update pause state from outside (e.g. keybind or server)
+    setPaused(paused: boolean): void {
+        const btn = document.getElementById('admin-pause-btn');
+        if (btn) {
+            btn.textContent = paused ? 'Resume Simulation' : 'Pause Simulation';
+            btn.classList.toggle('admin-btn-warning', paused);
+        }
     }
 
     private createUI(): HTMLElement {
@@ -96,6 +105,13 @@ export class AdminPanel {
                 <section class="admin-section">
                     <h3>Simulation</h3>
                     
+                    <div class="admin-field">
+                        <label>Time Warp</label>
+                        <select id="admin-time-warp">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+
                     <div class="admin-field">
                         <label>Timestep (seconds)</label>
                         <input type="number" id="admin-dt" value="3600" min="1" max="86400" step="60">
@@ -150,6 +166,7 @@ export class AdminPanel {
                 <section class="admin-section">
                     <h3>Actions</h3>
                     <button class="admin-btn" id="admin-apply">Apply Settings</button>
+                    <button class="admin-btn" id="admin-pause-btn">Pause Simulation</button>
                     <button class="admin-btn admin-btn-warning" id="admin-reset">Reset Simulation</button>
                 </section>
             </div>
@@ -323,6 +340,19 @@ export class AdminPanel {
         `;
         document.head.appendChild(style);
 
+        // Populate Time Warp dropdown
+        const warpSelect = container.querySelector('#admin-time-warp') as HTMLSelectElement;
+        const levels = this.timeController.getSpeedLevels();
+        levels.forEach((level, index) => {
+            const option = document.createElement('option');
+            option.value = level.sim.toString();
+            option.textContent = level.label;
+            if (index === this.timeController.getSpeedIndex()) {
+                option.selected = true;
+            }
+            warpSelect.appendChild(option);
+        });
+
         // Setup event listeners
         this.setupEventListeners(container);
 
@@ -380,7 +410,22 @@ export class AdminPanel {
         container.querySelector('#admin-load-preset')?.addEventListener('click', () => {
             const presetSelect = container.querySelector('#admin-preset') as HTMLSelectElement | null;
             if (!presetSelect) return;
-            this.onPresetChange?.(presetSelect.value);
+            const name = presetSelect.options[presetSelect.selectedIndex].text;
+            this.onPresetChange?.(presetSelect.value, name);
+        });
+
+        // Pause button
+        container.querySelector('#admin-pause-btn')?.addEventListener('click', () => {
+            this.timeController.togglePause();
+            // Logic to send pause is handled via listener in main.ts or we can do it here. 
+            // Wait, main.ts listens to timeController changes usually? No.
+            // Let's check main.ts. It handles keybinds and sends.
+            // We should probably emit an event or handle it directly here if we want to be self-contained?
+            // Actually, AdminPanel HAS access to NetworkClient.
+            if (this.network?.isConnected()) {
+                this.network.sendPause(this.timeController.isPaused());
+            }
+            this.setPaused(this.timeController.isPaused());
         });
 
         // Reset button
@@ -458,7 +503,9 @@ export class AdminPanel {
         const forceMethod = (document.getElementById('admin-force-method') as HTMLSelectElement).value;
         const theta = parseFloat((document.getElementById('admin-theta') as HTMLInputElement).value);
         const simMode = (document.getElementById('admin-sim-mode') as HTMLSelectElement).value as 'tick' | 'accumulator';
-        const timeScale = this.timeController.getCurrentSpeed().sim;
+
+        const warpSelect = document.getElementById('admin-time-warp') as HTMLSelectElement;
+        const timeScale = parseFloat(warpSelect.value);
 
         if (this.network?.isConnected()) {
             this.network.sendAdminSettings({
@@ -481,6 +528,7 @@ export class AdminPanel {
             this.physics.useDirectForce();
         }
         this.timeController.setPhysicsTimestep(dt);
+        this.timeController.setSpeedBySimRate(timeScale);
         this.onSimModeChange?.(simMode);
 
         console.log(`⚙️ Applied settings: dt=${dt}s, substeps=${substeps}, method=${forceMethod}, θ=${theta}`);
@@ -505,6 +553,7 @@ export class AdminPanel {
         const thetaInput = document.getElementById('admin-theta') as HTMLInputElement | null;
         const thetaField = document.getElementById('theta-field') as HTMLElement | null;
         const simModeSelect = document.getElementById('admin-sim-mode') as HTMLSelectElement | null;
+        const warpSelect = document.getElementById('admin-time-warp') as HTMLSelectElement | null;
 
         if (dtInput) dtInput.value = settings.dt.toString();
         if (substepsInput) substepsInput.value = settings.substeps.toString();
@@ -512,6 +561,12 @@ export class AdminPanel {
         if (thetaInput) thetaInput.value = settings.theta.toString();
         if (thetaField) thetaField.classList.toggle('visible', settings.forceMethod === 'barnes-hut');
         if (simModeSelect) simModeSelect.value = settings.simMode;
+        if (warpSelect) {
+            // Find closest match or add custom? usually predefined
+            // For now just set value if it matches, otherwise we might need logic
+            // Assuming settings.timeScale is one of the options
+            warpSelect.value = settings.timeScale.toString();
+        }
     }
 
     private setupDrag(container: HTMLElement): void {

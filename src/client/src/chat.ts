@@ -191,6 +191,15 @@ export class Chat {
             .chat-message.system .sender {
                 color: #ab47bc;
             }
+
+            .chat-message.admin {
+                color: rgba(255, 255, 255, 0.9);
+            }
+
+            .chat-message.admin .sender {
+                color: #ff5252;
+                font-weight: 700;
+            }
             
             .chat-message .text {
                 color: rgba(255, 255, 255, 0.9);
@@ -395,7 +404,7 @@ export class Chat {
             });
 
             return `
-                <div class="chat-message ${msg.isSystem ? 'system' : ''}">
+                <div class="chat-message ${msg.isSystem ? 'system' : ''} ${msg.sender === 'Admin' ? 'admin' : ''}">
                     <span class="sender">${this.escapeHtml(msg.sender)}:</span>
                     <span class="text">${this.escapeHtml(msg.text)}</span>
                     <span class="time">${time}</span>
