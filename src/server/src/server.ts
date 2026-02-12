@@ -239,7 +239,7 @@ class SimulationServer {
                         tickRate: CONFIG.tickRate,
                         serverTick: Number(this.simulation.tick()),
                         adminState: this.adminState,
-                        visualPresetDefault: 'Low',
+                        visualPresetDefault: 'Ultra',
                     },
                 },
                 serverTick: Number(this.simulation.tick()),

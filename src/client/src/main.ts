@@ -150,7 +150,7 @@ class NBodyClient {
             await this.network.connect();
         } catch (error) {
             console.warn('⚠️ Multiplayer server unavailable, running in local mode.', error);
-            this.ensureLocalPreset('Low');
+            this.ensureLocalPreset('Ultra');
         }
 
         // Initialize Admin Panel

@@ -9,7 +9,7 @@ describe('VisualPresetRegistry', () => {
     it('loads presets and returns the active preset', () => {
         const presets = visualPresets as VisualPresetsFile;
         VisualPresetRegistry.loadPresets(presets);
-        VisualPresetRegistry.setDefaultPreset('Low');
+        VisualPresetRegistry.setDefaultPreset('Ultra');
         const preset = VisualPresetRegistry.getPresetForPlayer('local');
         expect(preset.maxTextureSize).toBe(512);
     });
