@@ -2,8 +2,6 @@
 name = "physics-core"
 version = "0.1.0"
 edition = "2021"
-authors = ["Ali AL-BDAER"]
-description = "N-Body Physics engine for Symplectica"
 license = "MIT"
 
 [lib]
