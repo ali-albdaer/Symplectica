@@ -169,7 +169,7 @@ export class OptionsPanel {
 
                     <div class="opt-field">
                         <label>Grid Size (AU)</label>
-                        <input type="range" id="opt-grid-size" min="1" max="1000000" step="1" value="40">
+                        <input type="range" id="opt-grid-size" min="1" max="5000" step="1" value="40">
                         <span id="opt-grid-size-value">40 AU</span>
                     </div>
                 </section>
@@ -189,7 +189,7 @@ export class OptionsPanel {
                     <div class="opt-field">
                         <label>Speed (AU/s)</label>
                         <div class="opt-slider-row">
-                            <input type="range" id="opt-freecam-speed" min="0" max="1" step="0.001" value="0.1">
+                            <input type="range" id="opt-freecam-speed" min="0" max="100" step="0.1" value="0.1">
                             <span id="opt-freecam-speed-value">0.100 AU/s</span>
                         </div>
                     </div>
@@ -197,7 +197,7 @@ export class OptionsPanel {
                     <div class="opt-field">
                         <label>Sensitivity</label>
                         <div class="opt-slider-row">
-                            <input type="range" id="opt-freecam-sensitivity" min="0.1" max="5" step="0.1" value="0.3">
+                            <input type="range" id="opt-freecam-sensitivity" min="0.1" max="2" step="0.1" value="0.3">
                             <span id="opt-freecam-sensitivity-value">0.3x</span>
                         </div>
                     </div>
@@ -492,8 +492,7 @@ export class OptionsPanel {
 
         // Camera events
         this.freeCamSpeedInput.addEventListener('input', () => {
-            const t = parseFloat(this.freeCamSpeedInput.value);
-            const speed = this.sliderToSpeed(t);
+            const speed = parseFloat(this.freeCamSpeedInput.value);
             this.freeCamSpeed = speed;
             this.freeCamSpeedValue.textContent = `${speed.toFixed(3)} AU/s`;
             this.onFreeCamSpeedChange?.(speed);
@@ -649,28 +648,10 @@ export class OptionsPanel {
         this.ignoreEvents = false;
     }
 
-    // Camera Helpers
-    private sliderToSpeed(t: number): number {
-        const min = 0.001;
-        const max = 1000;
-        const minLog = Math.log10(min);
-        const maxLog = Math.log10(max);
-        const clamped = Math.max(0, Math.min(1, t));
-        return Math.pow(10, minLog + (maxLog - minLog) * clamped);
-    }
-
     // Can add setFreeCamSpeed/Sensitivity external control if needed
     setFreeCamSpeed(speed: number): void {
         this.freeCamSpeed = speed;
-        // Inverse of sliderToSpeed
-        const min = 0.001;
-        const max = 1000;
-        const minLog = Math.log10(min);
-        const maxLog = Math.log10(max);
-        const clampedSpeed = Math.max(min, Math.min(max, speed));
-        const t = (Math.log10(clampedSpeed) - minLog) / (maxLog - minLog);
-
-        this.freeCamSpeedInput.value = t.toString();
+        this.freeCamSpeedInput.value = speed.toString();
         this.freeCamSpeedValue.textContent = `${speed.toFixed(3)} AU/s`;
     }
 
