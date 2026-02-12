@@ -1,7 +1,7 @@
 /**
- * Visualization Options Panel
+ * Options Panel
  *
- * Controls display settings for the renderer.
+ * Consolidated settings for Visualization and Camera.
  */
 
 export interface VisualizationOptions {
@@ -29,15 +29,23 @@ const DEFAULTS: VisualizationOptions = {
     orbitTrailLength: 100,
 };
 
-export class VisualizationPanel {
+export class OptionsPanel {
     private container: HTMLElement;
     private isOpen = false;
     private options: VisualizationOptions;
+
+    // Callbacks
     private onChange: (options: VisualizationOptions) => void;
     private onPresetChange?: (preset: VisualizationPresetName) => void;
     private onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void;
+    private onFreeCamSpeedChange?: (speed: number) => void;
+    private onFreeCamSensitivityChange?: (sensitivity: number) => void;
+
+    // State
     private presetName: VisualizationPresetName;
     private presetRenderScale = 1;
+    private freeCamSpeed = 0.1; // AU/s
+    private freeCamSensitivity = 0.3;
     private ignoreEvents = false;
 
     // UI Elements
@@ -56,15 +64,25 @@ export class VisualizationPanel {
     private presetRenderScaleInput!: HTMLInputElement;
     private presetRenderScaleValue!: HTMLElement;
 
+    // Camera Elements
+    private freeCamSpeedInput!: HTMLInputElement;
+    private freeCamSpeedValue!: HTMLElement;
+    private freeCamSensitivityInput!: HTMLInputElement;
+    private freeCamSensitivityValue!: HTMLElement;
+
     constructor(
         onChange: (options: VisualizationOptions) => void,
         onPresetChange?: (preset: VisualizationPresetName) => void,
         onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void,
+        onFreeCamSpeedChange?: (speed: number) => void,
+        onFreeCamSensitivityChange?: (sensitivity: number) => void,
         initialPreset: VisualizationPresetName = 'Low'
     ) {
         this.onChange = onChange;
         this.onPresetChange = onPresetChange;
         this.onPresetEdit = onPresetEdit;
+        this.onFreeCamSpeedChange = onFreeCamSpeedChange;
+        this.onFreeCamSensitivityChange = onFreeCamSensitivityChange;
         this.presetName = initialPreset;
         this.options = { ...DEFAULTS };
         this.container = this.createUI();
@@ -74,24 +92,30 @@ export class VisualizationPanel {
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
 
-        this.onChange({ ...this.options });
+        // Don't auto-emit change on init to avoid double-firing, unless needed.
+        // this.onChange({ ...this.options }); // Removed to avoid overriding persisted settings if any
     }
 
     private createUI(): HTMLElement {
         const container = document.createElement('div');
-        container.id = 'viz-panel';
+        container.id = 'opt-panel';
         container.innerHTML = `
-            <div class="viz-header">
-                <h2>Visualization</h2>
-                <button class="viz-close" title="Close (V)">&times;</button>
+            <div class="opt-header">
+                <h2>Options</h2>
+                <button class="opt-close" title="Close (V)">&times;</button>
             </div>
 
-            <div class="viz-content">
-                <section class="viz-section">
+            <div class="opt-tabs">
+                <button class="opt-tab active" data-tab="graphics">Graphics</button>
+                <button class="opt-tab" data-tab="camera">Camera</button>
+            </div>
+
+            <div class="opt-content active" id="tab-graphics">
+                <section class="opt-section">
                     <h3>Preset</h3>
-                    <div class="viz-field">
+                    <div class="opt-field">
                         <label>Visual Quality</label>
-                        <select id="viz-preset">
+                        <select id="opt-preset">
                             <option value="Low">Low</option>
                             <option value="High">High</option>
                             <option value="Ultra">Ultra</option>
@@ -99,75 +123,95 @@ export class VisualizationPanel {
                     </div>
                 </section>
 
-                <section class="viz-section">
+                <section class="opt-section">
                     <h3>Preset Tuning</h3>
-                    <div class="viz-field">
+                    <div class="opt-field">
                         <label>Render Scale</label>
-                        <input type="range" id="viz-render-scale" min="0.1" max="5" step="0.05" value="1">
-                        <span id="viz-render-scale-value">1.00x</span>
+                        <input type="range" id="opt-render-scale" min="0.1" max="5" step="0.05" value="1">
+                        <span id="opt-render-scale-value">1.00x</span>
                     </div>
                 </section>
 
-                <section class="viz-section">
+                <section class="opt-section">
                     <h3>Display</h3>
 
-                    <div class="viz-row">
-                        <label class="viz-toggle">
-                            <input type="checkbox" id="viz-orbits">
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-orbits">
                             <span>Trails</span>
                         </label>
-                        <label class="viz-toggle">
-                            <input type="checkbox" id="viz-labels">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-labels">
                             <span>Labels</span>
                         </label>
                     </div>
 
-                    <div class="viz-row">
-                        <label class="viz-toggle">
-                            <input type="checkbox" id="viz-grid-xy">
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-grid-xy">
                             <span>XY</span>
                         </label>
-                        <label class="viz-toggle">
-                            <input type="checkbox" id="viz-grid-xz">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-grid-xz">
                             <span>XZ</span>
                         </label>
-                        <label class="viz-toggle">
-                            <input type="checkbox" id="viz-grid-yz">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-grid-yz">
                             <span>YZ</span>
                         </label>
                     </div>
 
-                    <div class="viz-field">
+                    <div class="opt-field">
                         <label>Grid Spacing (AU)</label>
-                        <input type="range" id="viz-grid-spacing" min="0.1" max="10" step="0.1" value="1">
-                        <span id="viz-grid-spacing-value">1.0 AU</span>
+                        <input type="range" id="opt-grid-spacing" min="0.1" max="10" step="0.1" value="1">
+                        <span id="opt-grid-spacing-value">1.0 AU</span>
                     </div>
 
-                    <div class="viz-field">
+                    <div class="opt-field">
                         <label>Grid Size (AU)</label>
-                        <input type="range" id="viz-grid-size" min="1" max="1000000" step="1" value="40">
-                        <span id="viz-grid-size-value">40 AU</span>
+                        <input type="range" id="opt-grid-size" min="1" max="1000000" step="1" value="40">
+                        <span id="opt-grid-size-value">40 AU</span>
                     </div>
                 </section>
 
-                <section class="viz-section">
+                <section class="opt-section">
                     <h3>Trail Length</h3>
-                    <div class="viz-slider-row">
-                        <input type="range" id="viz-trail-length" min="10" max="2000" step="10">
-                        <span id="viz-trail-value">100</span>
+                    <div class="opt-slider-row">
+                        <input type="range" id="opt-trail-length" min="10" max="2000" step="10">
+                        <span id="opt-trail-value">100</span>
                     </div>
                 </section>
+            </div>
 
+            <div class="opt-content" id="tab-camera" style="display: none;">
+                <section class="opt-section">
+                    <h3>Free Camera Settings</h3>
+                    <div class="opt-field">
+                        <label>Speed (AU/s)</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-freecam-speed" min="0" max="1" step="0.001" value="0.1">
+                            <span id="opt-freecam-speed-value">0.100 AU/s</span>
+                        </div>
+                    </div>
+
+                    <div class="opt-field">
+                        <label>Sensitivity</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-freecam-sensitivity" min="0.1" max="5" step="0.1" value="0.3">
+                            <span id="opt-freecam-sensitivity-value">0.3x</span>
+                        </div>
+                    </div>
+                </section>
             </div>
         `;
 
         const style = document.createElement('style');
         style.textContent = `
-            #viz-panel {
+            #opt-panel {
                 position: fixed;
                 top: 20px;
                 right: 360px;
-                width: 240px;
+                width: 260px;
                 background: rgba(10, 15, 30, 0.95);
                 backdrop-filter: blur(20px);
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -181,9 +225,9 @@ export class VisualizationPanel {
                 overflow: hidden;
             }
 
-            #viz-panel.open { display: flex; }
+            #opt-panel.open { display: flex; }
 
-            .viz-header {
+            .opt-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
@@ -194,14 +238,14 @@ export class VisualizationPanel {
                 user-select: none;
             }
 
-            .viz-header h2 {
+            .opt-header h2 {
                 font-size: 14px;
                 font-weight: 600;
                 margin: 0;
                 color: #4fc3f7;
             }
 
-            .viz-close {
+            .opt-close {
                 background: none;
                 border: none;
                 color: rgba(255, 255, 255, 0.5);
@@ -211,17 +255,47 @@ export class VisualizationPanel {
                 line-height: 1;
             }
 
-            .viz-close:hover { color: #fff; }
+            .opt-close:hover { color: #fff; }
 
-            .viz-content { padding: 12px 15px; }
+            .opt-tabs {
+                display: flex;
+                background: rgba(0, 0, 0, 0.2);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
 
-            .viz-section {
+            .opt-tab {
+                flex: 1;
+                background: none;
+                border: none;
+                color: rgba(255, 255, 255, 0.6);
+                padding: 10px 0;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                transition: color 0.2s, border-color 0.2s;
+            }
+
+            .opt-tab:hover {
+                color: #fff;
+                background: rgba(255, 255, 255, 0.05);
+            }
+
+            .opt-tab.active {
+                color: #4fc3f7;
+                border-bottom-color: #4fc3f7;
+            }
+
+            .opt-content { padding: 12px 15px; }
+            .opt-content.active { display: block; }
+
+            .opt-section {
                 margin-bottom: 14px;
             }
 
-            .viz-section:last-child { margin-bottom: 0; }
+            .opt-section:last-child { margin-bottom: 0; }
 
-            .viz-section h3 {
+            .opt-section h3 {
                 font-size: 10px;
                 font-weight: 600;
                 color: rgba(255, 255, 255, 0.5);
@@ -230,14 +304,14 @@ export class VisualizationPanel {
                 margin: 0 0 8px 0;
             }
 
-            .viz-row {
+            .opt-row {
                 display: flex;
                 justify-content: space-between;
                 gap: 10px;
                 margin-bottom: 6px;
             }
 
-            .viz-toggle {
+            .opt-toggle {
                 display: flex;
                 align-items: center;
                 gap: 6px;
@@ -245,30 +319,30 @@ export class VisualizationPanel {
                 cursor: pointer;
             }
 
-            .viz-toggle input[type="checkbox"] {
+            .opt-toggle input[type="checkbox"] {
                 width: 16px;
                 height: 16px;
                 accent-color: #4fc3f7;
                 margin: 0;
             }
 
-            .viz-toggle span {
+            .opt-toggle span {
                 font-size: 13px;
                 color: rgba(255, 255, 255, 0.9);
             }
 
-            .viz-field {
+            .opt-field {
                 margin: 8px 0 6px 0;
             }
 
-            .viz-field label {
+            .opt-field label {
                 display: block;
                 font-size: 11px;
                 color: rgba(255, 255, 255, 0.6);
                 margin-bottom: 6px;
             }
 
-            .viz-field select {
+            .opt-field select {
                 width: 100%;
                 background: rgba(0, 0, 0, 0.3);
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -278,39 +352,39 @@ export class VisualizationPanel {
                 font-size: 12px;
             }
 
-            .viz-field input[type="range"] {
+            .opt-field input[type="range"] {
                 width: 100%;
                 accent-color: #4fc3f7;
                 height: 4px;
             }
 
-            .viz-field span {
+            .opt-field span {
                 font-size: 11px;
                 color: rgba(255, 255, 255, 0.6);
             }
 
-            .viz-slider-row {
+            .opt-slider-row {
                 display: flex;
                 align-items: center;
                 gap: 10px;
                 margin-top: 6px;
             }
 
-            .viz-slider-row input[type="range"] {
+            .opt-slider-row input[type="range"] {
                 flex: 1;
                 accent-color: #4fc3f7;
                 height: 4px;
             }
 
-            .viz-slider-row span {
-                min-width: 50px;
+            .opt-slider-row span {
+                min-width: 60px;
                 text-align: right;
                 font-size: 12px;
                 color: rgba(255, 255, 255, 0.7);
                 font-variant-numeric: tabular-nums;
             }
 
-            .viz-slider-row.disabled {
+            .opt-slider-row.disabled {
                 opacity: 0.4;
                 pointer-events: none;
             }
@@ -320,26 +394,32 @@ export class VisualizationPanel {
     }
 
     private cacheElements(): void {
-        this.orbitsCheckbox = this.container.querySelector('#viz-orbits')!;
-        this.labelsCheckbox = this.container.querySelector('#viz-labels')!;
-        this.gridXYCheckbox = this.container.querySelector('#viz-grid-xy')!;
-        this.gridXZCheckbox = this.container.querySelector('#viz-grid-xz')!;
-        this.gridYZCheckbox = this.container.querySelector('#viz-grid-yz')!;
-        this.gridSpacingInput = this.container.querySelector('#viz-grid-spacing')!;
-        this.gridSpacingValue = this.container.querySelector('#viz-grid-spacing-value')!;
-        this.gridSizeInput = this.container.querySelector('#viz-grid-size')!;
-        this.gridSizeValue = this.container.querySelector('#viz-grid-size-value')!;
-        this.trailSlider = this.container.querySelector('#viz-trail-length')!;
-        this.trailValue = this.container.querySelector('#viz-trail-value')!;
-        this.presetSelect = this.container.querySelector('#viz-preset')!;
-        this.presetRenderScaleInput = this.container.querySelector('#viz-render-scale')!;
-        this.presetRenderScaleValue = this.container.querySelector('#viz-render-scale-value')!;
+        this.orbitsCheckbox = this.container.querySelector('#opt-orbits')!;
+        this.labelsCheckbox = this.container.querySelector('#opt-labels')!;
+        this.gridXYCheckbox = this.container.querySelector('#opt-grid-xy')!;
+        this.gridXZCheckbox = this.container.querySelector('#opt-grid-xz')!;
+        this.gridYZCheckbox = this.container.querySelector('#opt-grid-yz')!;
+        this.gridSpacingInput = this.container.querySelector('#opt-grid-spacing')!;
+        this.gridSpacingValue = this.container.querySelector('#opt-grid-spacing-value')!;
+        this.gridSizeInput = this.container.querySelector('#opt-grid-size')!;
+        this.gridSizeValue = this.container.querySelector('#opt-grid-size-value')!;
+        this.trailSlider = this.container.querySelector('#opt-trail-length')!;
+        this.trailValue = this.container.querySelector('#opt-trail-value')!;
+        this.presetSelect = this.container.querySelector('#opt-preset')!;
+        this.presetRenderScaleInput = this.container.querySelector('#opt-render-scale')!;
+        this.presetRenderScaleValue = this.container.querySelector('#opt-render-scale-value')!;
+
+        this.freeCamSpeedInput = this.container.querySelector('#opt-freecam-speed')!;
+        this.freeCamSpeedValue = this.container.querySelector('#opt-freecam-speed-value')!;
+        this.freeCamSensitivityInput = this.container.querySelector('#opt-freecam-sensitivity')!;
+        this.freeCamSensitivityValue = this.container.querySelector('#opt-freecam-sensitivity-value')!;
     }
 
     private bindEvents(): void {
-        this.container.querySelector('.viz-close')?.addEventListener('click', () => this.close());
+        this.container.querySelector('.opt-close')?.addEventListener('click', () => this.close());
 
         this.setupDrag();
+        this.setupTabs();
 
         this.orbitsCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
@@ -410,6 +490,41 @@ export class VisualizationPanel {
             this.onPresetEdit?.(this.presetName, { renderScale: value });
         });
 
+        // Camera events
+        this.freeCamSpeedInput.addEventListener('input', () => {
+            const t = parseFloat(this.freeCamSpeedInput.value);
+            const speed = this.sliderToSpeed(t);
+            this.freeCamSpeed = speed;
+            this.freeCamSpeedValue.textContent = `${speed.toFixed(3)} AU/s`;
+            this.onFreeCamSpeedChange?.(speed);
+        });
+
+        this.freeCamSensitivityInput.addEventListener('input', () => {
+            const sensitivity = parseFloat(this.freeCamSensitivityInput.value);
+            this.freeCamSensitivity = sensitivity;
+            this.freeCamSensitivityValue.textContent = `${sensitivity.toFixed(1)}x`;
+            this.onFreeCamSensitivityChange?.(sensitivity);
+        });
+    }
+
+    private setupTabs(): void {
+        const tabs = this.container.querySelectorAll('.opt-tab');
+        const contents = this.container.querySelectorAll('.opt-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetId = (tab as HTMLElement).dataset.tab;
+
+                // Update tabs
+                tabs.forEach(t => t.classList.toggle('active', t === tab));
+
+                // Update content
+                contents.forEach(content => {
+                    const id = content.id.replace('tab-', '');
+                    (content as HTMLElement).style.display = id === targetId ? 'block' : 'none';
+                });
+            });
+        });
     }
 
     private setupKeyboardShortcut(): void {
@@ -421,7 +536,7 @@ export class VisualizationPanel {
     }
 
     private setupDrag(): void {
-        const header = this.container.querySelector('.viz-header') as HTMLElement | null;
+        const header = this.container.querySelector('.opt-header') as HTMLElement | null;
         if (!header) return;
 
         let startX = 0;
@@ -482,6 +597,9 @@ export class VisualizationPanel {
         this.presetRenderScaleInput.value = String(this.presetRenderScale);
         this.presetRenderScaleValue.textContent = `${this.presetRenderScale.toFixed(2)}x`;
 
+        // Syn camera sliders too if needed?
+        // Default to set values..
+
         this.ignoreEvents = false;
     }
 
@@ -529,5 +647,36 @@ export class VisualizationPanel {
         this.presetRenderScaleInput.value = String(scale);
         this.presetRenderScaleValue.textContent = `${scale.toFixed(2)}x`;
         this.ignoreEvents = false;
+    }
+
+    // Camera Helpers
+    private sliderToSpeed(t: number): number {
+        const min = 0.001;
+        const max = 1000;
+        const minLog = Math.log10(min);
+        const maxLog = Math.log10(max);
+        const clamped = Math.max(0, Math.min(1, t));
+        return Math.pow(10, minLog + (maxLog - minLog) * clamped);
+    }
+
+    // Can add setFreeCamSpeed/Sensitivity external control if needed
+    setFreeCamSpeed(speed: number): void {
+        this.freeCamSpeed = speed;
+        // Inverse of sliderToSpeed
+        const min = 0.001;
+        const max = 1000;
+        const minLog = Math.log10(min);
+        const maxLog = Math.log10(max);
+        const clampedSpeed = Math.max(min, Math.min(max, speed));
+        const t = (Math.log10(clampedSpeed) - minLog) / (maxLog - minLog);
+
+        this.freeCamSpeedInput.value = t.toString();
+        this.freeCamSpeedValue.textContent = `${speed.toFixed(3)} AU/s`;
+    }
+
+    setFreeCamSensitivity(sensitivity: number): void {
+        this.freeCamSensitivity = sensitivity;
+        this.freeCamSensitivityInput.value = sensitivity.toString();
+        this.freeCamSensitivityValue.textContent = `${sensitivity.toFixed(1)}x`;
     }
 }

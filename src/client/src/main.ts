@@ -15,7 +15,7 @@ import { AdminStatePayload, NetworkClient } from './network';
 import { PhysicsClient } from './physics';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
-import { VisualizationPanel, VisualizationOptions, VisualizationPresetName } from './visualization-panel';
+import { OptionsPanel, VisualizationOptions, VisualizationPresetName } from './options-panel';
 import { TimeController } from './time-controller';
 import { getWebSocketUrl } from './config';
 import { VisualPresetRegistry, VisualPresetsFile } from './visual-preset-registry';
@@ -55,7 +55,7 @@ class NBodyClient {
     private physics!: PhysicsClient;
     private chat!: Chat;
     private adminPanel!: AdminPanel;
-    private vizPanel!: VisualizationPanel;
+    private optionsPanel!: OptionsPanel;
 
     private state: SimState = {
         tick: 0,
@@ -99,7 +99,7 @@ class NBodyClient {
 
     // Free camera mode
     private freeCamera = false;
-    private freeCamSpeedAuPerSec = 1;
+    private freeCamSpeedAuPerSec = 0.1;
     private freeCamCrosshair: HTMLElement | null = null;
     private raycaster = new THREE.Raycaster();
     private starfield?: THREE.Points;
@@ -158,13 +158,6 @@ class NBodyClient {
             this.physics,
             this.timeController,
             this.network,
-            (speed) => {
-                this.freeCamSpeedAuPerSec = speed;
-                // Save preference?
-            },
-            (sensitivity) => {
-                this.camera.setFreeLookSensitivity(sensitivity);
-            },
             (presetId, name) => {
                 this.loadPresetFromAdmin(presetId, name);
             },
@@ -173,8 +166,8 @@ class NBodyClient {
             }
         );
 
-        // Initialize Visualization Panel
-        this.vizPanel = new VisualizationPanel(
+        // Initialize Options Panel
+        this.optionsPanel = new OptionsPanel(
             (options: VisualizationOptions) => {
                 this.currentVizOptions = { ...options };
                 this.applyVisualizationToRenderer(options);
@@ -182,14 +175,21 @@ class NBodyClient {
             (preset: VisualizationPresetName) => {
                 VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, preset);
                 const current = VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER);
-                this.vizPanel?.setPresetRenderScale(current.renderScale);
+                this.optionsPanel?.setPresetRenderScale(current.renderScale);
             },
             (preset: VisualizationPresetName, patch: { renderScale?: number }) => {
                 VisualPresetRegistry.updatePreset(preset, patch);
             },
+            (speed) => {
+                this.freeCamSpeedAuPerSec = speed;
+                // Save preference?
+            },
+            (sensitivity) => {
+                this.camera.setFreeLookSensitivity(sensitivity);
+            },
             VisualPresetRegistry.getPresetNameForPlayer(LOCAL_PRESET_PLAYER)
         );
-        this.vizPanel.setPresetRenderScale(
+        this.optionsPanel.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
         );
 
@@ -305,8 +305,8 @@ class NBodyClient {
         if (VisualPresetRegistry.hasPlayerPreset(LOCAL_PRESET_PLAYER)) return;
         VisualPresetRegistry.setDefaultPreset(preset);
         VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, preset);
-        this.vizPanel?.setPreset(preset);
-        this.vizPanel?.setPresetRenderScale(
+        this.optionsPanel?.setPreset(preset);
+        this.optionsPanel?.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
         );
     }
@@ -501,7 +501,7 @@ class NBodyClient {
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
         // Include ALL UI elements including stats-overlay (Simulation panel)
-        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #viz-panel');
+        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #opt-panel');
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });

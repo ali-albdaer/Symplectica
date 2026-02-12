@@ -26,13 +26,9 @@ export class AdminPanel {
     private physics: PhysicsClient;
     private timeController: TimeController;
     private network?: NetworkClient;
-    private onFreeCamSpeedChange?: (speed: number) => void;
-    private onFreeCamSensitivityChange?: (sensitivity: number) => void;
     private onPresetChange?: (presetId: string, name: string) => void;
     private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
     private isOpen = false;
-    private freeCamSpeed = 1; // AU/s
-    private freeCamSensitivity = 1.0;
     private config: ServerConfig = {
         tickRate: 60,
         forceMethod: 'direct',
@@ -45,23 +41,17 @@ export class AdminPanel {
         physics: PhysicsClient,
         timeController: TimeController,
         network?: NetworkClient,
-        onFreeCamSpeedChange?: (speed: number) => void,
-        onFreeCamSensitivityChange?: (sensitivity: number) => void,
         onPresetChange?: (presetId: string, name: string) => void,
         onSimModeChange?: (mode: 'tick' | 'accumulator') => void
     ) {
         this.physics = physics;
         this.timeController = timeController;
         this.network = network;
-        this.onFreeCamSpeedChange = onFreeCamSpeedChange;
-        this.onFreeCamSensitivityChange = onFreeCamSensitivityChange;
         this.onPresetChange = onPresetChange;
         this.onSimModeChange = onSimModeChange;
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
-        this.onFreeCamSpeedChange?.(this.freeCamSpeed);
-        this.onFreeCamSensitivityChange?.(this.freeCamSensitivity);
     }
 
     // Public method to update pause state from outside (e.g. keybind or server)
@@ -144,23 +134,6 @@ export class AdminPanel {
                     </div>
                 </section>
 
-                <section class="admin-section">
-                    <h3>Camera</h3>
-                    <div class="admin-field">
-                        <label>Free Cam Speed (AU/s)</label>
-                        <div class="admin-slider-row">
-                            <input type="range" id="admin-freecam-speed" min="0" max="1" step="0.001" value="0.5">
-                            <span id="admin-freecam-speed-value">1.000 AU/s</span>
-                        </div>
-                    </div>
-
-                    <div class="admin-field">
-                        <label>Free Cam Sensitivity</label>
-                        <div class="admin-slider-row">
-                            <input type="range" id="admin-freecam-sensitivity" min="0.1" max="5" step="0.1" value="1">
-                            <span id="admin-freecam-sensitivity-value">1.0x</span>
-                        </div>
-                    </div>
                 </section>
                 
                 <section class="admin-section">
@@ -367,32 +340,6 @@ export class AdminPanel {
 
         this.setupDrag(container);
 
-        const freeCamSpeedInput = container.querySelector('#admin-freecam-speed') as HTMLInputElement;
-        const freeCamSpeedValue = container.querySelector('#admin-freecam-speed-value') as HTMLElement;
-        const freeCamSensitivityInput = container.querySelector('#admin-freecam-sensitivity') as HTMLInputElement;
-        const freeCamSensitivityValue = container.querySelector('#admin-freecam-sensitivity-value') as HTMLElement;
-
-        const updateFreeCamSpeed = () => {
-            const t = parseFloat(freeCamSpeedInput.value);
-            const speed = this.sliderToSpeed(t);
-            this.freeCamSpeed = speed;
-            freeCamSpeedValue.textContent = `${this.freeCamSpeed.toFixed(3)} AU/s`;
-            this.onFreeCamSpeedChange?.(this.freeCamSpeed);
-        };
-
-        const updateFreeCamSensitivity = () => {
-            const value = parseFloat(freeCamSensitivityInput.value);
-            if (!Number.isFinite(value)) return;
-            this.freeCamSensitivity = value;
-            freeCamSensitivityValue.textContent = `${this.freeCamSensitivity.toFixed(1)}x`;
-            this.onFreeCamSensitivityChange?.(this.freeCamSensitivity);
-        };
-
-        freeCamSpeedInput?.addEventListener('input', updateFreeCamSpeed);
-        freeCamSensitivityInput?.addEventListener('input', updateFreeCamSensitivity);
-        updateFreeCamSpeed();
-        updateFreeCamSensitivity();
-
         // Force method change
         const forceMethodSelect = container.querySelector('#admin-force-method') as HTMLSelectElement;
         const thetaField = container.querySelector('#theta-field') as HTMLElement;
@@ -436,24 +383,6 @@ export class AdminPanel {
         });
     }
 
-    private sliderToSpeed(t: number): number {
-        const min = 0.001;
-        const max = 1000;
-        const minLog = Math.log10(min);
-        const maxLog = Math.log10(max);
-        const clamped = Math.max(0, Math.min(1, t));
-        return Math.pow(10, minLog + (maxLog - minLog) * clamped);
-    }
-
-    private speedToSlider(speed: number): number {
-        const min = 0.001;
-        const max = 1000;
-        const clampedSpeed = Math.max(min, Math.min(max, speed));
-        const minLog = Math.log10(min);
-        const maxLog = Math.log10(max);
-        return (Math.log10(clampedSpeed) - minLog) / (maxLog - minLog);
-    }
-
     private setupKeyboardShortcut(): void {
         window.addEventListener('keydown', (e) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -481,15 +410,6 @@ export class AdminPanel {
     open(): void {
         this.isOpen = true;
         this.container.classList.add('open');
-
-        const freeCamSpeedInput = document.getElementById('admin-freecam-speed') as HTMLInputElement | null;
-        const freeCamSpeedValue = document.getElementById('admin-freecam-speed-value') as HTMLElement | null;
-        if (freeCamSpeedInput) {
-            freeCamSpeedInput.value = this.speedToSlider(this.freeCamSpeed).toString();
-        }
-        if (freeCamSpeedValue) {
-            freeCamSpeedValue.textContent = `${this.freeCamSpeed.toFixed(3)} AU/s`;
-        }
     }
 
     close(): void {

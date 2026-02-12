@@ -37,7 +37,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private pointerLocked = false;
 
     // Free camera look sensitivity multiplier
-    private freeLookSensitivity = 1.0;
+    private freeLookSensitivity = 0.3;
 
     // Floating origin offset
     private originX = 0;
