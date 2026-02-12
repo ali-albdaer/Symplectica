@@ -89,8 +89,8 @@ class NBodyClient {
     // Time control (centralized)
     private timeController = new TimeController();
     private uiHidden = false;
-    private hintsVisible = false;
-    private showSimulationParams = true;
+    private hintsVisible = true;
+    private showSimulationParams = false;
     private showFollowingDetails = true;
 
     // Body following
@@ -115,7 +115,7 @@ class NBodyClient {
 
     async init(): Promise<void> {
         VisualPresetRegistry.loadPresets(visualPresets as VisualPresetsFile);
-        VisualPresetRegistry.setDefaultPreset('Low');
+        VisualPresetRegistry.setDefaultPreset('Ultra');
         registerVisualPresetFeatures();
         VisualPresetRegistry.registerFeature('bodyRenderer', {});
         VisualPresetRegistry.registerFeatureHooks('bodyRenderer', {
@@ -362,7 +362,7 @@ class NBodyClient {
             1e3,     // 1 km near plane
             1e15     // ~1000 AU far plane
         );
-        this.camera.setDistance(1 * AU); // Start at 1 AU distance
+        this.camera.setDistance(0.020 * AU); // Start at 0.020 AU distance
         this.camera.setElevation(0.5); // Look down at system
 
         // Create body renderer

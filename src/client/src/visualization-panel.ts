@@ -111,30 +111,31 @@ export class VisualizationPanel {
                 <section class="viz-section">
                     <h3>Display</h3>
 
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-orbits">
-                        <span>Orbit Trails</span>
-                    </label>
+                    <div class="viz-row">
+                        <label class="viz-toggle">
+                            <input type="checkbox" id="viz-orbits">
+                            <span>Trails</span>
+                        </label>
+                        <label class="viz-toggle">
+                            <input type="checkbox" id="viz-labels">
+                            <span>Labels</span>
+                        </label>
+                    </div>
 
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-labels">
-                        <span>Body Labels</span>
-                    </label>
-
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-grid-xy">
-                        <span>Grid XY</span>
-                    </label>
-
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-grid-xz">
-                        <span>Grid XZ</span>
-                    </label>
-
-                    <label class="viz-toggle">
-                        <input type="checkbox" id="viz-grid-yz">
-                        <span>Grid YZ</span>
-                    </label>
+                    <div class="viz-row">
+                        <label class="viz-toggle">
+                            <input type="checkbox" id="viz-grid-xy">
+                            <span>XY</span>
+                        </label>
+                        <label class="viz-toggle">
+                            <input type="checkbox" id="viz-grid-xz">
+                            <span>XZ</span>
+                        </label>
+                        <label class="viz-toggle">
+                            <input type="checkbox" id="viz-grid-yz">
+                            <span>YZ</span>
+                        </label>
+                    </div>
 
                     <div class="viz-field">
                         <label>Grid Spacing (AU)</label>
@@ -144,7 +145,7 @@ export class VisualizationPanel {
 
                     <div class="viz-field">
                         <label>Grid Size (AU)</label>
-                        <input type="range" id="viz-grid-size" min="1" max="100" step="1" value="40">
+                        <input type="range" id="viz-grid-size" min="1" max="1000000" step="1" value="40">
                         <span id="viz-grid-size-value">40 AU</span>
                     </div>
                 </section>
@@ -229,10 +230,17 @@ export class VisualizationPanel {
                 margin: 0 0 8px 0;
             }
 
+            .viz-row {
+                display: flex;
+                justify-content: space-between;
+                gap: 10px;
+                margin-bottom: 6px;
+            }
+
             .viz-toggle {
                 display: flex;
                 align-items: center;
-                gap: 10px;
+                gap: 6px;
                 padding: 6px 0;
                 cursor: pointer;
             }
