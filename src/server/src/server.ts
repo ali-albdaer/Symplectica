@@ -438,7 +438,7 @@ class SimulationServer {
                 this.broadcastAdminState();
                 this.broadcastChat({
                     sender: 'System',
-                    text: `Simulation ${payload.paused ? 'paused' : 'resumed'}`
+                    text: `Simulation ${payload.paused ? 'stopped' : 'resumed'}.`
                 });
                 break;
             }
@@ -453,7 +453,7 @@ class SimulationServer {
                     const name = payload.presetName || 'Custom Snapshot';
                     this.broadcastChat({
                         sender: 'Admin',
-                        text: `Universe was changed to ${name}`
+                        text: `Universe set to ${name}`
                     });
                 }
                 break;
@@ -465,7 +465,7 @@ class SimulationServer {
                 this.broadcastAdminState();
                 this.broadcastChat({
                     sender: 'Admin',
-                    text: 'Universe was changed to Full Solar System (Reset)'
+                    text: 'Simulation reset.'
                 });
                 break;
 

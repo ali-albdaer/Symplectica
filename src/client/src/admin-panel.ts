@@ -453,7 +453,7 @@ export class AdminPanel {
 
         console.log(`⚙️ Applied settings: dt=${dt}s, substeps=${substeps}, method=${forceMethod}, θ=${theta}`);
 
-        this.close();
+        // this.close();
     }
 
     private resetSimulation(): void {
