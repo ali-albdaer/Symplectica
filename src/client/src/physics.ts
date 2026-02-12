@@ -60,6 +60,7 @@ interface BodyInfo {
     mass: number;
     radius: number;
     color: number;
+    axialTilt: number;
 }
 
 // Convert RGB [0-1, 0-1, 0-1] to hex integer
@@ -228,6 +229,7 @@ export class PhysicsClient {
                 luminosity?: number;
                 effective_temperature?: number;
                 rotation_rate?: number;
+                axial_tilt?: number;
                 seed?: number;
             }>;
 
@@ -239,6 +241,7 @@ export class PhysicsClient {
                 radius: b.radius,
                 // Use named color lookup first, then body struct color (RGB 0-1 → hex)
                 color: BODY_COLORS[b.name] ?? rgbToHex(b.color),
+                axialTilt: b.axial_tilt ?? 0,
             }));
         } catch (e) {
             console.error('Failed to parse bodies:', e);

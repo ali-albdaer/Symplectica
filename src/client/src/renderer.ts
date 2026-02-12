@@ -17,6 +17,7 @@ interface BodyData {
     mass: number;
     radius: number;
     color: number;
+    axialTilt?: number; // radians, obliquity — used for rotation axis overlay
     // TODO(rendering): Add these fields to support richer body rendering:
     //   luminosity?: number;          → drive star point-light intensity
     //   effectiveTemperature?: number; → derive star mesh color from black-body curve
@@ -61,6 +62,16 @@ export class BodyRenderer {
     private readonly TRAIL_SAMPLE_INTERVAL = 5; // Sample every N frames
     private frameCount = 0;
     private lastOrigin = { x: 0, y: 0, z: 0 };
+
+    // Debug overlays
+    private axisLines: Map<number, THREE.ArrowHelper> = new Map();
+    private showAxisLinesFlag = false;
+    private refPlaneGroup: THREE.Group | null = null;
+    private showRefPlaneFlag = false;
+    private refLineArrow: THREE.ArrowHelper | null = null;
+    private showRefLineFlag = false;
+    private refPointMesh: THREE.Mesh | null = null;
+    private showRefPointFlag = false;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
@@ -120,6 +131,27 @@ export class BodyRenderer {
         label.visible = this.showLabels;
         this.bodyLabels.set(body.id, label);
         this.scene.add(label);
+
+        // Create rotation axis arrow overlay
+        const tilt = body.axialTilt ?? 0;
+        const axisDir = new THREE.Vector3(
+            -Math.sin(tilt),
+            Math.cos(tilt),
+            0
+        ).normalize();
+        const axisLength = scaleRadius(body.radius * this.renderScale) * 3;
+        const axisColor = body.type === 'star' ? 0xffaa00 : 0x44ddff;
+        const arrow = new THREE.ArrowHelper(
+            axisDir,
+            new THREE.Vector3(0, 0, 0),
+            Math.max(axisLength, AU * 0.002),
+            axisColor,
+            Math.max(axisLength * 0.2, AU * 0.0004),
+            Math.max(axisLength * 0.1, AU * 0.0002)
+        );
+        arrow.visible = this.showAxisLinesFlag;
+        mesh.group.add(arrow);
+        this.axisLines.set(body.id, arrow);
     }
 
     setSphereSegments(width: number, height: number): void {
@@ -265,6 +297,20 @@ export class BodyRenderer {
             }
             i++;
         }
+
+        // Update reference overlay positions relative to floating origin
+        const ox = -origin.x;
+        const oy = -origin.y;
+        const oz = -origin.z;
+        if (this.refPlaneGroup) {
+            this.refPlaneGroup.position.set(ox, oy, oz);
+        }
+        if (this.refLineArrow) {
+            this.refLineArrow.position.set(ox, oy, oz);
+        }
+        if (this.refPointMesh) {
+            this.refPointMesh.position.set(ox, oy, oz);
+        }
     }
 
     private updateOrbitLine(id: number, history: Array<{ x: number; y: number; z: number }>, origin: { x: number; y: number; z: number }): void {
@@ -295,6 +341,119 @@ export class BodyRenderer {
     private showOrbitTrails = true;
     private showLabels = false;
     private bodyLabels: Map<number, THREE.Sprite> = new Map();
+
+    setShowAxisLines(show: boolean): void {
+        this.showAxisLinesFlag = show;
+        for (const arrow of this.axisLines.values()) {
+            arrow.visible = show;
+        }
+    }
+
+    setShowRefPlane(show: boolean): void {
+        this.showRefPlaneFlag = show;
+        if (show && !this.refPlaneGroup) {
+            this.buildRefPlane();
+        }
+        if (this.refPlaneGroup) {
+            this.refPlaneGroup.visible = show;
+        }
+    }
+
+    setShowRefLine(show: boolean): void {
+        this.showRefLineFlag = show;
+        if (show && !this.refLineArrow) {
+            this.buildRefLine();
+        }
+        if (this.refLineArrow) {
+            this.refLineArrow.visible = show;
+        }
+    }
+
+    setShowRefPoint(show: boolean): void {
+        this.showRefPointFlag = show;
+        if (show && !this.refPointMesh) {
+            this.buildRefPoint();
+        }
+        if (this.refPointMesh) {
+            this.refPointMesh.visible = show;
+        }
+    }
+
+    private buildRefPlane(): void {
+        if (this.refPlaneGroup) return;
+        this.refPlaneGroup = new THREE.Group();
+        this.refPlaneGroup.name = 'ecliptic-ref-plane';
+
+        // Semi-transparent disc on XZ plane (Y=0 is ecliptic)
+        const discRadius = AU * 2;
+        const discGeo = new THREE.RingGeometry(AU * 0.01, discRadius, 64);
+        const discMat = new THREE.MeshBasicMaterial({
+            color: 0x2266aa,
+            transparent: true,
+            opacity: 0.08,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+        });
+        const disc = new THREE.Mesh(discGeo, discMat);
+        disc.rotation.x = -Math.PI / 2; // Rotate from XY to XZ
+        this.refPlaneGroup.add(disc);
+
+        // Grid lines on XZ plane
+        const gridMat = new THREE.LineBasicMaterial({
+            color: 0x335577,
+            transparent: true,
+            opacity: 0.15,
+        });
+        const gridStep = AU * 0.25;
+        const gridExtent = discRadius;
+        for (let x = -gridExtent; x <= gridExtent; x += gridStep) {
+            const points = [
+                new THREE.Vector3(x, 0, -gridExtent),
+                new THREE.Vector3(x, 0, gridExtent),
+            ];
+            const geo = new THREE.BufferGeometry().setFromPoints(points);
+            this.refPlaneGroup.add(new THREE.Line(geo, gridMat));
+        }
+        for (let z = -gridExtent; z <= gridExtent; z += gridStep) {
+            const points = [
+                new THREE.Vector3(-gridExtent, 0, z),
+                new THREE.Vector3(gridExtent, 0, z),
+            ];
+            const geo = new THREE.BufferGeometry().setFromPoints(points);
+            this.refPlaneGroup.add(new THREE.Line(geo, gridMat));
+        }
+
+        this.refPlaneGroup.visible = this.showRefPlaneFlag;
+        this.scene.add(this.refPlaneGroup);
+    }
+
+    private buildRefLine(): void {
+        if (this.refLineArrow) return;
+        // Vernal equinox direction: +X axis, bright green arrow
+        const dir = new THREE.Vector3(1, 0, 0);
+        const length = AU * 0.5;
+        this.refLineArrow = new THREE.ArrowHelper(
+            dir,
+            new THREE.Vector3(0, 0, 0),
+            length,
+            0x44ff44,
+            length * 0.05,
+            length * 0.02
+        );
+        this.refLineArrow.visible = this.showRefLineFlag;
+        this.scene.add(this.refLineArrow);
+    }
+
+    private buildRefPoint(): void {
+        if (this.refPointMesh) return;
+        const geo = new THREE.SphereGeometry(AU * 0.003, 16, 12);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+        });
+        this.refPointMesh = new THREE.Mesh(geo, mat);
+        this.refPointMesh.visible = this.showRefPointFlag;
+        this.scene.add(this.refPointMesh);
+    }
 
     setShowOrbitTrails(show: boolean): void {
         this.showOrbitTrails = show;
@@ -368,6 +527,27 @@ export class BodyRenderer {
             label.material.dispose();
         }
         this.bodyLabels.clear();
+        this.axisLines.clear();
+
+        // Dispose reference overlays
+        if (this.refPlaneGroup) {
+            this.scene.remove(this.refPlaneGroup);
+            this.refPlaneGroup.traverse((child) => {
+                if ((child as THREE.Mesh).geometry) (child as THREE.Mesh).geometry.dispose();
+                if ((child as THREE.Mesh).material) ((child as THREE.Mesh).material as THREE.Material).dispose();
+            });
+            this.refPlaneGroup = null;
+        }
+        if (this.refLineArrow) {
+            this.scene.remove(this.refLineArrow);
+            this.refLineArrow = null;
+        }
+        if (this.refPointMesh) {
+            this.scene.remove(this.refPointMesh);
+            this.refPointMesh.geometry.dispose();
+            (this.refPointMesh.material as THREE.Material).dispose();
+            this.refPointMesh = null;
+        }
 
         if (this.gridGroup) {
             this.scene.remove(this.gridGroup);

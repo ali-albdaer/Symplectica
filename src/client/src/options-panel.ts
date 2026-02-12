@@ -7,6 +7,10 @@
 export interface VisualizationOptions {
     showOrbitTrails: boolean;
     showLabels: boolean;
+    showAxisLines: boolean;
+    showRefPlane: boolean;
+    showRefLine: boolean;
+    showRefPoint: boolean;
     showGridXY: boolean;
     showGridXZ: boolean;
     showGridYZ: boolean;
@@ -21,6 +25,10 @@ const AU = 1.495978707e11;
 const DEFAULTS: VisualizationOptions = {
     showOrbitTrails: true,
     showLabels: false,
+    showAxisLines: false,
+    showRefPlane: false,
+    showRefLine: false,
+    showRefPoint: false,
     showGridXY: false,
     showGridXZ: false,
     showGridYZ: false,
@@ -64,6 +72,10 @@ export class OptionsPanel {
     private presetSelect!: HTMLSelectElement;
     private presetRenderScaleInput!: HTMLInputElement;
     private presetRenderScaleValue!: HTMLElement;
+    private axisLinesCheckbox!: HTMLInputElement;
+    private refPlaneCheckbox!: HTMLInputElement;
+    private refLineCheckbox!: HTMLInputElement;
+    private refPointCheckbox!: HTMLInputElement;
 
     // Grid Spacing Helpers (Logarithmic)
     private sliderToSpacing(t: number): number {
@@ -188,6 +200,30 @@ export class OptionsPanel {
                         <label>Grid Extent (AU)</label>
                         <input type="range" id="opt-grid-size" min="1" max="5000" step="1" value="40">
                         <span id="opt-grid-size-value">40 AU</span>
+                    </div>
+                </section>
+
+                <section class="opt-section">
+                    <h3>Body Overlays</h3>
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-axis-lines">
+                            <span>Axis</span>
+                        </label>
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-ref-plane">
+                            <span>Ecliptic</span>
+                        </label>
+                    </div>
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-ref-line">
+                            <span>Ref Line</span>
+                        </label>
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-ref-point">
+                            <span>Ref Point</span>
+                        </label>
                     </div>
                 </section>
 
@@ -426,6 +462,11 @@ export class OptionsPanel {
         this.presetRenderScaleInput = this.container.querySelector('#opt-render-scale')!;
         this.presetRenderScaleValue = this.container.querySelector('#opt-render-scale-value')!;
 
+        this.axisLinesCheckbox = this.container.querySelector('#opt-axis-lines')!;
+        this.refPlaneCheckbox = this.container.querySelector('#opt-ref-plane')!;
+        this.refLineCheckbox = this.container.querySelector('#opt-ref-line')!;
+        this.refPointCheckbox = this.container.querySelector('#opt-ref-point')!;
+
         this.freeCamSpeedInput = this.container.querySelector('#opt-freecam-speed')!;
         this.freeCamSpeedValue = this.container.querySelector('#opt-freecam-speed-value')!;
         this.freeCamSensitivityInput = this.container.querySelector('#opt-freecam-sensitivity')!;
@@ -495,6 +536,30 @@ export class OptionsPanel {
             const rawSize = this.gridExtent / (2 * spacingAu);
             this.options.gridSize = Math.max(1, Math.min(5000, Math.round(rawSize)));
 
+            this.emitChange();
+        });
+
+        this.axisLinesCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showAxisLines = this.axisLinesCheckbox.checked;
+            this.emitChange();
+        });
+
+        this.refPlaneCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showRefPlane = this.refPlaneCheckbox.checked;
+            this.emitChange();
+        });
+
+        this.refLineCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showRefLine = this.refLineCheckbox.checked;
+            this.emitChange();
+        });
+
+        this.refPointCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showRefPoint = this.refPointCheckbox.checked;
             this.emitChange();
         });
 
@@ -616,6 +681,10 @@ export class OptionsPanel {
         this.gridXYCheckbox.checked = this.options.showGridXY;
         this.gridXZCheckbox.checked = this.options.showGridXZ;
         this.gridYZCheckbox.checked = this.options.showGridYZ;
+        this.axisLinesCheckbox.checked = this.options.showAxisLines;
+        this.refPlaneCheckbox.checked = this.options.showRefPlane;
+        this.refLineCheckbox.checked = this.options.showRefLine;
+        this.refPointCheckbox.checked = this.options.showRefPoint;
         this.gridSpacingInput.value = String(this.spacingToSlider(this.options.gridSpacing / AU));
         this.gridSpacingValue.textContent = `${(this.options.gridSpacing / AU).toFixed(3)} AU`;
 

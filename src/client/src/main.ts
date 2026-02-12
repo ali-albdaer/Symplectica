@@ -78,6 +78,10 @@ class NBodyClient {
     private currentVizOptions: VisualizationOptions = {
         showOrbitTrails: true,
         showLabels: false,
+        showAxisLines: false,
+        showRefPlane: false,
+        showRefLine: false,
+        showRefPoint: false,
         showGridXY: false,
         showGridXZ: false,
         showGridYZ: false,
@@ -264,6 +268,10 @@ class NBodyClient {
     private applyVisualizationToRenderer(options: VisualizationOptions): void {
         this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
         this.bodyRenderer.setShowLabels(options.showLabels);
+        this.bodyRenderer.setShowAxisLines(options.showAxisLines);
+        this.bodyRenderer.setShowRefPlane(options.showRefPlane);
+        this.bodyRenderer.setShowRefLine(options.showRefLine);
+        this.bodyRenderer.setShowRefPoint(options.showRefPoint);
         this.bodyRenderer.setMaxTrailPoints(options.orbitTrailLength);
         this.bodyRenderer.setGridOptions(
             options.showGridXY,
