@@ -13,10 +13,15 @@ import * as THREE from 'three';
 interface BodyData {
     id: number;
     name: string;
-    type: 'star' | 'planet' | 'moon' | 'asteroid' | 'spacecraft';
+    type: 'star' | 'planet' | 'moon' | 'asteroid' | 'comet' | 'spacecraft' | 'test_particle' | 'player';
     mass: number;
     radius: number;
     color: number;
+    // TODO(rendering): Add these fields to support richer body rendering:
+    //   luminosity?: number;          → drive star point-light intensity
+    //   effectiveTemperature?: number; → derive star mesh color from black-body curve
+    //   rotationRate?: number;         → spin planet/moon meshes at correct angular velocity
+    //   seed?: number;                 → seed procedural texture generation per body
 }
 
 // Body scaling for visualization
@@ -134,15 +139,15 @@ export class BodyRenderer {
         const ctx = canvas.getContext('2d')!;
         canvas.width = 512;
         canvas.height = 128;
-        
+
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
+
         // Measure text first
         ctx.font = 'bold 36px "Segoe UI", system-ui, sans-serif';
         const textMetrics = ctx.measureText(text);
         const textWidth = textMetrics.width;
-        
+
         // Draw pill-shaped background
         const padding = 24;
         const bgWidth = textWidth + padding * 2;
@@ -150,7 +155,7 @@ export class BodyRenderer {
         const x = (canvas.width - bgWidth) / 2;
         const y = (canvas.height - bgHeight) / 2;
         const radius = bgHeight / 2;
-        
+
         ctx.beginPath();
         ctx.roundRect(x, y, bgWidth, bgHeight, radius);
         ctx.fillStyle = 'rgba(10, 20, 40, 0.85)';
@@ -158,16 +163,16 @@ export class BodyRenderer {
         ctx.strokeStyle = 'rgba(100, 180, 255, 0.4)';
         ctx.lineWidth = 2;
         ctx.stroke();
-        
+
         // Draw text with subtle shadow
         ctx.font = 'bold 36px "Segoe UI", system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
+
         // Shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillText(text, canvas.width / 2 + 1, canvas.height / 2 + 1);
-        
+
         // Main text
         ctx.fillStyle = '#ffffff';
         ctx.fillText(text, canvas.width / 2, canvas.height / 2);
@@ -175,7 +180,7 @@ export class BodyRenderer {
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
-        
+
         const material = new THREE.SpriteMaterial({
             map: texture,
             transparent: true,

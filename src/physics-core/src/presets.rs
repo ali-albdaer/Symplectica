@@ -61,14 +61,41 @@ impl Preset {
 pub fn create_sun_earth_moon(seed: u64) -> Simulation {
     let mut sim = Simulation::new(seed);
     
-    sim.add_star("Sun", M_SUN, R_SUN);
+    let sun_id = sim.add_star("Sun", M_SUN, R_SUN);
+    if let Some(sun) = sim.get_body_mut(sun_id) {
+        sun.luminosity = L_SUN;
+        sun.effective_temperature = T_SUN;
+        sun.rotation_rate = 2.865e-6; // ~25.05 day sidereal period
+        sun.mean_surface_temperature = T_SUN;
+        sun.seed = seed.wrapping_add(0);
+        sun.compute_derived();
+    }
     
     let earth_id = sim.add_planet("Earth", M_EARTH, R_EARTH, AU, 29784.0);
-    
-    sim.add_moon("Moon", M_MOON, R_MOON, earth_id, 3.844e8, 1022.0);
-    
     if let Some(earth) = sim.get_body_mut(earth_id) {
         earth.atmosphere = Some(Atmosphere::earth_like());
+        earth.rotation_rate = OMEGA_EARTH;
+        earth.axial_tilt = AXIAL_TILT_EARTH;
+        earth.mean_surface_temperature = T_SURFACE_EARTH;
+        earth.seed = seed.wrapping_add(1);
+        earth.semi_major_axis = AU;
+        earth.eccentricity = 0.0167;
+        earth.parent_id = Some(sun_id);
+        earth.color = hex_to_rgb(0x6b93d6);
+        earth.compute_derived();
+    }
+    
+    sim.add_moon("Moon", M_MOON, R_MOON, earth_id, 3.844e8, 1022.0);
+    // Moon is bodies[2] (0=Sun, 1=Earth, 2=Moon)
+    if let Some(moon) = sim.get_body_mut(2) {
+        moon.rotation_rate = 2.6617e-6; // Synchronous (27.32 day period)
+        moon.axial_tilt = 0.02692; // 1.54°
+        moon.mean_surface_temperature = 250.0; // Mean ~250 K
+        moon.seed = seed.wrapping_add(2);
+        moon.semi_major_axis = 3.844e8;
+        moon.eccentricity = 0.0549;
+        moon.color = hex_to_rgb(0xb0b0b0);
+        moon.compute_derived();
     }
     
     sim

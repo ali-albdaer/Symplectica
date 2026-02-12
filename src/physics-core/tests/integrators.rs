@@ -135,7 +135,7 @@ fn test_barnes_hut_accuracy_low_theta() {
     let mut relative_errors: Vec<f64> = Vec::new();
 
     for (direct, bh) in direct_bodies.iter().zip(bh_bodies.iter()) {
-        if !direct.is_active || !direct.is_massive {
+        if !direct.is_active || !direct.contributes_gravity {
             continue;
         }
 

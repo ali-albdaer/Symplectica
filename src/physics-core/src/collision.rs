@@ -37,11 +37,11 @@ pub fn detect_collisions(bodies: &[Body]) -> Vec<CollisionEvent> {
             }
 
             let distance = bodies[i].position.distance(bodies[j].position);
-            let combined_radius = bodies[i].radius + bodies[j].radius;
+            let combined_radius = bodies[i].collision_radius + bodies[j].collision_radius;
 
             if distance < combined_radius {
                 let direction = (bodies[j].position - bodies[i].position).normalize();
-                let contact_point = bodies[i].position + direction * bodies[i].radius;
+                let contact_point = bodies[i].position + direction * bodies[i].collision_radius;
                 let relative_velocity = bodies[j].velocity - bodies[i].velocity;
 
                 collisions.push(CollisionEvent {
@@ -103,12 +103,14 @@ pub fn merge_bodies(bodies: &mut [Body], id_a: BodyId, id_b: BodyId) -> Result<(
     // V ∝ m, so r³ ∝ m, thus r_new = r_old * (m_new/m_old)^(1/3)
     let volume_ratio = total_mass / bodies[absorber_idx].mass;
     let new_radius = bodies[absorber_idx].radius * volume_ratio.powf(1.0 / 3.0);
+    let new_collision_radius = bodies[absorber_idx].collision_radius * volume_ratio.powf(1.0 / 3.0);
 
     // Apply changes to absorber
     bodies[absorber_idx].mass = total_mass;
     bodies[absorber_idx].velocity = new_velocity;
     bodies[absorber_idx].position = new_position;
     bodies[absorber_idx].radius = new_radius;
+    bodies[absorber_idx].collision_radius = new_collision_radius;
 
     // Mark absorbed body as inactive
     bodies[absorbed_idx].is_active = false;
@@ -149,21 +151,22 @@ pub fn process_collisions(bodies: &mut [Body]) -> usize {
 /// r_Roche ≈ 2.44 * R_primary * (ρ_primary / ρ_secondary)^(1/3)
 /// 
 /// For spherical bodies with uniform density: ρ = 3m / (4πr³)
+/// Uses collision_radius for physical radius.
 pub fn is_inside_roche_limit(primary: &Body, secondary: &Body) -> bool {
-    if primary.radius <= 0.0 || secondary.radius <= 0.0 {
+    if primary.collision_radius <= 0.0 || secondary.collision_radius <= 0.0 {
         return false;
     }
 
-    // Calculate densities (ρ = 3m / 4πr³)
-    let rho_primary = 3.0 * primary.mass / (4.0 * std::f64::consts::PI * primary.radius.powi(3));
-    let rho_secondary = 3.0 * secondary.mass / (4.0 * std::f64::consts::PI * secondary.radius.powi(3));
+    // Calculate densities (ρ = 3m / 4πr³) using collision_radius as physical radius
+    let rho_primary = 3.0 * primary.mass / (4.0 * std::f64::consts::PI * primary.collision_radius.powi(3));
+    let rho_secondary = 3.0 * secondary.mass / (4.0 * std::f64::consts::PI * secondary.collision_radius.powi(3));
 
     if rho_secondary <= 0.0 {
         return false;
     }
 
     // Roche limit
-    let roche_limit = 2.44 * primary.radius * (rho_primary / rho_secondary).powf(1.0 / 3.0);
+    let roche_limit = 2.44 * primary.collision_radius * (rho_primary / rho_secondary).powf(1.0 / 3.0);
 
     let distance = primary.position.distance(secondary.position);
     distance < roche_limit

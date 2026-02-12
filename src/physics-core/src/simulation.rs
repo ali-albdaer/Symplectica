@@ -108,6 +108,7 @@ impl Simulation {
     pub fn add_body(&mut self, mut body: Body) -> BodyId {
         body.id = self.next_id;
         self.next_id += 1;
+        body.compute_derived();
         let id = body.id;
         self.bodies.push(body);
         self.needs_init = true;

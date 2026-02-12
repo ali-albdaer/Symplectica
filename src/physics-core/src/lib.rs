@@ -95,26 +95,53 @@ impl WasmSimulation {
         self.inner.add_planet(name, mass, radius, orbital_distance, orbital_velocity)
     }
 
-    /// Add a body with full parameters
+    /// Add a body with full parameters.
+    /// `body_type`: 0=Star, 1=Planet, 2=Moon, 3=Asteroid, 4=Comet, 5=Spacecraft, 6=TestParticle, 7=Player
     #[wasm_bindgen(js_name = addBody)]
     pub fn add_body(
         &mut self,
         name: &str,
+        body_type: u8,
         mass: f64,
         radius: f64,
         px: f64, py: f64, pz: f64,
         vx: f64, vy: f64, vz: f64,
     ) -> u32 {
-        let body = body::Body::new(
+        let bt = match body_type {
+            0 => body::BodyType::Star,
+            1 => body::BodyType::Planet,
+            2 => body::BodyType::Moon,
+            3 => body::BodyType::Asteroid,
+            4 => body::BodyType::Comet,
+            5 => body::BodyType::Spacecraft,
+            6 => body::BodyType::TestParticle,
+            7 => body::BodyType::Player,
+            _ => body::BodyType::Asteroid,
+        };
+        let mut b = body::Body::new(
             0,
             name,
-            body::BodyType::Planet,
+            bt,
             mass,
             radius,
             vector::Vec3::new(px, py, pz),
             vector::Vec3::new(vx, vy, vz),
         );
-        self.inner.add_body(body)
+        b.compute_derived();
+        self.inner.add_body(b)
+    }
+
+    /// Add a body from a JSON string with all properties.
+    /// Accepts the full Body JSON structure from PROPERTIES.md.
+    #[wasm_bindgen(js_name = addBodyFromJson)]
+    pub fn add_body_from_json(&mut self, json: &str) -> u32 {
+        match serde_json::from_str::<body::Body>(json) {
+            Ok(mut b) => {
+                b.compute_derived();
+                self.inner.add_body(b)
+            }
+            Err(_) => u32::MAX, // Error sentinel
+        }
     }
 
     /// Remove a body by ID

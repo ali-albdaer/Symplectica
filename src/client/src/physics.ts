@@ -21,7 +21,8 @@ type WasmSimulation = {
     totalEnergy(): number;
     addStar(name: string, mass: number, radius: number): number;
     addPlanet(name: string, mass: number, radius: number, distance: number, velocity: number): number;
-    addBody(name: string, mass: number, radius: number, px: number, py: number, pz: number, vx: number, vy: number, vz: number): number;
+    addBody(name: string, bodyType: number, mass: number, radius: number, px: number, py: number, pz: number, vx: number, vy: number, vz: number): number;
+    addBodyFromJson(json: string): number;
     removeBody(id: number): boolean;
     setDt(dt: number): void;
     setSubsteps(substeps: number): void;
@@ -55,10 +56,18 @@ interface PhysicsModule {
 interface BodyInfo {
     id: number;
     name: string;
-    type: 'star' | 'planet' | 'moon' | 'asteroid' | 'spacecraft';
+    type: 'star' | 'planet' | 'moon' | 'asteroid' | 'comet' | 'spacecraft' | 'test_particle' | 'player';
     mass: number;
     radius: number;
     color: number;
+}
+
+// Convert RGB [0-1, 0-1, 0-1] to hex integer
+function rgbToHex(rgb: [number, number, number]): number {
+    const r = Math.round(Math.max(0, Math.min(1, rgb[0])) * 255);
+    const g = Math.round(Math.max(0, Math.min(1, rgb[1])) * 255);
+    const b = Math.round(Math.max(0, Math.min(1, rgb[2])) * 255);
+    return (r << 16) | (g << 8) | b;
 }
 
 // Body color mapping
@@ -215,6 +224,11 @@ export class PhysicsClient {
                 body_type: string;
                 mass: number;
                 radius: number;
+                color: [number, number, number];
+                luminosity?: number;
+                effective_temperature?: number;
+                rotation_rate?: number;
+                seed?: number;
             }>;
 
             return bodies.map(b => ({
@@ -223,7 +237,8 @@ export class PhysicsClient {
                 type: this.parseBodyType(b.body_type),
                 mass: b.mass,
                 radius: b.radius,
-                color: BODY_COLORS[b.name] ?? 0x888888,
+                // Use named color lookup first, then body struct color (RGB 0-1 → hex)
+                color: BODY_COLORS[b.name] ?? rgbToHex(b.color),
             }));
         } catch (e) {
             console.error('Failed to parse bodies:', e);
@@ -236,7 +251,10 @@ export class PhysicsClient {
         if (t.includes('star')) return 'star';
         if (t.includes('moon')) return 'moon';
         if (t.includes('asteroid')) return 'asteroid';
+        if (t.includes('comet')) return 'comet';
         if (t.includes('spacecraft')) return 'spacecraft';
+        if (t.includes('testparticle') || t.includes('test_particle')) return 'test_particle';
+        if (t.includes('player')) return 'player';
         return 'planet';
     }
 
@@ -301,7 +319,7 @@ export class PhysicsClient {
     /** Add a custom body */
     addBody(body: {
         name: string;
-        type: 'star' | 'planet' | 'moon' | 'asteroid';
+        type: 'star' | 'planet' | 'moon' | 'asteroid' | 'comet' | 'spacecraft' | 'test_particle' | 'player';
         mass: number;
         radius: number;
         x: number;

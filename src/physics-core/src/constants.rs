@@ -57,6 +57,30 @@ pub const DEFAULT_SUBSTEPS: u32 = 4;
 /// Floating origin recenter threshold in meters (10^7 m = 10,000 km)
 pub const FLOATING_ORIGIN_THRESHOLD: f64 = 1.0e7;
 
+/// Stefan-Boltzmann constant σ in W·m⁻²·K⁻⁴ (CODATA 2018)
+pub const STEFAN_BOLTZMANN: f64 = 5.670_374_419e-8;
+
+/// Solar luminosity in Watts (IAU 2015 nominal)
+pub const L_SUN: f64 = 3.828e26;
+
+/// Solar effective temperature in Kelvin
+pub const T_SUN: f64 = 5778.0;
+
+/// Earth bulk density in kg/m³
+pub const RHO_EARTH: f64 = 5514.0;
+
+/// Earth surface gravity in m/s²
+pub const G_SURFACE_EARTH: f64 = 9.80665;
+
+/// Earth mean surface temperature in K
+pub const T_SURFACE_EARTH: f64 = 288.0;
+
+/// Earth rotation rate in rad/s (sidereal)
+pub const OMEGA_EARTH: f64 = 7.2921159e-5;
+
+/// Earth axial tilt in radians (~23.44°)
+pub const AXIAL_TILT_EARTH: f64 = 0.4091;
+
 #[cfg(test)]
 mod tests {
     use super::*;

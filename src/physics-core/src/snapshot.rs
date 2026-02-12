@@ -182,7 +182,7 @@ impl Snapshot {
 
     /// Get the number of massive (gravitating) bodies
     pub fn massive_body_count(&self) -> usize {
-        self.bodies.iter().filter(|b| b.is_active && b.is_massive).count()
+        self.bodies.iter().filter(|b| b.is_active && b.contributes_gravity).count()
     }
 }
 

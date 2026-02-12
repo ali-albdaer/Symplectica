@@ -225,7 +225,7 @@ impl Octree {
         self.root = Some(OctreeNode::new(self.center, self.half_size));
         
         for (idx, body) in bodies.iter().enumerate() {
-            if body.is_active && body.is_massive {
+            if body.is_active && body.contributes_gravity {
                 if let Some(ref mut root) = self.root {
                     root.insert(bodies, idx, 0);
                 }
@@ -238,7 +238,7 @@ impl Octree {
         let mut min = Vec3::new(f64::MAX, f64::MAX, f64::MAX);
         let mut max = Vec3::new(f64::MIN, f64::MIN, f64::MIN);
         
-        for body in bodies.iter().filter(|b| b.is_active && b.is_massive) {
+        for body in bodies.iter().filter(|b| b.is_active && b.contributes_gravity) {
             min = min.min(body.position);
             max = max.max(body.position);
         }
@@ -300,22 +300,28 @@ pub struct OctreeStats {
 
 /// Compute accelerations using Barnes-Hut algorithm
 pub fn compute_accelerations_barnes_hut(bodies: &mut [Body], config: &ForceConfig) {
-    let softening_squared = config.softening * config.softening;
     
     // Build octree
     let mut octree = Octree::new();
     octree.build(bodies);
     
-    // Calculate accelerations
+    // Calculate accelerations for bodies that feel gravity
     for body in bodies.iter_mut() {
-        if !body.is_active {
+        if !body.is_active || !body.feels_gravity {
             continue;
         }
         
+        // TODO(softening_bh): Barnes-Hut currently uses global softening for all pairs.
+        //   For full per-body softening support, the octree nodes would need to store
+        //   softening info per-leaf, or use the target body's effective_softening as
+        //   a minimum. Current approach: use max(body.effective_softening, global).
+        let eps = body.effective_softening(config.softening);
+        let eps_sq = eps * eps;
+
         body.acceleration = octree.calculate_acceleration(
             body.position,
             config.barnes_hut_theta,
-            softening_squared,
+            eps_sq,
         );
     }
 }
@@ -341,7 +347,7 @@ pub fn compare_accuracy(bodies: &[Body], theta: f64, softening: f64) -> (f64, f6
     let mut count = 0;
     
     for (direct, bh) in direct_bodies.iter().zip(bh_bodies.iter()) {
-        if !direct.is_active || !direct.is_massive {
+        if !direct.is_active || !direct.contributes_gravity {
             continue;
         }
         

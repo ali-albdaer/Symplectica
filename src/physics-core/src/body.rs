@@ -27,10 +27,12 @@ pub enum BodyType {
     Asteroid = 3,
     /// Comet - small icy body with potential tail
     Comet = 4,
-    /// Spacecraft - artificial object (player or NPC)
+    /// Spacecraft - artificial object (NPC)
     Spacecraft = 5,
     /// TestParticle - massless particle for visualization
     TestParticle = 6,
+    /// Player - human-controlled entity; test mass by default
+    Player = 7,
 }
 
 impl Default for BodyType {
@@ -87,8 +89,11 @@ impl Atmosphere {
 /// A celestial body in the simulation.
 /// 
 /// All physical quantities are in SI units for consistency and accuracy.
+/// Fields are grouped by function. Fields marked `#[serde(default)]` were
+/// added after snapshot v1 and will silently default when loading old data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Body {
+    // ─── identity ───────────────────────────────────────────────
     /// Unique identifier
     pub id: BodyId,
     
@@ -97,11 +102,12 @@ pub struct Body {
     
     /// Type of body
     pub body_type: BodyType,
-    
+
+    // ─── dynamics (updated every tick) ──────────────────────────
     /// Mass in kilograms
     pub mass: f64,
     
-    /// Radius in meters
+    /// Mean / volumetric radius in meters (used for rendering)
     pub radius: f64,
     
     /// Position in meters (world coordinates)
@@ -115,7 +121,100 @@ pub struct Body {
     
     /// Previous acceleration (for Velocity Verlet)
     pub prev_acceleration: Vec3,
-    
+
+    // ─── gravity participation ──────────────────────────────────
+    /// Does this body contribute to the gravitational field?
+    /// true for stars, planets, moons, large asteroids.
+    /// false for players, ships, debris, test particles.
+    #[serde(default = "default_true")]
+    pub contributes_gravity: bool,
+
+    /// Does this body respond to (feel) gravitational forces?
+    /// true for almost everything; false only for fixed/anchored bodies.
+    #[serde(default = "default_true")]
+    pub feels_gravity: bool,
+
+    // ─── physical properties (PROPERTIES.md CRITICAL) ──────────
+    /// Physics collision / contact radius in meters.
+    /// Collisions and escape-velocity computations use this, not `radius`.
+    /// Defaults to `radius` when zero.
+    #[serde(default)]
+    pub collision_radius: f64,
+
+    /// Gravitational softening ε in meters.
+    /// 0 means "use the global default from ForceConfig".
+    /// Rule of thumb: ε = max(physical_radius * 0.001, 1 m) for particles.
+    // TODO(softening): When close-encounter integrator switching is added,
+    //   softening should be reduced to near-zero for bodies that switch to
+    //   adaptive RK45 / Gauss-Radau, relying on the adaptive step instead.
+    #[serde(default)]
+    pub softening_length: f64,
+
+    /// Sidereal angular velocity (rad/s)
+    // TODO(rotation): Use this in the renderer to spin body meshes.
+    //   Requires storing a rotation quaternion that accumulates each frame:
+    //   `quat = Quat::from_axis_angle(spin_axis, rotation_rate * dt) * quat`
+    #[serde(default)]
+    pub rotation_rate: f64,
+
+    /// Obliquity — angle between spin axis and orbit normal (rad)
+    #[serde(default)]
+    pub axial_tilt: f64,
+
+    /// Average density (kg/m³). Computed by `compute_derived()` if zero.
+    #[serde(default)]
+    pub bulk_density: f64,
+
+    /// Surface gravity g = G*M/R² (m/s²). Computed if zero.
+    #[serde(default)]
+    pub surface_gravity: f64,
+
+    /// Surface escape velocity sqrt(2GM/R) (m/s). Computed if zero.
+    #[serde(default)]
+    pub escape_velocity_surface: f64,
+
+    /// Equilibrium or measured mean surface temperature (K)
+    #[serde(default)]
+    pub mean_surface_temperature: f64,
+
+    /// Deterministic seed for procedural visuals (terrain, starfield, etc.)
+    #[serde(default)]
+    pub seed: u64,
+
+    // ─── star-specific ─────────────────────────────────────────
+    /// Bolometric luminosity in Watts (0 for non-stars)
+    // TODO(lighting): Feed luminosity into the Three.js point-light intensity.
+    //   Irradiance at distance d: E = L / (4π d²). Map to renderer units.
+    #[serde(default)]
+    pub luminosity: f64,
+
+    /// Effective photospheric temperature in Kelvin (0 for non-stars)
+    // TODO(star_color): Derive star color from T_eff via black-body curve
+    //   instead of using the hardcoded `color` field.
+    #[serde(default)]
+    pub effective_temperature: f64,
+
+    // ─── orbital elements (optional, for presets / orbit viz) ───
+    /// Semi-major axis a (m). 0 if unset / free-flying.
+    #[serde(default)]
+    pub semi_major_axis: f64,
+    /// Eccentricity e (unitless)
+    #[serde(default)]
+    pub eccentricity: f64,
+    /// Inclination i (rad)
+    #[serde(default)]
+    pub inclination: f64,
+    /// Longitude of ascending node Ω (rad)
+    #[serde(default)]
+    pub longitude_asc_node: f64,
+    /// Argument of periapsis ω (rad)
+    #[serde(default)]
+    pub arg_periapsis: f64,
+    /// Mean anomaly M at epoch (rad)
+    #[serde(default)]
+    pub mean_anomaly: f64,
+
+    // ─── appearance ────────────────────────────────────────────
     /// Optional atmosphere parameters
     pub atmosphere: Option<Atmosphere>,
     
@@ -124,16 +223,16 @@ pub struct Body {
     
     /// Surface color RGB (0-1 each)
     pub color: [f64; 3],
-    
-    /// Is this body affected by gravity? (false = test particle)
-    pub is_massive: bool,
-    
+
+    // ─── state flags ───────────────────────────────────────────
     /// Is this body active in the simulation?
     pub is_active: bool,
     
     /// Parent body ID for hierarchical systems (e.g., moon orbiting planet)
     pub parent_id: Option<BodyId>,
 }
+
+fn default_true() -> bool { true }
 
 impl Body {
     /// Create a new body with the given properties.
@@ -146,6 +245,11 @@ impl Body {
         position: Vec3,
         velocity: Vec3,
     ) -> Self {
+        let contributes = match body_type {
+            BodyType::Star | BodyType::Planet | BodyType::Moon | BodyType::Asteroid | BodyType::Comet => mass > 0.0,
+            BodyType::Spacecraft | BodyType::TestParticle | BodyType::Player => false,
+        };
+
         Self {
             id,
             name: name.into(),
@@ -156,10 +260,28 @@ impl Body {
             velocity,
             acceleration: Vec3::ZERO,
             prev_acceleration: Vec3::ZERO,
+            contributes_gravity: contributes,
+            feels_gravity: true,
+            collision_radius: radius,
+            softening_length: 0.0,
+            rotation_rate: 0.0,
+            axial_tilt: 0.0,
+            bulk_density: 0.0,
+            surface_gravity: 0.0,
+            escape_velocity_surface: 0.0,
+            mean_surface_temperature: 0.0,
+            seed: 0,
+            luminosity: 0.0,
+            effective_temperature: 0.0,
+            semi_major_axis: 0.0,
+            eccentricity: 0.0,
+            inclination: 0.0,
+            longitude_asc_node: 0.0,
+            arg_periapsis: 0.0,
+            mean_anomaly: 0.0,
             atmosphere: None,
             albedo: 0.3,
             color: [1.0, 1.0, 1.0],
-            is_massive: mass > 0.0,
             is_active: true,
             parent_id: None,
         }
@@ -219,6 +341,41 @@ impl Body {
         body
     }
 
+    /// Compute derived physical quantities from mass and radius.
+    /// Fills bulk_density, surface_gravity, escape_velocity_surface if they
+    /// are currently zero. Safe to call multiple times.
+    pub fn compute_derived(&mut self) {
+        if self.mass <= 0.0 || self.radius <= 0.0 {
+            return;
+        }
+        let g = crate::constants::G;
+
+        if self.bulk_density == 0.0 {
+            let volume = (4.0 / 3.0) * std::f64::consts::PI * self.radius.powi(3);
+            self.bulk_density = self.mass / volume;
+        }
+        if self.surface_gravity == 0.0 {
+            self.surface_gravity = g * self.mass / (self.radius * self.radius);
+        }
+        if self.escape_velocity_surface == 0.0 {
+            self.escape_velocity_surface = (2.0 * g * self.mass / self.radius).sqrt();
+        }
+        if self.collision_radius == 0.0 {
+            self.collision_radius = self.radius;
+        }
+    }
+
+    /// Return the effective softening for this body.
+    /// Uses the per-body value if set, otherwise falls back to the global.
+    #[inline]
+    pub fn effective_softening(&self, global_softening: f64) -> f64 {
+        if self.softening_length > 0.0 {
+            self.softening_length
+        } else {
+            global_softening
+        }
+    }
+
     /// Calculate the gravitational parameter μ = G * M
     pub fn gravitational_parameter(&self) -> f64 {
         crate::constants::G * self.mass
@@ -252,10 +409,10 @@ impl Body {
         semi_major_axis * (self.mass / (3.0 * parent_mass)).powf(1.0 / 3.0)
     }
 
-    /// Check if this body collides with another.
+    /// Check if this body collides with another (uses collision_radius).
     pub fn collides_with(&self, other: &Body) -> bool {
         let distance = self.position.distance(other.position);
-        distance < self.radius + other.radius
+        distance < self.collision_radius + other.collision_radius
     }
 
     /// Merge another body into this one (inelastic collision).
@@ -272,12 +429,15 @@ impl Body {
         // Position at center of mass
         self.position = (self.position * self.mass + other.position * other.mass) / total_mass;
 
+        // Compute volume_ratio BEFORE updating mass
+        let volume_ratio = total_mass / self.mass;
+
         // Update mass
         self.mass = total_mass;
 
         // Update radius assuming constant density (r ∝ m^(1/3))
-        let volume_ratio = total_mass / self.mass;
         self.radius *= volume_ratio.powf(1.0 / 3.0);
+        self.collision_radius *= volume_ratio.powf(1.0 / 3.0);
 
         // Mark as still active
         self.is_active = true;
@@ -290,6 +450,12 @@ impl Body {
             && self.position.is_finite()
             && self.velocity.is_finite()
             && self.acceleration.is_finite()
+    }
+
+    /// Legacy compat: returns `contributes_gravity` — equivalent to old `is_massive`.
+    #[inline]
+    pub fn is_massive(&self) -> bool {
+        self.contributes_gravity
     }
 }
 
@@ -305,10 +471,28 @@ impl Default for Body {
             velocity: Vec3::ZERO,
             acceleration: Vec3::ZERO,
             prev_acceleration: Vec3::ZERO,
+            contributes_gravity: true,
+            feels_gravity: true,
+            collision_radius: 1.0,
+            softening_length: 0.0,
+            rotation_rate: 0.0,
+            axial_tilt: 0.0,
+            bulk_density: 0.0,
+            surface_gravity: 0.0,
+            escape_velocity_surface: 0.0,
+            mean_surface_temperature: 0.0,
+            seed: 0,
+            luminosity: 0.0,
+            effective_temperature: 0.0,
+            semi_major_axis: 0.0,
+            eccentricity: 0.0,
+            inclination: 0.0,
+            longitude_asc_node: 0.0,
+            arg_periapsis: 0.0,
+            mean_anomaly: 0.0,
             atmosphere: None,
             albedo: 0.3,
             color: [1.0, 1.0, 1.0],
-            is_massive: true,
             is_active: true,
             parent_id: None,
         }
@@ -360,5 +544,78 @@ mod tests {
         
         assert!((momentum_before - momentum_after).abs() < 1e-10);
         assert_eq!(a.mass, 200.0);
+    }
+
+    #[test]
+    fn test_merge_radius_update() {
+        // Two equal-mass, equal-radius bodies → merged radius = r * 2^(1/3)
+        let mut a = Body::new(0, "A", BodyType::Asteroid, 100.0, 10.0, Vec3::ZERO, Vec3::ZERO);
+        let b = Body::new(1, "B", BodyType::Asteroid, 100.0, 10.0, Vec3::new(15.0, 0.0, 0.0), Vec3::ZERO);
+
+        a.merge(&b);
+
+        let expected_radius = 10.0 * (2.0_f64).powf(1.0 / 3.0);
+        assert!(
+            (a.radius - expected_radius).abs() < 1e-10,
+            "Merged radius {} != expected {}",
+            a.radius,
+            expected_radius
+        );
+    }
+
+    #[test]
+    fn test_compute_derived() {
+        let mut earth = Body::planet(1, "Earth", M_EARTH, R_EARTH, AU, 29784.0);
+        earth.compute_derived();
+
+        // surface_gravity ≈ 9.81 m/s²
+        assert!(
+            (earth.surface_gravity - 9.81).abs() < 0.1,
+            "Surface gravity {} m/s²",
+            earth.surface_gravity
+        );
+        // escape_velocity ≈ 11186 m/s
+        assert!(
+            (earth.escape_velocity_surface - 11186.0).abs() < 100.0,
+            "Escape velocity {} m/s",
+            earth.escape_velocity_surface
+        );
+        // bulk_density ≈ 5514 kg/m³
+        assert!(
+            (earth.bulk_density - 5514.0).abs() < 50.0,
+            "Bulk density {} kg/m³",
+            earth.bulk_density
+        );
+    }
+
+    #[test]
+    fn test_collision_uses_collision_radius() {
+        // Bodies 800m apart. render radius=1000, collision_radius=300.
+        // 300+300 = 600 < 800 → no collision
+        let mut a = Body::new(0, "A", BodyType::Asteroid, 1e10, 1000.0, Vec3::ZERO, Vec3::ZERO);
+        let mut b = Body::new(1, "B", BodyType::Asteroid, 1e10, 1000.0, Vec3::new(800.0, 0.0, 0.0), Vec3::ZERO);
+        a.collision_radius = 300.0;
+        b.collision_radius = 300.0;
+
+        assert!(!a.collides_with(&b), "Should NOT collide based on collision_radius");
+    }
+
+    #[test]
+    fn test_player_is_test_mass() {
+        let player = Body::new(99, "Player1", BodyType::Player, 80.0, 1.0, Vec3::ZERO, Vec3::ZERO);
+        assert!(!player.contributes_gravity, "Players should not contribute gravity");
+        assert!(player.feels_gravity, "Players should feel gravity");
+    }
+
+    #[test]
+    fn test_effective_softening() {
+        let mut body = Body::default();
+
+        // Per-body unset → falls back to global
+        assert_eq!(body.effective_softening(10_000.0), 10_000.0);
+
+        // Per-body set → uses per-body
+        body.softening_length = 500.0;
+        assert_eq!(body.effective_softening(10_000.0), 500.0);
     }
 }
