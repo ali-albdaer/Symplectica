@@ -323,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_delta_snapshot() {
-        let mut old = create_test_snapshot();
+        let old = create_test_snapshot();
         let mut new = old.clone();
         
         // Modify Earth's position

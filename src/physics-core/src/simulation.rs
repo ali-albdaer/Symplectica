@@ -396,7 +396,7 @@ mod tests {
         let json = snapshot.to_json().expect("Serialization failed");
         
         // Run more
-        let energy_before = sim.total_energy();
+        let _energy_before = sim.total_energy();
         sim.step_n(100);
         
         // Restore

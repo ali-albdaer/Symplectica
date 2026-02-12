@@ -66,7 +66,8 @@ interface WasmSimulation {
     totalEnergy(): number;
     addStar(name: string, mass: number, radius: number): number;
     addPlanet(name: string, mass: number, radius: number, distance: number, velocity: number): number;
-    addBody(name: string, mass: number, radius: number, px: number, py: number, pz: number, vx: number, vy: number, vz: number): number;
+    addBody(name: string, bodyType: number, mass: number, radius: number, px: number, py: number, pz: number, vx: number, vy: number, vz: number): number;
+    addBodyFromJson(json: string): number;
     removeBody(id: number): boolean;
     setDt(dt: number): void;
     setSubsteps(substeps: number): void;
@@ -363,7 +364,7 @@ class SimulationServer {
                     : this.adminState.timeScale;
 
                 const changes: string[] = [];
-                
+
                 if (timeScale !== this.adminState.timeScale) {
                     const label = getSpeedLabel(timeScale);
                     this.broadcastChat({

@@ -258,8 +258,8 @@ mod tests {
         use crate::body::BodyType;
         
         // Star (massive) + test-mass player (feels gravity, does not contribute)
-        let mut sun = Body::new(0, "Sun", BodyType::Star, M_SUN, R_SUN, Vec3::ZERO, Vec3::ZERO);
-        let mut player = Body::new(1, "Player1", BodyType::Player, 80.0, 1.0,
+        let sun = Body::new(0, "Sun", BodyType::Star, M_SUN, R_SUN, Vec3::ZERO, Vec3::ZERO);
+        let player = Body::new(1, "Player1", BodyType::Player, 80.0, 1.0,
             Vec3::new(AU, 0.0, 0.0), Vec3::new(0.0, 0.0, 0.0));
 
         assert!(sun.contributes_gravity);
@@ -286,7 +286,7 @@ mod tests {
 
         // Two bodies: one with per-body softening, one without
         let mut a = Body::new(0, "A", BodyType::Star, M_SUN, R_SUN, Vec3::ZERO, Vec3::ZERO);
-        let mut b = Body::new(1, "B", BodyType::Planet, M_EARTH, R_EARTH,
+        let b = Body::new(1, "B", BodyType::Planet, M_EARTH, R_EARTH,
             Vec3::new(AU, 0.0, 0.0), Vec3::new(0.0, 29784.0, 0.0));
 
         // Set a large per-body softening on body A

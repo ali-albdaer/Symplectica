@@ -218,7 +218,7 @@ mod tests {
     use super::*;
     use crate::body::BodyType;
     use crate::constants::*;
-    use crate::force::{compute_kinetic_energy, compute_potential_energy, compute_total_energy};
+    use crate::force::compute_total_energy;
     use crate::vector::Vec3;
 
     #[test]
