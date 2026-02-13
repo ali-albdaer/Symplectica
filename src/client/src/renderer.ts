@@ -8,6 +8,35 @@
  */
 
 import * as THREE from 'three';
+import { blackbodyToRGBNorm } from './blackbody';
+
+// ── Star surface shader ────────────────────────────────────────────────
+// Implements blackbody coloring + quadratic limb-darkening:
+//   I(μ) = 1 − a·(1−μ) − b·(1−μ)²    where μ = dot(N, V)
+
+const STAR_VERTEX = /* glsl */ `
+varying vec3 vNormal;
+varying vec3 vViewDir;
+void main() {
+    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    vNormal = normalize(normalMatrix * normal);
+    vViewDir = normalize(-mvPos.xyz);
+    gl_Position = projectionMatrix * mvPos;
+}
+`;
+
+const STAR_FRAGMENT = /* glsl */ `
+uniform vec3 u_color;   // blackbody RGB [0,1]
+uniform float u_limbA;
+uniform float u_limbB;
+varying vec3 vNormal;
+varying vec3 vViewDir;
+void main() {
+    float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
+    float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
+    gl_FragColor = vec4(u_color * limb, 1.0);
+}
+`;
 
 // Body data from physics simulation
 interface BodyData {
@@ -120,9 +149,12 @@ export class BodyRenderer {
         const radius = scaleRadius(body.radius * this.renderScale);
         mesh.setScale(radius);
 
-        // Add point light for stars - high intensity, no decay at astronomical distances
+        // Add point light for stars — tinted to blackbody color
         if (body.type === 'star') {
-            const light = new THREE.PointLight(0xffffff, 3, 0, 0); // intensity 3, infinite range, no decay
+            const teff = body.effectiveTemperature ?? 5778;
+            const [lr, lg, lb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
+            const lightColor = new THREE.Color(lr, lg, lb);
+            const light = new THREE.PointLight(lightColor, 3, 0, 0);
             mesh.group.add(light);
         }
 
@@ -490,6 +522,15 @@ export class BodyRenderer {
         return typeof id === 'number' ? id : null;
     }
 
+    /** Update star rotations based on simulation time (D4) */
+    updateStars(simTime: number): void {
+        for (const mesh of this.bodies.values()) {
+            if (mesh.type === 'star') {
+                mesh.updateRotation(simTime);
+            }
+        }
+    }
+
     dispose(): void {
         for (const mesh of this.bodies.values()) {
             this.scene.remove(mesh.group);
@@ -591,6 +632,11 @@ class BodyMesh {
     readonly realRadius: number;
     readonly type: string;
 
+    // Star-specific — rotation
+    private rotationRate = 0;
+    private axialTilt = 0;
+    private spinAxis: THREE.Vector3 | null = null;
+
     constructor(body: BodyData, segmentsWidth: number, segmentsHeight: number) {
         this.realRadius = body.radius;
         this.type = body.type;
@@ -604,10 +650,28 @@ class BodyMesh {
 
         // Create material based on body type
         if (body.type === 'star') {
-            // MeshBasicMaterial is unlit - perfect for stars
-            this.material = new THREE.MeshBasicMaterial({
-                color: body.color || 0xffdd44,
+            const teff = body.effectiveTemperature ?? 5778;
+            const [r, g, b] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
+            const [limbA, limbB] = body.limbDarkeningCoeffs ?? [0.6, 0.0];
+
+            this.material = new THREE.ShaderMaterial({
+                vertexShader: STAR_VERTEX,
+                fragmentShader: STAR_FRAGMENT,
+                uniforms: {
+                    u_color: { value: new THREE.Vector3(r, g, b) },
+                    u_limbA: { value: limbA },
+                    u_limbB: { value: limbB },
+                },
             });
+
+            // Store rotation data
+            this.rotationRate = body.rotationRate ?? 0;
+            this.axialTilt = body.axialTilt ?? 0;
+            this.spinAxis = new THREE.Vector3(
+                -Math.sin(this.axialTilt),
+                Math.cos(this.axialTilt),
+                0,
+            ).normalize();
         } else {
             this.material = new THREE.MeshStandardMaterial({
                 color: body.color || 0x4488ff,
@@ -620,10 +684,24 @@ class BodyMesh {
         this.mesh.userData.bodyId = body.id;
         this.group.add(this.mesh);
 
-        // Add glow effect for stars
+        // Add glow effect for stars — tinted to blackbody color (D3)
         if (body.type === 'star') {
-            this.addStarGlow(body.color || 0xffdd44);
+            const teff = body.effectiveTemperature ?? 5778;
+            const [cr, cg, cb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
+            const bbHex = ((Math.round(cr * 255) & 0xff) << 16) |
+                          ((Math.round(cg * 255) & 0xff) << 8)  |
+                           (Math.round(cb * 255) & 0xff);
+            const luminosity = body.luminosity ?? 1;
+            this.addStarGlow(bbHex, luminosity);
         }
+    }
+
+    /** Rotate star mesh based on cumulative simulation time (D4) */
+    updateRotation(simTime: number): void {
+        if (!this.spinAxis || this.rotationRate === 0) return;
+        const angle = this.rotationRate * simTime;
+        const q = new THREE.Quaternion().setFromAxisAngle(this.spinAxis, angle);
+        this.mesh.quaternion.copy(q);
     }
 
     setScale(radius: number): void {
@@ -645,12 +723,15 @@ class BodyMesh {
         this.mesh.geometry = this.geometry;
     }
 
-    private addStarGlow(color: number): void {
-        // Create glow sprite - initial scale will be set by setScale
+    private addStarGlow(color: number, luminosity: number): void {
+        // Glow intensity scales with luminosity (log, clamped)
+        const glowOpacity = Math.min(1.0, 0.3 + 0.15 * Math.log10(Math.max(luminosity, 0.01)));
+
         const spriteMaterial = new THREE.SpriteMaterial({
             map: this.createGlowTexture(),
             color: color,
             transparent: true,
+            opacity: glowOpacity,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
         });
@@ -672,10 +753,11 @@ class BodyMesh {
             size / 2, size / 2, size / 2
         );
 
+        // Neutral white gradient — colour is applied via SpriteMaterial.color
         gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.2, 'rgba(255, 255, 200, 0.8)');
-        gradient.addColorStop(0.5, 'rgba(255, 200, 100, 0.3)');
-        gradient.addColorStop(1, 'rgba(255, 100, 50, 0)');
+        gradient.addColorStop(0.15, 'rgba(255, 255, 255, 0.85)');
+        gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.3)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, size, size);

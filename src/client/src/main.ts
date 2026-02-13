@@ -1002,6 +1002,9 @@ class NBodyClient {
         // Update body positions with floating origin
         this.bodyRenderer.update(this.state.positions, cameraOrigin);
 
+        // Update star rotations from simulation time
+        this.bodyRenderer.updateStars(this.state.time);
+
         // Render
         this.renderer.render(this.scene, this.camera);
 
