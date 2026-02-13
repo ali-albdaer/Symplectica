@@ -19,10 +19,12 @@ const STAR_VERTEX = /* glsl */ `
 #include <logdepthbuf_pars_vertex>
 varying vec3 vNormal;
 varying vec3 vViewDir;
+varying vec2 vUv;
 void main() {
     vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
     vNormal = normalize(normalMatrix * normal);
     vViewDir = normalize(-mvPos.xyz);
+    vUv = uv;
     gl_Position = projectionMatrix * mvPos;
     #include <logdepthbuf_vertex>
 }
@@ -34,12 +36,19 @@ const STAR_FRAGMENT = /* glsl */ `
 uniform vec3 u_color;   // blackbody RGB [0,1]
 uniform float u_limbA;
 uniform float u_limbB;
+uniform sampler2D u_granulationMap;
+uniform float u_granulationStrength;
+uniform float u_time;
 varying vec3 vNormal;
 varying vec3 vViewDir;
+varying vec2 vUv;
 void main() {
     float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
     float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
-    gl_FragColor = vec4(u_color * limb, 1.0);
+    vec2 uv = fract(vUv * 6.0 + vec2(u_time * 0.002, u_time * 0.001));
+    float granTex = texture2D(u_granulationMap, uv).r;
+    float granulation = mix(1.0, 0.9 + 0.2 * granTex, u_granulationStrength);
+    gl_FragColor = vec4(u_color * limb * granulation, 1.0);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -120,6 +129,10 @@ interface BodyData {
     meanSurfaceTemperature?: number;
 }
 
+interface StarRenderOptions {
+    granulationEnabled: boolean;
+}
+
 // Body scaling for visualization
 // Real world: Sun radius = 6.96e8m, Earth = 6.37e6m, Moon = 1.74e6m
 // Moon-Earth distance = 3.84e8m, Earth-Sun distance = 1.496e11m (1 AU)
@@ -132,6 +145,54 @@ const AU = 1.495978707e11;
 
 function scaleRadius(realRadius: number): number {
     return realRadius;
+}
+
+function mulberry32(seed: number): () => number {
+    let t = seed >>> 0;
+    return () => {
+        t += 0x6D2B79F5;
+        let r = Math.imul(t ^ (t >>> 15), t | 1);
+        r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    const image = ctx.createImageData(size, size);
+    const data = image.data;
+
+    const random = mulberry32(seed);
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const i = (y * size + x) * 4;
+            const gx = x / size;
+            const gy = y / size;
+
+            const cell = Math.sin(gx * 80.0) * Math.sin(gy * 80.0);
+            const swirl = Math.sin((gx * 27.0 + gy * 19.0) * 6.28318 + random() * 3.14159);
+            const noise = random() * 2.0 - 1.0;
+            const v = Math.max(0, Math.min(255, Math.round(128 + 50 * cell + 36 * swirl + 22 * noise)));
+
+            data[i] = v;
+            data[i + 1] = v;
+            data[i + 2] = v;
+            data[i + 3] = 255;
+        }
+    }
+
+    ctx.putImageData(image, 0, 0);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = true;
+    texture.needsUpdate = true;
+    return texture;
 }
 
 export class BodyRenderer {
@@ -149,6 +210,7 @@ export class BodyRenderer {
     // Scale settings
     private renderScale = 1;
     private sphereSegments = { width: 64, height: 32 };
+    private starRenderOptions: StarRenderOptions = { granulationEnabled: true };
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
@@ -178,6 +240,22 @@ export class BodyRenderer {
         this.updateBodySizes();
     }
 
+    setStarRenderOptions(options: Partial<StarRenderOptions>): void {
+        const nextEnabled =
+            typeof options.granulationEnabled === 'boolean'
+                ? options.granulationEnabled
+                : this.starRenderOptions.granulationEnabled;
+
+        if (nextEnabled === this.starRenderOptions.granulationEnabled) {
+            return;
+        }
+
+        this.starRenderOptions.granulationEnabled = nextEnabled;
+        for (const mesh of this.bodies.values()) {
+            mesh.setGranulationEnabled(nextEnabled);
+        }
+    }
+
     private updateBodySizes(): void {
         for (const [_, mesh] of this.bodies) {
             const newRadius = scaleRadius(mesh.realRadius * this.renderScale);
@@ -186,7 +264,12 @@ export class BodyRenderer {
     }
 
     addBody(body: BodyData): void {
-        const mesh = new BodyMesh(body, this.sphereSegments.width, this.sphereSegments.height);
+        const mesh = new BodyMesh(
+            body,
+            this.sphereSegments.width,
+            this.sphereSegments.height,
+            this.starRenderOptions,
+        );
         this.bodies.set(body.id, mesh);
         this.scene.add(mesh.group);
 
@@ -674,6 +757,8 @@ class BodyMesh {
     private geometry: THREE.SphereGeometry;
     private material: THREE.Material;
     private atmosphereMesh: THREE.Mesh | null = null;
+    private starMaterial: THREE.ShaderMaterial | null = null;
+    private granulationTexture: THREE.Texture | null = null;
 
     // Expose for dynamic rescaling
     readonly realRadius: number;
@@ -684,7 +769,12 @@ class BodyMesh {
     private rotationRate = 0;
     private spinAxis: THREE.Vector3 | null = null;
 
-    constructor(body: BodyData, segmentsWidth: number, segmentsHeight: number) {
+    constructor(
+        body: BodyData,
+        segmentsWidth: number,
+        segmentsHeight: number,
+        starOptions: StarRenderOptions,
+    ) {
         this.realRadius = body.radius;
         this.type = body.type;
         this.oblateness = body.oblateness ?? 0;
@@ -712,6 +802,8 @@ class BodyMesh {
             const teff = body.effectiveTemperature ?? 5778;
             const [r, g, b] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
             const [limbA, limbB] = body.limbDarkeningCoeffs ?? [0.6, 0.0];
+            const seed = (body.seed ?? body.id) | 0;
+            this.granulationTexture = createGranulationTexture(seed === 0 ? 1 : seed);
 
             this.material = new THREE.ShaderMaterial({
                 vertexShader: STAR_VERTEX,
@@ -720,8 +812,12 @@ class BodyMesh {
                     u_color: { value: new THREE.Vector3(r, g, b) },
                     u_limbA: { value: limbA },
                     u_limbB: { value: limbB },
+                    u_granulationMap: { value: this.granulationTexture },
+                    u_granulationStrength: { value: starOptions.granulationEnabled ? 1.0 : 0.0 },
+                    u_time: { value: 0.0 },
                 },
             });
+            this.starMaterial = this.material as THREE.ShaderMaterial;
         } else {
             // F4: Physics-derived planet surface color as fallback
             const color = body.color || this.deriveColorFromPhysics(body);
@@ -830,10 +926,20 @@ class BodyMesh {
 
     /** Rotate entire body group (mesh + overlays) based on cumulative simulation time (D4) */
     updateRotation(simTime: number): void {
+        if (this.starMaterial?.uniforms.u_time) {
+            this.starMaterial.uniforms.u_time.value = simTime;
+        }
+
         if (!this.spinAxis || this.rotationRate === 0) return;
         const angle = this.rotationRate * simTime;
         const q = new THREE.Quaternion().setFromAxisAngle(this.spinAxis, angle);
         this.group.quaternion.copy(q);
+    }
+
+    setGranulationEnabled(enabled: boolean): void {
+        if (this.starMaterial?.uniforms.u_granulationStrength) {
+            this.starMaterial.uniforms.u_granulationStrength.value = enabled ? 1.0 : 0.0;
+        }
     }
 
     setScale(radius: number): void {
@@ -915,6 +1021,7 @@ class BodyMesh {
     dispose(): void {
         this.geometry.dispose();
         this.material.dispose();
+        this.granulationTexture?.dispose();
         if (this.atmosphereMesh) {
             this.atmosphereMesh.geometry.dispose();
             (this.atmosphereMesh.material as THREE.Material).dispose();

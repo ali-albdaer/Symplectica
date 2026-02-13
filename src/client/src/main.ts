@@ -302,11 +302,17 @@ class NBodyClient {
             starCount?: number;
             starSize?: number;
             starOpacity?: number;
+            granulationEnabled?: boolean;
         };
         this.skyRenderer.setOptions({
             starCount: starParams.starCount,
             starSize: starParams.starSize,
             opacity: starParams.starOpacity,
+        });
+        this.bodyRenderer.setStarRenderOptions({
+            granulationEnabled: typeof starParams.granulationEnabled === 'boolean'
+                ? starParams.granulationEnabled
+                : true,
         });
     }
 
@@ -411,6 +417,7 @@ class NBodyClient {
         // Clear existing bodies from renderer
         this.bodyRenderer.dispose();
         this.bodyRenderer = new BodyRenderer(this.scene);
+        this.applyPresetToRenderer();
 
         // Add all bodies from physics
         const bodies = this.physics.getBodies();
