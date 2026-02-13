@@ -33,7 +33,7 @@ const DEFAULTS: VisualizationOptions = {
     showGridXZ: false,
     showGridYZ: false,
     gridSpacing: 0.1 * AU,
-    gridSize: 40,
+    gridSize: 1000,
     orbitTrailLength: 100,
 };
 
@@ -66,7 +66,7 @@ export class OptionsPanel {
     private gridSpacingValue!: HTMLElement;
     private gridSizeInput!: HTMLInputElement;
     private gridSizeValue!: HTMLElement;
-    private gridExtent = 40;
+    private gridExtent = 200;
     private trailSlider!: HTMLInputElement;
     private trailValue!: HTMLElement;
     private presetSelect!: HTMLSelectElement;
@@ -198,8 +198,8 @@ export class OptionsPanel {
 
                     <div class="opt-field">
                         <label>Grid Extent (AU)</label>
-                        <input type="range" id="opt-grid-size" min="1" max="5000" step="1" value="40">
-                        <span id="opt-grid-size-value">40 AU</span>
+                        <input type="range" id="opt-grid-size" min="1" max="5000" step="1" value="200">
+                        <span id="opt-grid-size-value">200 AU</span>
                     </div>
                 </section>
 
