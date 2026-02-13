@@ -759,6 +759,8 @@ class NBodyClient {
         const L_SUN = 3.828e26;
         const M_SUN = 1.98892e30;
 
+        clearDetails();
+
         setText('follow-target', body.name);
         setText('follow-type', this.formatBodyType(body.type));
         setText('follow-mass', this.formatMass(body.mass));
