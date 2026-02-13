@@ -39,9 +39,32 @@ uniform float u_limbB;
 uniform sampler2D u_granulationMap;
 uniform float u_granulationStrength;
 uniform float u_time;
+uniform float u_spotFraction;
+uniform float u_spotEnabled;
+uniform float u_spotSeed;
 varying vec3 vNormal;
 varying vec3 vViewDir;
 varying vec3 vObjNormal;
+
+float hash11(float p) {
+    p = fract(p * 0.1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return fract(p);
+}
+
+vec3 randomOnSphere(float idx, float seed) {
+    float u = hash11(idx * 17.13 + seed * 3.7) * 2.0 - 1.0;
+    float a = 6.28318530718 * hash11(idx * 29.73 + seed * 5.1);
+    float s = sqrt(max(0.0, 1.0 - u * u));
+    return vec3(cos(a) * s, sin(a) * s, u);
+}
+
+vec3 rotateY(vec3 v, float a) {
+    float c = cos(a);
+    float s = sin(a);
+    return vec3(v.x * c - v.z * s, v.y, v.x * s + v.z * c);
+}
 
 float sampleGranulation(vec3 n, float scale, vec2 drift) {
     vec3 an = abs(n);
@@ -66,7 +89,40 @@ void main() {
     vec2 drift = vec2(u_time * 0.0016, u_time * 0.0011);
     float granTex = sampleGranulation(objN, 5.8, drift);
     float granulation = mix(1.0, 0.84 + 0.34 * granTex, u_granulationStrength);
-    gl_FragColor = vec4(u_color * limb * granulation, 1.0);
+
+    // D6: Seeded starspots (Ultra) with slow drift
+    float spotCoverage = clamp(u_spotFraction / 0.3, 0.0, 1.0) * u_spotEnabled;
+    float spotCount = floor(clamp(u_spotFraction * 80.0, 0.0, 24.0) + 0.5);
+    float spotDarkening = 0.0;
+    for (int i = 0; i < 24; i++) {
+        float fi = float(i);
+        if (fi >= spotCount) {
+            continue;
+        }
+
+        vec3 center = randomOnSphere(fi + 1.0, u_spotSeed);
+
+        // Keep most spots away from poles for a more solar-like pattern
+        center.y *= 0.75;
+        center = normalize(center);
+
+        // Slow longitudinal drift (seeded)
+        float driftAngle = 0.07 * sin(u_time * 0.00001 + fi * 1.7 + u_spotSeed * 0.01);
+        center = normalize(rotateY(center, driftAngle));
+
+        float radius = mix(0.035, 0.095, hash11(fi * 11.3 + u_spotSeed * 0.7));
+        float d = dot(objN, center);
+        float core = smoothstep(cos(radius), cos(radius * 0.55), d);
+
+        // Darkness corresponds to cooler spot regions (ΔT-like visual approximation)
+        float darkness = mix(0.18, 0.38, hash11(fi * 23.7 + u_spotSeed * 1.9));
+        spotDarkening = max(spotDarkening, core * darkness);
+    }
+
+    vec3 finalColor = u_color * limb * granulation;
+    finalColor *= (1.0 - spotCoverage * spotDarkening);
+
+    gl_FragColor = vec4(finalColor, 1.0);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -149,6 +205,7 @@ interface BodyData {
 
 interface StarRenderOptions {
     granulationEnabled: boolean;
+    starspotsEnabled: boolean;
 }
 
 // Body scaling for visualization
@@ -302,7 +359,10 @@ export class BodyRenderer {
     // Scale settings
     private renderScale = 1;
     private sphereSegments = { width: 64, height: 32 };
-    private starRenderOptions: StarRenderOptions = { granulationEnabled: true };
+    private starRenderOptions: StarRenderOptions = {
+        granulationEnabled: true,
+        starspotsEnabled: false,
+    };
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
@@ -333,18 +393,28 @@ export class BodyRenderer {
     }
 
     setStarRenderOptions(options: Partial<StarRenderOptions>): void {
-        const nextEnabled =
+        const nextGranulationEnabled =
             typeof options.granulationEnabled === 'boolean'
                 ? options.granulationEnabled
                 : this.starRenderOptions.granulationEnabled;
 
-        if (nextEnabled === this.starRenderOptions.granulationEnabled) {
+        const nextStarspotsEnabled =
+            typeof options.starspotsEnabled === 'boolean'
+                ? options.starspotsEnabled
+                : this.starRenderOptions.starspotsEnabled;
+
+        if (
+            nextGranulationEnabled === this.starRenderOptions.granulationEnabled &&
+            nextStarspotsEnabled === this.starRenderOptions.starspotsEnabled
+        ) {
             return;
         }
 
-        this.starRenderOptions.granulationEnabled = nextEnabled;
+        this.starRenderOptions.granulationEnabled = nextGranulationEnabled;
+        this.starRenderOptions.starspotsEnabled = nextStarspotsEnabled;
         for (const mesh of this.bodies.values()) {
-            mesh.setGranulationEnabled(nextEnabled);
+            mesh.setGranulationEnabled(nextGranulationEnabled);
+            mesh.setStarspotsEnabled(nextStarspotsEnabled);
         }
     }
 
@@ -896,6 +966,7 @@ class BodyMesh {
             const [limbA, limbB] = body.limbDarkeningCoeffs ?? [0.6, 0.0];
             const seed = (body.seed ?? body.id) | 0;
             this.granulationTexture = createGranulationTexture(seed === 0 ? 1 : seed);
+            const spotFraction = Math.max(0, Math.min(0.3, body.spotFraction ?? 0));
 
             this.material = new THREE.ShaderMaterial({
                 vertexShader: STAR_VERTEX,
@@ -907,6 +978,9 @@ class BodyMesh {
                     u_granulationMap: { value: this.granulationTexture },
                     u_granulationStrength: { value: starOptions.granulationEnabled ? 1.0 : 0.0 },
                     u_time: { value: 0.0 },
+                    u_spotFraction: { value: spotFraction },
+                    u_spotEnabled: { value: starOptions.starspotsEnabled ? 1.0 : 0.0 },
+                    u_spotSeed: { value: seed === 0 ? 1 : seed },
                 },
             });
             this.starMaterial = this.material as THREE.ShaderMaterial;
@@ -1031,6 +1105,12 @@ class BodyMesh {
     setGranulationEnabled(enabled: boolean): void {
         if (this.starMaterial?.uniforms.u_granulationStrength) {
             this.starMaterial.uniforms.u_granulationStrength.value = enabled ? 1.0 : 0.0;
+        }
+    }
+
+    setStarspotsEnabled(enabled: boolean): void {
+        if (this.starMaterial?.uniforms.u_spotEnabled) {
+            this.starMaterial.uniforms.u_spotEnabled.value = enabled ? 1.0 : 0.0;
         }
     }
 
