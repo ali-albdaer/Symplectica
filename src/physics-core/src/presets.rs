@@ -156,6 +156,7 @@ pub fn create_inner_solar_system(seed: u64) -> Simulation {
         ven.color = hex_to_rgb(0xe6c229);
         ven.composition = PlanetComposition::Rocky;
         ven.albedo = 0.77;
+        ven.atmosphere = Some(Atmosphere::venus_like());
         ven.compute_derived();
     }
     let earth_id = sim.add_planet("Earth", M_EARTH, R_EARTH, AU, 29784.0);
@@ -201,6 +202,7 @@ pub fn create_inner_solar_system(seed: u64) -> Simulation {
         mars.color = hex_to_rgb(0xc1440e);
         mars.composition = PlanetComposition::Rocky;
         mars.albedo = 0.25;
+        mars.atmosphere = Some(Atmosphere::mars_like());
         mars.compute_derived();
     }
     

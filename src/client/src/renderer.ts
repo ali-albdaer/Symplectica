@@ -44,6 +44,40 @@ void main() {
 }
 `;
 
+// ── Atmosphere shell shader ─────────────────────────────────────────────
+// Fresnel-edge glow: bright at limb, transparent at center, tinted by
+// Rayleigh scattering coefficients.
+
+const ATMO_VERTEX = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_vertex>
+varying vec3 vNormal;
+varying vec3 vViewDir;
+void main() {
+    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    vNormal = normalize(normalMatrix * normal);
+    vViewDir = normalize(-mvPos.xyz);
+    gl_Position = projectionMatrix * mvPos;
+    #include <logdepthbuf_vertex>
+}
+`;
+
+const ATMO_FRAGMENT = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 u_color;
+uniform float u_intensity;
+varying vec3 vNormal;
+varying vec3 vViewDir;
+void main() {
+    float mu = dot(normalize(vNormal), normalize(vViewDir));
+    // Fresnel-like: bright at edges (mu→0), transparent at center (mu→1)
+    float rim = pow(1.0 - max(mu, 0.0), 3.0);
+    gl_FragColor = vec4(u_color, rim * u_intensity);
+    #include <logdepthbuf_fragment>
+}
+`;
+
 // Body data from physics simulation
 interface BodyData {
     id: number;
@@ -155,12 +189,15 @@ export class BodyRenderer {
         const radius = scaleRadius(body.radius * this.renderScale);
         mesh.setScale(radius);
 
-        // Add point light for stars — tinted to blackbody color
+        // F5: Physically-based point light for stars — tinted to blackbody, intensity from luminosity
         if (body.type === 'star') {
             const teff = body.effectiveTemperature ?? 5778;
             const [lr, lg, lb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
             const lightColor = new THREE.Color(lr, lg, lb);
-            const light = new THREE.PointLight(lightColor, 3, 0, 0);
+            // Intensity proportional to luminosity (log scale, clamped)
+            const lum = body.luminosity ?? 1;
+            const intensity = Math.min(10, Math.max(0.5, 1.5 + Math.log10(Math.max(lum, 0.001))));
+            const light = new THREE.PointLight(lightColor, intensity, 0, 0);
             mesh.group.add(light);
         }
 
@@ -631,10 +668,12 @@ class BodyMesh {
     private mesh: THREE.Mesh;
     private geometry: THREE.SphereGeometry;
     private material: THREE.Material;
+    private atmosphereMesh: THREE.Mesh | null = null;
 
     // Expose for dynamic rescaling
     readonly realRadius: number;
     readonly type: string;
+    private oblateness = 0;
 
     // Body rotation
     private rotationRate = 0;
@@ -643,6 +682,7 @@ class BodyMesh {
     constructor(body: BodyData, segmentsWidth: number, segmentsHeight: number) {
         this.realRadius = body.radius;
         this.type = body.type;
+        this.oblateness = body.oblateness ?? 0;
 
         this.group = new THREE.Group();
         this.group.name = body.name;
@@ -678,8 +718,10 @@ class BodyMesh {
                 },
             });
         } else {
+            // F4: Physics-derived planet surface color as fallback
+            const color = body.color || this.deriveColorFromPhysics(body);
             this.material = new THREE.MeshStandardMaterial({
-                color: body.color || 0x4488ff,
+                color: color,
                 roughness: 0.8,
                 metalness: 0.1,
             });
@@ -699,6 +741,76 @@ class BodyMesh {
             const luminosity = body.luminosity ?? 1;
             this.addStarGlow(bbHex, luminosity);
         }
+
+        // F3: Atmosphere shell for bodies with atmosphere data
+        if (body.atmosphere && body.atmosphere.height > 0) {
+            this.addAtmosphereShell(body, segmentsWidth, segmentsHeight);
+        }
+    }
+
+    /** F3: Add atmosphere glow shell */
+    private addAtmosphereShell(body: BodyData, segW: number, segH: number): void {
+        const atm = body.atmosphere!;
+        // Rayleigh coefficients → visible color (normalize to [0,1])
+        const rc = atm.rayleighCoefficients;
+        const maxC = Math.max(rc[0], rc[1], rc[2], 1e-10);
+        const cr = rc[0] / maxC;
+        const cg = rc[1] / maxC;
+        const cb = rc[2] / maxC;
+
+        // Intensity based on atmosphere thickness relative to body size
+        const relHeight = atm.height / body.radius;
+        const intensity = Math.min(1.0, 0.4 + relHeight * 2.0);
+
+        const atmoGeo = new THREE.SphereGeometry(1, segW, segH);
+        const atmoMat = new THREE.ShaderMaterial({
+            vertexShader: ATMO_VERTEX,
+            fragmentShader: ATMO_FRAGMENT,
+            uniforms: {
+                u_color: { value: new THREE.Vector3(cr, cg, cb) },
+                u_intensity: { value: intensity },
+            },
+            transparent: true,
+            side: THREE.BackSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+
+        this.atmosphereMesh = new THREE.Mesh(atmoGeo, atmoMat);
+        // Scale will be set in setScale — atmosphere is slightly larger than body
+        this.atmosphereMesh.userData.atmosphereScale = 1 + relHeight;
+        this.group.add(this.atmosphereMesh);
+    }
+
+    /** F4: Derive a reasonable surface color from physics when no named color exists */
+    private deriveColorFromPhysics(body: BodyData): number {
+        const comp = body.composition ?? 'Rocky';
+        const albedo = body.albedo ?? 0.3;
+        const a = Math.max(0.15, Math.min(0.95, albedo));
+        switch (comp) {
+            case 'GasGiant': {
+                const r = Math.round(180 * a + 40);
+                const g = Math.round(140 * a + 30);
+                const b = Math.round(80 * a + 20);
+                return (r << 16) | (g << 8) | b;
+            }
+            case 'IceGiant': {
+                const r = Math.round(80 * a + 30);
+                const g = Math.round(160 * a + 40);
+                const b = Math.round(200 * a + 40);
+                return (r << 16) | (g << 8) | b;
+            }
+            case 'Dwarf': {
+                const v = Math.round(180 * a + 40);
+                return (v << 16) | (v << 8) | v;
+            }
+            default: {
+                const r = Math.round(140 * a + 40);
+                const g = Math.round(120 * a + 35);
+                const b = Math.round(100 * a + 30);
+                return (r << 16) | (g << 8) | b;
+            }
+        }
     }
 
     /** Rotate entire body group (mesh + overlays) based on cumulative simulation time (D4) */
@@ -710,9 +822,23 @@ class BodyMesh {
     }
 
     setScale(radius: number): void {
-        // Scale the mesh to the desired radius
-        // Since geometry is created with radius=1, we scale by the target radius
-        this.mesh.scale.setScalar(radius);
+        // F2: Apply oblateness — compress along local Y (pole axis)
+        if (this.oblateness > 0.001) {
+            this.mesh.scale.set(radius, radius * (1 - this.oblateness), radius);
+        } else {
+            this.mesh.scale.setScalar(radius);
+        }
+
+        // Scale atmosphere shell if present
+        if (this.atmosphereMesh) {
+            const atmoRatio = this.atmosphereMesh.userData.atmosphereScale as number;
+            const atmoR = radius * atmoRatio;
+            if (this.oblateness > 0.001) {
+                this.atmosphereMesh.scale.set(atmoR, atmoR * (1 - this.oblateness), atmoR);
+            } else {
+                this.atmosphereMesh.scale.setScalar(atmoR);
+            }
+        }
 
         // Also scale glow sprites for stars
         for (const child of this.group.children) {
@@ -774,6 +900,10 @@ class BodyMesh {
     dispose(): void {
         this.geometry.dispose();
         this.material.dispose();
+        if (this.atmosphereMesh) {
+            this.atmosphereMesh.geometry.dispose();
+            (this.atmosphereMesh.material as THREE.Material).dispose();
+        }
     }
 
     getPickMesh(): THREE.Mesh {

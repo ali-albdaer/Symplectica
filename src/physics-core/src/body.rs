@@ -113,6 +113,17 @@ impl Atmosphere {
         }
     }
 
+    /// Dense CO₂ Venus atmosphere (thick, yellowish scattering)
+    pub fn venus_like() -> Self {
+        Self {
+            scale_height: 15900.0,
+            rayleigh_coefficients: [12.0e-6, 10.0e-6, 4.0e-6], // Yellowish
+            mie_coefficient: 50.0e-6,  // Very dense sulphuric-acid haze
+            mie_direction: 0.85,
+            height: 250_000.0,         // ~250 km
+        }
+    }
+
     /// Check if atmosphere exists
     pub fn is_present(&self) -> bool {
         self.height > 0.0 && self.scale_height > 0.0
