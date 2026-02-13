@@ -15,6 +15,8 @@ import { blackbodyToRGBNorm } from './blackbody';
 //   I(μ) = 1 − a·(1−μ) − b·(1−μ)²    where μ = dot(N, V)
 
 const STAR_VERTEX = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_vertex>
 varying vec3 vNormal;
 varying vec3 vViewDir;
 void main() {
@@ -22,10 +24,13 @@ void main() {
     vNormal = normalize(normalMatrix * normal);
     vViewDir = normalize(-mvPos.xyz);
     gl_Position = projectionMatrix * mvPos;
+    #include <logdepthbuf_vertex>
 }
 `;
 
 const STAR_FRAGMENT = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_fragment>
 uniform vec3 u_color;   // blackbody RGB [0,1]
 uniform float u_limbA;
 uniform float u_limbB;
@@ -35,6 +40,7 @@ void main() {
     float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
     float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
     gl_FragColor = vec4(u_color * limb, 1.0);
+    #include <logdepthbuf_fragment>
 }
 `;
 
@@ -522,12 +528,10 @@ export class BodyRenderer {
         return typeof id === 'number' ? id : null;
     }
 
-    /** Update star rotations based on simulation time (D4) */
-    updateStars(simTime: number): void {
+    /** Update body rotations based on simulation time */
+    updateBodies(simTime: number): void {
         for (const mesh of this.bodies.values()) {
-            if (mesh.type === 'star') {
-                mesh.updateRotation(simTime);
-            }
+            mesh.updateRotation(simTime);
         }
     }
 
@@ -632,9 +636,8 @@ class BodyMesh {
     readonly realRadius: number;
     readonly type: string;
 
-    // Star-specific — rotation
+    // Body rotation
     private rotationRate = 0;
-    private axialTilt = 0;
     private spinAxis: THREE.Vector3 | null = null;
 
     constructor(body: BodyData, segmentsWidth: number, segmentsHeight: number) {
@@ -643,6 +646,17 @@ class BodyMesh {
 
         this.group = new THREE.Group();
         this.group.name = body.name;
+
+        // Store rotation data for all body types
+        this.rotationRate = body.rotationRate ?? 0;
+        const tilt = body.axialTilt ?? 0;
+        if (this.rotationRate !== 0) {
+            this.spinAxis = new THREE.Vector3(
+                -Math.sin(tilt),
+                Math.cos(tilt),
+                0,
+            ).normalize();
+        }
 
         // Create sphere geometry - initially at default scale (will be set by renderer)
         const initialRadius = 1; // Placeholder, will be scaled
@@ -663,15 +677,6 @@ class BodyMesh {
                     u_limbB: { value: limbB },
                 },
             });
-
-            // Store rotation data
-            this.rotationRate = body.rotationRate ?? 0;
-            this.axialTilt = body.axialTilt ?? 0;
-            this.spinAxis = new THREE.Vector3(
-                -Math.sin(this.axialTilt),
-                Math.cos(this.axialTilt),
-                0,
-            ).normalize();
         } else {
             this.material = new THREE.MeshStandardMaterial({
                 color: body.color || 0x4488ff,
@@ -696,12 +701,12 @@ class BodyMesh {
         }
     }
 
-    /** Rotate star mesh based on cumulative simulation time (D4) */
+    /** Rotate entire body group (mesh + overlays) based on cumulative simulation time (D4) */
     updateRotation(simTime: number): void {
         if (!this.spinAxis || this.rotationRate === 0) return;
         const angle = this.rotationRate * simTime;
         const q = new THREE.Quaternion().setFromAxisAngle(this.spinAxis, angle);
-        this.mesh.quaternion.copy(q);
+        this.group.quaternion.copy(q);
     }
 
     setScale(radius: number): void {
