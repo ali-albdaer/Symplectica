@@ -493,8 +493,9 @@ void main() {
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
 
+    vec4 mvCenter = modelViewMatrix * vec4(center, 1.0);
     vec3 viewN = normalize(mat3(modelViewMatrix) * n);
-    vec3 viewDir = normalize(-mv.xyz);
+    vec3 viewDir = normalize(-mvCenter.xyz);
     vFacing = dot(viewN, viewDir);
 
     vUv = uv;
@@ -523,7 +524,7 @@ void main() {
                       * cos(vUv.y * 19.0 - u_time * (0.02 + 0.05 * u_animStrength) + vSeed * 2.1);
     float intensity = (3.0 + 14.0 * vEnergy) * vLife * (0.72 + 0.28 * turb);
     vec3 col = mix(u_glowColor, u_coreColor, core);
-    float front = smoothstep(0.0, 0.15, vFacing);
+    float front = smoothstep(-0.18, 0.06, vFacing);
     float alpha = edge * vLife * (0.25 * outer + 0.85 * core) * front;
     gl_FragColor = vec4(col * intensity, alpha);
 }
@@ -536,6 +537,7 @@ void main() {
             },
             transparent: true,
             blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
             depthTest: false,
             depthWrite: false,
             toneMapped: false,
@@ -631,7 +633,7 @@ void main() {
                         * cos(18.0 * p.y - u_time * (0.02 + 0.07 * u_animStrength) + vSeed * 2.3);
     float intensity = (1.8 + 8.0 * vEnergy) * vLife * (0.8 + 0.2 * plasma);
     vec3 col = mix(u_glowColor, u_coreColor, core);
-    float front = smoothstep(0.0, 0.15, vFacing);
+    float front = smoothstep(-0.18, 0.06, vFacing);
     float alpha = vLife * (0.4 * halo + 0.8 * core) * (1.0 - smoothstep(0.85, 1.0, r)) * front;
     gl_FragColor = vec4(col * intensity, alpha);
 }
@@ -644,6 +646,7 @@ void main() {
             },
             transparent: true,
             blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
             depthTest: false,
             depthWrite: false,
             toneMapped: false,
@@ -726,7 +729,7 @@ void main() {
     vec2 p = vUv - 0.5;
     float r = length(p) * 2.0;
     float core = exp(-10.0 * r * r);
-    float front = smoothstep(0.0, 0.15, vFacing);
+    float front = smoothstep(-0.18, 0.06, vFacing);
     float alpha = vLife * core * (1.0 - smoothstep(0.85, 1.0, r)) * front;
     vec3 col = u_coreColor * (2.2 + 4.5 * vEnergy);
     gl_FragColor = vec4(col, alpha);
@@ -738,6 +741,7 @@ void main() {
             },
             transparent: true,
             blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
             depthTest: false,
             depthWrite: false,
             toneMapped: false,
