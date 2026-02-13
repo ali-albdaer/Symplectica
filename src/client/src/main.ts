@@ -689,36 +689,197 @@ class NBodyClient {
     }
 
     private updateFollowUI(): void {
-        const typeEl = document.getElementById('follow-type');
-        const massEl = document.getElementById('follow-mass');
-        const radiusEl = document.getElementById('follow-radius');
-        const setFollowDetails = (type: string, mass: string, radius: string) => {
-            if (typeEl) typeEl.textContent = type;
-            if (massEl) massEl.textContent = mass;
-            if (radiusEl) radiusEl.textContent = radius;
+        const setText = (id: string, text: string) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+        const showRow = (id: string, visible: boolean) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = visible ? 'flex' : 'none';
+        };
+        const showGroup = (id: string, visible: boolean) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = visible ? 'block' : 'none';
+        };
+
+        // Helper: clear all detail rows
+        const clearDetails = () => {
+            for (const id of [
+                'follow-type', 'follow-mass', 'follow-radius', 'follow-density',
+                'follow-gravity', 'follow-vesc', 'follow-rotation', 'follow-tilt',
+                'follow-oblateness', 'follow-spectral', 'follow-composition',
+                'follow-sma', 'follow-ecc', 'follow-albedo',
+                'follow-teff', 'follow-tsurf', 'follow-teq',
+                'follow-luminosity', 'follow-metallicity', 'follow-age', 'follow-lifetime',
+                'follow-flare', 'follow-spot', 'follow-scaleheight', 'follow-atmheight',
+            ]) {
+                setText(id, '—');
+            }
+            // Hide conditional rows/groups
+            for (const id of [
+                'follow-row-spectral', 'follow-row-composition',
+                'follow-row-rotation', 'follow-row-tilt', 'follow-row-oblateness',
+                'follow-row-tsurf', 'follow-row-teq', 'follow-row-atm',
+            ]) {
+                showRow(id, false);
+            }
+            for (const id of ['follow-grp-orbital', 'follow-grp-thermal', 'follow-grp-star', 'follow-grp-planet']) {
+                showGroup(id, false);
+            }
         };
 
         if (this.freeCamera) {
-            const el = document.getElementById('follow-target');
-            if (el) el.textContent = 'Free';
-            setFollowDetails('Camera', '—', '—');
+            setText('follow-target', 'Free');
+            setText('follow-type', 'Camera');
+            clearDetails();
             return;
         }
+
         const bodies = this.physics.getBodies();
-        let followName = 'Origin';
-        if (this.followBodyIndex >= 0 && this.followBodyIndex < bodies.length) {
-            const body = bodies[this.followBodyIndex];
-            followName = body.name;
-            setFollowDetails(
-                this.formatBodyType(body.type),
-                this.formatMass(body.mass),
-                this.formatRadius(body.radius)
-            );
-        } else {
-            setFollowDetails('—', '—', '—');
+        if (this.followBodyIndex < 0 || this.followBodyIndex >= bodies.length) {
+            setText('follow-target', 'Origin');
+            clearDetails();
+            return;
         }
-        const el = document.getElementById('follow-target');
-        if (el) el.textContent = followName;
+
+        const body = bodies[this.followBodyIndex];
+        const isStar = body.type === 'star';
+        const isPlanetOrMoon = body.type === 'planet' || body.type === 'moon';
+        const AU = 1.495978707e11;
+        const L_SUN = 3.828e26;
+        const M_SUN = 1.98892e30;
+
+        setText('follow-target', body.name);
+        setText('follow-type', this.formatBodyType(body.type));
+        setText('follow-mass', this.formatMass(body.mass));
+        setText('follow-radius', this.formatRadius(body.radius));
+
+        // Density
+        if (body.mass > 0 && body.radius > 0) {
+            const vol = (4 / 3) * Math.PI * body.radius ** 3;
+            const density = body.mass / vol;
+            setText('follow-density', density.toFixed(0) + ' kg/m³');
+        }
+
+        // Surface gravity
+        const G = 6.6743e-11;
+        if (body.mass > 0 && body.radius > 0) {
+            const g = G * body.mass / (body.radius * body.radius);
+            setText('follow-gravity', g < 100 ? g.toFixed(2) + ' m/s²' : g.toExponential(2) + ' m/s²');
+        }
+
+        // Escape velocity
+        if (body.mass > 0 && body.radius > 0) {
+            const vesc = Math.sqrt(2 * G * body.mass / body.radius);
+            setText('follow-vesc', vesc < 1e5 ? (vesc / 1e3).toFixed(1) + ' km/s' : vesc.toExponential(2) + ' m/s');
+        }
+
+        // Rotation period
+        if (body.rotationRate !== 0) {
+            showRow('follow-row-rotation', true);
+            const period = Math.abs(2 * Math.PI / body.rotationRate);
+            setText('follow-rotation', this.formatDuration(period) + (body.rotationRate < 0 ? ' (retro)' : ''));
+        }
+
+        // Axial tilt
+        if (body.axialTilt !== 0) {
+            showRow('follow-row-tilt', true);
+            setText('follow-tilt', (body.axialTilt * 180 / Math.PI).toFixed(2) + '°');
+        }
+
+        // Oblateness
+        if (body.oblateness > 0.0001) {
+            showRow('follow-row-oblateness', true);
+            setText('follow-oblateness', body.oblateness.toFixed(4));
+        }
+
+        // Spectral type (stars only)
+        if (isStar && body.spectralType) {
+            showRow('follow-row-spectral', true);
+            setText('follow-spectral', body.spectralType);
+        }
+
+        // Composition (planets)
+        if (isPlanetOrMoon && body.composition) {
+            showRow('follow-row-composition', true);
+            const compLabels: Record<string, string> = {
+                'Rocky': 'Rocky', 'GasGiant': 'Gas Giant',
+                'IceGiant': 'Ice Giant', 'Dwarf': 'Dwarf',
+            };
+            setText('follow-composition', compLabels[body.composition] || body.composition);
+        }
+
+        // Orbital group
+        if (body.semiMajorAxis > 0) {
+            showGroup('follow-grp-orbital', true);
+            const smaAU = body.semiMajorAxis / AU;
+            setText('follow-sma', smaAU >= 0.01 ? smaAU.toFixed(4) + ' AU' : this.formatRadius(body.semiMajorAxis));
+            setText('follow-ecc', body.eccentricity.toFixed(4));
+            setText('follow-albedo', body.albedo > 0 ? body.albedo.toFixed(3) : '—');
+        }
+
+        // Thermal group
+        const hasThermal = body.effectiveTemperature > 0 || body.meanSurfaceTemperature > 0 || body.equilibriumTemperature > 0;
+        if (hasThermal) {
+            showGroup('follow-grp-thermal', true);
+            setText('follow-teff', body.effectiveTemperature > 0 ? Math.round(body.effectiveTemperature) + ' K' : '—');
+            if (body.meanSurfaceTemperature > 0) {
+                showRow('follow-row-tsurf', true);
+                setText('follow-tsurf', Math.round(body.meanSurfaceTemperature) + ' K');
+            }
+            if (body.equilibriumTemperature > 0) {
+                showRow('follow-row-teq', true);
+                setText('follow-teq', Math.round(body.equilibriumTemperature) + ' K');
+            }
+        }
+
+        // Star-specific group
+        if (isStar) {
+            showGroup('follow-grp-star', true);
+            setText('follow-luminosity', body.luminosity > 0
+                ? (body.luminosity / L_SUN).toFixed(4) + ' L☉'
+                : '—');
+            setText('follow-metallicity', '[Fe/H] = ' + (body.metallicity >= 0 ? '+' : '') + body.metallicity.toFixed(2));
+            setText('follow-age', body.age > 0 ? this.formatAge(body.age) : '—');
+
+            // Lifetime from BodyInfo — compute from mass/luminosity
+            if (body.mass > 0 && body.luminosity > 0) {
+                const lifetimeSec = 1e10 * 365.25 * 86400 * (M_SUN / body.mass) * (L_SUN / body.luminosity);
+                setText('follow-lifetime', this.formatAge(lifetimeSec));
+            }
+
+            setText('follow-flare', body.flareRate > 0 ? body.flareRate.toExponential(1) + ' /s' : 'None');
+            setText('follow-spot', (body.spotFraction * 100).toFixed(1) + '%');
+        }
+
+        // Planet/Moon atmosphere group
+        if (isPlanetOrMoon) {
+            showGroup('follow-grp-planet', true);
+            setText('follow-scaleheight', body.scaleHeight > 0
+                ? (body.scaleHeight / 1e3).toFixed(1) + ' km'
+                : '—');
+            if (body.atmosphere) {
+                showRow('follow-row-atm', true);
+                setText('follow-atmheight', (body.atmosphere.height / 1e3).toFixed(0) + ' km');
+            }
+        }
+    }
+
+    /** Format seconds as human-readable age (Myr/Gyr) */
+    private formatAge(seconds: number): string {
+        const years = seconds / (365.25 * 86400);
+        if (years >= 1e9) return (years / 1e9).toFixed(2) + ' Gyr';
+        if (years >= 1e6) return (years / 1e6).toFixed(0) + ' Myr';
+        if (years >= 1e3) return (years / 1e3).toFixed(0) + ' kyr';
+        return years.toFixed(0) + ' yr';
+    }
+
+    /** Format seconds as human-readable duration (hours/days) */
+    private formatDuration(seconds: number): string {
+        if (seconds < 3600) return seconds.toFixed(0) + ' s';
+        if (seconds < 86400) return (seconds / 3600).toFixed(2) + ' hr';
+        if (seconds < 86400 * 365.25) return (seconds / 86400).toFixed(2) + ' d';
+        return (seconds / (86400 * 365.25)).toFixed(2) + ' yr';
     }
 
     private updateTimeScaleUI(): void {

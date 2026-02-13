@@ -96,6 +96,42 @@
       display: none;
     }
 
+    #follow-section {
+      max-height: calc(100vh - 340px);
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(79,195,247,0.3) transparent;
+    }
+
+    #follow-section::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    #follow-section::-webkit-scrollbar-thumb {
+      background: rgba(79,195,247,0.3);
+      border-radius: 2px;
+    }
+
+    #follow-section .follow-group {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    #follow-section .follow-group:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    #follow-section .group-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(79,195,247,0.6);
+      margin-bottom: 2px;
+    }
+
     #hints-panel ul {
       list-style: none;
       padding: 0;
@@ -260,37 +296,152 @@
       </div>
       <div id="follow-section" class="stats-card">
         <h3>Following</h3>
-        <div class="stat-row">
-          <span class="label">Camera Dist</span>
-          <span class="value" id="camera-dist">0 AU</span>
+        <!-- Identity -->
+        <div class="follow-group">
+          <div class="stat-row">
+            <span class="label">Target</span>
+            <span class="value" id="follow-target">Origin</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Type</span>
+            <span class="value" id="follow-type">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-spectral" style="display:none">
+            <span class="label">Spectral</span>
+            <span class="value" id="follow-spectral">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-composition" style="display:none">
+            <span class="label">Composition</span>
+            <span class="value" id="follow-composition">—</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">X</span>
-          <span class="value" id="sim-x">0.000 AU</span>
+        <!-- Camera -->
+        <div class="follow-group">
+          <div class="group-label">Camera</div>
+          <div class="stat-row">
+            <span class="label">Distance</span>
+            <span class="value" id="camera-dist">0 AU</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">X</span>
+            <span class="value" id="sim-x">0.000 AU</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Y</span>
+            <span class="value" id="sim-y">0.000 AU</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Z</span>
+            <span class="value" id="sim-z">0.000 AU</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Y</span>
-          <span class="value" id="sim-y">0.000 AU</span>
+        <!-- Bulk properties -->
+        <div class="follow-group">
+          <div class="group-label">Physical</div>
+          <div class="stat-row">
+            <span class="label">Mass</span>
+            <span class="value" id="follow-mass">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Radius</span>
+            <span class="value" id="follow-radius">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Density</span>
+            <span class="value" id="follow-density">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Surf. Gravity</span>
+            <span class="value" id="follow-gravity">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Esc. Velocity</span>
+            <span class="value" id="follow-vesc">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-rotation" style="display:none">
+            <span class="label">Rot. Period</span>
+            <span class="value" id="follow-rotation">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-tilt" style="display:none">
+            <span class="label">Axial Tilt</span>
+            <span class="value" id="follow-tilt">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-oblateness" style="display:none">
+            <span class="label">Oblateness</span>
+            <span class="value" id="follow-oblateness">—</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Z</span>
-          <span class="value" id="sim-z">0.000 AU</span>
+        <!-- Orbital -->
+        <div class="follow-group" id="follow-grp-orbital" style="display:none">
+          <div class="group-label">Orbital</div>
+          <div class="stat-row">
+            <span class="label">Semi-major</span>
+            <span class="value" id="follow-sma">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Eccentricity</span>
+            <span class="value" id="follow-ecc">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Albedo</span>
+            <span class="value" id="follow-albedo">—</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Following</span>
-          <span class="value" id="follow-target">Origin</span>
+        <!-- Thermal -->
+        <div class="follow-group" id="follow-grp-thermal" style="display:none">
+          <div class="group-label">Thermal</div>
+          <div class="stat-row" id="follow-row-teff">
+            <span class="label">T<sub>eff</sub></span>
+            <span class="value" id="follow-teff">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-tsurf" style="display:none">
+            <span class="label">T<sub>surf</sub></span>
+            <span class="value" id="follow-tsurf">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-teq" style="display:none">
+            <span class="label">T<sub>eq</sub></span>
+            <span class="value" id="follow-teq">—</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Type</span>
-          <span class="value" id="follow-type">—</span>
+        <!-- Star-specific -->
+        <div class="follow-group" id="follow-grp-star" style="display:none">
+          <div class="group-label">Star</div>
+          <div class="stat-row">
+            <span class="label">Luminosity</span>
+            <span class="value" id="follow-luminosity">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Metallicity</span>
+            <span class="value" id="follow-metallicity">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Age</span>
+            <span class="value" id="follow-age">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Lifetime</span>
+            <span class="value" id="follow-lifetime">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Flare Rate</span>
+            <span class="value" id="follow-flare">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Spot Frac.</span>
+            <span class="value" id="follow-spot">—</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Mass</span>
-          <span class="value" id="follow-mass">—</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">Radius</span>
-          <span class="value" id="follow-radius">—</span>
+        <!-- Planet/Moon-specific -->
+        <div class="follow-group" id="follow-grp-planet" style="display:none">
+          <div class="group-label">Atmosphere</div>
+          <div class="stat-row">
+            <span class="label">Scale Height</span>
+            <span class="value" id="follow-scaleheight">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-atm" style="display:none">
+            <span class="label">Atm. Height</span>
+            <span class="value" id="follow-atmheight">—</span>
+          </div>
         </div>
       </div>
     </div>
