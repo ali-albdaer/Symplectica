@@ -65,7 +65,9 @@ void main() {
 const ATMO_FRAGMENT = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_fragment>
-uniform vec3 u_color;
+uniform vec3 u_rayleighColor;
+uniform vec3 u_mieColor;
+uniform float u_mieWeight;   // 0 = pure Rayleigh, 1 = pure Mie
 uniform float u_intensity;
 varying vec3 vNormal;
 varying vec3 vViewDir;
@@ -73,7 +75,9 @@ void main() {
     float mu = dot(normalize(vNormal), normalize(vViewDir));
     // Fresnel-like: bright at edges (mu→0), transparent at center (mu→1)
     float rim = pow(1.0 - max(mu, 0.0), 3.0);
-    gl_FragColor = vec4(u_color, rim * u_intensity);
+    // Blend Rayleigh (molecular) and Mie (aerosol/dust) scattering colors
+    vec3 color = mix(u_rayleighColor, u_mieColor, u_mieWeight);
+    gl_FragColor = vec4(color, rim * u_intensity);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -109,6 +113,7 @@ interface BodyData {
         mieCoefficient: number;
         mieDirection: number;
         height: number;
+        mieColor: [number, number, number];
     };
     semiMajorAxis?: number;
     eccentricity?: number;
@@ -751,12 +756,20 @@ class BodyMesh {
     /** F3: Add atmosphere glow shell */
     private addAtmosphereShell(body: BodyData, segW: number, segH: number): void {
         const atm = body.atmosphere!;
-        // Rayleigh coefficients → visible color (normalize to [0,1])
+
+        // Rayleigh coefficients → normalized visible color [0,1]
         const rc = atm.rayleighCoefficients;
-        const maxC = Math.max(rc[0], rc[1], rc[2], 1e-10);
-        const cr = rc[0] / maxC;
-        const cg = rc[1] / maxC;
-        const cb = rc[2] / maxC;
+        const maxR = Math.max(rc[0], rc[1], rc[2], 1e-10);
+        const rayleighColor = new THREE.Vector3(rc[0] / maxR, rc[1] / maxR, rc[2] / maxR);
+
+        // Mie scattering color from dust/haze composition
+        const mc = atm.mieColor ?? [1, 1, 1];
+        const mieColor = new THREE.Vector3(mc[0], mc[1], mc[2]);
+
+        // Weight: how much Mie dominates vs Rayleigh
+        // Uses ratio of mie coefficient to average Rayleigh coefficient
+        const avgRayleigh = (rc[0] + rc[1] + rc[2]) / 3;
+        const mieWeight = atm.mieCoefficient / (atm.mieCoefficient + avgRayleigh + 1e-15);
 
         // Intensity based on atmosphere thickness relative to body size
         const relHeight = atm.height / body.radius;
@@ -767,8 +780,10 @@ class BodyMesh {
             vertexShader: ATMO_VERTEX,
             fragmentShader: ATMO_FRAGMENT,
             uniforms: {
-                u_color: { value: new THREE.Vector3(cr, cg, cb) },
-                u_intensity: { value: intensity },
+                u_rayleighColor: { value: rayleighColor },
+                u_mieColor:      { value: mieColor },
+                u_mieWeight:     { value: mieWeight },
+                u_intensity:     { value: intensity },
             },
             transparent: true,
             side: THREE.BackSide,

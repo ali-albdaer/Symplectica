@@ -459,10 +459,11 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
         titan.albedo = 0.22;
         titan.atmosphere = Some(Atmosphere {
             scale_height: 40_000.0,                   // ~40 km (thick N₂ atmosphere)
-            rayleigh_coefficients: [5.0e-6, 1.2e-5, 3.0e-5], // Orange-ish haze
-            mie_coefficient: 2.1e-5,                  // Dense haze
+            rayleigh_coefficients: [3.5e-6, 8.5e-6, 2.1e-5], // N₂ Rayleigh (blue-shifted)
+            mie_coefficient: 2.1e-5,                  // Dense tholin haze
             mie_direction: 0.75,
             height: 600_000.0,                        // ~600 km effective atmosphere
+            mie_color: [0.85, 0.55, 0.2],             // Tholin haze — deep orange-brown
         });
         titan.compute_derived();
     }

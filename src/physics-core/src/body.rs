@@ -87,9 +87,18 @@ pub struct Atmosphere {
     pub mie_direction: f64,
     /// Atmosphere height in meters (where density becomes negligible)
     pub height: f64,
+    /// Mie scattering color (RGB 0-1) — color of the scattering medium
+    /// (dust, cloud droplets, haze). White for clean, salmon for iron-oxide dust, etc.
+    #[serde(default = "Atmosphere::default_mie_color")]
+    pub mie_color: [f64; 3],
 }
 
 impl Atmosphere {
+    /// Default Mie color: neutral white (clean atmosphere, water droplets)
+    fn default_mie_color() -> [f64; 3] {
+        [1.0, 1.0, 1.0]
+    }
+
     /// Earth-like atmosphere parameters
     pub fn earth_like() -> Self {
         Self {
@@ -99,17 +108,20 @@ impl Atmosphere {
             mie_coefficient: 21.0e-6,
             mie_direction: 0.758,
             height: 100_000.0, // 100 km
+            mie_color: [1.0, 1.0, 1.0], // White (water droplets / clean air)
         }
     }
 
-    /// Mars-like thin atmosphere
+    /// Mars-like thin CO₂ atmosphere with iron-oxide dust
     pub fn mars_like() -> Self {
         Self {
             scale_height: 11100.0,
-            rayleigh_coefficients: [19.918e-6, 13.57e-6, 5.75e-6], // Reddish
-            mie_coefficient: 4.0e-6,
-            mie_direction: 0.9,
+            // Rayleigh for thin CO₂ (~1/100th of Earth pressure, ~1.5× refractivity)
+            rayleigh_coefficients: [8.0e-8, 2.0e-7, 3.4e-7],
+            mie_coefficient: 4.0e-6,   // Dust dominates the visual
+            mie_direction: 0.9,        // Strong forward scattering
             height: 200_000.0,
+            mie_color: [0.85, 0.55, 0.35], // Iron-oxide dust — salmon/butterscotch
         }
     }
 
@@ -117,10 +129,12 @@ impl Atmosphere {
     pub fn venus_like() -> Self {
         Self {
             scale_height: 15900.0,
-            rayleigh_coefficients: [12.0e-6, 10.0e-6, 4.0e-6], // Yellowish
-            mie_coefficient: 50.0e-6,  // Very dense sulphuric-acid haze
+            // Rayleigh for dense CO₂ (higher than Earth due to ~90× pressure)
+            rayleigh_coefficients: [4.5e-4, 1.1e-3, 1.9e-3],
+            mie_coefficient: 1.0e-2,   // Very dense sulphuric-acid cloud deck
             mie_direction: 0.85,
             height: 250_000.0,         // ~250 km
+            mie_color: [0.95, 0.88, 0.55], // Pale yellow (H₂SO₄ droplets)
         }
     }
 

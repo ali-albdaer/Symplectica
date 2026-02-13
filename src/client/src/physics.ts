@@ -83,6 +83,7 @@ interface BodyInfo {
         mieCoefficient: number;
         mieDirection: number;
         height: number;
+        mieColor: [number, number, number];
     };
     semiMajorAxis: number;
     eccentricity: number;
@@ -274,6 +275,7 @@ export class PhysicsClient {
                     mie_coefficient: number;
                     mie_direction: number;
                     height: number;
+                    mie_color?: [number, number, number];
                 };
                 semi_major_axis?: number;
                 eccentricity?: number;
@@ -310,6 +312,7 @@ export class PhysicsClient {
                     mieCoefficient: b.atmosphere.mie_coefficient,
                     mieDirection: b.atmosphere.mie_direction,
                     height: b.atmosphere.height,
+                    mieColor: b.atmosphere.mie_color ?? [1, 1, 1],
                 } : undefined,
                 semiMajorAxis: b.semi_major_axis ?? 0,
                 eccentricity: b.eccentricity ?? 0,
