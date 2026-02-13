@@ -2,16 +2,16 @@ import { VisualPresetRegistry } from './visual-preset-registry';
 
 export function registerVisualPresetFeatures(): void {
     VisualPresetRegistry.registerFeature('starRenderer', {
-        Low: { maxTextureSize: 256, granulationEnabled: false, flareQuality: 'Off', starCount: 4000, starSize: 0.8e12, starOpacity: 0.6 },
-        High: { maxTextureSize: 1024, granulationEnabled: true, flareQuality: 'Low', starCount: 10000, starSize: 1.0e12, starOpacity: 0.8 },
-        Ultra: { maxTextureSize: 4096, granulationEnabled: true, flareQuality: 'High', starCount: 20000, starSize: 1.2e12, starOpacity: 0.9 },
+        Low: { maxTextureSize: 256, granulationEnabled: false, flareQuality: 'Low', starCount: 4000, starSize: 0.8e12, starOpacity: 0.6 },
+        High: { maxTextureSize: 1024, granulationEnabled: true, flareQuality: 'High', starCount: 10000, starSize: 1.0e12, starOpacity: 0.8 },
+        Ultra: { maxTextureSize: 4096, granulationEnabled: true, flareQuality: 'Ultra', starCount: 20000, starSize: 1.2e12, starOpacity: 0.9 },
     });
 
     VisualPresetRegistry.registerFeatureHooks('starRenderer', {
         defaultParams: {
             maxTextureSize: 1024,
             granulationEnabled: true,
-            flareQuality: 'Low',
+            flareQuality: 'High',
             starCount: 10000,
             starSize: 1.0e12,
             starOpacity: 0.8,

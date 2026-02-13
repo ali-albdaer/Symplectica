@@ -3,7 +3,7 @@ export type PresetName = 'Low' | 'High' | 'Ultra';
 export type CloudQuality = 'Off' | 'Low' | 'High' | 'Volumetric';
 export type ShadowQuality = 'Off' | 'Low' | 'Medium' | 'High';
 export type ReflectionMode = 'Off' | 'Cubemap' | 'SSR' | 'SSR+Fallback';
-export type FlareQuality = 'Off' | 'Low' | 'High';
+export type FlareQuality = 'Off' | 'Low' | 'High' | 'Ultra';
 
 export interface VisualPresetParams {
     renderScale: number;

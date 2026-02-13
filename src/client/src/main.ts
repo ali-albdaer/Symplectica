@@ -303,7 +303,7 @@ class NBodyClient {
             starSize?: number;
             starOpacity?: number;
             granulationEnabled?: boolean;
-            flareQuality?: 'Off' | 'Low' | 'High';
+            flareQuality?: 'Off' | 'Low' | 'High' | 'Ultra';
         };
         this.skyRenderer.setOptions({
             starCount: starParams.starCount,
@@ -314,7 +314,8 @@ class NBodyClient {
             granulationEnabled: typeof starParams.granulationEnabled === 'boolean'
                 ? starParams.granulationEnabled
                 : true,
-            starspotsEnabled: starParams.flareQuality === 'High',
+            starspotsEnabled: starParams.flareQuality === 'Ultra',
+            flareQuality: starParams.flareQuality ?? 'Off',
         });
     }
 

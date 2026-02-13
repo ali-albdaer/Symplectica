@@ -203,9 +203,12 @@ interface BodyData {
     meanSurfaceTemperature?: number;
 }
 
+type FlareQuality = 'Off' | 'Low' | 'High' | 'Ultra';
+
 interface StarRenderOptions {
     granulationEnabled: boolean;
     starspotsEnabled: boolean;
+    flareQuality: FlareQuality;
 }
 
 // Body scaling for visualization
@@ -344,6 +347,634 @@ function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture
     return texture;
 }
 
+function hashUnit(seed: number, id: number, channel: number): number {
+    let h = (seed | 0) ^ ((id * 374761393) | 0) ^ ((channel * 668265263) | 0);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+}
+
+function latLonToNormal(lat: number, lon: number): THREE.Vector3 {
+    const cl = Math.cos(lat);
+    return new THREE.Vector3(
+        cl * Math.cos(lon),
+        Math.sin(lat),
+        cl * Math.sin(lon),
+    );
+}
+
+type FlareEvent = {
+    id: number;
+    start: number;
+    duration: number;
+    energy: number;
+    lat: number;
+    lon: number;
+    size: number;
+    phase: number;
+};
+
+class StarFlareSystem {
+    readonly group = new THREE.Group();
+
+    private readonly maxFlares = 12;
+    private readonly sparksPerFlare = 6;
+
+    private flareQuality: FlareQuality;
+    private flareRate: number;
+    private seed: number;
+
+    private events: FlareEvent[] = [];
+    private nextEventId = 1;
+    private nextEventTime = 0;
+
+    private readonly arcGeometry: THREE.InstancedBufferGeometry;
+    private readonly glowGeometry: THREE.InstancedBufferGeometry;
+    private readonly sparkGeometry: THREE.InstancedBufferGeometry;
+
+    private readonly arcMaterial: THREE.ShaderMaterial;
+    private readonly glowMaterial: THREE.ShaderMaterial;
+    private readonly sparkMaterial: THREE.ShaderMaterial;
+
+    private readonly arcMesh: THREE.Mesh;
+    private readonly glowMesh: THREE.Mesh;
+    private readonly sparkMesh: THREE.Mesh;
+
+    private readonly arcAnchor: Float32Array;
+    private readonly arcTiming: Float32Array;
+    private readonly arcShape: Float32Array;
+    private readonly arcPhase: Float32Array;
+
+    private readonly glowAnchor: Float32Array;
+    private readonly glowTiming: Float32Array;
+    private readonly glowShape: Float32Array;
+    private readonly glowPhase: Float32Array;
+
+    private readonly sparkAnchor: Float32Array;
+    private readonly sparkTiming: Float32Array;
+    private readonly sparkVelocity: Float32Array;
+    private readonly sparkSize: Float32Array;
+
+    constructor(seed: number, flareRate: number, effectiveTemperature: number, flareQuality: FlareQuality) {
+        this.seed = seed === 0 ? 1 : seed;
+        this.flareRate = Math.max(0, flareRate);
+        this.flareQuality = flareQuality;
+
+        this.group.name = 'star-flares';
+
+        const [r, g, b] = blackbodyToRGBNorm(effectiveTemperature > 0 ? effectiveTemperature : 5778);
+        const baseColor = new THREE.Color(r, g, b);
+        const coreColor = baseColor.clone().lerp(new THREE.Color(1.0, 0.98, 0.9), 0.55);
+        const glowColor = baseColor.clone().lerp(new THREE.Color(1.0, 0.62, 0.32), 0.35);
+
+        const arcBase = new THREE.PlaneGeometry(1, 1, 20, 2);
+        this.arcGeometry = new THREE.InstancedBufferGeometry();
+        this.arcGeometry.index = arcBase.index;
+        this.arcGeometry.setAttribute('position', arcBase.getAttribute('position'));
+        this.arcGeometry.setAttribute('uv', arcBase.getAttribute('uv'));
+
+        this.arcAnchor = new Float32Array(this.maxFlares * 3);
+        this.arcTiming = new Float32Array(this.maxFlares * 4);
+        this.arcShape = new Float32Array(this.maxFlares * 4);
+        this.arcPhase = new Float32Array(this.maxFlares);
+
+        this.arcGeometry.setAttribute('a_anchor', new THREE.InstancedBufferAttribute(this.arcAnchor, 3));
+        this.arcGeometry.setAttribute('a_timing', new THREE.InstancedBufferAttribute(this.arcTiming, 4));
+        this.arcGeometry.setAttribute('a_shape', new THREE.InstancedBufferAttribute(this.arcShape, 4));
+        this.arcGeometry.setAttribute('a_phase', new THREE.InstancedBufferAttribute(this.arcPhase, 1));
+        this.arcGeometry.instanceCount = 0;
+
+        this.arcMaterial = new THREE.ShaderMaterial({
+            vertexShader: `
+attribute vec3 a_anchor;
+attribute vec4 a_timing;
+attribute vec4 a_shape;
+attribute float a_phase;
+varying vec2 vUv;
+varying float vLife;
+varying float vEnergy;
+varying float vSeed;
+varying float vFacing;
+uniform float u_time;
+
+float flareLife(float t, float start, float duration) {
+    float p = clamp((t - start) / max(duration, 1e-6), 0.0, 1.0);
+    float riseEnd = 0.15;
+    float peakEnd = 0.25;
+    float rise = exp(-6.0 * (1.0 - p / riseEnd));
+    float peak = 1.0;
+    float decay = exp(-4.2 * ((p - peakEnd) / max(1.0 - peakEnd, 1e-5)));
+    if (p < riseEnd) return rise;
+    if (p < peakEnd) return peak;
+    return decay;
+}
+
+void main() {
+    float life = flareLife(u_time, a_timing.x, a_timing.y);
+    vec3 n = normalize(a_anchor);
+    vec3 ref = abs(n.y) < 0.95 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 t = normalize(cross(ref, n));
+    vec3 b = normalize(cross(n, t));
+
+    float rot = a_phase * 6.28318530718;
+    vec3 tR = normalize(t * cos(rot) + b * sin(rot));
+    vec3 bR = normalize(cross(n, tR));
+
+    float x = position.x;
+    float y = position.y;
+    float arcLen = a_shape.x;
+    float arcHeight = a_shape.y * (0.35 + 0.95 * life);
+    float thickness = a_shape.z * (0.55 + 0.7 * life);
+    float curve = max(0.0, 1.0 - 4.0 * x * x);
+
+    vec3 center = n * (1.015 + 0.01 * life);
+    vec3 p = center + tR * (x * arcLen) + bR * (y * thickness) + n * (curve * arcHeight);
+
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * mv;
+
+    vec3 viewN = normalize(mat3(modelViewMatrix) * n);
+    vec3 viewDir = normalize(-mv.xyz);
+    vFacing = dot(viewN, viewDir);
+
+    vUv = uv;
+    vLife = life;
+    vEnergy = a_timing.z;
+    vSeed = a_timing.w;
+}
+`,
+            fragmentShader: `
+varying vec2 vUv;
+varying float vLife;
+varying float vEnergy;
+varying float vSeed;
+varying float vFacing;
+uniform float u_time;
+uniform vec3 u_coreColor;
+uniform vec3 u_glowColor;
+uniform float u_animStrength;
+
+void main() {
+    float edge = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+    float y = abs(vUv.y - 0.5) * 2.0;
+    float core = exp(-6.0 * y * y);
+    float outer = exp(-1.5 * y * y);
+    float turb = 0.5 + 0.5 * sin(vUv.x * 34.0 + u_time * (0.02 + 0.07 * u_animStrength) + vSeed * 5.3)
+                      * cos(vUv.y * 19.0 - u_time * (0.02 + 0.05 * u_animStrength) + vSeed * 2.1);
+    float intensity = (3.0 + 14.0 * vEnergy) * vLife * (0.72 + 0.28 * turb);
+    vec3 col = mix(u_glowColor, u_coreColor, core);
+    float front = smoothstep(0.0, 0.15, vFacing);
+    float alpha = edge * vLife * (0.25 * outer + 0.85 * core) * front;
+    gl_FragColor = vec4(col * intensity, alpha);
+}
+`,
+            uniforms: {
+                u_time: { value: 0.0 },
+                u_coreColor: { value: coreColor },
+                u_glowColor: { value: glowColor },
+                u_animStrength: { value: 0.75 },
+            },
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+        });
+
+        this.arcMesh = new THREE.Mesh(this.arcGeometry, this.arcMaterial);
+        this.arcMesh.frustumCulled = false;
+        this.group.add(this.arcMesh);
+
+        const glowBase = new THREE.PlaneGeometry(1, 1, 1, 1);
+        this.glowGeometry = new THREE.InstancedBufferGeometry();
+        this.glowGeometry.index = glowBase.index;
+        this.glowGeometry.setAttribute('position', glowBase.getAttribute('position'));
+        this.glowGeometry.setAttribute('uv', glowBase.getAttribute('uv'));
+
+        this.glowAnchor = new Float32Array(this.maxFlares * 3);
+        this.glowTiming = new Float32Array(this.maxFlares * 4);
+        this.glowShape = new Float32Array(this.maxFlares * 4);
+        this.glowPhase = new Float32Array(this.maxFlares);
+
+        this.glowGeometry.setAttribute('a_anchor', new THREE.InstancedBufferAttribute(this.glowAnchor, 3));
+        this.glowGeometry.setAttribute('a_timing', new THREE.InstancedBufferAttribute(this.glowTiming, 4));
+        this.glowGeometry.setAttribute('a_shape', new THREE.InstancedBufferAttribute(this.glowShape, 4));
+        this.glowGeometry.setAttribute('a_phase', new THREE.InstancedBufferAttribute(this.glowPhase, 1));
+        this.glowGeometry.instanceCount = 0;
+
+        this.glowMaterial = new THREE.ShaderMaterial({
+            vertexShader: `
+attribute vec3 a_anchor;
+attribute vec4 a_timing;
+attribute vec4 a_shape;
+attribute float a_phase;
+varying vec2 vUv;
+varying float vLife;
+varying float vEnergy;
+varying float vSeed;
+varying float vFacing;
+uniform float u_time;
+
+float flareLife(float t, float start, float duration) {
+    float p = clamp((t - start) / max(duration, 1e-6), 0.0, 1.0);
+    float riseEnd = 0.15;
+    float peakEnd = 0.25;
+    float rise = exp(-6.0 * (1.0 - p / riseEnd));
+    float peak = 1.0;
+    float decay = exp(-4.2 * ((p - peakEnd) / max(1.0 - peakEnd, 1e-5)));
+    if (p < riseEnd) return rise;
+    if (p < peakEnd) return peak;
+    return decay;
+}
+
+void main() {
+    float life = flareLife(u_time, a_timing.x, a_timing.y);
+    vec3 n = normalize(a_anchor);
+    vec3 center = n * (1.02 + 0.025 * life);
+    vec4 mvCenter = modelViewMatrix * vec4(center, 1.0);
+
+    float size = a_shape.x * (2.4 + 1.8 * a_timing.z) * (0.55 + 0.55 * life);
+    vec2 wobble = vec2(
+        sin(u_time * 0.08 + a_phase * 10.0),
+        cos(u_time * 0.06 + a_phase * 7.0)
+    ) * 0.05 * size;
+    mvCenter.xy += position.xy * size + wobble;
+    gl_Position = projectionMatrix * mvCenter;
+
+    vec3 viewN = normalize(mat3(modelViewMatrix) * n);
+    vec3 viewDir = normalize(-mvCenter.xyz);
+    vFacing = dot(viewN, viewDir);
+
+    vUv = uv;
+    vLife = life;
+    vEnergy = a_timing.z;
+    vSeed = a_timing.w;
+}
+`,
+            fragmentShader: `
+varying vec2 vUv;
+varying float vLife;
+varying float vEnergy;
+varying float vSeed;
+varying float vFacing;
+uniform float u_time;
+uniform vec3 u_coreColor;
+uniform vec3 u_glowColor;
+uniform float u_animStrength;
+
+void main() {
+    vec2 p = vUv - 0.5;
+    float r = length(p) * 2.0;
+    float core = exp(-8.0 * r * r);
+    float halo = exp(-2.0 * r * r);
+    float plasma = 0.5 + 0.5 * sin(24.0 * p.x + u_time * (0.02 + 0.09 * u_animStrength) + vSeed * 1.7)
+                        * cos(18.0 * p.y - u_time * (0.02 + 0.07 * u_animStrength) + vSeed * 2.3);
+    float intensity = (1.8 + 8.0 * vEnergy) * vLife * (0.8 + 0.2 * plasma);
+    vec3 col = mix(u_glowColor, u_coreColor, core);
+    float front = smoothstep(0.0, 0.15, vFacing);
+    float alpha = vLife * (0.4 * halo + 0.8 * core) * (1.0 - smoothstep(0.85, 1.0, r)) * front;
+    gl_FragColor = vec4(col * intensity, alpha);
+}
+`,
+            uniforms: {
+                u_time: { value: 0.0 },
+                u_coreColor: { value: coreColor },
+                u_glowColor: { value: glowColor },
+                u_animStrength: { value: 0.75 },
+            },
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+        });
+
+        this.glowMesh = new THREE.Mesh(this.glowGeometry, this.glowMaterial);
+        this.glowMesh.frustumCulled = false;
+        this.group.add(this.glowMesh);
+
+        const sparkBase = new THREE.PlaneGeometry(1, 1, 1, 1);
+        this.sparkGeometry = new THREE.InstancedBufferGeometry();
+        this.sparkGeometry.index = sparkBase.index;
+        this.sparkGeometry.setAttribute('position', sparkBase.getAttribute('position'));
+        this.sparkGeometry.setAttribute('uv', sparkBase.getAttribute('uv'));
+
+        const maxSparks = this.maxFlares * this.sparksPerFlare;
+        this.sparkAnchor = new Float32Array(maxSparks * 3);
+        this.sparkTiming = new Float32Array(maxSparks * 4);
+        this.sparkVelocity = new Float32Array(maxSparks * 3);
+        this.sparkSize = new Float32Array(maxSparks);
+
+        this.sparkGeometry.setAttribute('a_anchor', new THREE.InstancedBufferAttribute(this.sparkAnchor, 3));
+        this.sparkGeometry.setAttribute('a_timing', new THREE.InstancedBufferAttribute(this.sparkTiming, 4));
+        this.sparkGeometry.setAttribute('a_velocity', new THREE.InstancedBufferAttribute(this.sparkVelocity, 3));
+        this.sparkGeometry.setAttribute('a_size', new THREE.InstancedBufferAttribute(this.sparkSize, 1));
+        this.sparkGeometry.instanceCount = 0;
+
+        this.sparkMaterial = new THREE.ShaderMaterial({
+            vertexShader: `
+attribute vec3 a_anchor;
+attribute vec4 a_timing;
+attribute vec3 a_velocity;
+attribute float a_size;
+varying vec2 vUv;
+varying float vLife;
+varying float vEnergy;
+varying float vFacing;
+uniform float u_time;
+
+float flareLife(float t, float start, float duration) {
+    float p = clamp((t - start) / max(duration, 1e-6), 0.0, 1.0);
+    float riseEnd = 0.15;
+    float peakEnd = 0.25;
+    float rise = exp(-6.0 * (1.0 - p / riseEnd));
+    float peak = 1.0;
+    float decay = exp(-4.2 * ((p - peakEnd) / max(1.0 - peakEnd, 1e-5)));
+    if (p < riseEnd) return rise;
+    if (p < peakEnd) return peak;
+    return decay;
+}
+
+void main() {
+    float life = flareLife(u_time, a_timing.x, a_timing.y);
+    float age = clamp((u_time - a_timing.x) / max(a_timing.y, 1e-6), 0.0, 1.0);
+    vec3 n = normalize(a_anchor);
+    vec3 center = n * (1.025 + 0.09 * age) + a_velocity * (0.35 * age);
+
+    vec4 mvCenter = modelViewMatrix * vec4(center, 1.0);
+    float size = a_size * (1.0 - age) * (0.4 + 0.8 * a_timing.z);
+    mvCenter.xy += position.xy * size;
+    gl_Position = projectionMatrix * mvCenter;
+
+    vec3 viewN = normalize(mat3(modelViewMatrix) * n);
+    vec3 viewDir = normalize(-mvCenter.xyz);
+    vFacing = dot(viewN, viewDir);
+
+    vUv = uv;
+    vLife = life;
+    vEnergy = a_timing.z;
+}
+`,
+            fragmentShader: `
+varying vec2 vUv;
+varying float vLife;
+varying float vEnergy;
+varying float vFacing;
+uniform vec3 u_coreColor;
+
+void main() {
+    vec2 p = vUv - 0.5;
+    float r = length(p) * 2.0;
+    float core = exp(-10.0 * r * r);
+    float front = smoothstep(0.0, 0.15, vFacing);
+    float alpha = vLife * core * (1.0 - smoothstep(0.85, 1.0, r)) * front;
+    vec3 col = u_coreColor * (2.2 + 4.5 * vEnergy);
+    gl_FragColor = vec4(col, alpha);
+}
+`,
+            uniforms: {
+                u_time: { value: 0.0 },
+                u_coreColor: { value: coreColor },
+            },
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            depthWrite: false,
+            toneMapped: false,
+        });
+
+        this.sparkMesh = new THREE.Mesh(this.sparkGeometry, this.sparkMaterial);
+        this.sparkMesh.frustumCulled = false;
+        this.group.add(this.sparkMesh);
+
+        this.setQuality(flareQuality);
+        this.scheduleNextEvent(0);
+    }
+
+    setQuality(quality: FlareQuality): void {
+        this.flareQuality = quality;
+        this.arcMesh.visible = quality === 'High' || quality === 'Ultra';
+        this.glowMesh.visible = quality !== 'Off';
+        this.sparkMesh.visible = quality === 'Ultra';
+        const animStrength = quality === 'Low' ? 0.3 : quality === 'High' ? 0.75 : quality === 'Ultra' ? 1.0 : 0.0;
+        this.arcMaterial.uniforms.u_animStrength.value = animStrength;
+        this.glowMaterial.uniforms.u_animStrength.value = animStrength;
+        const cap = this.maxActiveForQuality();
+        if (this.events.length > cap) {
+            this.events.splice(0, this.events.length - cap);
+            this.syncBuffers();
+        }
+    }
+
+    setFlareRate(rate: number): void {
+        this.flareRate = Math.max(0, rate);
+    }
+
+    update(simTime: number): void {
+        this.arcMaterial.uniforms.u_time.value = simTime;
+        this.glowMaterial.uniforms.u_time.value = simTime;
+        this.sparkMaterial.uniforms.u_time.value = simTime;
+
+        if (this.flareQuality === 'Off') {
+            return;
+        }
+
+        let guard = 0;
+        while (simTime >= this.nextEventTime && guard < 6) {
+            this.spawnEvent(this.nextEventTime);
+            guard++;
+        }
+
+        const before = this.events.length;
+        this.events = this.events.filter((e) => simTime <= e.start + e.duration);
+        if (this.events.length !== before) {
+            this.syncBuffers();
+        }
+    }
+
+    dispose(): void {
+        this.arcGeometry.dispose();
+        this.glowGeometry.dispose();
+        this.sparkGeometry.dispose();
+        this.arcMaterial.dispose();
+        this.glowMaterial.dispose();
+        this.sparkMaterial.dispose();
+    }
+
+    private maxActiveForQuality(): number {
+        if (this.flareQuality === 'Off') return 0;
+        if (this.flareQuality === 'Low') return 2;
+        if (this.flareQuality === 'High') return 5;
+        if (this.flareQuality === 'Ultra') return 8;
+        return 0;
+    }
+
+    private effectiveRate(): number {
+        if (this.flareQuality === 'Off') return 0;
+        const baseline = this.flareQuality === 'Low'
+            ? 1 / 260
+            : this.flareQuality === 'High'
+                ? 1 / 150
+                : 1 / 95;
+        // TEMP TEST TUNING: 10x flare frequency for quick visual validation
+        return Math.min(0.8, (baseline + this.flareRate * 90.0) * 10.0);
+    }
+
+    private spawnEvent(startTime: number): void {
+        const cap = this.maxActiveForQuality();
+        if (cap <= 0) {
+            this.scheduleNextEvent(startTime);
+            return;
+        }
+
+        const eventId = this.nextEventId++;
+        const energy = 0.45 + 1.85 * Math.pow(hashUnit(this.seed, eventId, 1), 1.35);
+        const durationBase = this.flareQuality === 'Low' ? 42 : this.flareQuality === 'High' ? 34 : 28;
+        const duration = durationBase * (0.65 + 0.9 * hashUnit(this.seed, eventId, 2));
+
+        const lat = (hashUnit(this.seed, eventId, 3) * 2 - 1) * 0.9;
+        const lon = hashUnit(this.seed, eventId, 4) * Math.PI * 2;
+        const size = 0.16 + 0.46 * energy;
+        const phase = hashUnit(this.seed, eventId, 5);
+
+        const event: FlareEvent = {
+            id: eventId,
+            start: startTime,
+            duration,
+            energy,
+            lat,
+            lon,
+            size,
+            phase,
+        };
+
+        if (this.events.length >= cap) {
+            this.events.shift();
+        }
+        this.events.push(event);
+        this.syncBuffers();
+        this.scheduleNextEvent(startTime);
+    }
+
+    private scheduleNextEvent(fromTime: number): void {
+        const rate = this.effectiveRate();
+        if (rate <= 0) {
+            this.nextEventTime = Number.POSITIVE_INFINITY;
+            return;
+        }
+        const u = Math.max(1e-6, 1 - hashUnit(this.seed, this.nextEventId, 9));
+        const dt = -Math.log(u) / rate;
+        this.nextEventTime = fromTime + dt;
+    }
+
+    private syncBuffers(): void {
+        const cap = this.maxActiveForQuality();
+        const count = Math.min(this.events.length, cap);
+
+        for (let i = 0; i < count; i++) {
+            const ev = this.events[this.events.length - count + i];
+            const n = latLonToNormal(ev.lat, ev.lon);
+
+            this.arcAnchor[i * 3] = n.x;
+            this.arcAnchor[i * 3 + 1] = n.y;
+            this.arcAnchor[i * 3 + 2] = n.z;
+            this.arcTiming[i * 4] = ev.start;
+            this.arcTiming[i * 4 + 1] = ev.duration;
+            this.arcTiming[i * 4 + 2] = ev.energy;
+            this.arcTiming[i * 4 + 3] = ev.id;
+            this.arcShape[i * 4] = ev.size;
+            this.arcShape[i * 4 + 1] = ev.size * 0.55;
+            this.arcShape[i * 4 + 2] = ev.size * 0.18;
+            this.arcShape[i * 4 + 3] = 0;
+            this.arcPhase[i] = ev.phase;
+
+            this.glowAnchor[i * 3] = n.x;
+            this.glowAnchor[i * 3 + 1] = n.y;
+            this.glowAnchor[i * 3 + 2] = n.z;
+            this.glowTiming[i * 4] = ev.start;
+            this.glowTiming[i * 4 + 1] = ev.duration;
+            this.glowTiming[i * 4 + 2] = ev.energy;
+            this.glowTiming[i * 4 + 3] = ev.id;
+            this.glowShape[i * 4] = ev.size;
+            this.glowShape[i * 4 + 1] = ev.size;
+            this.glowShape[i * 4 + 2] = ev.size;
+            this.glowShape[i * 4 + 3] = 0;
+            this.glowPhase[i] = ev.phase;
+        }
+
+        const arcAnchorAttr = this.arcGeometry.getAttribute('a_anchor') as THREE.InstancedBufferAttribute;
+        const arcTimingAttr = this.arcGeometry.getAttribute('a_timing') as THREE.InstancedBufferAttribute;
+        const arcShapeAttr = this.arcGeometry.getAttribute('a_shape') as THREE.InstancedBufferAttribute;
+        const arcPhaseAttr = this.arcGeometry.getAttribute('a_phase') as THREE.InstancedBufferAttribute;
+        arcAnchorAttr.needsUpdate = true;
+        arcTimingAttr.needsUpdate = true;
+        arcShapeAttr.needsUpdate = true;
+        arcPhaseAttr.needsUpdate = true;
+        this.arcGeometry.instanceCount = count;
+
+        const glowAnchorAttr = this.glowGeometry.getAttribute('a_anchor') as THREE.InstancedBufferAttribute;
+        const glowTimingAttr = this.glowGeometry.getAttribute('a_timing') as THREE.InstancedBufferAttribute;
+        const glowShapeAttr = this.glowGeometry.getAttribute('a_shape') as THREE.InstancedBufferAttribute;
+        const glowPhaseAttr = this.glowGeometry.getAttribute('a_phase') as THREE.InstancedBufferAttribute;
+        glowAnchorAttr.needsUpdate = true;
+        glowTimingAttr.needsUpdate = true;
+        glowShapeAttr.needsUpdate = true;
+        glowPhaseAttr.needsUpdate = true;
+        this.glowGeometry.instanceCount = count;
+
+        if (this.flareQuality === 'Ultra') {
+            let sparkIndex = 0;
+            for (let i = 0; i < count; i++) {
+                const ev = this.events[this.events.length - count + i];
+                const n = latLonToNormal(ev.lat, ev.lon);
+                for (let s = 0; s < this.sparksPerFlare; s++) {
+                    const idx = sparkIndex;
+                    const r1 = hashUnit(this.seed, ev.id, 20 + s * 3);
+                    const r2 = hashUnit(this.seed, ev.id, 21 + s * 3);
+                    const r3 = hashUnit(this.seed, ev.id, 22 + s * 3);
+
+                    const ref = Math.abs(n.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+                    const t = ref.clone().cross(n).normalize();
+                    const b = n.clone().cross(t).normalize();
+                    const ang = r1 * Math.PI * 2;
+                    const spread = 0.25 + 0.6 * r2;
+                    const vel = n.clone().multiplyScalar(0.8 + 0.8 * r3)
+                        .add(t.clone().multiplyScalar(Math.cos(ang) * spread))
+                        .add(b.clone().multiplyScalar(Math.sin(ang) * spread))
+                        .normalize();
+
+                    this.sparkAnchor[idx * 3] = n.x;
+                    this.sparkAnchor[idx * 3 + 1] = n.y;
+                    this.sparkAnchor[idx * 3 + 2] = n.z;
+                    this.sparkTiming[idx * 4] = ev.start;
+                    this.sparkTiming[idx * 4 + 1] = ev.duration;
+                    this.sparkTiming[idx * 4 + 2] = ev.energy;
+                    this.sparkTiming[idx * 4 + 3] = ev.id;
+                    this.sparkVelocity[idx * 3] = vel.x;
+                    this.sparkVelocity[idx * 3 + 1] = vel.y;
+                    this.sparkVelocity[idx * 3 + 2] = vel.z;
+                    this.sparkSize[idx] = 0.06 + 0.08 * hashUnit(this.seed, ev.id, 50 + s);
+                    sparkIndex++;
+                }
+            }
+
+            const sparkAnchorAttr = this.sparkGeometry.getAttribute('a_anchor') as THREE.InstancedBufferAttribute;
+            const sparkTimingAttr = this.sparkGeometry.getAttribute('a_timing') as THREE.InstancedBufferAttribute;
+            const sparkVelAttr = this.sparkGeometry.getAttribute('a_velocity') as THREE.InstancedBufferAttribute;
+            const sparkSizeAttr = this.sparkGeometry.getAttribute('a_size') as THREE.InstancedBufferAttribute;
+            sparkAnchorAttr.needsUpdate = true;
+            sparkTimingAttr.needsUpdate = true;
+            sparkVelAttr.needsUpdate = true;
+            sparkSizeAttr.needsUpdate = true;
+            this.sparkGeometry.instanceCount = sparkIndex;
+        } else {
+            this.sparkGeometry.instanceCount = 0;
+        }
+    }
+}
+
+
+
 export class BodyRenderer {
     private scene: THREE.Scene;
     private bodies: Map<number, BodyMesh> = new Map();
@@ -362,6 +993,7 @@ export class BodyRenderer {
     private starRenderOptions: StarRenderOptions = {
         granulationEnabled: true,
         starspotsEnabled: false,
+        flareQuality: 'Low',
     };
 
     // Orbit trails
@@ -403,18 +1035,26 @@ export class BodyRenderer {
                 ? options.starspotsEnabled
                 : this.starRenderOptions.starspotsEnabled;
 
+        const nextFlareQuality =
+            options.flareQuality === 'Off' || options.flareQuality === 'Low' || options.flareQuality === 'High' || options.flareQuality === 'Ultra'
+                ? options.flareQuality
+                : this.starRenderOptions.flareQuality;
+
         if (
             nextGranulationEnabled === this.starRenderOptions.granulationEnabled &&
-            nextStarspotsEnabled === this.starRenderOptions.starspotsEnabled
+            nextStarspotsEnabled === this.starRenderOptions.starspotsEnabled &&
+            nextFlareQuality === this.starRenderOptions.flareQuality
         ) {
             return;
         }
 
         this.starRenderOptions.granulationEnabled = nextGranulationEnabled;
         this.starRenderOptions.starspotsEnabled = nextStarspotsEnabled;
+        this.starRenderOptions.flareQuality = nextFlareQuality;
         for (const mesh of this.bodies.values()) {
             mesh.setGranulationEnabled(nextGranulationEnabled);
             mesh.setStarspotsEnabled(nextStarspotsEnabled);
+            mesh.setFlareQuality(nextFlareQuality);
         }
     }
 
@@ -921,6 +1561,7 @@ class BodyMesh {
     private atmosphereMesh: THREE.Mesh | null = null;
     private starMaterial: THREE.ShaderMaterial | null = null;
     private granulationTexture: THREE.Texture | null = null;
+    private flareSystem: StarFlareSystem | null = null;
 
     // Expose for dynamic rescaling
     readonly realRadius: number;
@@ -984,6 +1625,14 @@ class BodyMesh {
                 },
             });
             this.starMaterial = this.material as THREE.ShaderMaterial;
+
+            // D7: Visual-only deterministic flare system (quality-driven)
+            this.flareSystem = new StarFlareSystem(
+                seed,
+                body.flareRate ?? 0,
+                teff,
+                starOptions.flareQuality,
+            );
         } else {
             // F4: Physics-derived planet surface color as fallback
             const color = body.color || this.deriveColorFromPhysics(body);
@@ -997,6 +1646,11 @@ class BodyMesh {
         this.mesh = new THREE.Mesh(this.geometry, this.material);
         this.mesh.userData.bodyId = body.id;
         this.group.add(this.mesh);
+
+        if (this.flareSystem) {
+            // Attach to the scaled star mesh so flare placement tracks stellar radius
+            this.mesh.add(this.flareSystem.group);
+        }
 
         // Add glow effect for stars — tinted to blackbody color (D3)
         if (body.type === 'star') {
@@ -1096,6 +1750,8 @@ class BodyMesh {
             this.starMaterial.uniforms.u_time.value = simTime;
         }
 
+        this.flareSystem?.update(simTime);
+
         if (!this.spinAxis || this.rotationRate === 0) return;
         const angle = this.rotationRate * simTime;
         const q = new THREE.Quaternion().setFromAxisAngle(this.spinAxis, angle);
@@ -1112,6 +1768,10 @@ class BodyMesh {
         if (this.starMaterial?.uniforms.u_spotEnabled) {
             this.starMaterial.uniforms.u_spotEnabled.value = enabled ? 1.0 : 0.0;
         }
+    }
+
+    setFlareQuality(quality: FlareQuality): void {
+        this.flareSystem?.setQuality(quality);
     }
 
     setScale(radius: number): void {
@@ -1194,6 +1854,7 @@ class BodyMesh {
         this.geometry.dispose();
         this.material.dispose();
         this.granulationTexture?.dispose();
+        this.flareSystem?.dispose();
         if (this.atmosphereMesh) {
             this.atmosphereMesh.geometry.dispose();
             (this.atmosphereMesh.material as THREE.Material).dispose();

@@ -9,7 +9,7 @@
       "shadowQuality": "Low",
       "reflectionMode": "Off",
       "granulationEnabled": false,
-      "flareQuality": "Off",
+      "flareQuality": "Low",
       "lodBias": 0.5,
       "maxShaderSamples": 16,
       "performanceBudgetMs": 8
@@ -22,7 +22,7 @@
       "shadowQuality": "Medium",
       "reflectionMode": "SSR",
       "granulationEnabled": true,
-      "flareQuality": "Low",
+      "flareQuality": "High",
       "lodBias": 0.0,
       "maxShaderSamples": 48,
       "performanceBudgetMs": 12
@@ -35,7 +35,7 @@
       "shadowQuality": "High",
       "reflectionMode": "SSR+Fallback",
       "granulationEnabled": true,
-      "flareQuality": "High",
+      "flareQuality": "Ultra",
       "lodBias": -0.5,
       "maxShaderSamples": 96,
       "performanceBudgetMs": 16
