@@ -61,6 +61,32 @@ interface BodyInfo {
     radius: number;
     color: number;
     axialTilt: number;
+    // Extended physics fields (from derive modules)
+    luminosity: number;
+    effectiveTemperature: number;
+    rotationRate: number;
+    seed: number;
+    oblateness: number;
+    scaleHeight: number;
+    equilibriumTemperature: number;
+    metallicity: number;
+    age: number;
+    spectralType: string;
+    limbDarkeningCoeffs: [number, number];
+    flareRate: number;
+    spotFraction: number;
+    composition: string;
+    albedo: number;
+    atmosphere?: {
+        scaleHeight: number;
+        rayleighCoefficients: [number, number, number];
+        mieCoefficient: number;
+        mieDirection: number;
+        height: number;
+    };
+    semiMajorAxis: number;
+    eccentricity: number;
+    meanSurfaceTemperature: number;
 }
 
 // Convert RGB [0-1, 0-1, 0-1] to hex integer
@@ -231,6 +257,27 @@ export class PhysicsClient {
                 rotation_rate?: number;
                 axial_tilt?: number;
                 seed?: number;
+                oblateness?: number;
+                scale_height?: number;
+                equilibrium_temperature?: number;
+                metallicity?: number;
+                age?: number;
+                spectral_type?: string;
+                limb_darkening_coeffs?: [number, number];
+                flare_rate?: number;
+                spot_fraction?: number;
+                composition?: string;
+                albedo?: number;
+                atmosphere?: {
+                    scale_height: number;
+                    rayleigh_coefficients: [number, number, number];
+                    mie_coefficient: number;
+                    mie_direction: number;
+                    height: number;
+                };
+                semi_major_axis?: number;
+                eccentricity?: number;
+                mean_surface_temperature?: number;
             }>;
 
             return bodies.map(b => ({
@@ -242,6 +289,31 @@ export class PhysicsClient {
                 // Use named color lookup first, then body struct color (RGB 0-1 → hex)
                 color: BODY_COLORS[b.name] ?? rgbToHex(b.color),
                 axialTilt: b.axial_tilt ?? 0,
+                luminosity: b.luminosity ?? 0,
+                effectiveTemperature: b.effective_temperature ?? 0,
+                rotationRate: b.rotation_rate ?? 0,
+                seed: b.seed ?? 0,
+                oblateness: b.oblateness ?? 0,
+                scaleHeight: b.scale_height ?? 0,
+                equilibriumTemperature: b.equilibrium_temperature ?? 0,
+                metallicity: b.metallicity ?? 0,
+                age: b.age ?? 0,
+                spectralType: b.spectral_type ?? '',
+                limbDarkeningCoeffs: b.limb_darkening_coeffs ?? [0, 0],
+                flareRate: b.flare_rate ?? 0,
+                spotFraction: b.spot_fraction ?? 0,
+                composition: b.composition ?? 'Rocky',
+                albedo: b.albedo ?? 0,
+                atmosphere: b.atmosphere ? {
+                    scaleHeight: b.atmosphere.scale_height,
+                    rayleighCoefficients: b.atmosphere.rayleigh_coefficients,
+                    mieCoefficient: b.atmosphere.mie_coefficient,
+                    mieDirection: b.atmosphere.mie_direction,
+                    height: b.atmosphere.height,
+                } : undefined,
+                semiMajorAxis: b.semi_major_axis ?? 0,
+                eccentricity: b.eccentricity ?? 0,
+                meanSurfaceTemperature: b.mean_surface_temperature ?? 0,
             }));
         } catch (e) {
             console.error('Failed to parse bodies:', e);

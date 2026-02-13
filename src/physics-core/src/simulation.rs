@@ -175,6 +175,27 @@ impl Simulation {
         &self.bodies
     }
 
+    /// Re-derive planet/moon properties with parent star context.
+    /// Call after all bodies have been added (e.g. after preset creation)
+    /// so planets can compute equilibrium temperature from their parent star.
+    pub fn finalize_derived(&mut self) {
+        // Find the first star to use as parent for planets
+        let parent_star: Option<Body> = self
+            .bodies
+            .iter()
+            .find(|b| b.is_active && b.body_type == crate::body::BodyType::Star)
+            .cloned();
+
+        for body in &mut self.bodies {
+            match body.body_type {
+                crate::body::BodyType::Planet | crate::body::BodyType::Moon => {
+                    body.compute_derived_with_parent(parent_star.as_ref());
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// Get active bodies
     pub fn active_bodies(&self) -> impl Iterator<Item = &Body> {
         self.bodies.iter().filter(|b| b.is_active)

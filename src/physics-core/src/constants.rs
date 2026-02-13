@@ -81,6 +81,53 @@ pub const OMEGA_EARTH: f64 = 7.2921159e-5;
 /// Earth axial tilt in radians (~23.44°)
 pub const AXIAL_TILT_EARTH: f64 = 0.4091;
 
+// ─── Thermodynamic & molecular constants ────────────────────────
+
+/// Boltzmann constant k_B in J/K (CODATA 2018, exact by redefinition)
+pub const K_BOLTZMANN: f64 = 1.380_649e-23;
+
+/// Avogadro constant (CODATA 2018, exact)
+pub const N_AVOGADRO: f64 = 6.022_140_76e23;
+
+/// Universal gas constant R = k_B × N_A in J/(mol·K)
+pub const R_GAS: f64 = K_BOLTZMANN * N_AVOGADRO;
+
+// ─── Mean molecular weights (kg/mol) by composition class ───────
+
+/// Rocky / terrestrial atmosphere (N₂/O₂ dominated)
+pub const MU_ROCKY: f64 = 0.029;
+
+/// Gas giant atmosphere (H₂/He dominated)
+pub const MU_GAS_GIANT: f64 = 0.002;
+
+/// Ice giant atmosphere (H₂/He + CH₄/H₂O enriched)
+pub const MU_ICE_GIANT: f64 = 0.004;
+
+/// Dwarf planet / thin atmosphere
+pub const MU_DWARF: f64 = 0.028;
+
+// ─── Star reference constants ───────────────────────────────────
+
+/// Solar age in seconds (~4.6 Gyr)
+pub const AGE_SUN: f64 = 4.6e9 * SECONDS_PER_YEAR;
+
+/// Solar rotation rate in rad/s (sidereal, ~25.05 day period)
+pub const OMEGA_SUN: f64 = 2.865e-6;
+
+/// Solar metallicity [Fe/H] in dex
+pub const METALLICITY_SUN: f64 = 0.0;
+
+// ─── Planet reference constants ─────────────────────────────────
+
+/// Jupiter mass in kg
+pub const M_JUPITER: f64 = 1.898_2e27;
+
+/// Jupiter equatorial radius in meters
+pub const R_JUPITER: f64 = 7.149_2e7;
+
+/// Jupiter rotation rate in rad/s (sidereal, ~9.925 hr)
+pub const OMEGA_JUPITER: f64 = 1.7585e-4;
+
 #[cfg(test)]
 mod tests {
     use super::*;

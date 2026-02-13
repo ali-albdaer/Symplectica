@@ -3,7 +3,7 @@
 //! Pre-configured solar system simulations with accurate orbital data.
 //! All values in SI units (meters, kilograms, seconds).
 
-use crate::body::{Atmosphere, Body, BodyType};
+use crate::body::{Atmosphere, Body, BodyType, PlanetComposition};
 use crate::simulation::Simulation;
 use crate::vector::Vec3;
 use crate::constants::*;
@@ -68,6 +68,8 @@ pub fn create_sun_earth_moon(seed: u64) -> Simulation {
         sun.rotation_rate = 2.865e-6; // ~25.05 day sidereal period
         sun.mean_surface_temperature = T_SUN;
         sun.seed = seed.wrapping_add(0);
+        sun.metallicity = 0.0; // solar
+        sun.age = AGE_SUN;
         sun.compute_derived();
     }
     
@@ -82,6 +84,8 @@ pub fn create_sun_earth_moon(seed: u64) -> Simulation {
         earth.eccentricity = 0.0167;
         earth.parent_id = Some(sun_id);
         earth.color = hex_to_rgb(0x6b93d6);
+        earth.composition = PlanetComposition::Rocky;
+        earth.albedo = 0.306;
         earth.compute_derived();
     }
     
@@ -95,9 +99,12 @@ pub fn create_sun_earth_moon(seed: u64) -> Simulation {
         moon.semi_major_axis = 3.844e8;
         moon.eccentricity = 0.0549;
         moon.color = hex_to_rgb(0xb0b0b0);
+        moon.composition = PlanetComposition::Rocky;
+        moon.albedo = 0.12;
         moon.compute_derived();
     }
     
+    sim.finalize_derived();
     sim
 }
 
@@ -113,21 +120,25 @@ pub fn create_inner_solar_system(seed: u64) -> Simulation {
         sun.rotation_rate = 2.865e-6;
         sun.mean_surface_temperature = T_SUN;
         sun.seed = seed.wrapping_add(0);
+        sun.metallicity = 0.0;
+        sun.age = AGE_SUN;
         sun.compute_derived();
     }
     
     // Mercury — tidally locked (3:2 resonance)
     let merc_id = sim.add_planet("Mercury", 3.3011e23, 2.4397e6, 5.791e10, 47362.0);
     if let Some(merc) = sim.get_body_mut(merc_id) {
-        merc.rotation_rate = 1.24e-6;             // 58.646 day sidereal period
-        merc.axial_tilt = 0.00059;                 // 0.034°
-        merc.mean_surface_temperature = 440.0;     // mean ~440 K
+        merc.rotation_rate = 1.24e-6;
+        merc.axial_tilt = 0.00059;
+        merc.mean_surface_temperature = 440.0;
         merc.seed = seed.wrapping_add(1);
         merc.semi_major_axis = 5.791e10;
         merc.eccentricity = 0.2056;
-        merc.inclination = 0.1223;                 // 7.00°
+        merc.inclination = 0.1223;
         merc.parent_id = Some(sun_id);
         merc.color = hex_to_rgb(0x8c7853);
+        merc.composition = PlanetComposition::Rocky;
+        merc.albedo = 0.088;
         merc.compute_derived();
     }
     
@@ -143,10 +154,10 @@ pub fn create_inner_solar_system(seed: u64) -> Simulation {
         ven.inclination = 0.0593;                  // 3.39°
         ven.parent_id = Some(sun_id);
         ven.color = hex_to_rgb(0xe6c229);
+        ven.composition = PlanetComposition::Rocky;
+        ven.albedo = 0.77;
         ven.compute_derived();
     }
-    
-    // Earth
     let earth_id = sim.add_planet("Earth", M_EARTH, R_EARTH, AU, 29784.0);
     if let Some(earth) = sim.get_body_mut(earth_id) {
         earth.atmosphere = Some(Atmosphere::earth_like());
@@ -158,6 +169,8 @@ pub fn create_inner_solar_system(seed: u64) -> Simulation {
         earth.eccentricity = 0.0167;
         earth.parent_id = Some(sun_id);
         earth.color = hex_to_rgb(0x6b93d6);
+        earth.composition = PlanetComposition::Rocky;
+        earth.albedo = 0.306;
         earth.compute_derived();
     }
     
@@ -171,24 +184,27 @@ pub fn create_inner_solar_system(seed: u64) -> Simulation {
         moon.semi_major_axis = 3.844e8;
         moon.eccentricity = 0.0549;
         moon.color = hex_to_rgb(0xb0b0b0);
+        moon.composition = PlanetComposition::Rocky;
+        moon.albedo = 0.12;
         moon.compute_derived();
     }
-    
-    // Mars
     let mars_id = sim.add_planet("Mars", 6.4171e23, 3.3895e6, 2.279e11, 24077.0);
     if let Some(mars) = sim.get_body_mut(mars_id) {
-        mars.rotation_rate = 7.088e-5;             // 24.623 hr sidereal
-        mars.axial_tilt = 0.4396;                  // 25.19°
-        mars.mean_surface_temperature = 210.0;     // ~210 K
+        mars.rotation_rate = 7.088e-5;
+        mars.axial_tilt = 0.4396;
+        mars.mean_surface_temperature = 210.0;
         mars.seed = seed.wrapping_add(5);
         mars.semi_major_axis = 2.279e11;
         mars.eccentricity = 0.0934;
-        mars.inclination = 0.0323;                 // 1.85°
+        mars.inclination = 0.0323;
         mars.parent_id = Some(sun_id);
         mars.color = hex_to_rgb(0xc1440e);
+        mars.composition = PlanetComposition::Rocky;
+        mars.albedo = 0.25;
         mars.compute_derived();
     }
     
+    sim.finalize_derived();
     sim
 }
 
@@ -209,6 +225,8 @@ pub fn create_full_solar_system(seed: u64) -> Simulation {
         jup.inclination = 0.0228;                 // 1.31°
         jup.parent_id = Some(sun_id);
         jup.color = hex_to_rgb(0xd4a574);
+        jup.composition = PlanetComposition::GasGiant;
+        jup.albedo = 0.503;
         jup.compute_derived();
     }
     
@@ -224,6 +242,8 @@ pub fn create_full_solar_system(seed: u64) -> Simulation {
         sat.inclination = 0.0435;                 // 2.49°
         sat.parent_id = Some(sun_id);
         sat.color = hex_to_rgb(0xead6a7);
+        sat.composition = PlanetComposition::GasGiant;
+        sat.albedo = 0.342;
         sat.compute_derived();
     }
     
@@ -239,6 +259,8 @@ pub fn create_full_solar_system(seed: u64) -> Simulation {
         ura.inclination = 0.01344;                // 0.77°
         ura.parent_id = Some(sun_id);
         ura.color = hex_to_rgb(0x72b4c4);
+        ura.composition = PlanetComposition::IceGiant;
+        ura.albedo = 0.300;
         ura.compute_derived();
     }
     
@@ -254,6 +276,8 @@ pub fn create_full_solar_system(seed: u64) -> Simulation {
         nep.inclination = 0.0309;                 // 1.77°
         nep.parent_id = Some(sun_id);
         nep.color = hex_to_rgb(0x3d5ef5);
+        nep.composition = PlanetComposition::IceGiant;
+        nep.albedo = 0.290;
         nep.compute_derived();
     }
     
@@ -269,9 +293,12 @@ pub fn create_full_solar_system(seed: u64) -> Simulation {
         plu.inclination = 0.2992;                 // 17.14°
         plu.parent_id = Some(sun_id);
         plu.color = hex_to_rgb(0xdbd3c9);
+        plu.composition = PlanetComposition::Dwarf;
+        plu.albedo = 0.49;
         plu.compute_derived();
     }
     
+    sim.finalize_derived();
     sim
 }
 
@@ -333,6 +360,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
     jupiter.axial_tilt = 0.0546;
     jupiter.mean_surface_temperature = 165.0;
     jupiter.seed = seed.wrapping_add(0);
+    jupiter.composition = PlanetComposition::GasGiant;
+    jupiter.albedo = 0.503;
     let jup_id = sim.add_body(jupiter);
     
     // Galilean moons (all tidally locked — rotation rate = orbital period)
@@ -345,6 +374,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
         io.eccentricity = 0.0041;
         io.parent_id = Some(jup_id);
         io.color = hex_to_rgb(0xc8b84a);
+        io.composition = PlanetComposition::Rocky;
+        io.albedo = 0.63;
         io.compute_derived();
     }
     
@@ -357,6 +388,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
         eur.eccentricity = 0.0094;
         eur.parent_id = Some(jup_id);
         eur.color = hex_to_rgb(0xb8a090);
+        eur.composition = PlanetComposition::Rocky;
+        eur.albedo = 0.67;
         eur.compute_derived();
     }
     
@@ -369,6 +402,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
         gan.eccentricity = 0.0013;
         gan.parent_id = Some(jup_id);
         gan.color = hex_to_rgb(0x9a8a7a);
+        gan.composition = PlanetComposition::Rocky;
+        gan.albedo = 0.43;
         gan.compute_derived();
     }
     
@@ -381,6 +416,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
         cal.eccentricity = 0.0074;
         cal.parent_id = Some(jup_id);
         cal.color = hex_to_rgb(0x6a5a4a);
+        cal.composition = PlanetComposition::Rocky;
+        cal.albedo = 0.17;
         cal.compute_derived();
     }
     
@@ -402,6 +439,8 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
     saturn.axial_tilt = 0.4665;
     saturn.mean_surface_temperature = 134.0;
     saturn.seed = seed.wrapping_add(0);
+    saturn.composition = PlanetComposition::GasGiant;
+    saturn.albedo = 0.342;
     let sat_id = sim.add_body(saturn);
     
     // Titan — the only moon with a substantial atmosphere
@@ -414,6 +453,8 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
         titan.eccentricity = 0.0288;
         titan.parent_id = Some(sat_id);
         titan.color = hex_to_rgb(0xc8a050);
+        titan.composition = PlanetComposition::Rocky;
+        titan.albedo = 0.22;
         titan.atmosphere = Some(Atmosphere {
             scale_height: 40_000.0,                   // ~40 km (thick N₂ atmosphere)
             rayleigh_coefficients: [5.0e-6, 1.2e-5, 3.0e-5], // Orange-ish haze
@@ -441,6 +482,8 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
             m.semi_major_axis = dist;
             m.parent_id = Some(sat_id);
             m.color = hex_to_rgb(col);
+            m.composition = PlanetComposition::Rocky;
+            m.albedo = 0.5; // generic icy moon albedo
             m.compute_derived();
         }
     }
@@ -473,6 +516,8 @@ pub fn create_alpha_centauri(seed: u64) -> Simulation {
     star_a.luminosity = 1.519 * L_SUN;
     star_a.effective_temperature = 5790.0;
     star_a.seed = seed.wrapping_add(0);
+    star_a.metallicity = 0.20; // slightly metal-rich
+    star_a.age = 5.3e9 * 365.25 * 86400.0; // ~5.3 Gyr
     sim.add_body(star_a);
     
     // Alpha Centauri B (K1V, cooler orange)
@@ -486,6 +531,8 @@ pub fn create_alpha_centauri(seed: u64) -> Simulation {
     star_b.luminosity = 0.5002 * L_SUN;
     star_b.effective_temperature = 5260.0;
     star_b.seed = seed.wrapping_add(1);
+    star_b.metallicity = 0.23;
+    star_b.age = 5.3e9 * 365.25 * 86400.0;
     sim.add_body(star_b);
     
     sim
@@ -508,6 +555,8 @@ pub fn create_trappist1(seed: u64) -> Simulation {
     star.luminosity = 0.000522 * L_SUN;
     star.effective_temperature = 2566.0;
     star.seed = seed.wrapping_add(0);
+    star.metallicity = 0.04; // near-solar
+    star.age = 7.6e9 * 365.25 * 86400.0; // ~7.6 Gyr
     let star_id = sim.add_body(star);
     
     // Orbital data: (name, period_days, a_AU, mass, radius, eq_temp_K, seed_offset, color)
@@ -531,10 +580,13 @@ pub fn create_trappist1(seed: u64) -> Simulation {
             p.semi_major_axis = distance;
             p.parent_id = Some(star_id);
             p.color = hex_to_rgb(col);
+            p.composition = PlanetComposition::Rocky;
+            p.albedo = 0.3; // Earth-like estimate
             p.compute_derived();
         }
     }
     
+    sim.finalize_derived();
     sim
 }
 
@@ -565,6 +617,7 @@ pub fn create_binary_pulsar(seed: u64) -> Simulation {
     pulsar_a.color = hex_to_rgb(0xaaaaff);
     pulsar_a.rotation_rate = 276.8;               // 44.07 Hz spin (millisecond pulsar)
     pulsar_a.seed = seed.wrapping_add(0);
+    pulsar_a.age = 2.1e8 * 365.25 * 86400.0; // ~210 Myr estimate
     sim.add_body(pulsar_a);
     
     let mut pulsar_b = Body::new(
@@ -576,6 +629,7 @@ pub fn create_binary_pulsar(seed: u64) -> Simulation {
     pulsar_b.color = hex_to_rgb(0xffaaff);
     pulsar_b.rotation_rate = 1.76;                // 0.36 Hz spin
     pulsar_b.seed = seed.wrapping_add(1);
+    pulsar_b.age = 2.1e8 * 365.25 * 86400.0;
     sim.add_body(pulsar_b);
     
     sim

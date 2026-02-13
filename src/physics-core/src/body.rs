@@ -41,6 +41,39 @@ impl Default for BodyType {
     }
 }
 
+/// Planetary composition class — drives mean molecular weight for
+/// scale-height computation and visual appearance hints.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum PlanetComposition {
+    /// Rocky / terrestrial (N₂/O₂ atmosphere)
+    Rocky = 0,
+    /// Gas giant (H₂/He dominated)
+    GasGiant = 1,
+    /// Ice giant (H₂/He + CH₄/H₂O enriched)
+    IceGiant = 2,
+    /// Dwarf planet / minor body
+    Dwarf = 3,
+}
+
+impl Default for PlanetComposition {
+    fn default() -> Self {
+        Self::Rocky
+    }
+}
+
+impl PlanetComposition {
+    /// Mean molecular weight μ in kg/mol for scale-height computation.
+    pub fn mean_molecular_weight(&self) -> f64 {
+        match self {
+            Self::Rocky => crate::constants::MU_ROCKY,
+            Self::GasGiant => crate::constants::MU_GAS_GIANT,
+            Self::IceGiant => crate::constants::MU_ICE_GIANT,
+            Self::Dwarf => crate::constants::MU_DWARF,
+        }
+    }
+}
+
 /// Atmospheric properties for rendering
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Atmosphere {
@@ -183,16 +216,67 @@ pub struct Body {
 
     // ─── star-specific ─────────────────────────────────────────
     /// Bolometric luminosity in Watts (0 for non-stars)
-    // TODO(lighting): Feed luminosity into the Three.js point-light intensity.
-    //   Irradiance at distance d: E = L / (4π d²). Map to renderer units.
     #[serde(default)]
     pub luminosity: f64,
 
     /// Effective photospheric temperature in Kelvin (0 for non-stars)
-    // TODO(star_color): Derive star color from T_eff via black-body curve
-    //   instead of using the hardcoded `color` field.
     #[serde(default)]
     pub effective_temperature: f64,
+
+    // ─── star-specific (CRITICAL from PROPERTIES.md) ───────────
+    /// Metallicity [Fe/H] in dex (0 = solar)
+    #[serde(default)]
+    pub metallicity: f64,
+
+    /// Stellar age in seconds
+    #[serde(default)]
+    pub age: f64,
+
+    /// Spectral type label (e.g. "G2", "M8") — derived
+    #[serde(default)]
+    pub spectral_type: String,
+
+    /// Stellar wind mass-loss rate in kg/s (0 for most MS stars)
+    #[serde(default)]
+    pub mass_loss_rate: f64,
+
+    /// Quadratic limb-darkening coefficients [a, b]
+    /// I(μ)/I(1) = 1 − a(1−μ) − b(1−μ)²
+    #[serde(default)]
+    pub limb_darkening_coeffs: [f64; 2],
+
+    /// Flare rate in events/second (activity parameter)
+    #[serde(default)]
+    pub flare_rate: f64,
+
+    /// Fraction of stellar surface covered by spots, 0–1
+    #[serde(default)]
+    pub spot_fraction: f64,
+
+    /// Main-sequence lifetime estimate in seconds (derived)
+    #[serde(default)]
+    pub stellar_lifetime: f64,
+
+    // ─── planet-specific (CRITICAL from PROPERTIES.md) ─────────
+    /// Composition class (Rocky/GasGiant/IceGiant/Dwarf)
+    #[serde(default)]
+    pub composition: PlanetComposition,
+
+    /// Equilibrium temperature in K (derived from parent star)
+    #[serde(default)]
+    pub equilibrium_temperature: f64,
+
+    /// Atmospheric scale height in meters (derived from T_eq, μ, g)
+    #[serde(default)]
+    pub scale_height: f64,
+
+    /// Oblateness f = (R_eq − R_pol) / R_eq (derived from rotation)
+    #[serde(default)]
+    pub oblateness: f64,
+
+    /// Normalized polar moment of inertia factor C/(MR²)
+    #[serde(default)]
+    pub moment_of_inertia_factor: f64,
 
     // ─── orbital elements (optional, for presets / orbit viz) ───
     /// Semi-major axis a (m). 0 if unset / free-flying.
@@ -273,6 +357,19 @@ impl Body {
             seed: 0,
             luminosity: 0.0,
             effective_temperature: 0.0,
+            metallicity: 0.0,
+            age: 0.0,
+            spectral_type: String::new(),
+            mass_loss_rate: 0.0,
+            limb_darkening_coeffs: [0.0, 0.0],
+            flare_rate: 0.0,
+            spot_fraction: 0.0,
+            stellar_lifetime: 0.0,
+            composition: PlanetComposition::Rocky,
+            equilibrium_temperature: 0.0,
+            scale_height: 0.0,
+            oblateness: 0.0,
+            moment_of_inertia_factor: 0.0,
             semi_major_axis: 0.0,
             eccentricity: 0.0,
             inclination: 0.0,
@@ -343,8 +440,16 @@ impl Body {
 
     /// Compute derived physical quantities from mass and radius.
     /// Fills bulk_density, surface_gravity, escape_velocity_surface if they
-    /// are currently zero. Safe to call multiple times.
+    /// are currently zero. Also dispatches to type-specific derive functions
+    /// for stars and planets/moons. Safe to call multiple times.
     pub fn compute_derived(&mut self) {
+        self.compute_derived_with_parent(None);
+    }
+
+    /// Compute derived quantities with optional parent body context.
+    /// For planets/moons, the parent star is used to compute equilibrium
+    /// temperature and scale height from stellar irradiance.
+    pub fn compute_derived_with_parent(&mut self, parent: Option<&Body>) {
         if self.mass <= 0.0 || self.radius <= 0.0 {
             return;
         }
@@ -362,6 +467,17 @@ impl Body {
         }
         if self.collision_radius == 0.0 {
             self.collision_radius = self.radius;
+        }
+
+        // Type-specific derives
+        match self.body_type {
+            BodyType::Star => {
+                crate::star::derive_star_properties(self);
+            }
+            BodyType::Planet | BodyType::Moon => {
+                crate::planet::derive_planet_properties(self, parent);
+            }
+            _ => {}
         }
     }
 
@@ -484,6 +600,19 @@ impl Default for Body {
             seed: 0,
             luminosity: 0.0,
             effective_temperature: 0.0,
+            metallicity: 0.0,
+            age: 0.0,
+            spectral_type: String::new(),
+            mass_loss_rate: 0.0,
+            limb_darkening_coeffs: [0.0, 0.0],
+            flare_rate: 0.0,
+            spot_fraction: 0.0,
+            stellar_lifetime: 0.0,
+            composition: PlanetComposition::Rocky,
+            equilibrium_temperature: 0.0,
+            scale_height: 0.0,
+            oblateness: 0.0,
+            moment_of_inertia_factor: 0.0,
             semi_major_axis: 0.0,
             eccentricity: 0.0,
             inclination: 0.0,

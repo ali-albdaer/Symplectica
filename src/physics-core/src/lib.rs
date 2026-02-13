@@ -32,15 +32,17 @@ pub mod constants;
 pub mod force;
 pub mod integrator;
 pub mod octree;
+pub mod planet;
 pub mod presets;
 pub mod prng;
 pub mod simulation;
 pub mod snapshot;
+pub mod star;
 pub mod vector;
 
 // Re-exports for convenience
 pub mod prelude {
-    pub use crate::body::{Atmosphere, Body, BodyId, BodyType};
+    pub use crate::body::{Atmosphere, Body, BodyId, BodyType, PlanetComposition};
     pub use crate::constants::*;
     pub use crate::force::ForceConfig;
     pub use crate::integrator::{IntegratorConfig, IntegratorType};

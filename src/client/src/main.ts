@@ -21,6 +21,7 @@ import { getWebSocketUrl } from './config';
 import { VisualPresetRegistry, VisualPresetsFile } from './visual-preset-registry';
 import visualPresets from './visualPresets.json';
 import { registerVisualPresetFeatures } from './visual-preset-features';
+import { SkyRenderer } from './sky-renderer';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -106,7 +107,7 @@ class NBodyClient {
     private freeCamSpeedAuPerSec = 0.1;
     private freeCamCrosshair: HTMLElement | null = null;
     private raycaster = new THREE.Raycaster();
-    private starfield?: THREE.Points;
+    private skyRenderer!: SkyRenderer;
     private moveKeys: Record<string, boolean> = {
         KeyW: false,
         KeyA: false,
@@ -302,9 +303,9 @@ class NBodyClient {
             starSize?: number;
             starOpacity?: number;
         };
-        this.createStarfield({
-            count: starParams.starCount,
-            size: starParams.starSize,
+        this.skyRenderer.setOptions({
+            starCount: starParams.starCount,
+            starSize: starParams.starSize,
             opacity: starParams.starOpacity,
         });
     }
@@ -377,8 +378,9 @@ class NBodyClient {
         // Create body renderer
         this.bodyRenderer = new BodyRenderer(this.scene);
 
-        // Add starfield
-        this.createStarfield();
+        // Add seeded starfield
+        this.skyRenderer = new SkyRenderer(this.scene, { seed: 42 });
+        this.skyRenderer.generate();
 
         // Add ambient light (space is dark but we need some fill)
         const ambient = new THREE.AmbientLight(0x111122, 0.3);
@@ -724,70 +726,6 @@ class NBodyClient {
         if (scaleEl) {
             scaleEl.textContent = this.timeController.getDisplayLabel();
         }
-    }
-
-    private createStarfield(options?: { count?: number; size?: number; opacity?: number }): void {
-        if (this.starfield) {
-            this.scene.remove(this.starfield);
-            this.starfield.geometry.dispose();
-            (this.starfield.material as THREE.Material).dispose();
-            this.starfield = undefined;
-        }
-
-        const starCount = Math.max(1000, Math.round(options?.count ?? 10000));
-        const starSize = options?.size ?? 1.0e12;
-        const starOpacity = options?.opacity ?? 0.8;
-        const starsGeometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(starCount * 3);
-        const colors = new Float32Array(starCount * 3);
-        const sizes = new Float32Array(starCount);
-
-        for (let i = 0; i < starCount; i++) {
-            // Random position on sphere
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            const radius = 5e14; // 500 AU
-
-            positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
-            positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-            positions[i * 3 + 2] = radius * Math.cos(phi);
-
-            // Random color (slightly blue-shifted for realism)
-            const temp = Math.random();
-            if (temp > 0.9) {
-                // Hot blue star
-                colors[i * 3] = 0.7;
-                colors[i * 3 + 1] = 0.8;
-                colors[i * 3 + 2] = 1.0;
-            } else if (temp > 0.7) {
-                // White star
-                colors[i * 3] = 1.0;
-                colors[i * 3 + 1] = 1.0;
-                colors[i * 3 + 2] = 1.0;
-            } else {
-                // Yellow/orange star
-                colors[i * 3] = 1.0;
-                colors[i * 3 + 1] = 0.9;
-                colors[i * 3 + 2] = 0.7;
-            }
-
-            sizes[i] = Math.random() * 2 + 0.5;
-        }
-
-        starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        starsGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        starsGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-
-        const starsMaterial = new THREE.PointsMaterial({
-            size: starSize,
-            sizeAttenuation: true,
-            vertexColors: true,
-            transparent: true,
-            opacity: starOpacity,
-        });
-
-        this.starfield = new THREE.Points(starsGeometry, starsMaterial);
-        this.scene.add(this.starfield);
     }
 
     private onResize(): void {

@@ -18,11 +18,32 @@ interface BodyData {
     radius: number;
     color: number;
     axialTilt?: number; // radians, obliquity — used for rotation axis overlay
-    // TODO(rendering): Add these fields to support richer body rendering:
-    //   luminosity?: number;          → drive star point-light intensity
-    //   effectiveTemperature?: number; → derive star mesh color from black-body curve
-    //   rotationRate?: number;         → spin planet/moon meshes at correct angular velocity
-    //   seed?: number;                 → seed procedural texture generation per body
+    // Extended physics fields — populated from derive modules
+    luminosity?: number;
+    effectiveTemperature?: number;
+    rotationRate?: number;
+    seed?: number;
+    oblateness?: number;
+    scaleHeight?: number;
+    equilibriumTemperature?: number;
+    metallicity?: number;
+    age?: number;
+    spectralType?: string;
+    limbDarkeningCoeffs?: [number, number];
+    flareRate?: number;
+    spotFraction?: number;
+    composition?: string;
+    albedo?: number;
+    atmosphere?: {
+        scaleHeight: number;
+        rayleighCoefficients: [number, number, number];
+        mieCoefficient: number;
+        mieDirection: number;
+        height: number;
+    };
+    semiMajorAxis?: number;
+    eccentricity?: number;
+    meanSurfaceTemperature?: number;
 }
 
 // Body scaling for visualization
