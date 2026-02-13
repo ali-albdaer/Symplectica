@@ -19,12 +19,12 @@ const STAR_VERTEX = /* glsl */ `
 #include <logdepthbuf_pars_vertex>
 varying vec3 vNormal;
 varying vec3 vViewDir;
-varying vec2 vUv;
+varying vec3 vObjNormal;
 void main() {
     vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
     vNormal = normalize(normalMatrix * normal);
     vViewDir = normalize(-mvPos.xyz);
-    vUv = uv;
+    vObjNormal = normalize(normal);
     gl_Position = projectionMatrix * mvPos;
     #include <logdepthbuf_vertex>
 }
@@ -41,12 +41,30 @@ uniform float u_granulationStrength;
 uniform float u_time;
 varying vec3 vNormal;
 varying vec3 vViewDir;
-varying vec2 vUv;
+varying vec3 vObjNormal;
+
+float sampleGranulation(vec3 n, float scale, vec2 drift) {
+    vec3 an = abs(n);
+    vec3 w = pow(an, vec3(5.0));
+    float sum = w.x + w.y + w.z + 1e-6;
+    w /= sum;
+
+    vec2 uvX = fract(n.yz * scale + drift);
+    vec2 uvY = fract(n.zx * scale + drift * vec2(0.73, 1.21));
+    vec2 uvZ = fract(n.xy * scale + drift * vec2(1.37, 0.59));
+
+    float sx = texture2D(u_granulationMap, uvX).r;
+    float sy = texture2D(u_granulationMap, uvY).r;
+    float sz = texture2D(u_granulationMap, uvZ).r;
+    return sx * w.x + sy * w.y + sz * w.z;
+}
+
 void main() {
     float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
     float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
-    vec2 uv = fract(vUv * 6.0 + vec2(u_time * 0.002, u_time * 0.001));
-    float granTex = texture2D(u_granulationMap, uv).r;
+    vec3 objN = normalize(vObjNormal);
+    vec2 drift = vec2(u_time * 0.0016, u_time * 0.0011);
+    float granTex = sampleGranulation(objN, 5.8, drift);
     float granulation = mix(1.0, 0.84 + 0.34 * granTex, u_granulationStrength);
     gl_FragColor = vec4(u_color * limb * granulation, 1.0);
     #include <logdepthbuf_fragment>
@@ -204,6 +222,29 @@ function convectiveField(u: number, v: number, density: number, seed: number): n
     return 0.35 + 0.75 * center - 0.42 * laneDarkening;
 }
 
+function valueNoise2D(u: number, v: number, frequency: number, seed: number): number {
+    const x = u * frequency;
+    const y = v * frequency;
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const x1 = x0 + 1;
+    const y1 = y0 + 1;
+
+    const fx = x - x0;
+    const fy = y - y0;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+
+    const n00 = hash01(x0, y0, seed);
+    const n10 = hash01(x1, y0, seed);
+    const n01 = hash01(x0, y1, seed);
+    const n11 = hash01(x1, y1, seed);
+
+    const nx0 = n00 * (1 - sx) + n10 * sx;
+    const nx1 = n01 * (1 - sx) + n11 * sx;
+    return nx0 * (1 - sy) + nx1 * sy;
+}
+
 function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = size;
@@ -221,7 +262,7 @@ function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture
 
             const layerA = convectiveField(gx, gy, 34.0, seed);
             const layerB = convectiveField(gx, gy, 51.0, seed + 173);
-            const macro = 0.5 + 0.5 * Math.sin((gx * 3.0 + gy * 2.2) * 6.28318 + seed * 0.013);
+            const macro = valueNoise2D(gx, gy, 5.5, seed + 911);
             const microNoise = (random() * 2.0 - 1.0) * 0.06;
 
             const field = 0.62 * layerA + 0.38 * layerB;
