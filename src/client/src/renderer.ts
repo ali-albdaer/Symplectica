@@ -39,60 +39,16 @@ uniform float u_limbB;
 uniform sampler2D u_granulationMap;
 uniform float u_granulationStrength;
 uniform float u_time;
-uniform float u_spotCoverage;
-uniform float u_spotStrengthScale;
-uniform float u_spotSeed;
 varying vec3 vNormal;
 varying vec3 vViewDir;
 varying vec2 vUv;
-
-float hash11(float p) {
-    p = fract(p * 0.1031);
-    p *= p + 33.33;
-    p *= p + p;
-    return fract(p);
-}
-
-vec3 hashToUnitVec(float p) {
-    float u = hash11(p * 1.37) * 2.0 - 1.0;
-    float a = hash11(p * 2.11) * 6.28318530718;
-    float s = sqrt(max(0.0, 1.0 - u * u));
-    return normalize(vec3(cos(a) * s, u, sin(a) * s));
-}
-
-vec3 rotateY(vec3 p, float a) {
-    float c = cos(a);
-    float s = sin(a);
-    return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
-}
-
 void main() {
     float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
     float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
     vec2 uv = fract(vUv * 6.0 + vec2(u_time * 0.002, u_time * 0.001));
     float granTex = texture2D(u_granulationMap, uv).r;
-    float granulation = mix(1.0, 0.9 + 0.2 * granTex, u_granulationStrength);
-
-    vec3 p = normalize(vNormal);
-    float drift = u_time * (0.00012 + 0.00008 * hash11(u_spotSeed + 9.0));
-    p = rotateY(p, drift);
-
-    float spotMask = 0.0;
-    for (int i = 0; i < 9; i++) {
-        float fi = float(i);
-        vec3 center = hashToUnitVec(u_spotSeed + fi * 17.0 + 3.0);
-        float radius = 0.10 + 0.16 * hash11(u_spotSeed + fi * 23.0 + 11.0);
-        float d = distance(p, center);
-        float spot = 1.0 - smoothstep(radius * 0.55, radius, d);
-        spotMask = max(spotMask, spot);
-    }
-
-    // Response curve tuned so Sun-like spot_fraction (~0.01) is visible in Ultra.
-    float coverage = clamp(sqrt(max(u_spotCoverage, 0.0) / 0.03), 0.0, 1.0);
-    float spotStrength = coverage * u_spotStrengthScale;
-    float spotDarkening = mix(1.0, 0.38, spotMask * spotStrength);
-
-    gl_FragColor = vec4(u_color * limb * granulation * spotDarkening, 1.0);
+    float granulation = mix(1.0, 0.84 + 0.34 * granTex, u_granulationStrength);
+    gl_FragColor = vec4(u_color * limb * granulation, 1.0);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -175,7 +131,6 @@ interface BodyData {
 
 interface StarRenderOptions {
     granulationEnabled: boolean;
-    spotStrengthScale: number;
 }
 
 // Body scaling for visualization
@@ -202,6 +157,53 @@ function mulberry32(seed: number): () => number {
     };
 }
 
+function hash01(ix: number, iy: number, seed: number): number {
+    let h = (ix * 374761393) ^ (iy * 668265263) ^ (seed * 1442695041);
+    h = (h ^ (h >>> 13)) * 1274126177;
+    h = h ^ (h >>> 16);
+    return (h >>> 0) / 4294967296;
+}
+
+function convectiveField(u: number, v: number, density: number, seed: number): number {
+    const gx = u * density;
+    const gy = v * density;
+    const cx = Math.floor(gx);
+    const cy = Math.floor(gy);
+
+    let nearest = Number.POSITIVE_INFINITY;
+    let secondNearest = Number.POSITIVE_INFINITY;
+
+    for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+            const cellX = cx + ox;
+            const cellY = cy + oy;
+
+            const jitterX = (hash01(cellX, cellY, seed) - 0.5) * 0.75;
+            const jitterY = (hash01(cellX, cellY, seed + 97) - 0.5) * 0.75;
+
+            const px = cellX + 0.5 + jitterX;
+            const py = cellY + 0.5 + jitterY;
+
+            const dx = gx - px;
+            const dy = gy - py;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < nearest) {
+                secondNearest = nearest;
+                nearest = dist;
+            } else if (dist < secondNearest) {
+                secondNearest = dist;
+            }
+        }
+    }
+
+    const center = Math.exp(-nearest * 2.1);
+    const laneProximity = Math.max(0, 1 - (secondNearest - nearest) * 4.2);
+    const laneDarkening = laneProximity * laneProximity;
+
+    return 0.35 + 0.75 * center - 0.42 * laneDarkening;
+}
+
 function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = size;
@@ -217,10 +219,14 @@ function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture
             const gx = x / size;
             const gy = y / size;
 
-            const cell = Math.sin(gx * 80.0) * Math.sin(gy * 80.0);
-            const swirl = Math.sin((gx * 27.0 + gy * 19.0) * 6.28318 + random() * 3.14159);
-            const noise = random() * 2.0 - 1.0;
-            const v = Math.max(0, Math.min(255, Math.round(128 + 50 * cell + 36 * swirl + 22 * noise)));
+            const layerA = convectiveField(gx, gy, 34.0, seed);
+            const layerB = convectiveField(gx, gy, 51.0, seed + 173);
+            const macro = 0.5 + 0.5 * Math.sin((gx * 3.0 + gy * 2.2) * 6.28318 + seed * 0.013);
+            const microNoise = (random() * 2.0 - 1.0) * 0.06;
+
+            const field = 0.62 * layerA + 0.38 * layerB;
+            const modulated = field * (0.9 + 0.18 * macro) + microNoise;
+            const v = Math.max(0, Math.min(255, Math.round(modulated * 255)));
 
             data[i] = v;
             data[i + 1] = v;
@@ -255,7 +261,7 @@ export class BodyRenderer {
     // Scale settings
     private renderScale = 1;
     private sphereSegments = { width: 64, height: 32 };
-    private starRenderOptions: StarRenderOptions = { granulationEnabled: true, spotStrengthScale: 1 };
+    private starRenderOptions: StarRenderOptions = { granulationEnabled: true };
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
@@ -290,23 +296,14 @@ export class BodyRenderer {
             typeof options.granulationEnabled === 'boolean'
                 ? options.granulationEnabled
                 : this.starRenderOptions.granulationEnabled;
-        const nextSpotScale =
-            typeof options.spotStrengthScale === 'number' && Number.isFinite(options.spotStrengthScale)
-                ? Math.max(0, Math.min(1, options.spotStrengthScale))
-                : this.starRenderOptions.spotStrengthScale;
 
-        if (
-            nextEnabled === this.starRenderOptions.granulationEnabled &&
-            nextSpotScale === this.starRenderOptions.spotStrengthScale
-        ) {
+        if (nextEnabled === this.starRenderOptions.granulationEnabled) {
             return;
         }
 
         this.starRenderOptions.granulationEnabled = nextEnabled;
-        this.starRenderOptions.spotStrengthScale = nextSpotScale;
         for (const mesh of this.bodies.values()) {
             mesh.setGranulationEnabled(nextEnabled);
-            mesh.setSpotStrengthScale(nextSpotScale);
         }
     }
 
@@ -857,7 +854,6 @@ class BodyMesh {
             const [r, g, b] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
             const [limbA, limbB] = body.limbDarkeningCoeffs ?? [0.6, 0.0];
             const seed = (body.seed ?? body.id) | 0;
-            const spotCoverage = Math.max(0, Math.min(0.3, body.spotFraction ?? 0));
             this.granulationTexture = createGranulationTexture(seed === 0 ? 1 : seed);
 
             this.material = new THREE.ShaderMaterial({
@@ -870,9 +866,6 @@ class BodyMesh {
                     u_granulationMap: { value: this.granulationTexture },
                     u_granulationStrength: { value: starOptions.granulationEnabled ? 1.0 : 0.0 },
                     u_time: { value: 0.0 },
-                    u_spotCoverage: { value: spotCoverage },
-                    u_spotStrengthScale: { value: starOptions.spotStrengthScale },
-                    u_spotSeed: { value: seed === 0 ? 1 : seed },
                 },
             });
             this.starMaterial = this.material as THREE.ShaderMaterial;
@@ -997,12 +990,6 @@ class BodyMesh {
     setGranulationEnabled(enabled: boolean): void {
         if (this.starMaterial?.uniforms.u_granulationStrength) {
             this.starMaterial.uniforms.u_granulationStrength.value = enabled ? 1.0 : 0.0;
-        }
-    }
-
-    setSpotStrengthScale(scale: number): void {
-        if (this.starMaterial?.uniforms.u_spotStrengthScale) {
-            this.starMaterial.uniforms.u_spotStrengthScale.value = Math.max(0, Math.min(1, scale));
         }
     }
 

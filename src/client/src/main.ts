@@ -303,25 +303,16 @@ class NBodyClient {
             starSize?: number;
             starOpacity?: number;
             granulationEnabled?: boolean;
-            flareQuality?: 'Off' | 'Low' | 'High';
         };
         this.skyRenderer.setOptions({
             starCount: starParams.starCount,
             starSize: starParams.starSize,
             opacity: starParams.starOpacity,
         });
-
-        const spotStrengthScale = starParams.flareQuality === 'High'
-            ? 1.0
-            : starParams.flareQuality === 'Low'
-                ? 0.45
-                : 0.0;
-
         this.bodyRenderer.setStarRenderOptions({
             granulationEnabled: typeof starParams.granulationEnabled === 'boolean'
                 ? starParams.granulationEnabled
                 : true,
-            spotStrengthScale,
         });
     }
 
