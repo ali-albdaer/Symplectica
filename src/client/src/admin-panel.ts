@@ -152,7 +152,7 @@ export class AdminPanel {
                 position: fixed;
                 top: 80px;
                 right: 40px;
-                width: 320px;
+                width: 260px;
                 background: rgba(10, 15, 30, 0.95);
                 backdrop-filter: blur(20px);
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -163,7 +163,7 @@ export class AdminPanel {
                 z-index: 300;
                 display: none;
                 flex-direction: column;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                overflow: hidden;
             }
             
             #admin-panel.open {
@@ -220,11 +220,11 @@ export class AdminPanel {
                 color: rgba(255, 255, 255, 0.5);
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                margin-bottom: 8px;
+                margin: 0 0 8px 0;
             }
             
             .admin-field {
-                margin-bottom: 10px;
+                margin: 8px 0 6px 0;
             }
             
             .admin-field label {
