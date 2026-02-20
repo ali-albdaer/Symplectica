@@ -30,6 +30,7 @@ export class Chat {
     private isFocused = false;
     private unreadCount = 0;
     private unreadBadge?: HTMLElement;
+    private onToggleTouchControls?: () => { enabled: boolean; message: string };
 
     private readonly MAX_MESSAGES = 10;
     private localName = `Player${Math.floor(Math.random() * 9000) + 1000}`;
@@ -341,6 +342,15 @@ export class Chat {
         const text = this.input.value.trim();
         if (!text) return;
 
+        // Handle local commands (not sent to server)
+        if (text.startsWith('/')) {
+            const handled = this.handleLocalCommand(text);
+            if (handled) {
+                this.input.value = '';
+                return;
+            }
+        }
+
         if (this.network?.isConnected()) {
             this.network.sendChat(this.localName, text);
         } else {
@@ -356,6 +366,26 @@ export class Chat {
         }
 
         this.input.value = '';
+    }
+
+    private handleLocalCommand(text: string): boolean {
+        const commandText = text.slice(1).trim();
+        const [rawCommand] = commandText.split(/\s+/);
+        const command = rawCommand?.toLowerCase();
+
+        switch (command) {
+            case 'mobile': {
+                if (this.onToggleTouchControls) {
+                    const result = this.onToggleTouchControls();
+                    this.addSystemMessage(result.message);
+                } else {
+                    this.addSystemMessage('Touch controls not available.');
+                }
+                return true;
+            }
+            default:
+                return false; // Not a local command, send to server
+        }
     }
 
     addMessage(message: ChatMessage): void {
@@ -446,5 +476,16 @@ export class Chat {
         if (trimmed.length > 0) {
             this.localName = trimmed.slice(0, 20);
         }
+    }
+
+    /** Set callback for touch controls toggle */
+    setTouchControlsCallback(callback: () => { enabled: boolean; message: string }): void {
+        this.onToggleTouchControls = callback;
+    }
+
+    /** Open chat and focus input (for touch controls button) */
+    openForInput(): void {
+        this.setOpen(true);
+        this.input.focus();
     }
 }

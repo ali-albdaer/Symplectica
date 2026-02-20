@@ -22,6 +22,7 @@ import { VisualPresetRegistry, VisualPresetsFile } from './visual-preset-registr
 import visualPresets from './visualPresets.json';
 import { registerVisualPresetFeatures } from './visual-preset-features';
 import { SkyRenderer } from './sky-renderer';
+import { TouchControls } from './touch-controls';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -57,6 +58,7 @@ class NBodyClient {
     private chat!: Chat;
     private adminPanel!: AdminPanel;
     private optionsPanel!: OptionsPanel;
+    private touchControls!: TouchControls;
 
     private state: SimState = {
         tick: 0,
@@ -197,6 +199,31 @@ class NBodyClient {
         this.optionsPanel.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
         );
+
+        // Initialize Touch Controls (disabled by default, enabled with /mobile command)
+        this.touchControls = new TouchControls({
+            onSpeedIncrease: () => this.timeController.increaseSpeed(),
+            onSpeedDecrease: () => this.timeController.decreaseSpeed(),
+            onPauseToggle: () => this.timeController.togglePause(),
+            onFollowNext: () => this.followNextBody(),
+            onFollowPrevious: () => this.followPreviousBody(),
+            onToggleUI: () => this.toggleUIVisibility(),
+            onToggleHints: () => this.toggleHints(),
+            onToggleSim: () => this.toggleSimulationSection('sim'),
+            onToggleFollow: () => this.toggleSimulationSection('follow'),
+            onToggleFreeCamera: () => this.toggleFreeCamera(),
+            onOpenChat: () => this.chat.openForInput(),
+        });
+
+        // Wire up /mobile command in chat to toggle touch controls
+        this.chat.setTouchControlsCallback(() => {
+            this.toggleTouchControls();
+            const enabled = this.isTouchControlsEnabled();
+            return {
+                enabled,
+                message: enabled ? 'Touch controls enabled' : 'Touch controls disabled'
+            };
+        });
 
         this.hideLoading();
         this.start();
@@ -1179,6 +1206,23 @@ class NBodyClient {
     /** Expose for testing */
     getPhysics() { return this.physics; }
     getTimeController() { return this.timeController; }
+
+    /** Enable/disable touch controls (called by /mobile command) */
+    enableTouchControls(): void {
+        this.touchControls.enable();
+    }
+
+    disableTouchControls(): void {
+        this.touchControls.disable();
+    }
+
+    toggleTouchControls(): void {
+        this.touchControls.toggle();
+    }
+
+    isTouchControlsEnabled(): boolean {
+        return this.touchControls.isEnabled();
+    }
 
     showError(message: string): void {
         const el = document.getElementById('loading-status');
