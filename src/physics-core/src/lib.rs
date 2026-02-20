@@ -332,6 +332,19 @@ pub fn create_full_solar_system(seed: u64) -> WasmSimulation {
     WasmSimulation { inner: presets::create_full_solar_system(seed) }
 }
 
+/// Create Full Solar System II preset (J2000 corrected orbital elements)
+/// Uses canonical JPL values with proper inclinations and Kepler→Cartesian conversion
+#[wasm_bindgen(js_name = createFullSolarSystemII)]
+pub fn create_full_solar_system_ii(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_full_solar_system_ii(seed, false) }
+}
+
+/// Create Full Solar System II in barycentric frame (center-of-mass at origin)
+#[wasm_bindgen(js_name = createFullSolarSystemIIBarycentric)]
+pub fn create_full_solar_system_ii_barycentric(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_full_solar_system_ii(seed, true) }
+}
+
 /// Create Playable Solar System preset (scaled distances/masses/radii)
 #[wasm_bindgen(js_name = createPlayableSolarSystem)]
 pub fn create_playable_solar_system(seed: u64) -> WasmSimulation {

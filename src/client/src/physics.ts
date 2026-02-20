@@ -347,7 +347,7 @@ export class PhysicsClient {
     }
 
     /** Create a preset simulation */
-    createPreset(preset: string, seed: bigint): void {
+    createPreset(preset: string, seed: bigint, barycentric: boolean = false): void {
         if (!this.initialized || !this.module) throw new Error('Physics not initialized');
 
         let loadedPreset = preset;
@@ -358,6 +358,17 @@ export class PhysicsClient {
                 break;
             case 'fullSolarSystem':
                 this.simulation = this.module.createFullSolarSystem(seed);
+                break;
+            case 'fullSolarSystemII':
+                if (barycentric && typeof this.module.createFullSolarSystemIIBarycentric === 'function') {
+                    this.simulation = this.module.createFullSolarSystemIIBarycentric(seed);
+                } else if (typeof this.module.createFullSolarSystemII === 'function') {
+                    this.simulation = this.module.createFullSolarSystemII(seed);
+                } else {
+                    console.warn('[WARN] Full Solar System II preset unavailable. Falling back to Full Solar System.');
+                    this.simulation = this.module.createFullSolarSystem(seed);
+                    loadedPreset = 'fullSolarSystem';
+                }
                 break;
             case 'playableSolarSystem':
                 if (typeof this.module.createPlayableSolarSystem === 'function') {

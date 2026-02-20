@@ -165,8 +165,8 @@ class NBodyClient {
             this.physics,
             this.timeController,
             this.network,
-            (presetId, name) => {
-                this.loadPresetFromAdmin(presetId, name);
+            (presetId, name, barycentric) => {
+                this.loadPresetFromAdmin(presetId, name, barycentric);
             },
             (mode) => {
                 this.setLocalSimMode(mode);
@@ -580,11 +580,11 @@ class NBodyClient {
         }
     }
 
-    private loadPresetFromAdmin(presetId: string, name: string): void {
+    private loadPresetFromAdmin(presetId: string, name: string, barycentric: boolean = false): void {
         if (presetId === 'sunEarthMoon') {
             this.physics.createSunEarthMoon();
         } else {
-            this.physics.createPreset(presetId, BigInt(Date.now()));
+            this.physics.createPreset(presetId, BigInt(Date.now()), barycentric);
         }
 
         this.refreshBodies();

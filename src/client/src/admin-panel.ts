@@ -26,7 +26,7 @@ export class AdminPanel {
     private physics: PhysicsClient;
     private timeController: TimeController;
     private network?: NetworkClient;
-    private onPresetChange?: (presetId: string, name: string) => void;
+    private onPresetChange?: (presetId: string, name: string, barycentric: boolean) => void;
     private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
     private isOpen = false;
     private config: ServerConfig = {
@@ -41,7 +41,7 @@ export class AdminPanel {
         physics: PhysicsClient,
         timeController: TimeController,
         network?: NetworkClient,
-        onPresetChange?: (presetId: string, name: string) => void,
+        onPresetChange?: (presetId: string, name: string, barycentric: boolean) => void,
         onSimModeChange?: (mode: 'tick' | 'accumulator') => void
     ) {
         this.physics = physics;
@@ -80,7 +80,8 @@ export class AdminPanel {
                         <select id="admin-preset">
                             <option value="sunEarthMoon">Sun-Earth-Moon</option>
                             <option value="innerSolarSystem">Inner Solar System</option>
-                            <option value="fullSolarSystem" selected>Full Solar System</option>
+                            <option value="fullSolarSystem">Full Solar System</option>
+                            <option value="fullSolarSystemII" selected>Full Solar System II (J2000)</option>
                             <option value="playableSolarSystem">Playable Solar System</option>
                             <option value="jupiterSystem">Jupiter System</option>
                             <option value="saturnSystem">Saturn System</option>
@@ -88,6 +89,13 @@ export class AdminPanel {
                             <option value="trappist1">TRAPPIST-1</option>
                             <option value="binaryPulsar">Binary Pulsar</option>
                         </select>
+                    </div>
+                    <div class="admin-field" id="barycentric-field">
+                        <label>
+                            <input type="checkbox" id="admin-barycentric">
+                            Barycentric Mode
+                        </label>
+                        <div class="admin-hint">Shift to center-of-mass frame (zero system momentum)</div>
                     </div>
                     <button class="admin-btn" id="admin-load-preset">Load Preset</button>
                 </section>
@@ -356,10 +364,24 @@ export class AdminPanel {
         // Load preset
         container.querySelector('#admin-load-preset')?.addEventListener('click', () => {
             const presetSelect = container.querySelector('#admin-preset') as HTMLSelectElement | null;
+            const barycentricCheckbox = container.querySelector('#admin-barycentric') as HTMLInputElement | null;
             if (!presetSelect) return;
             const name = presetSelect.options[presetSelect.selectedIndex].text;
-            this.onPresetChange?.(presetSelect.value, name);
+            const barycentric = barycentricCheckbox?.checked ?? false;
+            this.onPresetChange?.(presetSelect.value, name, barycentric);
         });
+
+        // Show/hide barycentric option based on preset selection
+        const presetSelect = container.querySelector('#admin-preset') as HTMLSelectElement | null;
+        const barycentricField = container.querySelector('#barycentric-field') as HTMLElement | null;
+        const updateBarycentricVisibility = () => {
+            if (barycentricField && presetSelect) {
+                // Only show barycentric option for Full Solar System II
+                barycentricField.style.display = presetSelect.value === 'fullSolarSystemII' ? 'block' : 'none';
+            }
+        };
+        presetSelect?.addEventListener('change', updateBarycentricVisibility);
+        updateBarycentricVisibility();
 
         // Pause button
         container.querySelector('#admin-pause-btn')?.addEventListener('click', () => {
