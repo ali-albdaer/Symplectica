@@ -1135,10 +1135,10 @@ export class BodyRenderer {
         const arrow = new THREE.ArrowHelper(
             axisDir,
             new THREE.Vector3(0, 0, 0),
-            Math.max(axisLength, AU * 0.002),
+            axisLength,
             axisColor,
-            Math.max(axisLength * 0.2, AU * 0.0004),
-            Math.max(axisLength * 0.1, AU * 0.0002)
+            axisLength * 0.2,
+            axisLength * 0.1
         );
         arrow.visible = this.showAxisLinesFlag;
         mesh.group.add(arrow);
@@ -1146,7 +1146,7 @@ export class BodyRenderer {
 
         // Create per-body equatorial reference plane (disc perpendicular to tilt axis)
         const planeRadius = bodyVisRadius * 2;
-        const planeGeo = new THREE.RingGeometry(bodyVisRadius * 0.1, Math.max(planeRadius, AU * 0.001), 48);
+        const planeGeo = new THREE.RingGeometry(bodyVisRadius * 0.1, planeRadius, 48);
         const planeMat = new THREE.MeshBasicMaterial({
             color: 0x4488cc,
             transparent: true,
@@ -1172,7 +1172,7 @@ export class BodyRenderer {
             equatorDir.set(1, 0, 0).cross(axisDir);
         }
         equatorDir.normalize();
-        const surfaceR = Math.max(bodyVisRadius, AU * 0.0005);
+        const surfaceR = bodyVisRadius;
         const meridianSegments = 32;
         const meridianPoints: THREE.Vector3[] = [];
         for (let s = 0; s <= meridianSegments; s++) {
@@ -1194,7 +1194,7 @@ export class BodyRenderer {
         this.refLines.set(body.id, refLine);
 
         // Create per-body equator reference point (reuses equatorDir from meridian arc)
-        const dotRadius = Math.max(bodyVisRadius * 0.08, AU * 0.0001);
+        const dotRadius = bodyVisRadius * 0.08;
         const dotGeo = new THREE.SphereGeometry(dotRadius, 8, 6);
         const dotMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
         const dot = new THREE.Mesh(dotGeo, dotMat);
@@ -1272,6 +1272,7 @@ export class BodyRenderer {
             sizeAttenuation: true,
         });
         const sprite = new THREE.Sprite(material);
+        // Store default scale to be adjusted per body later
         sprite.scale.set(AU * 0.12, AU * 0.03, 1);
         return sprite;
     }
@@ -1330,7 +1331,13 @@ export class BodyRenderer {
                 // Update label position (offset above body)
                 const label = this.bodyLabels.get(id);
                 if (label) {
-                    label.position.set(localX, localY + AU * 0.05, localZ);
+                    // Scale label based on body visual radius for better proportions
+                    const bodyMesh = this.bodies.get(id);
+                    const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
+                    const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
+                    const labelScale = Math.max(bodyVisRadius * 0.5, AU * 0.01);
+                    label.scale.set(labelScale, labelScale * 0.25, 1);
+                    label.position.set(localX, localY + labelOffset, localZ);
                 }
 
                 // Update orbit trail
