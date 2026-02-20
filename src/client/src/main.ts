@@ -1138,8 +1138,8 @@ class NBodyClient {
 
     private computeSystemTotals(): { mass: number; linearMagnitude: number; angularMagnitude: number } | null {
         const bodies = this.physics.getBodies();
+        const positions = this.physics.getPositions();
         const velocities = this.physics.getVelocities();
-        const positions = this.state.positions;
 
         if (bodies.length === 0) return null;
         if (velocities.length < bodies.length * 3) return null;
