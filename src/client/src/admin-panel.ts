@@ -92,7 +92,7 @@ export class AdminPanel {
                     </div>
                     <div class="admin-field" id="barycentric-field">
                         <label>
-                            <input type="checkbox" id="admin-barycentric">
+                            <input type="checkbox" id="admin-barycentric" checked>
                             Barycentric Mode
                         </label>
                         <div class="admin-hint">Shift to center-of-mass frame (zero system momentum)</div>

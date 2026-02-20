@@ -403,3 +403,117 @@ fn test_determinism() {
     
     println!("✓ Determinism verified (identical initial states)");
 }
+
+/// Test: All conserved quantities in barycentric mode (10 simulated years)
+/// This is the comprehensive conservation verification test
+#[test]
+fn test_barycentric_conservation_10_years() {
+    use physics_core::force::compute_angular_momentum;
+    
+    let mut sim = create_full_solar_system_ii(42, true); // barycentric = true
+    
+    // dt = 43200s (12 hours) - typical for high timewarp
+    // This matches user's "1 month/s" timewarp scenario
+    sim.set_dt(43200.0);
+    sim.set_substeps(4); // 4 substeps for better accuracy
+    
+    let years = 10.0;
+    let seconds = years * SECONDS_PER_YEAR;
+    let steps = (seconds / 43200.0) as usize;
+    
+    println!("\n========================================");
+    println!("BARYCENTRIC CONSERVATION TEST (10 years)");
+    println!("========================================");
+    println!("Timestep: 43200s (12 hours), Substeps: 4");
+    println!("Total steps: {}\n", steps);
+    
+    // Initial quantities
+    let initial_energy = compute_total_energy(sim.bodies(), DEFAULT_SOFTENING);
+    let initial_momentum = compute_total_momentum(sim.bodies());
+    let initial_angular = compute_angular_momentum(sim.bodies(), Vec3::ZERO);
+    
+    println!("Initial state:");
+    println!("  Energy:           {:.10e} J", initial_energy);
+    println!("  Linear momentum:  {:.10e} kg·m/s", initial_momentum.length());
+    println!("  Angular momentum: {:.10e} kg·m²/s", initial_angular.length());
+    
+    // Track min/max for oscillation check
+    let mut min_energy = initial_energy;
+    let mut max_energy = initial_energy;
+    let mut max_momentum = initial_momentum.length();
+    let mut min_angular = initial_angular.length();
+    let mut max_angular = initial_angular.length();
+    
+    // Run simulation
+    for i in 0..steps {
+        sim.step();
+        
+        if (i + 1) % (steps / 10) == 0 {
+            let e = compute_total_energy(sim.bodies(), DEFAULT_SOFTENING);
+            let p = compute_total_momentum(sim.bodies());
+            let l = compute_angular_momentum(sim.bodies(), Vec3::ZERO);
+            
+            if e < min_energy { min_energy = e; }
+            if e > max_energy { max_energy = e; }
+            if p.length() > max_momentum { max_momentum = p.length(); }
+            if l.length() < min_angular { min_angular = l.length(); }
+            if l.length() > max_angular { max_angular = l.length(); }
+            
+            let year_now = (i + 1) as f64 * 43200.0 / SECONDS_PER_YEAR;
+            println!("  Year {:5.1}: E={:.6e} J, |p|={:.3e}, |L|={:.6e}",
+                year_now, e, p.length(), l.length());
+        }
+    }
+    
+    // Final quantities
+    let final_energy = compute_total_energy(sim.bodies(), DEFAULT_SOFTENING);
+    let final_momentum = compute_total_momentum(sim.bodies());
+    let final_angular = compute_angular_momentum(sim.bodies(), Vec3::ZERO);
+    
+    // Calculate drifts
+    let energy_drift = ((final_energy - initial_energy) / initial_energy.abs()).abs();
+    let momentum_drift = final_momentum.length(); // Should remain near zero
+    let angular_drift = ((final_angular.length() - initial_angular.length()) / initial_angular.length()).abs();
+    
+    // Check Sun position drift (should stay near origin in barycentric)
+    let sun = sim.bodies().iter().find(|b| b.name == "Sun").unwrap();
+    let sun_drift_au = sun.position.length() / AU;
+    
+    println!("\n--- Final Results (10 years) ---");
+    println!("  Final energy:           {:.10e} J", final_energy);
+    println!("  Final linear momentum:  {:.10e} kg·m/s", final_momentum.length());
+    println!("  Final angular momentum: {:.10e} kg·m²/s", final_angular.length());
+    println!("  Sun position from origin: {:.6} AU", sun_drift_au);
+    
+    println!("\n--- Conservation Metrics ---");
+    println!("  Energy drift:          {:.6e} (relative)", energy_drift);
+    println!("  Momentum magnitude:    {:.6e} kg·m/s (should be ~0)", momentum_drift);
+    println!("  Angular momentum drift: {:.6e} (relative)", angular_drift);
+    println!("  Energy oscillation:    {:.6e} to {:.6e}", min_energy, max_energy);
+    println!("  Angular oscillation:   {:.6e} to {:.6e}", min_angular, max_angular);
+    
+    // Assertions
+    // 1. Energy should drift < 0.01% over 10 years with 4 substeps
+    assert!(energy_drift < 1e-4,
+        "Energy drift {:.6e} exceeds 1e-4 (0.01%)", energy_drift);
+    
+    // 2. Linear momentum should stay near zero (barycentric frame)
+    assert!(momentum_drift < 1e20,
+        "Linear momentum {:.3e} exceeds 1e20 kg·m/s", momentum_drift);
+    
+    // 3. Angular momentum should be conserved < 0.001%
+    assert!(angular_drift < 1e-5,
+        "Angular momentum drift {:.6e} exceeds 1e-5", angular_drift);
+    
+    // 4. Angular momentum should NOT oscillate 100x (max/min ratio < 1.001)
+    let angular_ratio = max_angular / min_angular;
+    assert!(angular_ratio < 1.001,
+        "Angular momentum oscillation ratio {:.6} reeks of a bug", angular_ratio);
+    
+    // 5. Sun should stay within ~0.02 AU of origin (natural wobble from planets)
+    assert!(sun_drift_au < 0.02,
+        "Sun drifted {:.4} AU from origin, exceeds 0.02 AU", sun_drift_au);
+    
+    println!("\n✓ All conservation checks passed!");
+    println!("========================================\n");
+}

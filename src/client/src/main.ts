@@ -436,8 +436,9 @@ class NBodyClient {
         this.physics = new PhysicsClient();
         await this.physics.init();
 
-        // Use local simulation for now - default to full solar system
-        this.physics.createPreset('fullSolarSystem', BigInt(Date.now()));
+        // Use local simulation for now - default to Full Solar System II with barycentric frame
+        // Barycentric ensures zero system momentum for proper conservation
+        this.physics.createPreset('fullSolarSystemII', BigInt(Date.now()), true);
 
         // TimeController manages simulation speed; physics dt is set by createPreset
 
