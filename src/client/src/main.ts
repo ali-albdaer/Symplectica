@@ -621,6 +621,8 @@ class NBodyClient {
                 z: cameraWorld.z - target.z,
             };
             this.camera.setFreeMode(false);
+            // Update camera focus to the target position before setting orbit
+            this.camera.setFocus(target.x, target.y, target.z);
             this.camera.setOrbitFromOffset(offset);
             this.followBodyIndex = this.lastFollowBodyIndex;
             this.setFreeCamUI(false);
@@ -680,6 +682,8 @@ class NBodyClient {
 
         this.freeCamera = false;
         this.camera.setFreeMode(false);
+        // Update camera focus to the target position before setting orbit
+        this.camera.setFocus(target.x, target.y, target.z);
         this.camera.setOrbitFromOffset(offset);
         this.followBodyIndex = index;
         this.lastFollowBodyIndex = index;
@@ -1004,6 +1008,12 @@ class NBodyClient {
             this.state.time = this.physics.time();
             this.state.positions = this.physics.getPositions();
             this.state.energy = this.physics.totalEnergy();
+        }
+
+        // Update camera focus to follow target (for orbit mode)
+        if (!this.freeCamera) {
+            const target = this.getFollowTargetPosition(this.followBodyIndex);
+            this.camera.setFocus(target.x, target.y, target.z);
         }
 
         // Update camera
