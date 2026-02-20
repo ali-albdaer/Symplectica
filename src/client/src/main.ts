@@ -226,6 +226,12 @@ class NBodyClient {
         });
 
         this.hideLoading();
+
+        // Prompt mobile users to enable touch controls
+        if (this.isMobileDevice()) {
+            this.showMobileTouchPrompt();
+        }
+
         this.start();
     }
 
@@ -1222,6 +1228,166 @@ class NBodyClient {
 
     isTouchControlsEnabled(): boolean {
         return this.touchControls.isEnabled();
+    }
+
+    private isMobileDevice(): boolean {
+        // Check for touch capability and mobile user agent
+        const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        return hasTouchScreen && (isMobileUA || window.innerWidth < 768);
+    }
+
+    private showMobileTouchPrompt(): void {
+        const promptContainer = document.createElement('div');
+        promptContainer.id = 'mobile-prompt';
+        promptContainer.innerHTML = `
+            <div class="mobile-prompt-overlay">
+                <div class="mobile-prompt-content">
+                    <h2>📱 Mobile Device Detected</h2>
+                    <p>Would you like to enable touch controls for easier navigation?</p>
+                    <div class="mobile-prompt-buttons">
+                        <button class="mobile-prompt-btn primary" id="enable-touch">Enable Touch Controls</button>
+                        <button class="mobile-prompt-btn secondary" id="dismiss-touch">No Thanks</button>
+                    </div>
+                    <small>You can enable/disable touch controls anytime by typing <code>/mobile</code> in chat</small>
+                </div>
+            </div>
+        `;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            #mobile-prompt {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 1000;
+                animation: fadeIn 0.3s ease;
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            .mobile-prompt-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.75);
+                backdrop-filter: blur(8px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+
+            .mobile-prompt-content {
+                background: linear-gradient(160deg, rgba(15, 25, 45, 0.95), rgba(20, 35, 60, 0.95));
+                border: 1px solid rgba(120, 160, 240, 0.3);
+                border-radius: 16px;
+                padding: 32px 24px;
+                max-width: 480px;
+                width: 100%;
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                text-align: center;
+                color: #fff;
+                font-family: 'Segoe UI', system-ui, sans-serif;
+            }
+
+            .mobile-prompt-content h2 {
+                margin: 0 0 16px 0;
+                font-size: 24px;
+                font-weight: 600;
+                color: #fff;
+            }
+
+            .mobile-prompt-content p {
+                margin: 0 0 24px 0;
+                font-size: 16px;
+                line-height: 1.5;
+                color: rgba(255, 255, 255, 0.85);
+            }
+
+            .mobile-prompt-buttons {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+
+            .mobile-prompt-btn {
+                padding: 14px 24px;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .mobile-prompt-btn.primary {
+                background: linear-gradient(135deg, #4a90e2, #357abd);
+                color: #fff;
+                box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+            }
+
+            .mobile-prompt-btn.primary:active {
+                transform: scale(0.98);
+                box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4);
+            }
+
+            .mobile-prompt-btn.secondary {
+                background: rgba(255, 255, 255, 0.1);
+                color: rgba(255, 255, 255, 0.7);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+
+            .mobile-prompt-btn.secondary:active {
+                background: rgba(255, 255, 255, 0.15);
+            }
+
+            .mobile-prompt-content small {
+                display: block;
+                font-size: 13px;
+                color: rgba(255, 255, 255, 0.5);
+                line-height: 1.4;
+            }
+
+            .mobile-prompt-content code {
+                background: rgba(255, 255, 255, 0.15);
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 12px;
+                color: #6eb5ff;
+            }
+
+            @media (min-width: 500px) {
+                .mobile-prompt-buttons {
+                    flex-direction: row;
+                }
+            }
+        `;
+
+        document.head.appendChild(style);
+        document.body.appendChild(promptContainer);
+
+        // Handle button clicks
+        document.getElementById('enable-touch')?.addEventListener('click', () => {
+            this.enableTouchControls();
+            this.chat.addSystemMessage('Touch controls enabled! Buttons are now visible on screen.');
+            promptContainer.remove();
+        });
+
+        document.getElementById('dismiss-touch')?.addEventListener('click', () => {
+            this.chat.addSystemMessage('Touch controls not enabled. Type /mobile in chat to enable them later.');
+            promptContainer.remove();
+        });
     }
 
     showError(message: string): void {
