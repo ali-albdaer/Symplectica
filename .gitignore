@@ -10,3 +10,5 @@ src/physics-core/pkg/
 # Cargo.lock
 # package-lock.json
 .env
+# Temporarily ignore .github
+.github/
