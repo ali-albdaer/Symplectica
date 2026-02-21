@@ -7,6 +7,7 @@ use crate::body::{Atmosphere, Body, BodyType, PlanetComposition};
 use crate::simulation::Simulation;
 use crate::vector::Vec3;
 use crate::constants::*;
+use crate::prng::Pcg32;
 
 /// Convert hex color to RGB array
 fn hex_to_rgb(hex: u32) -> [f64; 3] {
@@ -22,6 +23,61 @@ fn hex_to_rgb(hex: u32) -> [f64; 3] {
 // ═══════════════════════════════════════════════════════════════════════════
 
 use std::f64::consts::PI;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATISTICAL DISTRIBUTIONS FOR PROCEDURAL GENERATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Sample from Rayleigh distribution with scale parameter sigma
+/// Used for eccentricity and inclination distributions
+fn sample_rayleigh(rng: &mut Pcg32, sigma: f64) -> f64 {
+    // Inverse CDF method: X = σ * sqrt(-2 * ln(1 - U))
+    let u = rng.next_f64();
+    // Clamp u to avoid ln(0)
+    let u_clamped = u.max(1e-10).min(1.0 - 1e-10);
+    sigma * (-2.0 * (1.0 - u_clamped).ln()).sqrt()
+}
+
+/// Sample from power-law distribution P(m) ∝ m^(-α) in range [m_min, m_max]
+/// Used for asteroid mass spectrum (α ≈ 2.0-2.5 for main belt)
+fn sample_power_law(rng: &mut Pcg32, m_min: f64, m_max: f64, alpha: f64) -> f64 {
+    let u = rng.next_f64();
+    if (alpha - 1.0).abs() < 1e-10 {
+        // Special case: α ≈ 1 → log-uniform
+        m_min * (m_max / m_min).powf(u)
+    } else {
+        // General case: inverse CDF of truncated power-law
+        let a = 1.0 - alpha;
+        let term = u * (m_max.powf(a) - m_min.powf(a)) + m_min.powf(a);
+        term.powf(1.0 / a)
+    }
+}
+
+/// Sample from standard normal distribution using Box-Muller transform
+fn sample_gaussian(rng: &mut Pcg32, mean: f64, std_dev: f64) -> f64 {
+    let u1 = rng.next_f64().max(1e-10);
+    let u2 = rng.next_f64();
+    let z = (-2.0 * u1.ln()).sqrt() * (2.0 * PI * u2).cos();
+    mean + std_dev * z
+}
+
+/// Sample uniformly on unit sphere surface, return (x, y, z)
+fn sample_unit_sphere(rng: &mut Pcg32) -> (f64, f64, f64) {
+    let theta = rng.next_f64() * 2.0 * PI;      // azimuthal angle
+    let phi = (1.0 - 2.0 * rng.next_f64()).acos(); // polar angle (uniform in cos)
+    let x = phi.sin() * theta.cos();
+    let y = phi.sin() * theta.sin();
+    let z = phi.cos();
+    (x, y, z)
+}
+
+/// Sample radius from Plummer sphere density profile
+/// ρ(r) ∝ (1 + (r/a)²)^(-5/2)
+fn sample_plummer_radius(rng: &mut Pcg32, scale_radius: f64) -> f64 {
+    // Inverse CDF: r = a / sqrt(U^(-2/3) - 1)
+    let u = rng.next_f64().max(1e-10);
+    scale_radius / (u.powf(-2.0 / 3.0) - 1.0).sqrt()
+}
 
 /// Orbital elements for a body at J2000 epoch
 /// All angles in radians, distances in meters
@@ -351,6 +407,12 @@ pub enum Preset {
     Trappist1,
     /// Binary pulsar system
     BinaryPulsar,
+    /// Asteroid Belt: Full solar system + 2000-10000 asteroids
+    /// Power-law mass spectrum, Rayleigh orbital elements
+    AsteroidBelt,
+    /// Dense Star Cluster: 1000-5000 equal-mass stars
+    /// Plummer sphere distribution, virialized velocities
+    StarCluster,
 }
 
 impl Preset {
@@ -367,6 +429,8 @@ impl Preset {
             Preset::AlphaCentauri => create_alpha_centauri(seed),
             Preset::Trappist1 => create_trappist1(seed),
             Preset::BinaryPulsar => create_binary_pulsar(seed),
+            Preset::AsteroidBelt => create_asteroid_belt(seed, 5000),
+            Preset::StarCluster => create_star_cluster(seed, 2000),
         }
     }
 
@@ -374,6 +438,15 @@ impl Preset {
     pub fn create_barycentric(&self, seed: u64) -> Simulation {
         match self {
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, true),
+            Preset::AsteroidBelt => {
+                let mut sim = create_asteroid_belt(seed, 5000);
+                recenter_to_barycenter(&mut sim);
+                sim
+            },
+            Preset::StarCluster => {
+                // Star clusters are already centered
+                create_star_cluster(seed, 2000)
+            },
             // Other presets don't support barycentric mode; fall back to default
             _ => self.create(seed),
         }
@@ -1264,6 +1337,284 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     sim
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ASTEROID BELT PRESET
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Asteroid belt orbital element data for major dwarf planets
+mod asteroid_data {
+    use super::*;
+    
+    /// Ceres - largest object in asteroid belt
+    pub const CERES: OrbitalElements = OrbitalElements {
+        semi_major_axis: 2.7691 * AU,        // 2.77 AU
+        eccentricity: 0.0758,
+        inclination: 0.1850,                  // 10.59°
+        longitude_asc_node: 1.4016,           // 80.3°
+        arg_periapsis: 1.2778,                // 73.2°
+        mean_anomaly: 1.5708,                 // ~90°
+    };
+    
+    /// Vesta - second most massive asteroid
+    pub const VESTA: OrbitalElements = OrbitalElements {
+        semi_major_axis: 2.3615 * AU,        // 2.36 AU
+        eccentricity: 0.0887,
+        inclination: 0.1248,                  // 7.14°
+        longitude_asc_node: 1.8326,           // 105°
+        arg_periapsis: 2.5656,                // 147°
+        mean_anomaly: 0.5236,                 // ~30°
+    };
+    
+    /// Pallas - third most massive asteroid
+    pub const PALLAS: OrbitalElements = OrbitalElements {
+        semi_major_axis: 2.7720 * AU,        // 2.77 AU
+        eccentricity: 0.2313,
+        inclination: 0.6050,                  // 34.8° (high inclination!)
+        longitude_asc_node: 2.8972,           // 166°
+        arg_periapsis: 5.4978,                // 315°
+        mean_anomaly: 2.0944,                 // ~120°
+    };
+    
+    /// Hygiea - fourth largest asteroid
+    pub const HYGIEA: OrbitalElements = OrbitalElements {
+        semi_major_axis: 3.1395 * AU,        // 3.14 AU
+        eccentricity: 0.1146,
+        inclination: 0.0646,                  // 3.7°
+        longitude_asc_node: 5.1836,           // 297°
+        arg_periapsis: 5.6199,                // 322°
+        mean_anomaly: 3.6652,                 // ~210°
+    };
+}
+
+/// Create asteroid belt simulation
+/// 
+/// Contains:
+/// - Sun + 8 planets (from Full Solar System II)
+/// - Major moons (Earth Moon, Mars moons, Galilean moons, etc.)
+/// - 4 dwarf planets (Ceres, Vesta, Pallas, Hygiea)
+/// - `asteroid_count` procedurally generated asteroids (2.1-3.3 AU)
+/// 
+/// Asteroid properties:
+/// - Mass: Power-law distribution (α ≈ 2.3, many small, few large)
+/// - Semi-major axis: Uniform in 2.1-3.3 AU (avoiding Kirkwood gaps)
+/// - Eccentricity: Rayleigh distribution (σ ≈ 0.1)
+/// - Inclination: Rayleigh distribution (σ ≈ 10°)
+pub fn create_asteroid_belt(seed: u64, asteroid_count: usize) -> Simulation {
+    // Start with the full solar system II as base
+    let mut sim = create_full_solar_system_ii(seed, true);
+    
+    let mu_sun = G * M_SUN;
+    let sun_id = 0; // Sun is always first body
+    
+    // Add major dwarf planets
+    let dwarf_planets = [
+        ("Ceres",  asteroid_data::CERES,  9.393e20, 4.73e5, 0xa0a0a0_u32),  // ~940 km diameter
+        ("Vesta",  asteroid_data::VESTA,  2.59e20,  2.63e5, 0xc0c0c0),      // ~525 km
+        ("Pallas", asteroid_data::PALLAS, 2.04e20,  2.56e5, 0xb0b0b0),      // ~512 km
+        ("Hygiea", asteroid_data::HYGIEA, 8.67e19,  2.15e5, 0x909090),      // ~430 km
+    ];
+    
+    for (name, elements, mass, radius, color_hex) in dwarf_planets.iter() {
+        let (pos, vel) = elements.to_cartesian(mu_sun);
+        let mut asteroid = Body::new(
+            0, *name, BodyType::Asteroid,
+            *mass, *radius,
+            pos, vel,
+        );
+        asteroid.semi_major_axis = elements.semi_major_axis;
+        asteroid.eccentricity = elements.eccentricity;
+        asteroid.inclination = elements.inclination;
+        asteroid.longitude_asc_node = elements.longitude_asc_node;
+        asteroid.arg_periapsis = elements.arg_periapsis;
+        asteroid.mean_anomaly = elements.mean_anomaly;
+        asteroid.parent_id = Some(sun_id);
+        asteroid.color = hex_to_rgb(*color_hex);
+        asteroid.composition = PlanetComposition::Rocky;
+        asteroid.albedo = 0.1;
+        asteroid.softening_length = compute_softening(*radius);
+        asteroid.compute_derived();
+        sim.add_body(asteroid);
+    }
+    
+    // Procedurally generate asteroid belt
+    let mut rng = Pcg32::new(seed.wrapping_add(1000));
+    
+    // Asteroid belt parameters
+    let a_min = 2.1 * AU;  // Inner edge (Mars crossers excluded)
+    let a_max = 3.3 * AU;  // Outer edge (before Jupiter trojans)
+    
+    // Mass range: 10^12 kg (1 km) to 10^18 kg (100 km) - most are small
+    let m_min = 1e12;
+    let m_max = 1e18;
+    let alpha = 2.3; // Power-law exponent (steeper = more small bodies)
+    
+    // Rayleigh distribution parameters
+    let ecc_sigma = 0.1;       // σ for eccentricity (~0.15 typical)
+    let inc_sigma = 10.0 * PI / 180.0;  // σ for inclination in radians (~10°)
+    
+    // Kirkwood gaps (resonances with Jupiter to avoid)
+    let kirkwood_gaps = [
+        (2.06 * AU, 0.03 * AU), // 4:1 resonance
+        (2.50 * AU, 0.04 * AU), // 3:1 resonance
+        (2.82 * AU, 0.03 * AU), // 5:2 resonance
+        (2.95 * AU, 0.03 * AU), // 7:3 resonance
+        (3.27 * AU, 0.03 * AU), // 2:1 resonance
+    ];
+    
+    for i in 0..asteroid_count {
+        // Sample semi-major axis, avoiding Kirkwood gaps
+        let mut semi_major_axis;
+        loop {
+            semi_major_axis = rng.next_f64_range(a_min, a_max);
+            let in_gap = kirkwood_gaps.iter().any(|&(center, width)| {
+                (semi_major_axis - center).abs() < width
+            });
+            if !in_gap {
+                break;
+            }
+        }
+        
+        // Sample orbital elements
+        let eccentricity = sample_rayleigh(&mut rng, ecc_sigma).min(0.4); // Cap at 0.4
+        let inclination = sample_rayleigh(&mut rng, inc_sigma);
+        let longitude_asc_node = rng.next_f64() * 2.0 * PI;
+        let arg_periapsis = rng.next_f64() * 2.0 * PI;
+        let mean_anomaly = rng.next_f64() * 2.0 * PI;
+        
+        let elements = OrbitalElements {
+            semi_major_axis,
+            eccentricity,
+            inclination,
+            longitude_asc_node,
+            arg_periapsis,
+            mean_anomaly,
+        };
+        
+        // Sample mass from power-law
+        let mass = sample_power_law(&mut rng, m_min, m_max, alpha);
+        
+        // Estimate radius from mass (assuming density ~2500 kg/m³ for rocky)
+        let density = 2500.0;
+        let volume = mass / density;
+        let radius = (3.0 * volume / (4.0 * PI)).powf(1.0 / 3.0);
+        
+        // Convert to cartesian
+        let (pos, vel) = elements.to_cartesian(mu_sun);
+        
+        // Create asteroid body
+        let name = format!("Asteroid_{}", i + 1);
+        let mut asteroid = Body::new(
+            0, &name, BodyType::Asteroid,
+            mass, radius,
+            pos, vel,
+        );
+        
+        asteroid.semi_major_axis = semi_major_axis;
+        asteroid.eccentricity = eccentricity;
+        asteroid.inclination = inclination;
+        asteroid.longitude_asc_node = longitude_asc_node;
+        asteroid.arg_periapsis = arg_periapsis;
+        asteroid.mean_anomaly = mean_anomaly;
+        asteroid.parent_id = Some(sun_id);
+        
+        // Random gray color for asteroids
+        let gray = 0x60 + (rng.next_bounded(0x40) as u32);
+        asteroid.color = hex_to_rgb((gray << 16) | (gray << 8) | gray);
+        asteroid.composition = PlanetComposition::Rocky;
+        asteroid.albedo = 0.05 + rng.next_f64() * 0.15; // Low albedo (0.05-0.2)
+        asteroid.softening_length = compute_softening(radius);
+        asteroid.compute_derived();
+        
+        sim.add_body(asteroid);
+    }
+    
+    sim.finalize_derived();
+    sim
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DENSE STAR CLUSTER PRESET
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Create a dense star cluster simulation
+/// 
+/// Configuration:
+/// - `star_count` equal-mass stars (solar mass)
+/// - Plummer sphere spatial distribution
+/// - Virialized velocities (virial ratio Q ≈ 0.5)
+/// 
+/// The cluster is self-gravitating with no external potential.
+/// Total mass = star_count × M_SUN
+/// Scale radius chosen to give ~1 pc core radius
+pub fn create_star_cluster(seed: u64, star_count: usize) -> Simulation {
+    let mut sim = Simulation::new(seed);
+    let mut rng = Pcg32::new(seed);
+    
+    // Cluster parameters
+    let star_mass = M_SUN;                    // Each star is 1 solar mass
+    let total_mass = star_mass * star_count as f64;
+    let scale_radius = 3.086e16;              // ~1 parsec Plummer scale radius
+    
+    // For virial equilibrium: 2K + U = 0
+    // K = 0.5 × M × σᵥ²
+    // U = -3πGM²/(64a) for Plummer sphere
+    // σᵥ² = (3π/64) × G × M / a
+    let velocity_dispersion = ((3.0 * PI / 64.0) * G * total_mass / scale_radius).sqrt();
+    
+    // Spectral type colors for variety (all roughly solar-type)
+    let star_colors = [
+        0xFFF4E8_u32, // G2V (Sun-like)
+        0xFFE4C4_u32, // G8V
+        0xFFFAF0_u32, // F8V
+        0xFFEBCD_u32, // G5V
+        0xFFE4B5_u32, // K0V
+    ];
+    
+    for i in 0..star_count {
+        // Sample position from Plummer sphere
+        let r = sample_plummer_radius(&mut rng, scale_radius);
+        let (nx, ny, nz) = sample_unit_sphere(&mut rng);
+        let position = Vec3::new(r * nx, r * ny, r * nz);
+        
+        // Sample velocity from isotropic Gaussian (Maxwell-Boltzmann)
+        // For virialized system, σ = velocity_dispersion / sqrt(3) per component
+        let sigma_1d = velocity_dispersion / 3.0_f64.sqrt();
+        let vx = sample_gaussian(&mut rng, 0.0, sigma_1d);
+        let vy = sample_gaussian(&mut rng, 0.0, sigma_1d);
+        let vz = sample_gaussian(&mut rng, 0.0, sigma_1d);
+        let velocity = Vec3::new(vx, vy, vz);
+        
+        let name = format!("Star_{}", i + 1);
+        let color_idx = rng.next_bounded(star_colors.len() as u32) as usize;
+        
+        let star_id = sim.add_star(&name, star_mass, R_SUN);
+        if let Some(star) = sim.get_body_mut(star_id) {
+            star.position = position;
+            star.velocity = velocity;
+            star.luminosity = L_SUN * (0.8 + rng.next_f64() * 0.4); // 0.8-1.2 L_SUN
+            star.effective_temperature = 5500.0 + rng.next_f64() * 1000.0; // 5500-6500 K
+            star.rotation_rate = OMEGA_SUN * (0.5 + rng.next_f64()); // 0.5-1.5 × solar
+            star.seed = seed.wrapping_add(i as u64);
+            star.metallicity = sample_gaussian(&mut rng, 0.0, 0.3); // Solar ± 0.3 dex
+            star.age = AGE_SUN * (0.1 + rng.next_f64() * 1.8); // 0.5-9 Gyr
+            star.color = hex_to_rgb(star_colors[color_idx]);
+            star.softening_length = R_SUN * 100.0; // Larger softening for cluster dynamics
+            star.compute_derived();
+        }
+    }
+    
+    // Recenter to center of mass (should already be close to zero)
+    recenter_to_barycenter(&mut sim);
+    
+    // Set appropriate timestep for cluster dynamics
+    // Crossing time ~ R / σ ~ 1 pc / 10 km/s ~ 10^5 years
+    sim.set_dt(SECONDS_PER_YEAR * 100.0); // 100 year timestep
+    sim.set_substeps(4);
+    
+    sim.finalize_derived();
+    sim
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1280,6 +1631,7 @@ mod tests {
             Preset::AlphaCentauri,
             Preset::Trappist1,
             Preset::BinaryPulsar,
+            // Note: AsteroidBelt and StarCluster are tested separately due to body count
         ];
         
         for preset in presets {
@@ -1407,5 +1759,93 @@ mod tests {
         println!("Moon position: {:?}", moon.position);
         println!("Moon distance from Earth: {} km", moon_to_earth / 1000.0);
         assert!((moon_to_earth - 3.844e8).abs() < 1e6, "Moon not at correct distance: {} km", moon_to_earth / 1000.0);
+    }
+    
+    #[test]
+    fn test_asteroid_belt_preset() {
+        // Test with a small number for speed
+        let sim = create_asteroid_belt(42, 100);
+        
+        // Full Solar System II has 11 bodies, + 4 dwarf planets + 100 asteroids = 115
+        let expected_min = 11 + 4 + 100;
+        assert!(
+            sim.body_count() >= expected_min,
+            "Asteroid belt should have at least {} bodies, got {}",
+            expected_min,
+            sim.body_count()
+        );
+        
+        // Verify some asteroids are in the correct orbital range
+        let bodies = sim.bodies();
+        let mut asteroid_count = 0;
+        for body in bodies {
+            if body.name.starts_with("Asteroid_") {
+                asteroid_count += 1;
+                // Check semi-major axis is in asteroid belt range (2.1-3.3 AU)
+                let a = body.semi_major_axis;
+                assert!(
+                    a >= 2.0 * AU && a <= 3.5 * AU,
+                    "Asteroid {} has a={:.2} AU, outside belt range",
+                    body.name,
+                    a / AU
+                );
+            }
+        }
+        assert_eq!(asteroid_count, 100, "Should have exactly 100 generated asteroids");
+        
+        // Verify energy is negative (gravitationally bound)
+        let energy = sim.total_energy();
+        assert!(energy < 0.0, "Asteroid belt should be gravitationally bound");
+        
+        println!("✓ Asteroid belt preset validated");
+        println!("  Total bodies: {}", sim.body_count());
+        println!("  Energy: {:.3e} J", energy);
+    }
+    
+    #[test]
+    fn test_star_cluster_preset() {
+        // Test with a small number for speed
+        let sim = create_star_cluster(42, 50);
+        
+        assert_eq!(
+            sim.body_count(),
+            50,
+            "Star cluster should have exactly 50 stars, got {}",
+            sim.body_count()
+        );
+        
+        // Verify all bodies are stars
+        let bodies = sim.bodies();
+        for body in bodies {
+            assert_eq!(
+                body.body_type,
+                BodyType::Star,
+                "All cluster members should be stars"
+            );
+        }
+        
+        // Verify center of mass is near origin (barycentric)
+        let mut com = Vec3::ZERO;
+        let mut total_mass = 0.0;
+        for body in sim.bodies() {
+            com = com + body.position * body.mass;
+            total_mass += body.mass;
+        }
+        com = com / total_mass;
+        let com_offset = com.length();
+        assert!(
+            com_offset < 1e10, // Should be very close to zero
+            "Cluster center of mass should be at origin, offset: {:.3e} m",
+            com_offset
+        );
+        
+        // Verify energy is negative (gravitationally bound)
+        let energy = sim.total_energy();
+        assert!(energy < 0.0, "Star cluster should be gravitationally bound");
+        
+        println!("✓ Star cluster preset validated");
+        println!("  Total stars: {}", sim.body_count());
+        println!("  COM offset: {:.3e} m", com_offset);
+        println!("  Energy: {:.3e} J", energy);
     }
 }

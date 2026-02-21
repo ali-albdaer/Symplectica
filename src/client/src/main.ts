@@ -35,6 +35,7 @@ interface SimState {
     tick: number;
     time: number;
     positions: Float64Array;
+    velocities: Float64Array;
     energy: number;
     bodyCount: number;
 }
@@ -64,9 +65,15 @@ class NBodyClient {
         tick: 0,
         time: 0,
         positions: new Float64Array(0),
+        velocities: new Float64Array(0),
         energy: 0,
         bodyCount: 0,
     };
+
+    // Throttle expensive calculations
+    private lastEnergyCalcTime = 0;
+    private readonly ENERGY_CALC_INTERVAL_MS = 500; // Only recalculate energy every 500ms when paused
+    private cachedBodyMasses: number[] | null = null; // Cache body masses to avoid JSON parsing every frame
 
     private lastFrameTime = 0;
     private fpsHistory: number[] = [];
@@ -476,9 +483,17 @@ class NBodyClient {
         this.bodyRenderer = new BodyRenderer(this.scene);
         this.applyPresetToRenderer();
 
+        // Invalidate caches
+        this.cachedBodyMasses = null;
+        
         // Add all bodies from physics
         const bodies = this.physics.getBodies();
         const positions = this.physics.getPositions();
+        const velocities = this.physics.getVelocities();
+        
+        // Cache initial state
+        this.state.positions = positions;
+        this.state.velocities = velocities;
 
         for (let i = 0; i < bodies.length; i++) {
             const body = bodies[i];
@@ -609,6 +624,20 @@ class NBodyClient {
             this.physics.createSunEarthMoon();
         } else {
             this.physics.createPreset(presetId, BigInt(Date.now()), barycentric);
+        }
+
+        // Configure camera scale based on preset type
+        const PARSEC = 3.086e16;
+        if (presetId === 'starCluster') {
+            // Star cluster preset spans ~10 parsecs, start camera at 5 parsecs
+            this.camera.configureForScale('galactic');
+            this.camera.setInitialDistance(5 * PARSEC);
+            this.camera.setElevation(0.3);
+        } else {
+            // Solar system scale presets
+            this.camera.configureForScale('solar');
+            this.camera.setDistance(3 * AU);
+            this.camera.setElevation(0.5);
         }
 
         this.refreshBodies();
@@ -1063,7 +1092,9 @@ class NBodyClient {
             this.state.energy = this.lastServerState!.energy;
             this.state.bodyCount = Math.floor(this.lastServerPositions.length / 3);
         } else {
-            if (!this.timeController.isPaused()) {
+            const wasPaused = this.timeController.isPaused();
+            
+            if (!wasPaused) {
                 if (this.localSimMode === 'accumulator') {
                     const steps = this.timeController.update(delta);
                     for (let i = 0; i < steps; i++) {
@@ -1092,11 +1123,23 @@ class NBodyClient {
                 }
             }
 
-            // Update state from physics
-            this.state.tick = this.physics.tick();
-            this.state.time = this.physics.time();
-            this.state.positions = this.physics.getPositions();
-            this.state.energy = this.physics.totalEnergy();
+            // Only update positions/velocities if simulation advanced or first frame
+            if (stepsThisFrame > 0 || this.state.positions.length === 0) {
+                this.state.tick = this.physics.tick();
+                this.state.time = this.physics.time();
+                this.state.positions = this.physics.getPositions();
+                this.state.velocities = this.physics.getVelocities();
+            }
+            
+            // Throttle energy calculation - O(N²) is expensive for large body counts
+            const now = performance.now();
+            const shouldRecalcEnergy = stepsThisFrame > 0 || 
+                (now - this.lastEnergyCalcTime > this.ENERGY_CALC_INTERVAL_MS);
+            
+            if (shouldRecalcEnergy) {
+                this.state.energy = this.physics.totalEnergy();
+                this.lastEnergyCalcTime = now;
+            }
         }
 
         const physicsEnd = performance.now();
@@ -1241,13 +1284,21 @@ class NBodyClient {
     }
 
     private computeSystemTotals(): { mass: number; linearMagnitude: number; angularMagnitude: number } | null {
-        const bodies = this.physics.getBodies();
-        const positions = this.physics.getPositions();
-        const velocities = this.physics.getVelocities();
+        // Use cached positions and velocities from state to avoid redundant WASM calls
+        const positions = this.state.positions;
+        const velocities = this.state.velocities;
+        
+        if (positions.length === 0 || velocities.length === 0) return null;
+        
+        const bodyCount = Math.floor(positions.length / 3);
+        if (velocities.length < bodyCount * 3) return null;
 
-        if (bodies.length === 0) return null;
-        if (velocities.length < bodies.length * 3) return null;
-        if (positions.length < bodies.length * 3) return null;
+        // Get body masses - cache this since it's expensive JSON parsing
+        // Only refresh when body count changes
+        if (!this.cachedBodyMasses || this.cachedBodyMasses.length !== bodyCount) {
+            const bodies = this.physics.getBodies();
+            this.cachedBodyMasses = bodies.map(b => b.mass);
+        }
 
         let mass = 0;
         let px = 0;
@@ -1257,8 +1308,8 @@ class NBodyClient {
         let ly = 0;
         let lz = 0;
 
-        for (let i = 0; i < bodies.length; i++) {
-            const bodyMass = bodies[i].mass;
+        for (let i = 0; i < bodyCount; i++) {
+            const bodyMass = this.cachedBodyMasses[i];
             const vx = velocities[i * 3];
             const vy = velocities[i * 3 + 1];
             const vz = velocities[i * 3 + 2];

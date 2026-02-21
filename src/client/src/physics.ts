@@ -394,6 +394,26 @@ export class PhysicsClient {
             case 'binaryPulsar':
                 this.simulation = this.module.createBinaryPulsar(seed);
                 break;
+            case 'asteroidBelt':
+                // Default to 5000 asteroids
+                if (typeof this.module.createAsteroidBelt === 'function') {
+                    this.simulation = this.module.createAsteroidBelt(seed, 5000);
+                } else {
+                    console.warn('[WARN] Asteroid Belt preset unavailable. Falling back to Full Solar System II.');
+                    this.simulation = this.module.createFullSolarSystemII(seed);
+                    loadedPreset = 'fullSolarSystemII';
+                }
+                break;
+            case 'starCluster':
+                // Default to 2000 stars
+                if (typeof this.module.createStarCluster === 'function') {
+                    this.simulation = this.module.createStarCluster(seed, 2000);
+                } else {
+                    console.warn('[WARN] Star Cluster preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
+                }
+                break;
             default:
                 this.simulation = this.module.createSunEarthMoon(seed);
         }

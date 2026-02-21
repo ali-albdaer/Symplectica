@@ -88,6 +88,8 @@ export class AdminPanel {
                             <option value="alphaCentauri">Alpha Centauri</option>
                             <option value="trappist1">TRAPPIST-1</option>
                             <option value="binaryPulsar">Binary Pulsar</option>
+                            <option value="asteroidBelt">Asteroid Belt (5000+ bodies)</option>
+                            <option value="starCluster">Star Cluster (2000 stars)</option>
                         </select>
                     </div>
                     <div class="admin-field" id="barycentric-field">

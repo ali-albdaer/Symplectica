@@ -381,6 +381,20 @@ pub fn create_binary_pulsar(seed: u64) -> WasmSimulation {
     WasmSimulation { inner: presets::create_binary_pulsar(seed) }
 }
 
+/// Create Asteroid Belt preset (Full solar system + 2000-10000 asteroids)
+/// Power-law mass spectrum, Rayleigh orbital elements
+#[wasm_bindgen(js_name = createAsteroidBelt)]
+pub fn create_asteroid_belt(seed: u64, asteroid_count: u32) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_asteroid_belt(seed, asteroid_count as usize) }
+}
+
+/// Create Dense Star Cluster preset (1000-5000 equal-mass stars)
+/// Plummer sphere distribution, virialized velocities
+#[wasm_bindgen(js_name = createStarCluster)]
+pub fn create_star_cluster(seed: u64, star_count: u32) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_star_cluster(seed, star_count as usize) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

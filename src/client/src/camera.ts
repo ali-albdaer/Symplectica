@@ -57,7 +57,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
 
     // Limits
     private readonly minRadius = 1e6;  // 1000 km
-    private readonly maxRadius = 1e15; // ~1000 AU
+    private maxRadius = 1e15; // ~1000 AU (can be increased for galactic scale)
     private readonly minElevation = -Math.PI / 2 + 0.01;
     private readonly maxElevation = Math.PI / 2 - 0.01;
 
@@ -365,5 +365,36 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             worldY - this.originY,
             worldZ - this.originZ
         );
+    }
+
+    /**
+     * Configure camera for different simulation scales.
+     * 'solar' = default solar system scale (~1000 AU max)
+     * 'galactic' = star cluster scale (~1000 parsecs max)
+     */
+    configureForScale(scale: 'solar' | 'galactic'): void {
+        const PARSEC = 3.086e16;  // meters
+        
+        if (scale === 'galactic') {
+            // Star clusters can span hundreds of parsecs
+            this.maxRadius = 1000 * PARSEC;  // 1000 parsecs
+            this.far = 1e20;  // Render up to ~3000 parsecs
+            this.updateProjectionMatrix();
+        } else {
+            // Solar system scale
+            this.maxRadius = 1e15;  // ~1000 AU
+            this.far = 1e15;
+            this.updateProjectionMatrix();
+        }
+    }
+
+    /** Set initial camera distance, bypassing maxRadius clamp during initialization */
+    setInitialDistance(distance: number): void {
+        // Temporarily allow any distance for initial setup
+        const savedMax = this.maxRadius;
+        this.maxRadius = Math.max(this.maxRadius, distance);
+        this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, distance));
+        this.maxRadius = savedMax;
+        this.updatePosition();
     }
 }
