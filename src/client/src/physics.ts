@@ -466,6 +466,38 @@ export class PhysicsClient {
         return id;
     }
 
+    /** 
+     * Add a body with direct position/velocity control.
+     * Uses the full WASM addBody function for precise placement.
+     * @param body.bodyType: 0=Star, 1=Planet, 2=Moon, 3=Asteroid, 4=Comet, 5=Spacecraft, 6=TestParticle, 7=Player
+     */
+    addBodyDirect(body: {
+        name: string;
+        bodyType: number;
+        mass: number;
+        radius: number;
+        x: number;
+        y: number;
+        z: number;
+        vx: number;
+        vy: number;
+        vz: number;
+    }): number {
+        if (!this.simulation) throw new Error('No simulation');
+
+        const id = this.simulation.addBody(
+            body.name,
+            body.bodyType,
+            body.mass,
+            body.radius,
+            body.x, body.y, body.z,
+            body.vx, body.vy, body.vz
+        );
+
+        console.log(`[INFO] Added body: ${body.name} (id: ${id}, type: ${body.bodyType})`);
+        return id;
+    }
+
     /** Remove a body by ID */
     removeBody(id: number): void {
         if (!this.simulation) return;

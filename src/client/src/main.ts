@@ -23,6 +23,7 @@ import visualPresets from './visualPresets.json';
 import { registerVisualPresetFeatures } from './visual-preset-features';
 import { SkyRenderer } from './sky-renderer';
 import { TouchControls } from './touch-controls';
+import { BuildPanel, BuildBodyParams, BuildableBodyType } from './build-panel';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -60,6 +61,8 @@ class NBodyClient {
     private adminPanel!: AdminPanel;
     private optionsPanel!: OptionsPanel;
     private touchControls!: TouchControls;
+    private buildPanel!: BuildPanel;
+    private buildMode = false; // True when in world builder mode
 
     private state: SimState = {
         tick: 0,
@@ -253,6 +256,12 @@ class NBodyClient {
                 message: enabled ? 'Touch controls enabled' : 'Touch controls disabled'
             };
         });
+
+        // Initialize Build Panel (World Builder mode)
+        this.buildPanel = new BuildPanel(
+            (params) => this.onBuildParamsChange(params),
+            (params) => this.onBuildSpawn(params)
+        );
 
         this.hideLoading();
 
@@ -625,9 +634,29 @@ class NBodyClient {
     }
 
     private loadPresetFromAdmin(presetId: string, name: string, barycentric: boolean = false, bodyCount?: number): void {
-        if (presetId === 'sunEarthMoon') {
+        if (presetId === 'worldBuilder') {
+            // World Builder: create empty simulation
+            this.physics.createNew(BigInt(Date.now()));
+            this.buildMode = true;
+            this.buildPanel.reset();
+            this.buildPanel.open();
+            
+            // Enable XY grid by default in build mode
+            this.currentVizOptions.showGridXY = true;
+            this.applyVisualizationToRenderer(this.currentVizOptions);
+            this.optionsPanel?.applyOptions(this.currentVizOptions);
+            
+            // Set camera to origin-focused view
+            this.camera.configureForScale('solar');
+            this.camera.setFocus(0, 0, 0);
+            this.camera.setDistance(3 * AU);
+            this.camera.setElevation(0.5);
+            this.followBodyIndex = -1;
+        } else if (presetId === 'sunEarthMoon') {
+            this.buildMode = false;
             this.physics.createSunEarthMoon();
         } else {
+            this.buildMode = false;
             this.physics.createPreset(presetId, BigInt(Date.now()), barycentric, bodyCount);
         }
 
@@ -638,8 +667,8 @@ class NBodyClient {
             this.camera.configureForScale('galactic');
             this.camera.setInitialDistance(5 * PARSEC);
             this.camera.setElevation(0.3);
-        } else {
-            // Solar system scale presets
+        } else if (presetId !== 'worldBuilder') {
+            // Solar system scale presets (worldBuilder already handled above)
             this.camera.configureForScale('solar');
             this.camera.setDistance(3 * AU);
             this.camera.setElevation(0.5);
@@ -1571,6 +1600,69 @@ class NBodyClient {
             this.chat.addSystemMessage('Touch controls not enabled. Type /mobile in chat to enable them later.');
             promptContainer.remove();
         });
+    }
+
+    // ===== Build Panel Handlers =====
+
+    private onBuildParamsChange(params: BuildBodyParams): void {
+        // Update ghost preview appearance in renderer
+        if (this.buildMode && this.buildPanel.isVisible()) {
+            this.bodyRenderer.setGhostPreview(params.radius, params.color, params.type);
+            this.bodyRenderer.setGhostVisible(true);
+            
+            // Position ghost at build panel's current position (camera-relative)
+            const origin = this.camera.getWorldOrigin();
+            const localX = params.x - origin.x;
+            const localY = params.y - origin.y;
+            const localZ = params.z - origin.z;
+            this.bodyRenderer.updateGhostPosition(localX, localY, localZ);
+        } else {
+            this.bodyRenderer.setGhostVisible(false);
+        }
+    }
+
+    private onBuildSpawn(params: BuildBodyParams): void {
+        if (!this.buildMode) {
+            console.warn('[Build] Cannot spawn body - not in build mode');
+            return;
+        }
+
+        // Map BuildableBodyType to WASM body type number
+        const bodyTypeMap: Record<BuildableBodyType, number> = {
+            'star': 0,
+            'planet': 1,
+            'moon': 2,
+            'asteroid': 3,
+            'comet': 4,
+            'spacecraft': 5,
+        };
+
+        const bodyType = bodyTypeMap[params.type] ?? 3; // Default to asteroid
+
+        // Add body via physics (which uses WASM addBody)
+        this.physics.addBodyDirect({
+            name: params.name,
+            bodyType,
+            mass: params.mass,
+            radius: params.radius,
+            x: params.x,
+            y: params.y,
+            z: params.z,
+            vx: params.vx,
+            vy: params.vy,
+            vz: params.vz,
+        });
+
+        // Refresh the body list and renderer
+        this.refreshBodies();
+        
+        // Update network if connected
+        if (this.network?.isConnected()) {
+            const snapshot = this.physics.getSnapshot();
+            this.network.sendSnapshot(snapshot, 'World Builder');
+        }
+
+        console.log(`[Build] Spawned ${params.type}: ${params.name}`);
     }
 
     showError(message: string): void {

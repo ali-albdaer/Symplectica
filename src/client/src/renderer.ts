@@ -1018,6 +1018,10 @@ export class BodyRenderer {
     private refPoints: Map<number, THREE.Mesh> = new Map();
     private showRefPointFlag = false;
 
+    // Ghost preview for world builder
+    private ghostMesh: THREE.Mesh | null = null;
+    private ghostVisible = false;
+
     constructor(scene: THREE.Scene) {
         this.scene = scene;
     }
@@ -1473,6 +1477,79 @@ export class BodyRenderer {
         }
     }
 
+    // ===== Ghost Preview Methods (World Builder) =====
+
+    /**
+     * Create or update the ghost preview body.
+     * @param radius Physical radius in meters
+     * @param color Hex color
+     * @param type Body type string for material selection
+     */
+    setGhostPreview(radius: number, color: number, type: string): void {
+        // Scale radius using same function as real bodies
+        const visualRadius = scaleRadius(radius * this.renderScale);
+
+        if (!this.ghostMesh) {
+            // Create ghost mesh
+            const geometry = new THREE.SphereGeometry(1, 32, 16);
+            const material = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.4,
+                wireframe: type === 'spacecraft',
+            });
+            this.ghostMesh = new THREE.Mesh(geometry, material);
+            this.ghostMesh.visible = false;
+            this.scene.add(this.ghostMesh);
+        }
+
+        // Update ghost appearance
+        const material = this.ghostMesh.material as THREE.MeshBasicMaterial;
+        material.color.setHex(color);
+        material.wireframe = type === 'spacecraft';
+        this.ghostMesh.scale.setScalar(visualRadius);
+    }
+
+    /**
+     * Update ghost preview position (world coordinates).
+     * Position is camera-relative for floating origin.
+     */
+    updateGhostPosition(localX: number, localY: number, localZ: number): void {
+        if (this.ghostMesh) {
+            this.ghostMesh.position.set(localX, localY, localZ);
+        }
+    }
+
+    /**
+     * Show or hide the ghost preview.
+     */
+    setGhostVisible(visible: boolean): void {
+        this.ghostVisible = visible;
+        if (this.ghostMesh) {
+            this.ghostMesh.visible = visible;
+        }
+    }
+
+    /**
+     * Get current ghost visibility state.
+     */
+    isGhostVisible(): boolean {
+        return this.ghostVisible;
+    }
+
+    /**
+     * Remove ghost preview.
+     */
+    removeGhost(): void {
+        if (this.ghostMesh) {
+            this.scene.remove(this.ghostMesh);
+            this.ghostMesh.geometry.dispose();
+            (this.ghostMesh.material as THREE.Material).dispose();
+            this.ghostMesh = null;
+        }
+        this.ghostVisible = false;
+    }
+
     dispose(): void {
         for (const mesh of this.bodies.values()) {
             this.scene.remove(mesh.group);
@@ -1498,6 +1575,9 @@ export class BodyRenderer {
         this.refPlanes.clear();
         this.refLines.clear();
         this.refPoints.clear();
+
+        // Clean up ghost preview
+        this.removeGhost();
 
         if (this.gridGroup) {
             this.scene.remove(this.gridGroup);

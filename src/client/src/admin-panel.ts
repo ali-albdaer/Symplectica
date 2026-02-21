@@ -90,6 +90,7 @@ export class AdminPanel {
                             <option value="binaryPulsar">Binary Pulsar</option>
                             <option value="asteroidBelt">Asteroid Belt (5000+ bodies)</option>
                             <option value="starCluster">Star Cluster (2000 stars)</option>
+                            <option value="worldBuilder">+ World Builder</option>
                         </select>
                     </div>
                     <div class="admin-field" id="barycentric-field">
