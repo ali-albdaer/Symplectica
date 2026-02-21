@@ -117,7 +117,7 @@ class NBodyClient {
         stepsThisFrame: 0,
     };
 
-    // Averaged performance timing (exponential moving average, α = 0.1)
+    // Averaged performance timing (exponential moving average, α = 0.05 for smooth display)
     private frameTimingAvg = {
         total: 0,
         physics: 0,
@@ -125,7 +125,8 @@ class NBodyClient {
         ui: 0,
         stepsThisFrame: 0,
     };
-    private readonly EMA_ALPHA = 0.1; // Smoothing factor (lower = smoother)
+    private frameTimingSeeded = false; // First frame seeds the average
+    private readonly EMA_ALPHA = 0.05; // Smoothing factor (lower = smoother)
 
     // Body following
     private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
@@ -771,13 +772,23 @@ class NBodyClient {
     private updatePerfMonitor(): void {
         if (!this.showPerfMonitor) return;
 
-        // Update exponential moving averages
-        const a = this.EMA_ALPHA;
-        this.frameTimingAvg.total = a * this.frameTiming.total + (1 - a) * this.frameTimingAvg.total;
-        this.frameTimingAvg.physics = a * this.frameTiming.physics + (1 - a) * this.frameTimingAvg.physics;
-        this.frameTimingAvg.render = a * this.frameTiming.render + (1 - a) * this.frameTimingAvg.render;
-        this.frameTimingAvg.ui = a * this.frameTiming.ui + (1 - a) * this.frameTimingAvg.ui;
-        this.frameTimingAvg.stepsThisFrame = a * this.frameTiming.stepsThisFrame + (1 - a) * this.frameTimingAvg.stepsThisFrame;
+        // Seed averages with first measurement to avoid slow ramp-up from 0
+        if (!this.frameTimingSeeded) {
+            this.frameTimingAvg.total = this.frameTiming.total;
+            this.frameTimingAvg.physics = this.frameTiming.physics;
+            this.frameTimingAvg.render = this.frameTiming.render;
+            this.frameTimingAvg.ui = this.frameTiming.ui;
+            this.frameTimingAvg.stepsThisFrame = this.frameTiming.stepsThisFrame;
+            this.frameTimingSeeded = true;
+        } else {
+            // Update exponential moving averages
+            const a = this.EMA_ALPHA;
+            this.frameTimingAvg.total = a * this.frameTiming.total + (1 - a) * this.frameTimingAvg.total;
+            this.frameTimingAvg.physics = a * this.frameTiming.physics + (1 - a) * this.frameTimingAvg.physics;
+            this.frameTimingAvg.render = a * this.frameTiming.render + (1 - a) * this.frameTimingAvg.render;
+            this.frameTimingAvg.ui = a * this.frameTiming.ui + (1 - a) * this.frameTimingAvg.ui;
+            this.frameTimingAvg.stepsThisFrame = a * this.frameTiming.stepsThisFrame + (1 - a) * this.frameTimingAvg.stepsThisFrame;
+        }
 
         const frameEl = document.getElementById('perf-frame-time');
         const physicsEl = document.getElementById('perf-physics-time');
