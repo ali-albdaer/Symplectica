@@ -652,7 +652,7 @@ class NBodyClient {
             // Set camera to origin-focused view
             this.camera.configureForScale('solar');
             this.camera.setFocus(0, 0, 0);
-            this.camera.setDistance(3 * AU);
+            this.camera.setDistance(0.5 * AU);
             this.camera.setElevation(0.5);
             this.followBodyIndex = -1;
         } else if (presetId === 'sunEarthMoon') {
