@@ -1284,6 +1284,11 @@ class NBodyClient {
             document.getElementById('sim-mass')!.textContent = this.formatMass(totals.mass);
             document.getElementById('sim-linear-momentum')!.textContent = this.formatMomentum(totals.linearMagnitude, 'kg·m/s');
             document.getElementById('sim-angular-momentum')!.textContent = this.formatMomentum(totals.angularMagnitude, 'kg·m²/s');
+        } else {
+            // No bodies or no velocity data - show zeros
+            document.getElementById('sim-mass')!.textContent = '0 kg';
+            document.getElementById('sim-linear-momentum')!.textContent = '0 kg·m/s';
+            document.getElementById('sim-angular-momentum')!.textContent = '0 kg·m²/s';
         }
 
         const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;

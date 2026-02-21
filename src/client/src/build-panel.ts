@@ -118,6 +118,7 @@ export class BuildPanel {
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.setupKeyboardShortcut();
+        this.setupDrag();
     }
 
     private createDefaultParams(type: BuildableBodyType): BuildBodyParams {
@@ -311,13 +312,15 @@ export class BuildPanel {
                 padding: 10px 12px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 background: rgba(0, 0, 0, 0.3);
+                cursor: move;
+                user-select: none;
             }
             
             .build-header h2 {
                 font-size: 14px;
                 font-weight: 600;
                 margin: 0;
-                color: #4caf50;
+                color: #4fc3f7;
             }
             
             .build-close {
@@ -357,8 +360,8 @@ export class BuildPanel {
             }
 
             .build-tab.active {
-                color: #4caf50;
-                border-bottom-color: #4caf50;
+                color: #4fc3f7;
+                border-bottom-color: #4fc3f7;
             }
             
             .build-content { 
@@ -405,9 +408,9 @@ export class BuildPanel {
             }
             
             .build-type-btn.active {
-                background: rgba(76, 175, 80, 0.2);
-                border-color: rgba(76, 175, 80, 0.6);
-                color: #4caf50;
+                background: rgba(79, 195, 247, 0.2);
+                border-color: rgba(79, 195, 247, 0.6);
+                color: #4fc3f7;
             }
 
             .build-row {
@@ -432,7 +435,7 @@ export class BuildPanel {
             .build-toggle input[type="checkbox"] {
                 width: 14px;
                 height: 14px;
-                accent-color: #4caf50;
+                accent-color: #4fc3f7;
                 margin: 0;
             }
 
@@ -490,7 +493,7 @@ export class BuildPanel {
             .build-field input:focus,
             .build-field-col input:focus {
                 outline: none;
-                border-color: rgba(76, 175, 80, 0.5);
+                border-color: rgba(79, 195, 247, 0.5);
             }
 
             .build-btn-small {
@@ -519,10 +522,10 @@ export class BuildPanel {
             .build-btn-spawn {
                 width: 100%;
                 padding: 10px;
-                background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(76, 175, 80, 0.1));
-                border: 1px solid rgba(76, 175, 80, 0.5);
+                background: linear-gradient(135deg, rgba(79, 195, 247, 0.3), rgba(79, 195, 247, 0.1));
+                border: 1px solid rgba(79, 195, 247, 0.5);
                 border-radius: 6px;
-                color: #4caf50;
+                color: #4fc3f7;
                 font-size: 12px;
                 font-weight: 600;
                 cursor: pointer;
@@ -530,8 +533,8 @@ export class BuildPanel {
             }
             
             .build-btn-spawn:hover {
-                background: linear-gradient(135deg, rgba(76, 175, 80, 0.4), rgba(76, 175, 80, 0.2));
-                border-color: rgba(76, 175, 80, 0.8);
+                background: linear-gradient(135deg, rgba(79, 195, 247, 0.4), rgba(79, 195, 247, 0.2));
+                border-color: rgba(79, 195, 247, 0.8);
             }
 
             #build-star-section.hidden { display: none; }
@@ -741,6 +744,46 @@ export class BuildPanel {
         nameInput.value = `${this.selectedType.charAt(0).toUpperCase() + this.selectedType.slice(1)} ${this.bodyCounter + 1}`;
         
         this.updateParamsFromUI();
+    }
+
+    private setupDrag(): void {
+        const header = this.container.querySelector('.build-header') as HTMLElement | null;
+        if (!header) return;
+
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        let dragging = false;
+
+        const onMouseMove = (event: MouseEvent) => {
+            if (!dragging) return;
+            const deltaX = event.clientX - startX;
+            const deltaY = event.clientY - startY;
+            this.container.style.left = `${startLeft + deltaX}px`;
+            this.container.style.top = `${startTop + deltaY}px`;
+        };
+
+        const onMouseUp = () => {
+            dragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        header.addEventListener('mousedown', (event) => {
+            if ((event.target as HTMLElement).closest('button')) return;
+            const rect = this.container.getBoundingClientRect();
+            startX = event.clientX;
+            startY = event.clientY;
+            startLeft = rect.left;
+            startTop = rect.top;
+            this.container.style.left = `${rect.left}px`;
+            this.container.style.top = `${rect.top}px`;
+            this.container.style.right = 'auto';
+            dragging = true;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
     }
 
     toggle(): void {
