@@ -110,6 +110,16 @@ class NBodyClient {
         stepsThisFrame: 0,
     };
 
+    // Averaged performance timing (exponential moving average, α = 0.1)
+    private frameTimingAvg = {
+        total: 0,
+        physics: 0,
+        render: 0,
+        ui: 0,
+        stepsThisFrame: 0,
+    };
+    private readonly EMA_ALPHA = 0.1; // Smoothing factor (lower = smoother)
+
     // Body following
     private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
     private lastFollowBodyIndex = -1;
@@ -732,6 +742,14 @@ class NBodyClient {
     private updatePerfMonitor(): void {
         if (!this.showPerfMonitor) return;
 
+        // Update exponential moving averages
+        const a = this.EMA_ALPHA;
+        this.frameTimingAvg.total = a * this.frameTiming.total + (1 - a) * this.frameTimingAvg.total;
+        this.frameTimingAvg.physics = a * this.frameTiming.physics + (1 - a) * this.frameTimingAvg.physics;
+        this.frameTimingAvg.render = a * this.frameTiming.render + (1 - a) * this.frameTimingAvg.render;
+        this.frameTimingAvg.ui = a * this.frameTiming.ui + (1 - a) * this.frameTimingAvg.ui;
+        this.frameTimingAvg.stepsThisFrame = a * this.frameTiming.stepsThisFrame + (1 - a) * this.frameTimingAvg.stepsThisFrame;
+
         const frameEl = document.getElementById('perf-frame-time');
         const physicsEl = document.getElementById('perf-physics-time');
         const renderEl = document.getElementById('perf-render-time');
@@ -740,11 +758,12 @@ class NBodyClient {
         const bodiesEl = document.getElementById('perf-bodies');
         const barEl = document.getElementById('perf-bar-fill');
 
-        if (frameEl) frameEl.textContent = `${this.frameTiming.total.toFixed(1)} ms`;
-        if (physicsEl) physicsEl.textContent = `${this.frameTiming.physics.toFixed(1)} ms`;
-        if (renderEl) renderEl.textContent = `${this.frameTiming.render.toFixed(1)} ms`;
-        if (uiEl) uiEl.textContent = `${this.frameTiming.ui.toFixed(1)} ms`;
-        if (stepsEl) stepsEl.textContent = this.frameTiming.stepsThisFrame.toString();
+        // Format: "instant (avg)" for better readability
+        if (frameEl) frameEl.textContent = `${this.frameTiming.total.toFixed(1)} (${this.frameTimingAvg.total.toFixed(1)}) ms`;
+        if (physicsEl) physicsEl.textContent = `${this.frameTiming.physics.toFixed(1)} (${this.frameTimingAvg.physics.toFixed(1)}) ms`;
+        if (renderEl) renderEl.textContent = `${this.frameTiming.render.toFixed(1)} (${this.frameTimingAvg.render.toFixed(1)}) ms`;
+        if (uiEl) uiEl.textContent = `${this.frameTiming.ui.toFixed(1)} (${this.frameTimingAvg.ui.toFixed(1)}) ms`;
+        if (stepsEl) stepsEl.textContent = `${this.frameTiming.stepsThisFrame} (${this.frameTimingAvg.stepsThisFrame.toFixed(1)})`;
         if (bodiesEl) bodiesEl.textContent = this.state.bodyCount.toString();
 
         // Show simulation status for debugging
@@ -753,13 +772,14 @@ class NBodyClient {
             const isPaused = this.timeController.isPaused();
             const useServer = this.network?.isConnected() && this.lastServerState;
             if (useServer) {
-                statusEl.textContent = 'SERVER';
-                statusEl.style.color = '#4fc3f7';
+                // Show server mode with pause indicator
+                statusEl.textContent = isPaused ? 'SERVER ⏸' : 'SERVER ▶';
+                statusEl.style.color = isPaused ? '#ff9800' : '#4fc3f7';
             } else if (isPaused) {
-                statusEl.textContent = 'PAUSED';
+                statusEl.textContent = 'LOCAL ⏸';
                 statusEl.style.color = '#ff9800';
             } else {
-                statusEl.textContent = 'RUNNING';
+                statusEl.textContent = 'LOCAL ▶';
                 statusEl.style.color = '#4caf50';
             }
         }
