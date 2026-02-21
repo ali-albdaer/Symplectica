@@ -400,9 +400,9 @@ export class AdminPanel {
             if (!presetSelect) return;
             const presetId = presetSelect.value;
             
-            // Show barycentric only for Full Solar System II
+            // Show barycentric for Full Solar System II and World Builder
             if (barycentricField) {
-                barycentricField.style.display = presetId === 'fullSolarSystemII' ? 'block' : 'none';
+                barycentricField.style.display = (presetId === 'fullSolarSystemII' || presetId === 'worldBuilder') ? 'block' : 'none';
             }
             
             // Show body count input for asteroid belt and star cluster
