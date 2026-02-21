@@ -23,7 +23,7 @@ import visualPresets from './visualPresets.json';
 import { registerVisualPresetFeatures } from './visual-preset-features';
 import { SkyRenderer } from './sky-renderer';
 import { TouchControls } from './touch-controls';
-import { BuildPanel, BuildBodyParams, BuildableBodyType } from './build-panel';
+import { BuildPanel, BuildBodyParams, BuildableBodyType, BodyListEntry } from './build-panel';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -261,7 +261,9 @@ class NBodyClient {
         this.buildPanel = new BuildPanel(
             (params) => this.onBuildParamsChange(params),
             (params) => this.onBuildSpawn(params),
-            () => this.onBuildPanelClose()
+            () => this.onBuildPanelClose(),
+            () => this.onGetBodiesForBuildPanel(),
+            (id) => this.onDeleteBodyFromBuildPanel(id)
         );
 
         this.hideLoading();
@@ -1641,6 +1643,39 @@ class NBodyClient {
     private onBuildPanelClose(): void {
         // Remove ghost preview when panel closes
         this.bodyRenderer.removeGhost();
+    }
+
+    private onGetBodiesForBuildPanel(): BodyListEntry[] {
+        const bodies = this.physics.getBodies();
+        return bodies.map(body => ({
+            id: body.id,
+            name: body.name,
+            type: body.type,
+            mass: body.mass,
+            radius: body.radius,
+            color: body.color,
+        }));
+    }
+
+    private onDeleteBodyFromBuildPanel(id: number): void {
+        if (!this.buildMode) {
+            console.warn('[Build] Cannot delete body - not in build mode');
+            return;
+        }
+
+        const success = this.physics.removeBody(id);
+        if (success) {
+            // Refresh the body list and renderer
+            this.refreshBodies();
+            
+            // Update network if connected
+            if (this.network?.isConnected()) {
+                const snapshot = this.physics.getSnapshot();
+                this.network.sendSnapshot(snapshot, 'World Builder');
+            }
+
+            console.log(`[Build] Deleted body id=${id}`);
+        }
     }
 
     private onBuildSpawn(params: BuildBodyParams): void {

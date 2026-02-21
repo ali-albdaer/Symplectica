@@ -95,6 +95,15 @@ const BODY_TYPE_DEFAULTS: Record<BuildableBodyType, BodyTypeDefaults> = {
     },
 };
 
+export interface BodyListEntry {
+    id: number;
+    name: string;
+    type: string;
+    mass: number;
+    radius: number;
+    color: number;
+}
+
 export class BuildPanel {
     private container: HTMLElement;
     private isOpen = false;
@@ -105,15 +114,21 @@ export class BuildPanel {
     private onParamsChange?: (params: BuildBodyParams) => void;
     private onSpawn?: (params: BuildBodyParams) => void;
     private onPanelClose?: () => void;
+    private onGetBodies?: () => BodyListEntry[];
+    private onDeleteBody?: (id: number) => void;
 
     constructor(
         onParamsChange?: (params: BuildBodyParams) => void,
         onSpawn?: (params: BuildBodyParams) => void,
-        onPanelClose?: () => void
+        onPanelClose?: () => void,
+        onGetBodies?: () => BodyListEntry[],
+        onDeleteBody?: (id: number) => void
     ) {
         this.onParamsChange = onParamsChange;
         this.onSpawn = onSpawn;
         this.onPanelClose = onPanelClose;
+        this.onGetBodies = onGetBodies;
+        this.onDeleteBody = onDeleteBody;
         this.params = this.createDefaultParams('planet');
         this.container = this.createUI();
         document.body.appendChild(this.container);
@@ -157,6 +172,7 @@ export class BuildPanel {
                 <button class="build-tab active" data-tab="basic">Basic</button>
                 <button class="build-tab" data-tab="orbit">Orbit</button>
                 <button class="build-tab" data-tab="props">Props</button>
+                <button class="build-tab" data-tab="bodies">Bodies</button>
             </div>
 
             <div class="build-content active" id="tab-basic">
@@ -278,6 +294,12 @@ export class BuildPanel {
                 </section>
             </div>
 
+            <div class="build-content" id="tab-bodies" style="display: none;">
+                <div class="build-body-list" id="build-body-list">
+                    <p class="build-body-empty">No bodies yet</p>
+                </div>
+            </div>
+
             <div class="build-footer">
                 <button class="build-btn-spawn" id="build-spawn">Spawn Body</button>
             </div>
@@ -289,7 +311,7 @@ export class BuildPanel {
                 position: fixed;
                 top: 20px;
                 left: 20px;
-                width: 220px;
+                width: 260px;
                 background: rgba(10, 15, 30, 0.95);
                 backdrop-filter: blur(20px);
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -538,6 +560,93 @@ export class BuildPanel {
             }
 
             #build-star-section.hidden { display: none; }
+
+            .build-body-list {
+                max-height: 300px;
+                overflow-y: auto;
+            }
+
+            .build-body-empty {
+                color: rgba(255, 255, 255, 0.4);
+                text-align: center;
+                padding: 20px;
+                margin: 0;
+                font-size: 12px;
+            }
+
+            .build-body-item {
+                display: flex;
+                align-items: center;
+                padding: 6px 8px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 4px;
+                margin-bottom: 4px;
+                gap: 8px;
+            }
+
+            .build-body-item:last-child {
+                margin-bottom: 0;
+            }
+
+            .build-body-color {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                flex-shrink: 0;
+            }
+
+            .build-body-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .build-body-name {
+                font-size: 11px;
+                font-weight: 500;
+                color: #fff;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .build-body-type {
+                font-size: 9px;
+                color: rgba(255, 255, 255, 0.5);
+                text-transform: uppercase;
+            }
+
+            .build-body-actions {
+                display: flex;
+                gap: 4px;
+                flex-shrink: 0;
+            }
+
+            .build-body-btn {
+                padding: 3px 6px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 3px;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 9px;
+                cursor: pointer;
+                transition: all 0.15s;
+            }
+
+            .build-body-btn:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff;
+            }
+
+            .build-body-btn.delete {
+                color: #ff6b6b;
+                border-color: rgba(255, 107, 107, 0.3);
+            }
+
+            .build-body-btn.delete:hover {
+                background: rgba(255, 107, 107, 0.2);
+                border-color: rgba(255, 107, 107, 0.5);
+            }
         `;
         document.head.appendChild(style);
 
@@ -606,6 +715,48 @@ export class BuildPanel {
             const isActive = content.id === `tab-${tabName}`;
             content.classList.toggle('active', isActive);
             (content as HTMLElement).style.display = isActive ? 'block' : 'none';
+        });
+
+        // Refresh body list when switching to bodies tab
+        if (tabName === 'bodies') {
+            this.refreshBodyList();
+        }
+    }
+
+    private refreshBodyList(): void {
+        const listEl = this.container.querySelector('#build-body-list');
+        if (!listEl) return;
+
+        const bodies = this.onGetBodies?.() ?? [];
+        
+        if (bodies.length === 0) {
+            listEl.innerHTML = '<p class="build-body-empty">No bodies yet</p>';
+            return;
+        }
+
+        listEl.innerHTML = bodies.map(body => `
+            <div class="build-body-item" data-body-id="${body.id}">
+                <div class="build-body-color" style="background: #${body.color.toString(16).padStart(6, '0')};"></div>
+                <div class="build-body-info">
+                    <div class="build-body-name">${body.name}</div>
+                    <div class="build-body-type">${body.type}</div>
+                </div>
+                <div class="build-body-actions">
+                    <button class="build-body-btn delete" data-action="delete" data-id="${body.id}" title="Delete">✕</button>
+                </div>
+            </div>
+        `).join('');
+
+        // Add click handlers for delete buttons
+        listEl.querySelectorAll('.build-body-btn.delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = parseInt((btn as HTMLElement).dataset.id ?? '0');
+                if (id > 0) {
+                    this.onDeleteBody?.(id);
+                    this.refreshBodyList();
+                }
+            });
         });
     }
 

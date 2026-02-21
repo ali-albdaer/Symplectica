@@ -499,11 +499,16 @@ export class PhysicsClient {
     }
 
     /** Remove a body by ID */
-    removeBody(id: number): void {
-        if (!this.simulation) return;
+    removeBody(id: number): boolean {
+        if (!this.simulation) return false;
 
-        // Note: WASM doesn't have remove yet, would need to rebuild
-        console.log(`[WARN] Remove body ${id} - not implemented in WASM yet`);
+        const result = this.simulation.removeBody(id);
+        if (result) {
+            console.log(`[INFO] Removed body id=${id}`);
+        } else {
+            console.log(`[WARN] Body id=${id} not found`);
+        }
+        return result;
     }
 
     dispose(): void {
