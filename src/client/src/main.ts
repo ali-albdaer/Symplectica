@@ -747,6 +747,23 @@ class NBodyClient {
         if (stepsEl) stepsEl.textContent = this.frameTiming.stepsThisFrame.toString();
         if (bodiesEl) bodiesEl.textContent = this.state.bodyCount.toString();
 
+        // Show simulation status for debugging
+        const statusEl = document.getElementById('perf-status');
+        if (statusEl) {
+            const isPaused = this.timeController.isPaused();
+            const useServer = this.network?.isConnected() && this.lastServerState;
+            if (useServer) {
+                statusEl.textContent = 'SERVER';
+                statusEl.style.color = '#4fc3f7';
+            } else if (isPaused) {
+                statusEl.textContent = 'PAUSED';
+                statusEl.style.color = '#ff9800';
+            } else {
+                statusEl.textContent = 'RUNNING';
+                statusEl.style.color = '#4caf50';
+            }
+        }
+
         // Bar shows frame time as percentage of 16.67ms (60fps budget)
         const budgetMs = 16.67;
         const usedPercent = Math.min((this.frameTiming.total / budgetMs) * 100, 100);
@@ -1125,12 +1142,14 @@ class NBodyClient {
         // --- UI timing ---
         const uiStart = performance.now();
         this.updateUI();
-        this.updatePerfMonitor();
         const uiEnd = performance.now();
         this.frameTiming.ui = uiEnd - uiStart;
 
         // Total frame time
         this.frameTiming.total = performance.now() - frameStart;
+
+        // Update perf monitor AFTER all timing values are set
+        this.updatePerfMonitor();
     };
 
     private updateUI(): void {
