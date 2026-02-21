@@ -53,7 +53,7 @@ interface PhysicsModule {
     init: () => void;
 }
 
-interface BodyInfo {
+export interface BodyInfo {
     id: number;
     name: string;
     type: 'star' | 'planet' | 'moon' | 'asteroid' | 'comet' | 'spacecraft' | 'test_particle' | 'player';

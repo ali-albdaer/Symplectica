@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
 import { AdminStatePayload, NetworkClient } from './network';
-import { PhysicsClient } from './physics';
+import { PhysicsClient, BodyInfo } from './physics';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
 import { OptionsPanel, VisualizationOptions, VisualizationPresetName } from './options-panel';
@@ -74,6 +74,7 @@ class NBodyClient {
     private lastEnergyCalcTime = 0;
     private readonly ENERGY_CALC_INTERVAL_MS = 500; // Only recalculate energy every 500ms when paused
     private cachedBodyMasses: number[] | null = null; // Cache body masses to avoid JSON parsing every frame
+    private cachedBodies: BodyInfo[] | null = null; // Cache body info to avoid JSON parsing every frame
 
     private lastFrameTime = 0;
     private fpsHistory: number[] = [];
@@ -487,8 +488,11 @@ class NBodyClient {
         // Invalidate caches
         this.cachedBodyMasses = null;
         
-        // Add all bodies from physics
+        // Add all bodies from physics and cache them
         const bodies = this.physics.getBodies();
+        this.cachedBodies = bodies; // Cache for use elsewhere this frame
+        this.cachedBodyMasses = bodies.map(b => b.mass); // Also cache masses
+        
         const positions = this.physics.getPositions();
         const velocities = this.physics.getVelocities();
         
@@ -720,7 +724,8 @@ class NBodyClient {
     }
 
     private findBodyIndexById(id: number): number | null {
-        const bodies = this.physics.getBodies();
+        // Use cached bodies to avoid JSON parsing
+        const bodies = this.cachedBodies ?? this.physics.getBodies();
         const index = bodies.findIndex((body) => body.id === id);
         return index >= 0 ? index : null;
     }
@@ -905,7 +910,8 @@ class NBodyClient {
             return;
         }
 
-        const bodies = this.physics.getBodies();
+        // Use cached bodies to avoid JSON parsing every frame
+        const bodies = this.cachedBodies ?? this.physics.getBodies();
         if (this.followBodyIndex < 0 || this.followBodyIndex >= bodies.length) {
             setText('follow-target', 'Origin');
             clearDetails();
@@ -1304,10 +1310,10 @@ class NBodyClient {
         const bodyCount = Math.floor(positions.length / 3);
         if (velocities.length < bodyCount * 3) return null;
 
-        // Get body masses - cache this since it's expensive JSON parsing
+        // Get body masses - use cached bodies to avoid expensive JSON parsing
         // Only refresh when body count changes
         if (!this.cachedBodyMasses || this.cachedBodyMasses.length !== bodyCount) {
-            const bodies = this.physics.getBodies();
+            const bodies = this.cachedBodies ?? this.physics.getBodies();
             this.cachedBodyMasses = bodies.map(b => b.mass);
         }
 
