@@ -99,6 +99,16 @@ class NBodyClient {
     private hintsVisible = true;
     private showSimulationParams = false;
     private showFollowingDetails = true;
+    private showPerfMonitor = true; // Performance monitor visible by default
+
+    // Performance timing (in milliseconds)
+    private frameTiming = {
+        total: 0,
+        physics: 0,
+        render: 0,
+        ui: 0,
+        stepsThisFrame: 0,
+    };
 
     // Body following
     private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
@@ -522,6 +532,9 @@ class NBodyClient {
                 case 'K':
                     this.toggleHints();
                     break;
+                case '3':
+                    this.togglePerfMonitor();
+                    break;
             }
         });
 
@@ -554,8 +567,8 @@ class NBodyClient {
 
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
-        // Include ALL UI elements including stats-overlay (Simulation panel)
-        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #opt-panel');
+        // Include ALL UI elements including stats-overlay, perf-overlay, etc.
+        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #opt-panel, #perf-overlay');
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
@@ -706,6 +719,38 @@ class NBodyClient {
         if (panel) {
             panel.style.display = this.hintsVisible ? 'block' : 'none';
         }
+    }
+
+    private togglePerfMonitor(): void {
+        this.showPerfMonitor = !this.showPerfMonitor;
+        const overlay = document.getElementById('perf-overlay');
+        if (overlay) {
+            overlay.style.display = this.showPerfMonitor ? 'block' : 'none';
+        }
+    }
+
+    private updatePerfMonitor(): void {
+        if (!this.showPerfMonitor) return;
+
+        const frameEl = document.getElementById('perf-frame-time');
+        const physicsEl = document.getElementById('perf-physics-time');
+        const renderEl = document.getElementById('perf-render-time');
+        const uiEl = document.getElementById('perf-ui-time');
+        const stepsEl = document.getElementById('perf-steps');
+        const bodiesEl = document.getElementById('perf-bodies');
+        const barEl = document.getElementById('perf-bar-fill');
+
+        if (frameEl) frameEl.textContent = `${this.frameTiming.total.toFixed(1)} ms`;
+        if (physicsEl) physicsEl.textContent = `${this.frameTiming.physics.toFixed(1)} ms`;
+        if (renderEl) renderEl.textContent = `${this.frameTiming.render.toFixed(1)} ms`;
+        if (uiEl) uiEl.textContent = `${this.frameTiming.ui.toFixed(1)} ms`;
+        if (stepsEl) stepsEl.textContent = this.frameTiming.stepsThisFrame.toString();
+        if (bodiesEl) bodiesEl.textContent = this.state.bodyCount.toString();
+
+        // Bar shows frame time as percentage of 16.67ms (60fps budget)
+        const budgetMs = 16.67;
+        const usedPercent = Math.min((this.frameTiming.total / budgetMs) * 100, 100);
+        if (barEl) barEl.style.width = `${usedPercent.toFixed(0)}%`;
     }
 
     private syncTimeScaleToServer(): void {
@@ -959,9 +1004,9 @@ class NBodyClient {
 
         requestAnimationFrame(this.animate);
 
-        const now = performance.now();
-        const delta = (now - this.lastFrameTime) / 1000;
-        this.lastFrameTime = now;
+        const frameStart = performance.now();
+        const delta = (frameStart - this.lastFrameTime) / 1000;
+        this.lastFrameTime = frameStart;
 
         // Update FPS counter
         const fps = 1 / delta;
@@ -969,6 +1014,10 @@ class NBodyClient {
         if (this.fpsHistory.length > 60) this.fpsHistory.shift();
 
         const useServerState = this.network?.isConnected() && this.lastServerState;
+
+        // --- Physics timing ---
+        const physicsStart = performance.now();
+        let stepsThisFrame = 0;
 
         if (useServerState) {
             this.state.tick = this.lastServerState!.tick;
@@ -983,6 +1032,7 @@ class NBodyClient {
                     for (let i = 0; i < steps; i++) {
                         this.physics.step();
                     }
+                    stepsThisFrame = steps;
                 } else {
                     const tickInterval = 1 / LOCAL_TICK_RATE;
                     this.localTickAccumulator += delta;
@@ -1001,6 +1051,7 @@ class NBodyClient {
                     if (steps >= maxSteps) {
                         this.localTickAccumulator = 0;
                     }
+                    stepsThisFrame = steps;
                 }
             }
 
@@ -1010,6 +1061,10 @@ class NBodyClient {
             this.state.positions = this.physics.getPositions();
             this.state.energy = this.physics.totalEnergy();
         }
+
+        const physicsEnd = performance.now();
+        this.frameTiming.physics = physicsEnd - physicsStart;
+        this.frameTiming.stepsThisFrame = stepsThisFrame;
 
         // Update camera focus to follow target (for orbit mode)
         if (!this.freeCamera) {
@@ -1061,11 +1116,21 @@ class NBodyClient {
         // Update star rotations from simulation time
         this.bodyRenderer.updateBodies(this.state.time);
 
-        // Render
+        // --- Render timing ---
+        const renderStart = performance.now();
         this.renderer.render(this.scene, this.camera);
+        const renderEnd = performance.now();
+        this.frameTiming.render = renderEnd - renderStart;
 
-        // Update UI
+        // --- UI timing ---
+        const uiStart = performance.now();
         this.updateUI();
+        this.updatePerfMonitor();
+        const uiEnd = performance.now();
+        this.frameTiming.ui = uiEnd - uiStart;
+
+        // Total frame time
+        this.frameTiming.total = performance.now() - frameStart;
     };
 
     private updateUI(): void {

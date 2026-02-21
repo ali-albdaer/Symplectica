@@ -237,6 +237,80 @@
       left: 50%;
       transform: translateX(-50%);
     }
+
+    /* Performance Monitor Overlay */
+    #perf-overlay {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      color: #fff;
+      font-size: 12px;
+      pointer-events: none;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    #perf-overlay .stats-card {
+      background: rgba(10, 15, 30, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      min-width: 220px;
+    }
+
+    #perf-overlay h3 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0 0 8px;
+      color: #4fc3f7;
+    }
+
+    #perf-overlay .perf-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 4px 0;
+    }
+
+    #perf-overlay .label {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    #perf-overlay .value {
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    #perf-overlay .perf-bar {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    #perf-overlay .perf-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, #4fc3f7, #ab47bc);
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+
+    #perf-overlay .perf-section {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #perf-overlay .perf-section:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
   </style>
 </head>
 
@@ -449,6 +523,7 @@
         <li><span>K</span>Keybinds</li>
         <li><span>1</span>Simulation Stats</li>
         <li><span>2</span>Following Stats</li>
+        <li><span>3</span>Performance Monitor</li>
         <li><span>O</span>Options</li>
         <li><span>C</span>Camera Mode</li>
         <li><span>P</span>Previous Body</li>
@@ -456,6 +531,48 @@
         <li><span>H</span>Hide UI</li>
         <li><span>WASD</span>Move</li>
       </ul>
+    </div>
+  </div>
+
+  <!-- Performance Monitor Overlay -->
+  <div id="perf-overlay">
+    <div class="stats-card">
+      <h3>Performance</h3>
+      <div class="perf-section">
+        <div class="perf-row">
+          <span class="label">Frame</span>
+          <span class="value" id="perf-frame-time">0.0 ms</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Physics</span>
+          <span class="value" id="perf-physics-time">0.0 ms</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Render</span>
+          <span class="value" id="perf-render-time">0.0 ms</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">UI</span>
+          <span class="value" id="perf-ui-time">0.0 ms</span>
+        </div>
+        <div class="perf-bar">
+          <div class="perf-bar-inner" id="perf-bar-fill" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="perf-section">
+        <div class="perf-row">
+          <span class="label">Steps/Frame</span>
+          <span class="value" id="perf-steps">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Bodies</span>
+          <span class="value" id="perf-bodies">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Target FPS</span>
+          <span class="value" id="perf-target-fps">60</span>
+        </div>
+      </div>
     </div>
   </div>
 
