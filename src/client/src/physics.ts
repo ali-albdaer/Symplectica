@@ -39,12 +39,16 @@ interface PhysicsModule {
     createSunEarthMoon: (seed: bigint) => WasmSimulation;
     createInnerSolarSystem: (seed: bigint) => WasmSimulation;
     createFullSolarSystem: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemII: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemIIBarycentric: (seed: bigint) => WasmSimulation;
     createPlayableSolarSystem: (seed: bigint) => WasmSimulation;
     createJupiterSystem: (seed: bigint) => WasmSimulation;
     createSaturnSystem: (seed: bigint) => WasmSimulation;
     createAlphaCentauri: (seed: bigint) => WasmSimulation;
     createTrappist1: (seed: bigint) => WasmSimulation;
     createBinaryPulsar: (seed: bigint) => WasmSimulation;
+    createAsteroidBelt: (seed: bigint, asteroidCount: number) => WasmSimulation;
+    createStarCluster: (seed: bigint, starCount: number) => WasmSimulation;
     getG: () => number;
     getAU: () => number;
     getSolarMass: () => number;
