@@ -192,8 +192,8 @@ class NBodyClient {
             this.physics,
             this.timeController,
             this.network,
-            (presetId, name, barycentric) => {
-                this.loadPresetFromAdmin(presetId, name, barycentric);
+            (presetId, name, barycentric, bodyCount) => {
+                this.loadPresetFromAdmin(presetId, name, barycentric, bodyCount);
             },
             (mode) => {
                 this.setLocalSimMode(mode);
@@ -619,11 +619,11 @@ class NBodyClient {
         }
     }
 
-    private loadPresetFromAdmin(presetId: string, name: string, barycentric: boolean = false): void {
+    private loadPresetFromAdmin(presetId: string, name: string, barycentric: boolean = false, bodyCount?: number): void {
         if (presetId === 'sunEarthMoon') {
             this.physics.createSunEarthMoon();
         } else {
-            this.physics.createPreset(presetId, BigInt(Date.now()), barycentric);
+            this.physics.createPreset(presetId, BigInt(Date.now()), barycentric, bodyCount);
         }
 
         // Configure camera scale based on preset type

@@ -347,7 +347,7 @@ export class PhysicsClient {
     }
 
     /** Create a preset simulation */
-    createPreset(preset: string, seed: bigint, barycentric: boolean = false): void {
+    createPreset(preset: string, seed: bigint, barycentric: boolean = false, bodyCount?: number): void {
         if (!this.initialized || !this.module) throw new Error('Physics not initialized');
 
         let loadedPreset = preset;
@@ -394,26 +394,30 @@ export class PhysicsClient {
             case 'binaryPulsar':
                 this.simulation = this.module.createBinaryPulsar(seed);
                 break;
-            case 'asteroidBelt':
-                // Default to 5000 asteroids
+            case 'asteroidBelt': {
+                // Use provided bodyCount or default to 5000 asteroids
+                const asteroidCount = bodyCount ?? 5000;
                 if (typeof this.module.createAsteroidBelt === 'function') {
-                    this.simulation = this.module.createAsteroidBelt(seed, 5000);
+                    this.simulation = this.module.createAsteroidBelt(seed, asteroidCount);
                 } else {
                     console.warn('[WARN] Asteroid Belt preset unavailable. Falling back to Full Solar System II.');
                     this.simulation = this.module.createFullSolarSystemII(seed);
                     loadedPreset = 'fullSolarSystemII';
                 }
                 break;
-            case 'starCluster':
-                // Default to 2000 stars
+            }
+            case 'starCluster': {
+                // Use provided bodyCount or default to 2000 stars
+                const starCount = bodyCount ?? 2000;
                 if (typeof this.module.createStarCluster === 'function') {
-                    this.simulation = this.module.createStarCluster(seed, 2000);
+                    this.simulation = this.module.createStarCluster(seed, starCount);
                 } else {
                     console.warn('[WARN] Star Cluster preset unavailable. Falling back to Sun-Earth-Moon.');
                     this.simulation = this.module.createSunEarthMoon(seed);
                     loadedPreset = 'sunEarthMoon';
                 }
                 break;
+            }
             default:
                 this.simulation = this.module.createSunEarthMoon(seed);
         }

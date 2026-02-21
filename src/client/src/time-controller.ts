@@ -29,7 +29,8 @@ export class TimeController {
         { sim: 31536000, label: '1yr/s' },   // 1 year per second
     ];
 
-    private speedIndex = 4;
+    // Default to 1s/s to match server mode
+    private speedIndex = 0;
     private accumulator = 0;
     private paused = false;
 

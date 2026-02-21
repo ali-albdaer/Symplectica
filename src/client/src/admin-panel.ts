@@ -26,7 +26,7 @@ export class AdminPanel {
     private physics: PhysicsClient;
     private timeController: TimeController;
     private network?: NetworkClient;
-    private onPresetChange?: (presetId: string, name: string, barycentric: boolean) => void;
+    private onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number) => void;
     private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
     private isOpen = false;
     private config: ServerConfig = {
@@ -41,7 +41,7 @@ export class AdminPanel {
         physics: PhysicsClient,
         timeController: TimeController,
         network?: NetworkClient,
-        onPresetChange?: (presetId: string, name: string, barycentric: boolean) => void,
+        onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number) => void,
         onSimModeChange?: (mode: 'tick' | 'accumulator') => void
     ) {
         this.physics = physics;
@@ -98,6 +98,11 @@ export class AdminPanel {
                             Barycentric Mode
                         </label>
                         <div class="admin-hint">Shift to center-of-mass frame (zero system momentum)</div>
+                    </div>
+                    <div class="admin-field" id="body-count-field" style="display: none;">
+                        <label>Number of Bodies</label>
+                        <input type="number" id="admin-body-count" min="0" step="1" value="5000">
+                        <div class="admin-hint" id="body-count-hint">More bodies = slower simulation</div>
                     </div>
                     <button class="admin-btn" id="admin-load-preset">Load Preset</button>
                 </section>
@@ -367,23 +372,58 @@ export class AdminPanel {
         container.querySelector('#admin-load-preset')?.addEventListener('click', () => {
             const presetSelect = container.querySelector('#admin-preset') as HTMLSelectElement | null;
             const barycentricCheckbox = container.querySelector('#admin-barycentric') as HTMLInputElement | null;
+            const bodyCountInput = container.querySelector('#admin-body-count') as HTMLInputElement | null;
             if (!presetSelect) return;
             const name = presetSelect.options[presetSelect.selectedIndex].text;
             const barycentric = barycentricCheckbox?.checked ?? false;
-            this.onPresetChange?.(presetSelect.value, name, barycentric);
+            const presetId = presetSelect.value;
+            
+            // Get body count for presets that support it
+            let bodyCount: number | undefined;
+            if (presetId === 'asteroidBelt' || presetId === 'starCluster') {
+                const parsed = bodyCountInput ? parseInt(bodyCountInput.value, 10) : NaN;
+                bodyCount = Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+            }
+            
+            this.onPresetChange?.(presetId, name, barycentric, bodyCount);
         });
 
-        // Show/hide barycentric option based on preset selection
+        // Show/hide barycentric option and body count based on preset selection
         const presetSelect = container.querySelector('#admin-preset') as HTMLSelectElement | null;
         const barycentricField = container.querySelector('#barycentric-field') as HTMLElement | null;
-        const updateBarycentricVisibility = () => {
-            if (barycentricField && presetSelect) {
-                // Only show barycentric option for Full Solar System II
-                barycentricField.style.display = presetSelect.value === 'fullSolarSystemII' ? 'block' : 'none';
+        const bodyCountField = container.querySelector('#body-count-field') as HTMLElement | null;
+        const bodyCountInput = container.querySelector('#admin-body-count') as HTMLInputElement | null;
+        const bodyCountHint = container.querySelector('#body-count-hint') as HTMLElement | null;
+        
+        const updatePresetOptions = () => {
+            if (!presetSelect) return;
+            const presetId = presetSelect.value;
+            
+            // Show barycentric only for Full Solar System II
+            if (barycentricField) {
+                barycentricField.style.display = presetId === 'fullSolarSystemII' ? 'block' : 'none';
+            }
+            
+            // Show body count input for asteroid belt and star cluster
+            if (bodyCountField && bodyCountInput && bodyCountHint) {
+                if (presetId === 'asteroidBelt') {
+                    bodyCountField.style.display = 'block';
+                    bodyCountInput.value = '5000';
+                    bodyCountInput.placeholder = '5000';
+                    bodyCountHint.textContent = 'Asteroids in main belt (plus ~15 planets/dwarf planets)';
+                } else if (presetId === 'starCluster') {
+                    bodyCountField.style.display = 'block';
+                    bodyCountInput.value = '2000';
+                    bodyCountInput.placeholder = '2000';
+                    bodyCountHint.textContent = 'Stars in Plummer sphere cluster';
+                } else {
+                    bodyCountField.style.display = 'none';
+                }
             }
         };
-        presetSelect?.addEventListener('change', updateBarycentricVisibility);
-        updateBarycentricVisibility();
+        
+        presetSelect?.addEventListener('change', updatePresetOptions);
+        updatePresetOptions();
 
         // Pause button
         container.querySelector('#admin-pause-btn')?.addEventListener('click', () => {
