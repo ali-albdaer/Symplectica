@@ -110,25 +110,29 @@ export class BuildPanel {
     private selectedType: BuildableBodyType = 'planet';
     private params: BuildBodyParams;
     private bodyCounter = 0;
+    private buildModeEnabled = false;
 
     private onParamsChange?: (params: BuildBodyParams) => void;
     private onSpawn?: (params: BuildBodyParams) => void;
     private onPanelClose?: () => void;
     private onGetBodies?: () => BodyListEntry[];
     private onDeleteBody?: (id: number) => void;
+    private onBuildModeRequired?: () => void;
 
     constructor(
         onParamsChange?: (params: BuildBodyParams) => void,
         onSpawn?: (params: BuildBodyParams) => void,
         onPanelClose?: () => void,
         onGetBodies?: () => BodyListEntry[],
-        onDeleteBody?: (id: number) => void
+        onDeleteBody?: (id: number) => void,
+        onBuildModeRequired?: () => void
     ) {
         this.onParamsChange = onParamsChange;
         this.onSpawn = onSpawn;
         this.onPanelClose = onPanelClose;
         this.onGetBodies = onGetBodies;
         this.onDeleteBody = onDeleteBody;
+        this.onBuildModeRequired = onBuildModeRequired;
         this.params = this.createDefaultParams('planet');
         this.container = this.createUI();
         document.body.appendChild(this.container);
@@ -767,7 +771,11 @@ export class BuildPanel {
             }
 
             if (e.key === 'b' || e.key === 'B') {
-                this.toggle();
+                if (this.buildModeEnabled) {
+                    this.toggle();
+                } else {
+                    this.onBuildModeRequired?.();
+                }
             }
 
             if (e.key === 'Escape' && this.isOpen) {
@@ -985,5 +993,20 @@ export class BuildPanel {
         (this.container.querySelector('#build-vy') as HTMLInputElement).value = '0';
         (this.container.querySelector('#build-vz') as HTMLInputElement).value = '0';
         this.switchTab('basic');
+    }
+
+    /** Set build mode state (controls whether B key opens panel) */
+    setBuildMode(enabled: boolean): void {
+        this.buildModeEnabled = enabled;
+    }
+
+    /** Hide the panel (for H key toggle UI) */
+    hide(): void {
+        this.container.style.display = 'none';
+    }
+
+    /** Show the panel (restore visibility after hide) */
+    show(): void {
+        this.container.style.display = '';
     }
 }

@@ -263,7 +263,8 @@ class NBodyClient {
             (params) => this.onBuildSpawn(params),
             () => this.onBuildPanelClose(),
             () => this.onGetBodiesForBuildPanel(),
-            (id) => this.onDeleteBodyFromBuildPanel(id)
+            (id) => this.onDeleteBodyFromBuildPanel(id),
+            () => this.onBuildModeRequired()
         );
 
         this.hideLoading();
@@ -614,6 +615,12 @@ class NBodyClient {
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
+
+        if (this.uiHidden) {
+            this.buildPanel.hide();
+        } else {
+            this.buildPanel.show();
+        }
     }
 
     private toggleSimulationSection(section: 'sim' | 'follow'): void {
@@ -641,6 +648,7 @@ class NBodyClient {
             // World Builder: create empty simulation
             this.physics.createNew(BigInt(Date.now()));
             this.buildMode = true;
+            this.buildPanel.setBuildMode(true);
             this.buildPanel.reset();
             this.buildPanel.open();
             
@@ -659,9 +667,11 @@ class NBodyClient {
             this.followBodyIndex = -1;
         } else if (presetId === 'sunEarthMoon') {
             this.buildMode = false;
+            this.buildPanel.setBuildMode(false);
             this.physics.createSunEarthMoon();
         } else {
             this.buildMode = false;
+            this.buildPanel.setBuildMode(false);
             this.physics.createPreset(presetId, BigInt(Date.now()), barycentric, bodyCount);
         }
 
@@ -1676,6 +1686,10 @@ class NBodyClient {
 
             console.log(`[Build] Deleted body id=${id}`);
         }
+    }
+
+    private onBuildModeRequired(): void {
+        this.chat.addSystemMessage('Switch to World Builder mode to use the Build panel (Admin Panel → World Builder).');
     }
 
     private onBuildSpawn(params: BuildBodyParams): void {
