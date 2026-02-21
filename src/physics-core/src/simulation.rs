@@ -49,7 +49,7 @@ impl Default for SimulationConfig {
             integrator: IntegratorConfig::default(),
             force_method: ForceMethod::Direct,
             enable_collisions: true,
-            barnes_hut_threshold: 50,
+            barnes_hut_threshold: 10000,
         }
     }
 }
