@@ -9,8 +9,6 @@
  * - Physics contribution toggle
  */
 
-import { BodyInfo } from './physics';
-
 // Physical constants
 const AU = 1.495978707e11;
 const M_SUN = 1.98892e30;
@@ -42,9 +40,9 @@ export interface BuildBodyParams {
     // Star-specific
     luminosity?: number;
     effectiveTemperature?: number;
-    // Planet-specific
+    // Body properties
     axialTilt?: number;
-    rotationRate?: number;
+    rotationPeriod?: number;
 }
 
 interface BodyTypeDefaults {
@@ -53,6 +51,7 @@ interface BodyTypeDefaults {
     color: number;
     luminosity?: number;
     effectiveTemperature?: number;
+    rotationPeriod?: number;
 }
 
 const BODY_TYPE_DEFAULTS: Record<BuildableBodyType, BodyTypeDefaults> = {
@@ -62,31 +61,37 @@ const BODY_TYPE_DEFAULTS: Record<BuildableBodyType, BodyTypeDefaults> = {
         color: 0xffdd44,
         luminosity: 1.0,
         effectiveTemperature: 5778,
+        rotationPeriod: 25.4 * 86400, // days to seconds
     },
     planet: {
         mass: M_EARTH,
         radius: R_EARTH,
         color: 0x4488ff,
+        rotationPeriod: 86400, // 1 day
     },
     moon: {
         mass: M_MOON,
         radius: R_MOON,
         color: 0x888888,
+        rotationPeriod: 27.3 * 86400,
     },
     asteroid: {
         mass: 1e15,
         radius: 1e4,
         color: 0x8c7853,
+        rotationPeriod: 5 * 3600,
     },
     comet: {
         mass: 1e13,
         radius: 5e3,
         color: 0xccddff,
+        rotationPeriod: 10 * 3600,
     },
     spacecraft: {
         mass: 1e4,
         radius: 10,
         color: 0xffffff,
+        rotationPeriod: 0,
     },
 };
 
@@ -99,13 +104,16 @@ export class BuildPanel {
 
     private onParamsChange?: (params: BuildBodyParams) => void;
     private onSpawn?: (params: BuildBodyParams) => void;
+    private onPanelClose?: () => void;
 
     constructor(
         onParamsChange?: (params: BuildBodyParams) => void,
-        onSpawn?: (params: BuildBodyParams) => void
+        onSpawn?: (params: BuildBodyParams) => void,
+        onPanelClose?: () => void
     ) {
         this.onParamsChange = onParamsChange;
         this.onSpawn = onSpawn;
+        this.onPanelClose = onPanelClose;
         this.params = this.createDefaultParams('planet');
         this.container = this.createUI();
         document.body.appendChild(this.container);
@@ -131,7 +139,7 @@ export class BuildPanel {
             luminosity: defaults.luminosity,
             effectiveTemperature: defaults.effectiveTemperature,
             axialTilt: 0,
-            rotationRate: 0,
+            rotationPeriod: defaults.rotationPeriod ?? 86400,
         };
     }
 
@@ -140,58 +148,74 @@ export class BuildPanel {
         container.id = 'build-panel';
         container.innerHTML = `
             <div class="build-header">
-                <h2>🔧 Build</h2>
+                <h2>Build</h2>
                 <button class="build-close" title="Close (B)">&times;</button>
             </div>
-            
-            <div class="build-content">
+
+            <div class="build-tabs">
+                <button class="build-tab active" data-tab="basic">Basic</button>
+                <button class="build-tab" data-tab="orbit">Orbit</button>
+                <button class="build-tab" data-tab="props">Props</button>
+            </div>
+
+            <div class="build-content active" id="tab-basic">
                 <section class="build-section">
-                    <h3>Object Type</h3>
+                    <h3>Type</h3>
                     <div class="build-type-grid">
-                        <button class="build-type-btn" data-type="star">⭐ Star</button>
-                        <button class="build-type-btn active" data-type="planet">🌍 Planet</button>
-                        <button class="build-type-btn" data-type="moon">🌙 Moon</button>
-                        <button class="build-type-btn" data-type="asteroid">🪨 Asteroid</button>
-                        <button class="build-type-btn" data-type="comet">☄️ Comet</button>
-                        <button class="build-type-btn" data-type="spacecraft">🚀 Spacecraft</button>
+                        <button class="build-type-btn" data-type="star">Star</button>
+                        <button class="build-type-btn active" data-type="planet">Planet</button>
+                        <button class="build-type-btn" data-type="moon">Moon</button>
+                        <button class="build-type-btn" data-type="asteroid">Asteroid</button>
+                        <button class="build-type-btn" data-type="comet">Comet</button>
+                        <button class="build-type-btn" data-type="spacecraft">Craft</button>
                     </div>
                 </section>
 
                 <section class="build-section">
-                    <h3>Properties</h3>
+                    <h3>Identity</h3>
                     <div class="build-field">
                         <label>Name</label>
                         <input type="text" id="build-name" value="Planet 1">
                     </div>
-                    <div class="build-field">
-                        <label>Mass (kg)</label>
-                        <input type="number" id="build-mass" value="${M_EARTH.toExponential(3)}" step="any">
-                    </div>
-                    <div class="build-field">
-                        <label>Radius (m)</label>
-                        <input type="number" id="build-radius" value="${R_EARTH.toExponential(3)}" step="any">
-                    </div>
-                    <div class="build-field">
-                        <label>Color</label>
-                        <input type="color" id="build-color" value="#4488ff">
-                    </div>
-                </section>
-
-                <section class="build-section" id="build-star-section" style="display: none;">
-                    <h3>Star Properties</h3>
-                    <div class="build-field">
-                        <label>Luminosity (L☉)</label>
-                        <input type="number" id="build-luminosity" value="1.0" step="0.01" min="0">
-                    </div>
-                    <div class="build-field">
-                        <label>Temperature (K)</label>
-                        <input type="number" id="build-temperature" value="5778" step="100" min="1000">
+                    <div class="build-row">
+                        <div class="build-field-sm">
+                            <label>Color</label>
+                            <input type="color" id="build-color" value="#4488ff">
+                        </div>
                     </div>
                 </section>
 
                 <section class="build-section">
+                    <h3>Physical</h3>
+                    <div class="build-field">
+                        <label>Mass (kg)</label>
+                        <input type="text" id="build-mass" value="${M_EARTH.toExponential(3)}">
+                    </div>
+                    <div class="build-field">
+                        <label>Radius (m)</label>
+                        <input type="text" id="build-radius" value="${R_EARTH.toExponential(3)}">
+                    </div>
+                </section>
+
+                <section class="build-section">
+                    <h3>Physics</h3>
+                    <div class="build-row">
+                        <label class="build-toggle">
+                            <input type="checkbox" id="build-physics" checked>
+                            <span>Simulated</span>
+                        </label>
+                        <label class="build-toggle">
+                            <input type="checkbox" id="build-massive" checked>
+                            <span>Massive</span>
+                        </label>
+                    </div>
+                </section>
+            </div>
+
+            <div class="build-content" id="tab-orbit" style="display: none;">
+                <section class="build-section">
                     <h3>Position (AU)</h3>
-                    <div class="build-field-row">
+                    <div class="build-row-3">
                         <div class="build-field-col">
                             <label>X</label>
                             <input type="number" id="build-x" value="0" step="0.1">
@@ -209,7 +233,7 @@ export class BuildPanel {
 
                 <section class="build-section">
                     <h3>Velocity (km/s)</h3>
-                    <div class="build-field-row">
+                    <div class="build-row-3">
                         <div class="build-field-col">
                             <label>Vx</label>
                             <input type="number" id="build-vx" value="0" step="0.1">
@@ -223,44 +247,48 @@ export class BuildPanel {
                             <input type="number" id="build-vz" value="0" step="0.1">
                         </div>
                     </div>
+                    <button class="build-btn-small" id="build-calc-orbital">Calc Circular Orbit</button>
+                </section>
+            </div>
+
+            <div class="build-content" id="tab-props" style="display: none;">
+                <section class="build-section" id="build-star-section">
+                    <h3>Star Properties</h3>
                     <div class="build-field">
-                        <button class="build-btn-secondary" id="build-calc-orbital">Calculate Circular Orbit</button>
+                        <label>Luminosity (L☉)</label>
+                        <input type="number" id="build-luminosity" value="1.0" step="0.01" min="0">
+                    </div>
+                    <div class="build-field">
+                        <label>Temperature (K)</label>
+                        <input type="number" id="build-temperature" value="5778" step="100" min="1000">
                     </div>
                 </section>
 
                 <section class="build-section">
-                    <h3>Physics</h3>
+                    <h3>Rotation</h3>
                     <div class="build-field">
-                        <label>
-                            <input type="checkbox" id="build-physics" checked>
-                            Contributes to Physics
-                        </label>
-                        <div class="build-hint">Body participates in gravitational simulation</div>
+                        <label>Axial Tilt (deg)</label>
+                        <input type="number" id="build-tilt" value="0" step="1" min="-180" max="180">
                     </div>
                     <div class="build-field">
-                        <label>
-                            <input type="checkbox" id="build-massive" checked>
-                            Massive Body
-                        </label>
-                        <div class="build-hint">Body exerts gravitational force on others</div>
+                        <label>Rotation Period (hours)</label>
+                        <input type="number" id="build-rotation" value="24" step="0.1" min="0">
                     </div>
                 </section>
+            </div>
 
-                <section class="build-section">
-                    <button class="build-btn-spawn" id="build-spawn">✨ Spawn Body</button>
-                </section>
+            <div class="build-footer">
+                <button class="build-btn-spawn" id="build-spawn">Spawn Body</button>
             </div>
         `;
 
-        // Add styles
         const style = document.createElement('style');
         style.textContent = `
             #build-panel {
                 position: fixed;
-                top: 80px;
+                top: 20px;
                 left: 20px;
-                width: 280px;
-                max-height: calc(100vh - 120px);
+                width: 220px;
                 background: rgba(10, 15, 30, 0.95);
                 backdrop-filter: blur(20px);
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -268,21 +296,19 @@ export class BuildPanel {
                 color: #fff;
                 font-family: 'Segoe UI', system-ui, sans-serif;
                 font-size: 13px;
-                z-index: 250;
+                z-index: 200;
                 display: none;
                 flex-direction: column;
                 overflow: hidden;
             }
             
-            #build-panel.open {
-                display: flex;
-            }
+            #build-panel.open { display: flex; }
             
             .build-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 12px 15px;
+                padding: 10px 12px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 background: rgba(0, 0, 0, 0.3);
             }
@@ -297,57 +323,80 @@ export class BuildPanel {
             .build-close {
                 background: none;
                 border: none;
-                color: #888;
+                color: rgba(255, 255, 255, 0.5);
                 font-size: 20px;
                 cursor: pointer;
                 padding: 0 5px;
+                line-height: 1;
             }
             
-            .build-close:hover {
-                color: #fff;
+            .build-close:hover { color: #fff; }
+
+            .build-tabs {
+                display: flex;
+                background: rgba(0, 0, 0, 0.2);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             }
-            
-            .build-content {
-                padding: 10px 15px;
-                overflow-y: auto;
+
+            .build-tab {
                 flex: 1;
-            }
-            
-            .build-section {
-                margin-bottom: 15px;
-                padding-bottom: 15px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            }
-            
-            .build-section:last-child {
-                border-bottom: none;
-                margin-bottom: 0;
-            }
-            
-            .build-section h3 {
+                background: none;
+                border: none;
+                color: rgba(255, 255, 255, 0.6);
+                padding: 8px 0;
                 font-size: 11px;
                 font-weight: 600;
-                color: #888;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                transition: color 0.2s, border-color 0.2s;
+            }
+
+            .build-tab:hover {
+                color: #fff;
+                background: rgba(255, 255, 255, 0.05);
+            }
+
+            .build-tab.active {
+                color: #4caf50;
+                border-bottom-color: #4caf50;
+            }
+            
+            .build-content { 
+                padding: 10px 12px; 
+                display: none;
+            }
+            .build-content.active { display: block; }
+            
+            .build-section {
+                margin-bottom: 10px;
+            }
+            
+            .build-section:last-child { margin-bottom: 0; }
+            
+            .build-section h3 {
+                font-size: 10px;
+                font-weight: 600;
+                color: rgba(255, 255, 255, 0.5);
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                margin: 0 0 10px 0;
+                margin: 0 0 6px 0;
             }
             
             .build-type-grid {
                 display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 6px;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 4px;
             }
             
             .build-type-btn {
-                padding: 8px;
+                padding: 5px 2px;
                 background: rgba(255, 255, 255, 0.05);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
+                border-radius: 4px;
                 color: #ccc;
-                font-size: 12px;
+                font-size: 10px;
                 cursor: pointer;
-                transition: all 0.2s;
+                transition: all 0.15s;
             }
             
             .build-type-btn:hover {
@@ -360,33 +409,77 @@ export class BuildPanel {
                 border-color: rgba(76, 175, 80, 0.6);
                 color: #4caf50;
             }
-            
-            .build-field {
-                margin-bottom: 10px;
+
+            .build-row {
+                display: flex;
+                gap: 8px;
+                margin-bottom: 4px;
+            }
+
+            .build-row-3 {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
+            }
+
+            .build-toggle {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                cursor: pointer;
+            }
+
+            .build-toggle input[type="checkbox"] {
+                width: 14px;
+                height: 14px;
+                accent-color: #4caf50;
+                margin: 0;
+            }
+
+            .build-toggle span {
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.9);
             }
             
-            .build-field label {
+            .build-field {
+                margin-bottom: 6px;
+            }
+
+            .build-field-sm {
+                flex: 1;
+            }
+
+            .build-field-col {
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .build-field label,
+            .build-field-sm label,
+            .build-field-col label {
                 display: block;
-                font-size: 12px;
-                color: #aaa;
-                margin-bottom: 4px;
+                font-size: 10px;
+                color: rgba(255, 255, 255, 0.6);
+                margin-bottom: 3px;
             }
             
             .build-field input[type="text"],
-            .build-field input[type="number"] {
+            .build-field input[type="number"],
+            .build-field-col input {
                 width: 100%;
-                padding: 6px 10px;
+                padding: 5px 6px;
                 background: rgba(0, 0, 0, 0.3);
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 4px;
                 color: #fff;
-                font-size: 12px;
+                font-size: 11px;
                 box-sizing: border-box;
             }
             
-            .build-field input[type="color"] {
+            .build-field input[type="color"],
+            .build-field-sm input[type="color"] {
                 width: 100%;
-                height: 32px;
+                height: 26px;
                 padding: 2px;
                 background: rgba(0, 0, 0, 0.3);
                 border: 1px solid rgba(255, 255, 255, 0.1);
@@ -394,74 +487,54 @@ export class BuildPanel {
                 cursor: pointer;
             }
             
-            .build-field input:focus {
+            .build-field input:focus,
+            .build-field-col input:focus {
                 outline: none;
                 border-color: rgba(76, 175, 80, 0.5);
             }
-            
-            .build-field-row {
-                display: flex;
-                gap: 8px;
-            }
-            
-            .build-field-col {
-                flex: 1;
-            }
-            
-            .build-field-col label {
-                font-size: 11px;
-            }
-            
-            .build-field-col input {
+
+            .build-btn-small {
                 width: 100%;
-                padding: 6px 8px;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 4px;
-                color: #fff;
-                font-size: 12px;
-                box-sizing: border-box;
-            }
-            
-            .build-hint {
-                font-size: 10px;
-                color: #666;
-                margin-top: 2px;
-            }
-            
-            .build-btn-secondary {
-                width: 100%;
-                padding: 8px;
+                padding: 6px;
+                margin-top: 6px;
                 background: rgba(79, 195, 247, 0.1);
                 border: 1px solid rgba(79, 195, 247, 0.3);
-                border-radius: 6px;
+                border-radius: 4px;
                 color: #4fc3f7;
-                font-size: 12px;
+                font-size: 10px;
                 cursor: pointer;
-                transition: all 0.2s;
+                transition: all 0.15s;
             }
-            
-            .build-btn-secondary:hover {
+
+            .build-btn-small:hover {
                 background: rgba(79, 195, 247, 0.2);
+            }
+
+            .build-footer {
+                padding: 10px 12px;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                background: rgba(0, 0, 0, 0.2);
             }
             
             .build-btn-spawn {
                 width: 100%;
-                padding: 12px;
+                padding: 10px;
                 background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(76, 175, 80, 0.1));
                 border: 1px solid rgba(76, 175, 80, 0.5);
-                border-radius: 8px;
+                border-radius: 6px;
                 color: #4caf50;
-                font-size: 14px;
+                font-size: 12px;
                 font-weight: 600;
                 cursor: pointer;
-                transition: all 0.2s;
+                transition: all 0.15s;
             }
             
             .build-btn-spawn:hover {
                 background: linear-gradient(135deg, rgba(76, 175, 80, 0.4), rgba(76, 175, 80, 0.2));
                 border-color: rgba(76, 175, 80, 0.8);
             }
+
+            #build-star-section.hidden { display: none; }
         `;
         document.head.appendChild(style);
 
@@ -474,6 +547,16 @@ export class BuildPanel {
         // Close button
         container.querySelector('.build-close')?.addEventListener('click', () => {
             this.close();
+        });
+
+        // Tab switching
+        container.querySelectorAll('.build-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const tabName = (e.target as HTMLElement).dataset.tab;
+                if (tabName) {
+                    this.switchTab(tabName);
+                }
+            });
         });
 
         // Type selection
@@ -489,7 +572,8 @@ export class BuildPanel {
         // Parameter inputs - update on change
         const inputs = ['build-name', 'build-mass', 'build-radius', 'build-color',
                         'build-x', 'build-y', 'build-z', 'build-vx', 'build-vy', 'build-vz',
-                        'build-luminosity', 'build-temperature', 'build-physics', 'build-massive'];
+                        'build-luminosity', 'build-temperature', 'build-physics', 'build-massive',
+                        'build-tilt', 'build-rotation'];
         
         inputs.forEach(id => {
             const el = container.querySelector(`#${id}`);
@@ -505,6 +589,20 @@ export class BuildPanel {
         // Calculate orbital velocity button
         container.querySelector('#build-calc-orbital')?.addEventListener('click', () => {
             this.calculateOrbitalVelocity();
+        });
+    }
+
+    private switchTab(tabName: string): void {
+        // Update tab buttons
+        this.container.querySelectorAll('.build-tab').forEach(tab => {
+            tab.classList.toggle('active', (tab as HTMLElement).dataset.tab === tabName);
+        });
+
+        // Update content visibility
+        this.container.querySelectorAll('.build-content').forEach(content => {
+            const isActive = content.id === `tab-${tabName}`;
+            content.classList.toggle('active', isActive);
+            (content as HTMLElement).style.display = isActive ? 'block' : 'none';
         });
     }
 
@@ -540,15 +638,17 @@ export class BuildPanel {
         const colorInput = this.container.querySelector('#build-color') as HTMLInputElement;
         const massiveCheckbox = this.container.querySelector('#build-massive') as HTMLInputElement;
         const starSection = this.container.querySelector('#build-star-section') as HTMLElement;
+        const rotationInput = this.container.querySelector('#build-rotation') as HTMLInputElement;
 
         nameInput.value = `${type.charAt(0).toUpperCase() + type.slice(1)} ${this.bodyCounter + 1}`;
         massInput.value = defaults.mass.toExponential(3);
         radiusInput.value = defaults.radius.toExponential(3);
         colorInput.value = '#' + defaults.color.toString(16).padStart(6, '0');
         massiveCheckbox.checked = type !== 'spacecraft';
+        rotationInput.value = ((defaults.rotationPeriod ?? 86400) / 3600).toFixed(1);
 
         // Show/hide star-specific options
-        starSection.style.display = type === 'star' ? 'block' : 'none';
+        starSection.classList.toggle('hidden', type !== 'star');
 
         if (type === 'star' && defaults.luminosity !== undefined) {
             (this.container.querySelector('#build-luminosity') as HTMLInputElement).value = defaults.luminosity.toString();
@@ -573,6 +673,8 @@ export class BuildPanel {
         const massiveCheckbox = this.container.querySelector('#build-massive') as HTMLInputElement;
         const luminosityInput = this.container.querySelector('#build-luminosity') as HTMLInputElement;
         const temperatureInput = this.container.querySelector('#build-temperature') as HTMLInputElement;
+        const tiltInput = this.container.querySelector('#build-tilt') as HTMLInputElement;
+        const rotationInput = this.container.querySelector('#build-rotation') as HTMLInputElement;
 
         this.params = {
             type: this.selectedType,
@@ -590,6 +692,8 @@ export class BuildPanel {
             isMassive: massiveCheckbox.checked,
             luminosity: this.selectedType === 'star' ? parseFloat(luminosityInput.value) || 1 : undefined,
             effectiveTemperature: this.selectedType === 'star' ? parseFloat(temperatureInput.value) || 5778 : undefined,
+            axialTilt: (parseFloat(tiltInput.value) || 0) * Math.PI / 180, // deg to rad
+            rotationPeriod: (parseFloat(rotationInput.value) || 24) * 3600, // hours to seconds
         };
 
         this.onParamsChange?.(this.params);
@@ -656,6 +760,7 @@ export class BuildPanel {
     close(): void {
         this.isOpen = false;
         this.container.classList.remove('open');
+        this.onPanelClose?.();
     }
 
     isVisible(): boolean {
@@ -678,5 +783,13 @@ export class BuildPanel {
     reset(): void {
         this.bodyCounter = 0;
         this.selectType('planet');
+        // Reset position/velocity
+        (this.container.querySelector('#build-x') as HTMLInputElement).value = '0';
+        (this.container.querySelector('#build-y') as HTMLInputElement).value = '0';
+        (this.container.querySelector('#build-z') as HTMLInputElement).value = '0';
+        (this.container.querySelector('#build-vx') as HTMLInputElement).value = '0';
+        (this.container.querySelector('#build-vy') as HTMLInputElement).value = '0';
+        (this.container.querySelector('#build-vz') as HTMLInputElement).value = '0';
+        this.switchTab('basic');
     }
 }

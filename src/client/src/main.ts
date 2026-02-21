@@ -260,7 +260,8 @@ class NBodyClient {
         // Initialize Build Panel (World Builder mode)
         this.buildPanel = new BuildPanel(
             (params) => this.onBuildParamsChange(params),
-            (params) => this.onBuildSpawn(params)
+            (params) => this.onBuildSpawn(params),
+            () => this.onBuildPanelClose()
         );
 
         this.hideLoading();
@@ -641,8 +642,10 @@ class NBodyClient {
             this.buildPanel.reset();
             this.buildPanel.open();
             
-            // Enable XY grid by default in build mode
+            // Enable all 3 grids by default in build mode
             this.currentVizOptions.showGridXY = true;
+            this.currentVizOptions.showGridXZ = true;
+            this.currentVizOptions.showGridYZ = true;
             this.applyVisualizationToRenderer(this.currentVizOptions);
             this.optionsPanel?.applyOptions(this.currentVizOptions);
             
@@ -1239,6 +1242,15 @@ class NBodyClient {
         // Update body positions with floating origin
         this.bodyRenderer.update(this.state.positions, cameraOrigin);
 
+        // Update ghost preview position if in build mode (must track floating origin each frame)
+        if (this.buildMode && this.buildPanel.isVisible()) {
+            const params = this.buildPanel.getParams();
+            const localX = params.x - cameraOrigin.x;
+            const localY = params.y - cameraOrigin.y;
+            const localZ = params.z - cameraOrigin.z;
+            this.bodyRenderer.updateGhostPosition(localX, localY, localZ);
+        }
+
         // Update star rotations from simulation time
         this.bodyRenderer.updateBodies(this.state.time);
 
@@ -1610,7 +1622,7 @@ class NBodyClient {
             this.bodyRenderer.setGhostPreview(params.radius, params.color, params.type);
             this.bodyRenderer.setGhostVisible(true);
             
-            // Position ghost at build panel's current position (camera-relative)
+            // Position ghost at world coordinates (convert to camera-local using floating origin)
             const origin = this.camera.getWorldOrigin();
             const localX = params.x - origin.x;
             const localY = params.y - origin.y;
@@ -1619,6 +1631,11 @@ class NBodyClient {
         } else {
             this.bodyRenderer.setGhostVisible(false);
         }
+    }
+
+    private onBuildPanelClose(): void {
+        // Remove ghost preview when panel closes
+        this.bodyRenderer.removeGhost();
     }
 
     private onBuildSpawn(params: BuildBodyParams): void {
