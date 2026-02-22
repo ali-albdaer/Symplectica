@@ -385,6 +385,7 @@ pub fn trial_integrate_subset_rk45(
     let mut t = 0.0;
     let mut h = dt;
     let mut steps = 0usize;
+    let mut attempts = 0usize;
     let mut max_error = 0.0f64;
 
     // Dormand-Prince coefficients
@@ -423,7 +424,7 @@ pub fn trial_integrate_subset_rk45(
     const B7S: f64 = 1.0 / 40.0;
 
     while t < dt {
-        if steps >= cfg.max_trial_substeps {
+        if attempts >= cfg.max_trial_substeps {
             return CloseEncounterTrialResult {
                 accepted: false,
                 steps,
@@ -580,6 +581,7 @@ pub fn trial_integrate_subset_rk45(
             velocities = next_vel;
             t += h;
             steps += 1;
+            attempts += 1;
 
             // Increase step for next iteration if possible
             let safety = 0.9;
@@ -594,6 +596,7 @@ pub fn trial_integrate_subset_rk45(
             let safety = 0.8;
             let factor = (safety * err_max.powf(-0.25)).clamp(0.1, 0.5);
             h = (h * factor).max(dt / (cfg.max_trial_substeps as f64));
+            attempts += 1;
             if h <= 0.0 {
                 return CloseEncounterTrialResult {
                     accepted: false,
