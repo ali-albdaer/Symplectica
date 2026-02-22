@@ -194,7 +194,6 @@ export class AdminPanel {
                                 <option value="gauss-radau">Gauss-Radau 5th</option>
                                 <option value="rk45">Adaptive RK45</option>
                             </select>
-                            <div class="admin-hint">Applies only to close-encounter subsets</div>
                         </div>
                         <div class="admin-field">
                             <label>Hill Radius Factor</label>
