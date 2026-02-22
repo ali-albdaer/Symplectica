@@ -337,6 +337,60 @@ class SimulationServer {
         });
     }
 
+    private normalizeSnapshotForAdmin(snapshot: string): string {
+        try {
+            const parsed = JSON.parse(snapshot) as {
+                force_config?: { softening?: number; barnes_hut_theta?: number };
+                integrator_config?: {
+                    dt?: number;
+                    substeps?: number;
+                    method?: string;
+                    close_encounter?: Record<string, unknown>;
+                };
+            };
+
+            if (!parsed || typeof parsed !== 'object') return snapshot;
+
+            const integrator = parsed.integrator_config ?? {};
+            const close = (integrator.close_encounter ?? {}) as Record<string, unknown>;
+
+            integrator.dt = this.adminState.dt;
+            integrator.substeps = this.adminState.substeps;
+            if (!integrator.method) {
+                integrator.method = 'VelocityVerlet';
+            }
+
+            const integratorName = this.adminState.closeEncounterIntegrator === 'rk45'
+                ? 'Rk45'
+                : this.adminState.closeEncounterIntegrator === 'gauss-radau'
+                    ? 'GaussRadau5'
+                    : 'None';
+
+            close.enabled = this.adminState.closeEncounterIntegrator !== 'none';
+            close.integrator = integratorName;
+            close.hill_factor = this.adminState.closeEncounterHillFactor;
+            close.tidal_ratio_threshold = this.adminState.closeEncounterTidalRatio;
+            close.jerk_norm_threshold = this.adminState.closeEncounterJerkNorm;
+            close.max_subset_size = this.adminState.closeEncounterMaxSubsetSize;
+            close.max_trial_substeps = this.adminState.closeEncounterMaxTrialSubsteps;
+            close.rk45_abs_tol = this.adminState.closeEncounterRk45AbsTol;
+            close.rk45_rel_tol = this.adminState.closeEncounterRk45RelTol;
+            close.gauss_radau_max_iters = this.adminState.closeEncounterGaussRadauMaxIters;
+            close.gauss_radau_tol = this.adminState.closeEncounterGaussRadauTol;
+
+            integrator.close_encounter = close;
+            parsed.integrator_config = integrator;
+
+            const force = parsed.force_config ?? {};
+            force.barnes_hut_theta = this.adminState.theta;
+            parsed.force_config = force;
+
+            return JSON.stringify(parsed);
+        } catch {
+            return snapshot;
+        }
+    }
+
     private handleMessage(client: Client, message: ClientMessage): void {
         switch (message.type) {
             case 'ping':
@@ -529,7 +583,8 @@ class SimulationServer {
             case 'apply_snapshot': {
                 const payload = message.payload as { snapshot?: string; presetName?: string } | undefined;
                 if (!payload?.snapshot) return;
-                const ok = this.simulation.fromJson(payload.snapshot);
+                const normalized = this.normalizeSnapshotForAdmin(payload.snapshot);
+                const ok = this.simulation.fromJson(normalized);
                 if (ok) {
                     this.broadcastSnapshot();
                     const name = payload.presetName || 'Custom Snapshot';
