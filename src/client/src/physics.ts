@@ -30,7 +30,10 @@ type WasmSimulation = {
     useDirectForce(): void;
     useBarnesHut(): void;
     setCloseEncounterIntegrator(name: string): void;
-    setCloseEncounterThresholds(hillFactor: number, accel: number, jerk: number): void;
+    setCloseEncounterThresholds(hillFactor: number, tidalRatio: number, jerkNorm: number): void;
+    setCloseEncounterLimits(maxSubsetSize: number, maxTrialSubsteps: number): void;
+    setCloseEncounterRk45Tolerances(absTol: number, relTol: number): void;
+    setCloseEncounterGaussRadau(maxIters: number, tol: number): void;
     takeCloseEncounterEvents(): string;
     random(): number;
     free(): void;
@@ -229,9 +232,27 @@ export class PhysicsClient {
         }
     }
 
-    setCloseEncounterThresholds(hillFactor: number, accel: number, jerk: number): void {
+    setCloseEncounterThresholds(hillFactor: number, tidalRatio: number, jerkNorm: number): void {
         if (this.simulation) {
-            this.simulation.setCloseEncounterThresholds(hillFactor, accel, jerk);
+            this.simulation.setCloseEncounterThresholds(hillFactor, tidalRatio, jerkNorm);
+        }
+    }
+
+    setCloseEncounterLimits(maxSubsetSize: number, maxTrialSubsteps: number): void {
+        if (this.simulation) {
+            this.simulation.setCloseEncounterLimits(maxSubsetSize, maxTrialSubsteps);
+        }
+    }
+
+    setCloseEncounterRk45Tolerances(absTol: number, relTol: number): void {
+        if (this.simulation) {
+            this.simulation.setCloseEncounterRk45Tolerances(absTol, relTol);
+        }
+    }
+
+    setCloseEncounterGaussRadau(maxIters: number, tol: number): void {
+        if (this.simulation) {
+            this.simulation.setCloseEncounterGaussRadau(maxIters, tol);
         }
     }
 

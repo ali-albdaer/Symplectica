@@ -52,10 +52,10 @@ pub struct CloseEncounterConfig {
     pub integrator: CloseEncounterIntegrator,
     /// Distance threshold multiplier on Hill radius.
     pub hill_factor: f64,
-    /// Acceleration magnitude threshold (m/s^2).
-    pub accel_threshold: f64,
-    /// Jerk magnitude threshold (m/s^3).
-    pub jerk_threshold: f64,
+    /// Tidal ratio threshold (|a_perturber| / |a_primary|).
+    pub tidal_ratio_threshold: f64,
+    /// Normalized jerk threshold (|jerk| * dt / |accel|).
+    pub jerk_norm_threshold: f64,
     /// Max number of bodies in a close-encounter subset.
     pub max_subset_size: usize,
     /// Max adaptive substeps during a trial.
@@ -76,8 +76,8 @@ impl Default for CloseEncounterConfig {
             enabled: true,
             integrator: CloseEncounterIntegrator::GaussRadau5,
             hill_factor: 3.0,
-            accel_threshold: 1.0e-3,
-            jerk_threshold: 1.0e-7,
+            tidal_ratio_threshold: 1.0e-3,
+            jerk_norm_threshold: 0.1,
             max_subset_size: 8,
             max_trial_substeps: 128,
             rk45_abs_tol: 1.0e-2,

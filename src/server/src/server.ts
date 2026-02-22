@@ -75,7 +75,10 @@ interface WasmSimulation {
     useDirectForce(): void;
     useBarnesHut(): void;
     setCloseEncounterIntegrator(name: string): void;
-    setCloseEncounterThresholds(hillFactor: number, accel: number, jerk: number): void;
+    setCloseEncounterThresholds(hillFactor: number, tidalRatio: number, jerkNorm: number): void;
+    setCloseEncounterLimits(maxSubsetSize: number, maxTrialSubsteps: number): void;
+    setCloseEncounterRk45Tolerances(absTol: number, relTol: number): void;
+    setCloseEncounterGaussRadau(maxIters: number, tol: number): void;
     takeCloseEncounterEvents(): string;
     random(): number;
     free(): void;
@@ -116,6 +119,15 @@ interface AdminStatePayload {
     paused: boolean;
     simMode: 'tick' | 'accumulator';
     closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
+    closeEncounterHillFactor: number;
+    closeEncounterTidalRatio: number;
+    closeEncounterJerkNorm: number;
+    closeEncounterMaxSubsetSize: number;
+    closeEncounterMaxTrialSubsteps: number;
+    closeEncounterRk45AbsTol: number;
+    closeEncounterRk45RelTol: number;
+    closeEncounterGaussRadauMaxIters: number;
+    closeEncounterGaussRadauTol: number;
 }
 
 
@@ -145,6 +157,15 @@ class SimulationServer {
         paused: false,
         simMode: 'tick',
         closeEncounterIntegrator: 'gauss-radau',
+        closeEncounterHillFactor: 3.0,
+        closeEncounterTidalRatio: 1.0e-3,
+        closeEncounterJerkNorm: 0.1,
+        closeEncounterMaxSubsetSize: 8,
+        closeEncounterMaxTrialSubsteps: 128,
+        closeEncounterRk45AbsTol: 1.0e-2,
+        closeEncounterRk45RelTol: 1.0e-6,
+        closeEncounterGaussRadauMaxIters: 6,
+        closeEncounterGaussRadauTol: 1.0e-9,
     };
 
     // New properties for HTTP server
@@ -235,6 +256,15 @@ class SimulationServer {
             paused: false,
             simMode: 'tick',
             closeEncounterIntegrator: 'gauss-radau',
+            closeEncounterHillFactor: 3.0,
+            closeEncounterTidalRatio: 1.0e-3,
+            closeEncounterJerkNorm: 0.1,
+            closeEncounterMaxSubsetSize: 8,
+            closeEncounterMaxTrialSubsteps: 128,
+            closeEncounterRk45AbsTol: 1.0e-2,
+            closeEncounterRk45RelTol: 1.0e-6,
+            closeEncounterGaussRadauMaxIters: 6,
+            closeEncounterGaussRadauTol: 1.0e-9,
         };
 
         console.log(`   Bodies: ${this.simulation.bodyCount()}`);
@@ -368,6 +398,33 @@ class SimulationServer {
                 const closeIntegrator = payload.closeEncounterIntegrator === 'rk45' || payload.closeEncounterIntegrator === 'gauss-radau'
                     ? payload.closeEncounterIntegrator
                     : 'none';
+                const closeEncounterHillFactor = typeof payload.closeEncounterHillFactor === 'number' && payload.closeEncounterHillFactor > 0
+                    ? payload.closeEncounterHillFactor
+                    : this.adminState.closeEncounterHillFactor;
+                const closeEncounterTidalRatio = typeof payload.closeEncounterTidalRatio === 'number' && payload.closeEncounterTidalRatio >= 0
+                    ? payload.closeEncounterTidalRatio
+                    : this.adminState.closeEncounterTidalRatio;
+                const closeEncounterJerkNorm = typeof payload.closeEncounterJerkNorm === 'number' && payload.closeEncounterJerkNorm >= 0
+                    ? payload.closeEncounterJerkNorm
+                    : this.adminState.closeEncounterJerkNorm;
+                const closeEncounterMaxSubsetSize = typeof payload.closeEncounterMaxSubsetSize === 'number' && payload.closeEncounterMaxSubsetSize > 0
+                    ? payload.closeEncounterMaxSubsetSize
+                    : this.adminState.closeEncounterMaxSubsetSize;
+                const closeEncounterMaxTrialSubsteps = typeof payload.closeEncounterMaxTrialSubsteps === 'number' && payload.closeEncounterMaxTrialSubsteps > 0
+                    ? payload.closeEncounterMaxTrialSubsteps
+                    : this.adminState.closeEncounterMaxTrialSubsteps;
+                const closeEncounterRk45AbsTol = typeof payload.closeEncounterRk45AbsTol === 'number' && payload.closeEncounterRk45AbsTol > 0
+                    ? payload.closeEncounterRk45AbsTol
+                    : this.adminState.closeEncounterRk45AbsTol;
+                const closeEncounterRk45RelTol = typeof payload.closeEncounterRk45RelTol === 'number' && payload.closeEncounterRk45RelTol > 0
+                    ? payload.closeEncounterRk45RelTol
+                    : this.adminState.closeEncounterRk45RelTol;
+                const closeEncounterGaussRadauMaxIters = typeof payload.closeEncounterGaussRadauMaxIters === 'number' && payload.closeEncounterGaussRadauMaxIters > 0
+                    ? payload.closeEncounterGaussRadauMaxIters
+                    : this.adminState.closeEncounterGaussRadauMaxIters;
+                const closeEncounterGaussRadauTol = typeof payload.closeEncounterGaussRadauTol === 'number' && payload.closeEncounterGaussRadauTol > 0
+                    ? payload.closeEncounterGaussRadauTol
+                    : this.adminState.closeEncounterGaussRadauTol;
                 const timeScale = typeof payload.timeScale === 'number' && payload.timeScale > 0
                     ? payload.timeScale
                     : this.adminState.timeScale;
@@ -392,6 +449,23 @@ class SimulationServer {
                 }
 
                 this.simulation.setCloseEncounterIntegrator(closeIntegrator);
+                this.simulation.setCloseEncounterThresholds(
+                    closeEncounterHillFactor,
+                    closeEncounterTidalRatio,
+                    closeEncounterJerkNorm
+                );
+                this.simulation.setCloseEncounterLimits(
+                    closeEncounterMaxSubsetSize,
+                    closeEncounterMaxTrialSubsteps
+                );
+                this.simulation.setCloseEncounterRk45Tolerances(
+                    closeEncounterRk45AbsTol,
+                    closeEncounterRk45RelTol
+                );
+                this.simulation.setCloseEncounterGaussRadau(
+                    closeEncounterGaussRadauMaxIters,
+                    closeEncounterGaussRadauTol
+                );
 
                 this.adminState = {
                     dt,
@@ -402,6 +476,15 @@ class SimulationServer {
                     paused: this.adminState.paused,
                     simMode,
                     closeEncounterIntegrator: closeIntegrator,
+                    closeEncounterHillFactor,
+                    closeEncounterTidalRatio,
+                    closeEncounterJerkNorm,
+                    closeEncounterMaxSubsetSize,
+                    closeEncounterMaxTrialSubsteps,
+                    closeEncounterRk45AbsTol,
+                    closeEncounterRk45RelTol,
+                    closeEncounterGaussRadauMaxIters,
+                    closeEncounterGaussRadauTol,
                 };
 
                 this.simAccumulator = 0;

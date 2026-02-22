@@ -259,10 +259,28 @@ impl WasmSimulation {
         self.inner.set_close_encounter_integrator(integrator);
     }
 
-    /// Set close-encounter thresholds (hill_factor, accel, jerk)
+    /// Set close-encounter thresholds (hill_factor, tidal_ratio, jerk_norm)
     #[wasm_bindgen(js_name = setCloseEncounterThresholds)]
-    pub fn set_close_encounter_thresholds(&mut self, hill_factor: f64, accel: f64, jerk: f64) {
-        self.inner.set_close_encounter_thresholds(hill_factor, accel, jerk);
+    pub fn set_close_encounter_thresholds(&mut self, hill_factor: f64, tidal_ratio: f64, jerk_norm: f64) {
+        self.inner.set_close_encounter_thresholds(hill_factor, tidal_ratio, jerk_norm);
+    }
+
+    /// Set close-encounter limits (max_subset_size, max_trial_substeps)
+    #[wasm_bindgen(js_name = setCloseEncounterLimits)]
+    pub fn set_close_encounter_limits(&mut self, max_subset_size: u32, max_trial_substeps: u32) {
+        self.inner.set_close_encounter_limits(max_subset_size as usize, max_trial_substeps as usize);
+    }
+
+    /// Set close-encounter RK45 tolerances (abs_tol, rel_tol)
+    #[wasm_bindgen(js_name = setCloseEncounterRk45Tolerances)]
+    pub fn set_close_encounter_rk45_tolerances(&mut self, abs_tol: f64, rel_tol: f64) {
+        self.inner.set_close_encounter_rk45_tolerances(abs_tol, rel_tol);
+    }
+
+    /// Set close-encounter Gauss-Radau parameters (max_iters, tol)
+    #[wasm_bindgen(js_name = setCloseEncounterGaussRadau)]
+    pub fn set_close_encounter_gauss_radau(&mut self, max_iters: u32, tol: f64) {
+        self.inner.set_close_encounter_gauss_radau(max_iters as usize, tol);
     }
 
     /// Drain close-encounter events as JSON

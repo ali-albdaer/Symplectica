@@ -4,6 +4,7 @@
 //! advanced by step, checkpointed, and serialized.
 
 use crate::body::{Body, BodyId};
+use crate::constants::G;
 use crate::force::{compute_accelerations_direct, compute_total_energy};
 use crate::integrator::{
     step_with_accel,
@@ -414,13 +415,22 @@ impl Simulation {
 
                 let accel_i = bi.acceleration.length();
                 let accel_j = bj.acceleration.length();
-                let jerk_i = (bi.acceleration - bi.prev_acceleration).length() / dt;
-                let jerk_j = (bj.acceleration - bj.prev_acceleration).length() / dt;
+                let jerk_i = (bi.acceleration - bi.prev_acceleration).length();
+                let jerk_j = (bj.acceleration - bj.prev_acceleration).length();
 
-                let accel_hit = accel_i.max(accel_j) >= cfg.accel_threshold;
-                let jerk_hit = jerk_i.max(jerk_j) >= cfg.jerk_threshold;
+                let accel_floor = 1.0e-12;
+                let a_pert_i = G * bj.mass / (dist * dist);
+                let a_pert_j = G * bi.mass / (dist * dist);
 
-                if accel_hit || jerk_hit {
+                let tidal_i = a_pert_i / accel_i.max(accel_floor);
+                let tidal_j = a_pert_j / accel_j.max(accel_floor);
+                let jerk_norm_i = (jerk_i * dt) / accel_i.max(accel_floor);
+                let jerk_norm_j = (jerk_j * dt) / accel_j.max(accel_floor);
+
+                let tidal_hit = tidal_i.max(tidal_j) >= cfg.tidal_ratio_threshold;
+                let jerk_hit = jerk_norm_i.max(jerk_norm_j) >= cfg.jerk_norm_threshold;
+
+                if tidal_hit || jerk_hit {
                     if !marked[i] {
                         marked[i] = true;
                         subset.push(i);
@@ -432,11 +442,11 @@ impl Simulation {
 
                     if reason.is_empty() {
                         reason = format!(
-                            "dist={:.3e}, hill={:.3e}, accel={:.3e}, jerk={:.3e}",
+                            "dist={:.3e}, hill={:.3e}, tidal={:.3e}, jerkN={:.3e}",
                             dist,
                             hill,
-                            accel_i.max(accel_j),
-                            jerk_i.max(jerk_j),
+                            tidal_i.max(tidal_j),
+                            jerk_norm_i.max(jerk_norm_j),
                         );
                     }
 
@@ -626,15 +636,45 @@ impl Simulation {
     }
 
     /// Set close-encounter thresholds
-    pub fn set_close_encounter_thresholds(&mut self, hill_factor: f64, accel: f64, jerk: f64) {
+    pub fn set_close_encounter_thresholds(&mut self, hill_factor: f64, tidal_ratio: f64, jerk_norm: f64) {
         if hill_factor > 0.0 {
             self.config.integrator.close_encounter.hill_factor = hill_factor;
         }
-        if accel > 0.0 {
-            self.config.integrator.close_encounter.accel_threshold = accel;
+        if tidal_ratio >= 0.0 {
+            self.config.integrator.close_encounter.tidal_ratio_threshold = tidal_ratio;
         }
-        if jerk > 0.0 {
-            self.config.integrator.close_encounter.jerk_threshold = jerk;
+        if jerk_norm >= 0.0 {
+            self.config.integrator.close_encounter.jerk_norm_threshold = jerk_norm;
+        }
+    }
+
+    /// Set close-encounter limits
+    pub fn set_close_encounter_limits(&mut self, max_subset_size: usize, max_trial_substeps: usize) {
+        if max_subset_size > 0 {
+            self.config.integrator.close_encounter.max_subset_size = max_subset_size;
+        }
+        if max_trial_substeps > 0 {
+            self.config.integrator.close_encounter.max_trial_substeps = max_trial_substeps;
+        }
+    }
+
+    /// Set close-encounter RK45 tolerances
+    pub fn set_close_encounter_rk45_tolerances(&mut self, abs_tol: f64, rel_tol: f64) {
+        if abs_tol > 0.0 {
+            self.config.integrator.close_encounter.rk45_abs_tol = abs_tol;
+        }
+        if rel_tol > 0.0 {
+            self.config.integrator.close_encounter.rk45_rel_tol = rel_tol;
+        }
+    }
+
+    /// Set close-encounter Gauss-Radau parameters
+    pub fn set_close_encounter_gauss_radau(&mut self, max_iters: usize, tol: f64) {
+        if max_iters > 0 {
+            self.config.integrator.close_encounter.gauss_radau_max_iters = max_iters;
+        }
+        if tol > 0.0 {
+            self.config.integrator.close_encounter.gauss_radau_tol = tol;
         }
     }
 

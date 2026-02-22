@@ -27,7 +27,7 @@ fn build_close_pair() -> Simulation {
     sim.set_dt(1.0);
     sim.set_substeps(1);
     // Very permissive thresholds to guarantee trigger
-    sim.set_close_encounter_thresholds(3.0, 1.0e-12, 1.0e-12);
+    sim.set_close_encounter_thresholds(3.0, 1.0e-6, 1.0e-6);
     sim
 }
 

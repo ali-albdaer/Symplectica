@@ -338,6 +338,23 @@ class NBodyClient {
         this.timeController.setPaused(settings.paused);
         this.setLocalSimMode(settings.simMode);
         this.physics.setCloseEncounterIntegrator(settings.closeEncounterIntegrator);
+        this.physics.setCloseEncounterThresholds(
+            settings.closeEncounterHillFactor,
+            settings.closeEncounterTidalRatio,
+            settings.closeEncounterJerkNorm
+        );
+        this.physics.setCloseEncounterLimits(
+            settings.closeEncounterMaxSubsetSize,
+            settings.closeEncounterMaxTrialSubsteps
+        );
+        this.physics.setCloseEncounterRk45Tolerances(
+            settings.closeEncounterRk45AbsTol,
+            settings.closeEncounterRk45RelTol
+        );
+        this.physics.setCloseEncounterGaussRadau(
+            settings.closeEncounterGaussRadauMaxIters,
+            settings.closeEncounterGaussRadauTol
+        );
         this.updateTimeScaleUI();
         this.adminPanel?.applyServerSettings(settings);
     }

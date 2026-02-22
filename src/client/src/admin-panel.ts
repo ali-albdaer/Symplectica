@@ -20,6 +20,15 @@ interface ServerConfig {
     substeps: number;
     simMode: 'tick' | 'accumulator';
     closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
+    closeEncounterHillFactor: number;
+    closeEncounterTidalRatio: number;
+    closeEncounterJerkNorm: number;
+    closeEncounterMaxSubsetSize: number;
+    closeEncounterMaxTrialSubsteps: number;
+    closeEncounterRk45AbsTol: number;
+    closeEncounterRk45RelTol: number;
+    closeEncounterGaussRadauMaxIters: number;
+    closeEncounterGaussRadauTol: number;
 }
 
 export class AdminPanel {
@@ -37,6 +46,15 @@ export class AdminPanel {
         substeps: 4,
         simMode: 'tick',
         closeEncounterIntegrator: 'gauss-radau',
+        closeEncounterHillFactor: 3.0,
+        closeEncounterTidalRatio: 1.0e-3,
+        closeEncounterJerkNorm: 0.1,
+        closeEncounterMaxSubsetSize: 8,
+        closeEncounterMaxTrialSubsteps: 128,
+        closeEncounterRk45AbsTol: 1.0e-2,
+        closeEncounterRk45RelTol: 1.0e-6,
+        closeEncounterGaussRadauMaxIters: 6,
+        closeEncounterGaussRadauTol: 1.0e-9,
     };
 
     constructor(
@@ -74,7 +92,12 @@ export class AdminPanel {
                 <button class="admin-close" title="Close (&#96;)">&times;</button>
             </div>
             
-            <div class="admin-content">
+            <div class="opt-tabs admin-tabs">
+                <button class="opt-tab active" data-tab="admin-general">General</button>
+                <button class="opt-tab" data-tab="admin-close">Close Encounters</button>
+            </div>
+
+            <div class="opt-content admin-content active" id="tab-admin-general">
                 <section class="admin-section">
                     <h3>Presets</h3>
                     <div class="admin-field">
@@ -145,7 +168,24 @@ export class AdminPanel {
                             <option value="barnes-hut">Barnes-Hut O(N log N)</option>
                         </select>
                     </div>
+                    
+                    <div class="admin-field" id="theta-field">
+                        <label>Barnes-Hut θ</label>
+                        <input type="number" id="admin-theta" value="0.5" min="0.1" max="2" step="0.1">
+                    </div>
+                </section>
+                
+                <section class="admin-section">
+                    <h3>Actions</h3>
+                    <button class="admin-btn" id="admin-apply">Apply Settings</button>
+                    <button class="admin-btn" id="admin-pause-btn">Pause Simulation</button>
+                    <button class="admin-btn admin-btn-warning" id="admin-reset">Reset Simulation</button>
+                </section>
+            </div>
 
+            <div class="opt-content admin-content" id="tab-admin-close" style="display: none;">
+                <section class="admin-section">
+                    <h3>Switching</h3>
                     <div class="admin-field">
                         <label>Close-Encounter Integrator</label>
                         <select id="admin-close-encounter">
@@ -155,20 +195,52 @@ export class AdminPanel {
                         </select>
                         <div class="admin-hint">Applies only to close-encounter subsets</div>
                     </div>
-                    
-                    <div class="admin-field" id="theta-field">
-                        <label>Barnes-Hut θ</label>
-                        <input type="number" id="admin-theta" value="0.5" min="0.1" max="2" step="0.1">
+                    <div class="admin-field">
+                        <label>Hill Radius Factor</label>
+                        <input type="number" id="admin-close-hill" value="3" min="0.1" step="0.1">
+                    </div>
+                    <div class="admin-field">
+                        <label>Tidal Ratio Threshold</label>
+                        <input type="number" id="admin-close-tidal" value="0.001" min="0" step="0.0001">
+                        <div class="admin-hint">|a_perturber| / |a_primary|</div>
+                    </div>
+                    <div class="admin-field">
+                        <label>Normalized Jerk Threshold</label>
+                        <input type="number" id="admin-close-jerk" value="0.1" min="0" step="0.01">
+                        <div class="admin-hint">|jerk| × dt / |accel|</div>
+                    </div>
+                    <div class="admin-field">
+                        <label>Max Subset Size</label>
+                        <input type="number" id="admin-close-max-subset" value="8" min="1" step="1">
+                    </div>
+                    <div class="admin-field">
+                        <label>Max Trial Substeps</label>
+                        <input type="number" id="admin-close-max-substeps" value="128" min="1" step="1">
                     </div>
                 </section>
 
-                </section>
-                
                 <section class="admin-section">
-                    <h3>Actions</h3>
-                    <button class="admin-btn" id="admin-apply">Apply Settings</button>
-                    <button class="admin-btn" id="admin-pause-btn">Pause Simulation</button>
-                    <button class="admin-btn admin-btn-warning" id="admin-reset">Reset Simulation</button>
+                    <h3>RK45</h3>
+                    <div class="admin-field">
+                        <label>Absolute Tolerance</label>
+                        <input type="number" id="admin-close-rk45-abs" value="0.01" min="0" step="0.0001">
+                    </div>
+                    <div class="admin-field">
+                        <label>Relative Tolerance</label>
+                        <input type="number" id="admin-close-rk45-rel" value="0.000001" min="0" step="0.000001">
+                    </div>
+                </section>
+
+                <section class="admin-section">
+                    <h3>Gauss-Radau</h3>
+                    <div class="admin-field">
+                        <label>Max Iterations</label>
+                        <input type="number" id="admin-close-gr-iters" value="6" min="1" step="1">
+                    </div>
+                    <div class="admin-field">
+                        <label>Convergence Tolerance</label>
+                        <input type="number" id="admin-close-gr-tol" value="0.000000001" min="0" step="0.000000001">
+                    </div>
                 </section>
             </div>
         `;
@@ -233,6 +305,38 @@ export class AdminPanel {
             .admin-content {
                 padding: 12px 15px;
             }
+
+            .opt-tabs {
+                display: flex;
+                background: rgba(0, 0, 0, 0.2);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .opt-tab {
+                flex: 1;
+                background: none;
+                border: none;
+                color: rgba(255, 255, 255, 0.6);
+                padding: 10px 0;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                transition: color 0.2s, border-color 0.2s;
+            }
+
+            .opt-tab:hover {
+                color: #fff;
+                background: rgba(255, 255, 255, 0.05);
+            }
+
+            .opt-tab.active {
+                color: #4fc3f7;
+                border-bottom-color: #4fc3f7;
+            }
+
+            .opt-content { padding: 12px 15px; }
+            .opt-content.active { display: block; }
             
             .admin-section {
                 margin-bottom: 14px;
@@ -356,6 +460,7 @@ export class AdminPanel {
 
         // Setup event listeners
         this.setupEventListeners(container);
+        this.setupTabs(container);
 
         return container;
     }
@@ -455,6 +560,24 @@ export class AdminPanel {
         });
     }
 
+    private setupTabs(container: HTMLElement): void {
+        const tabs = container.querySelectorAll('.opt-tab');
+        const contents = container.querySelectorAll('.opt-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetId = (tab as HTMLElement).dataset.tab;
+
+                tabs.forEach(t => t.classList.toggle('active', t === tab));
+
+                contents.forEach(content => {
+                    const id = content.id.replace('tab-', '');
+                    (content as HTMLElement).style.display = id === targetId ? 'block' : 'none';
+                });
+            });
+        });
+    }
+
     private setupKeyboardShortcut(): void {
         window.addEventListener('keydown', (e) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -496,6 +619,15 @@ export class AdminPanel {
         const theta = parseFloat((document.getElementById('admin-theta') as HTMLInputElement).value);
         const simMode = (document.getElementById('admin-sim-mode') as HTMLSelectElement).value as 'tick' | 'accumulator';
         const closeIntegrator = (document.getElementById('admin-close-encounter') as HTMLSelectElement).value as 'none' | 'rk45' | 'gauss-radau';
+        const closeHill = parseFloat((document.getElementById('admin-close-hill') as HTMLInputElement).value);
+        const closeTidal = parseFloat((document.getElementById('admin-close-tidal') as HTMLInputElement).value);
+        const closeJerk = parseFloat((document.getElementById('admin-close-jerk') as HTMLInputElement).value);
+        const closeMaxSubset = parseInt((document.getElementById('admin-close-max-subset') as HTMLInputElement).value, 10);
+        const closeMaxSubsteps = parseInt((document.getElementById('admin-close-max-substeps') as HTMLInputElement).value, 10);
+        const closeRk45Abs = parseFloat((document.getElementById('admin-close-rk45-abs') as HTMLInputElement).value);
+        const closeRk45Rel = parseFloat((document.getElementById('admin-close-rk45-rel') as HTMLInputElement).value);
+        const closeGrIters = parseInt((document.getElementById('admin-close-gr-iters') as HTMLInputElement).value, 10);
+        const closeGrTol = parseFloat((document.getElementById('admin-close-gr-tol') as HTMLInputElement).value);
 
         const warpSelect = document.getElementById('admin-time-warp') as HTMLSelectElement;
         const timeScale = parseFloat(warpSelect.value);
@@ -509,6 +641,15 @@ export class AdminPanel {
                 timeScale,
                 simMode,
                 closeEncounterIntegrator: closeIntegrator,
+                closeEncounterHillFactor: closeHill,
+                closeEncounterTidalRatio: closeTidal,
+                closeEncounterJerkNorm: closeJerk,
+                closeEncounterMaxSubsetSize: closeMaxSubset,
+                closeEncounterMaxTrialSubsteps: closeMaxSubsteps,
+                closeEncounterRk45AbsTol: closeRk45Abs,
+                closeEncounterRk45RelTol: closeRk45Rel,
+                closeEncounterGaussRadauMaxIters: closeGrIters,
+                closeEncounterGaussRadauTol: closeGrTol,
             } as AdminStatePayload);
         }
 
@@ -522,6 +663,10 @@ export class AdminPanel {
             this.physics.useDirectForce();
         }
         this.physics.setCloseEncounterIntegrator(closeIntegrator);
+        this.physics.setCloseEncounterThresholds(closeHill, closeTidal, closeJerk);
+        this.physics.setCloseEncounterLimits(closeMaxSubset, closeMaxSubsteps);
+        this.physics.setCloseEncounterRk45Tolerances(closeRk45Abs, closeRk45Rel);
+        this.physics.setCloseEncounterGaussRadau(closeGrIters, closeGrTol);
         this.timeController.setPhysicsTimestep(dt);
         this.timeController.setSpeedBySimRate(timeScale);
         this.onSimModeChange?.(simMode);
@@ -550,6 +695,15 @@ export class AdminPanel {
         const simModeSelect = document.getElementById('admin-sim-mode') as HTMLSelectElement | null;
         const warpSelect = document.getElementById('admin-time-warp') as HTMLSelectElement | null;
         const closeIntegratorSelect = document.getElementById('admin-close-encounter') as HTMLSelectElement | null;
+        const closeHillInput = document.getElementById('admin-close-hill') as HTMLInputElement | null;
+        const closeTidalInput = document.getElementById('admin-close-tidal') as HTMLInputElement | null;
+        const closeJerkInput = document.getElementById('admin-close-jerk') as HTMLInputElement | null;
+        const closeMaxSubsetInput = document.getElementById('admin-close-max-subset') as HTMLInputElement | null;
+        const closeMaxSubstepsInput = document.getElementById('admin-close-max-substeps') as HTMLInputElement | null;
+        const closeRk45AbsInput = document.getElementById('admin-close-rk45-abs') as HTMLInputElement | null;
+        const closeRk45RelInput = document.getElementById('admin-close-rk45-rel') as HTMLInputElement | null;
+        const closeGrItersInput = document.getElementById('admin-close-gr-iters') as HTMLInputElement | null;
+        const closeGrTolInput = document.getElementById('admin-close-gr-tol') as HTMLInputElement | null;
 
         if (dtInput) dtInput.value = settings.dt.toString();
         if (substepsInput) substepsInput.value = settings.substeps.toString();
@@ -561,6 +715,15 @@ export class AdminPanel {
             warpSelect.value = settings.timeScale.toString();
         }
         if (closeIntegratorSelect) closeIntegratorSelect.value = settings.closeEncounterIntegrator;
+        if (closeHillInput) closeHillInput.value = settings.closeEncounterHillFactor.toString();
+        if (closeTidalInput) closeTidalInput.value = settings.closeEncounterTidalRatio.toString();
+        if (closeJerkInput) closeJerkInput.value = settings.closeEncounterJerkNorm.toString();
+        if (closeMaxSubsetInput) closeMaxSubsetInput.value = settings.closeEncounterMaxSubsetSize.toString();
+        if (closeMaxSubstepsInput) closeMaxSubstepsInput.value = settings.closeEncounterMaxTrialSubsteps.toString();
+        if (closeRk45AbsInput) closeRk45AbsInput.value = settings.closeEncounterRk45AbsTol.toString();
+        if (closeRk45RelInput) closeRk45RelInput.value = settings.closeEncounterRk45RelTol.toString();
+        if (closeGrItersInput) closeGrItersInput.value = settings.closeEncounterGaussRadauMaxIters.toString();
+        if (closeGrTolInput) closeGrTolInput.value = settings.closeEncounterGaussRadauTol.toString();
     }
 
     private setupDrag(container: HTMLElement): void {

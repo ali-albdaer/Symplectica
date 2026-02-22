@@ -48,6 +48,15 @@ export interface AdminStatePayload {
     paused: boolean;
     simMode: 'tick' | 'accumulator';
     closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
+    closeEncounterHillFactor: number;
+    closeEncounterTidalRatio: number;
+    closeEncounterJerkNorm: number;
+    closeEncounterMaxSubsetSize: number;
+    closeEncounterMaxTrialSubsteps: number;
+    closeEncounterRk45AbsTol: number;
+    closeEncounterRk45RelTol: number;
+    closeEncounterGaussRadauMaxIters: number;
+    closeEncounterGaussRadauTol: number;
 }
 
 
