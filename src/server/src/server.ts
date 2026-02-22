@@ -18,6 +18,8 @@ interface PhysicsModule {
     WasmSimulation: new (seed: bigint) => WasmSimulation;
     createSunEarthMoon: (seed: bigint) => WasmSimulation;
     createFullSolarSystem: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemII?: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemIIBarycentric?: (seed: bigint) => WasmSimulation;
     createPlayableSolarSystem: (seed: bigint) => WasmSimulation;
     getG: () => number;
     getAU: () => number;
@@ -241,8 +243,14 @@ class SimulationServer {
     private createSimulation(): void {
         console.log('[INFO] Creating simulation...');
 
-        // Use preset for now
-        this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
+        // Use Full Solar System II barycentric when available
+        if (typeof this.physics.createFullSolarSystemIIBarycentric === 'function') {
+            this.simulation = this.physics.createFullSolarSystemIIBarycentric(CONFIG.seed);
+        } else if (typeof this.physics.createFullSolarSystemII === 'function') {
+            this.simulation = this.physics.createFullSolarSystemII(CONFIG.seed);
+        } else {
+            this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
+        }
 
         // Configure for 60Hz tick rate
         this.simulation.setDt(1.0 / CONFIG.tickRate);
