@@ -16,12 +16,12 @@
     "closeEncounterIntegrator": "none",
     "closeEncounterHillFactor": 3,
     "closeEncounterTidalRatio": 0.001,
-    "closeEncounterJerkNorm": 0.1,
+    "closeEncounterJerkNorm": 0.01,
     "closeEncounterMaxSubsetSize": 8,
     "closeEncounterMaxTrialSubsteps": 128,
-    "closeEncounterRk45AbsTol": 0.01,
+    "closeEncounterRk45AbsTol": 0.0000001,
     "closeEncounterRk45RelTol": 0.000001,
-    "closeEncounterGaussRadauMaxIters": 6,
+    "closeEncounterGaussRadauMaxIters": 8,
     "closeEncounterGaussRadauTol": 0.000000001
   },
   "optionsDefaults": {
