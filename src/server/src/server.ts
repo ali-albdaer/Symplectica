@@ -74,6 +74,9 @@ interface WasmSimulation {
     setTheta(theta: number): void;
     useDirectForce(): void;
     useBarnesHut(): void;
+    setCloseEncounterIntegrator(name: string): void;
+    setCloseEncounterThresholds(hillFactor: number, accel: number, jerk: number): void;
+    takeCloseEncounterEvents(): string;
     random(): number;
     free(): void;
 }
@@ -112,6 +115,7 @@ interface AdminStatePayload {
     timeScale: number;
     paused: boolean;
     simMode: 'tick' | 'accumulator';
+    closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
 }
 
 
@@ -140,6 +144,7 @@ class SimulationServer {
         timeScale: 1, // Matches dt * tickRate (1s/s)
         paused: false,
         simMode: 'tick',
+        closeEncounterIntegrator: 'gauss-radau',
     };
 
     // New properties for HTTP server
@@ -229,6 +234,7 @@ class SimulationServer {
             timeScale: 1.0 / CONFIG.tickRate * CONFIG.tickRate,
             paused: false,
             simMode: 'tick',
+            closeEncounterIntegrator: 'gauss-radau',
         };
 
         console.log(`   Bodies: ${this.simulation.bodyCount()}`);
@@ -359,6 +365,9 @@ class SimulationServer {
                 const forceMethod = payload.forceMethod === 'barnes-hut' ? 'barnes-hut' : 'direct';
                 const theta = typeof payload.theta === 'number' && payload.theta > 0 ? payload.theta : this.adminState.theta;
                 const simMode = payload.simMode === 'accumulator' ? 'accumulator' : 'tick';
+                const closeIntegrator = payload.closeEncounterIntegrator === 'rk45' || payload.closeEncounterIntegrator === 'gauss-radau'
+                    ? payload.closeEncounterIntegrator
+                    : 'none';
                 const timeScale = typeof payload.timeScale === 'number' && payload.timeScale > 0
                     ? payload.timeScale
                     : this.adminState.timeScale;
@@ -382,6 +391,8 @@ class SimulationServer {
                     this.simulation.useDirectForce();
                 }
 
+                this.simulation.setCloseEncounterIntegrator(closeIntegrator);
+
                 this.adminState = {
                     dt,
                     substeps,
@@ -390,6 +401,7 @@ class SimulationServer {
                     timeScale,
                     paused: this.adminState.paused,
                     simMode,
+                    closeEncounterIntegrator: closeIntegrator,
                 };
 
                 this.simAccumulator = 0;
@@ -501,6 +513,30 @@ class SimulationServer {
                     }
                 } else {
                     this.simulation.step();
+                }
+            }
+
+            // Drain close-encounter events and log
+            const eventJson = this.simulation.takeCloseEncounterEvents();
+            if (eventJson && eventJson !== '[]') {
+                try {
+                    const events = JSON.parse(eventJson) as Array<{
+                        id: number;
+                        time: number;
+                        dt: number;
+                        integrator: string;
+                        body_ids: number[];
+                        reason: string;
+                        max_error: number;
+                        steps: number;
+                    }>;
+                    for (const ev of events) {
+                        console.log(
+                            `[CE] id=${ev.id} t=${ev.time.toFixed(2)} dt=${ev.dt} integrator=${ev.integrator} bodies=${ev.body_ids.join(',')} reason=${ev.reason} err=${ev.max_error.toExponential(2)} steps=${ev.steps}`
+                        );
+                    }
+                } catch {
+                    console.warn('[CE] Failed to parse close-encounter events');
                 }
             }
 

@@ -29,6 +29,9 @@ type WasmSimulation = {
     setTheta(theta: number): void;
     useDirectForce(): void;
     useBarnesHut(): void;
+    setCloseEncounterIntegrator(name: string): void;
+    setCloseEncounterThresholds(hillFactor: number, accel: number, jerk: number): void;
+    takeCloseEncounterEvents(): string;
     random(): number;
     free(): void;
 };
@@ -217,6 +220,28 @@ export class PhysicsClient {
     useBarnesHut(): void {
         if (this.simulation) {
             this.simulation.useBarnesHut();
+        }
+    }
+
+    setCloseEncounterIntegrator(name: 'none' | 'rk45' | 'gauss-radau'): void {
+        if (this.simulation) {
+            this.simulation.setCloseEncounterIntegrator(name);
+        }
+    }
+
+    setCloseEncounterThresholds(hillFactor: number, accel: number, jerk: number): void {
+        if (this.simulation) {
+            this.simulation.setCloseEncounterThresholds(hillFactor, accel, jerk);
+        }
+    }
+
+    takeCloseEncounterEvents(): Array<{ id: number; time: number; dt: number; integrator: string; body_ids: number[]; reason: string; max_error: number; steps: number }> {
+        if (!this.simulation) return [];
+        try {
+            const json = this.simulation.takeCloseEncounterEvents();
+            return JSON.parse(json) as Array<{ id: number; time: number; dt: number; integrator: string; body_ids: number[]; reason: string; max_error: number; steps: number }>;
+        } catch {
+            return [];
         }
     }
 

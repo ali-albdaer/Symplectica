@@ -43,7 +43,7 @@ pub mod prelude {
     pub use crate::body::{Atmosphere, Body, BodyId, BodyType, PlanetComposition};
     pub use crate::constants::*;
     pub use crate::force::ForceConfig;
-    pub use crate::integrator::{IntegratorConfig, IntegratorType};
+    pub use crate::integrator::{CloseEncounterConfig, CloseEncounterIntegrator, IntegratorConfig, IntegratorType};
     pub use crate::presets::Preset;
     pub use crate::prng::Pcg32;
     pub use crate::simulation::{ForceMethod, Simulation, SimulationConfig};
@@ -245,6 +245,31 @@ impl WasmSimulation {
     #[wasm_bindgen(js_name = useBarnesHut)]
     pub fn use_barnes_hut(&mut self) {
         self.inner.set_force_method(simulation::ForceMethod::BarnesHut);
+    }
+
+    /// Set close-encounter integrator ("none", "rk45", "gauss-radau")
+    #[wasm_bindgen(js_name = setCloseEncounterIntegrator)]
+    pub fn set_close_encounter_integrator(&mut self, name: &str) {
+        let integrator = match name {
+            "rk45" => integrator::CloseEncounterIntegrator::Rk45,
+            "gauss-radau" => integrator::CloseEncounterIntegrator::GaussRadau5,
+            "none" => integrator::CloseEncounterIntegrator::None,
+            _ => integrator::CloseEncounterIntegrator::GaussRadau5,
+        };
+        self.inner.set_close_encounter_integrator(integrator);
+    }
+
+    /// Set close-encounter thresholds (hill_factor, accel, jerk)
+    #[wasm_bindgen(js_name = setCloseEncounterThresholds)]
+    pub fn set_close_encounter_thresholds(&mut self, hill_factor: f64, accel: f64, jerk: f64) {
+        self.inner.set_close_encounter_thresholds(hill_factor, accel, jerk);
+    }
+
+    /// Drain close-encounter events as JSON
+    #[wasm_bindgen(js_name = takeCloseEncounterEvents)]
+    pub fn take_close_encounter_events(&mut self) -> String {
+        let events = self.inner.take_close_encounter_events();
+        serde_json::to_string(&events).unwrap_or_default()
     }
 
     /// Get a random number from the deterministic PRNG

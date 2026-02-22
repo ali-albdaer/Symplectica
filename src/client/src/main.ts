@@ -337,6 +337,7 @@ class NBodyClient {
         this.timeController.setSpeedBySimRate(settings.timeScale);
         this.timeController.setPaused(settings.paused);
         this.setLocalSimMode(settings.simMode);
+        this.physics.setCloseEncounterIntegrator(settings.closeEncounterIntegrator);
         this.updateTimeScaleUI();
         this.adminPanel?.applyServerSettings(settings);
     }

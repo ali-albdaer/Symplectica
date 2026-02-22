@@ -5,7 +5,7 @@
 
 use crate::body::Body;
 use crate::force::ForceConfig;
-use crate::integrator::IntegratorConfig;
+use crate::integrator::{CloseEncounterConfig, CloseEncounterIntegrator, IntegratorConfig, IntegratorType};
 use crate::prng::Pcg32;
 use serde::{Deserialize, Serialize};
 
@@ -68,12 +68,65 @@ impl From<&SerializableForceConfig> for ForceConfig {
     }
 }
 
+impl From<&SerializableIntegratorConfig> for IntegratorConfig {
+    fn from(config: &SerializableIntegratorConfig) -> Self {
+        let mut result = IntegratorConfig::default();
+        result.dt = config.dt;
+        result.substeps = config.substeps;
+        result.method = match config.method.as_str() {
+            "VelocityVerlet" => IntegratorType::VelocityVerlet,
+            "Euler" => IntegratorType::Euler,
+            "Leapfrog" => IntegratorType::Leapfrog,
+            _ => IntegratorType::VelocityVerlet,
+        };
+
+        let integrator = match config.close_encounter.integrator.as_str() {
+            "Rk45" => CloseEncounterIntegrator::Rk45,
+            "GaussRadau5" => CloseEncounterIntegrator::GaussRadau5,
+            "None" => CloseEncounterIntegrator::None,
+            _ => CloseEncounterIntegrator::GaussRadau5,
+        };
+
+        result.close_encounter = CloseEncounterConfig {
+            enabled: config.close_encounter.enabled,
+            integrator,
+            hill_factor: config.close_encounter.hill_factor,
+            accel_threshold: config.close_encounter.accel_threshold,
+            jerk_threshold: config.close_encounter.jerk_threshold,
+            max_subset_size: config.close_encounter.max_subset_size as usize,
+            max_trial_substeps: config.close_encounter.max_trial_substeps as usize,
+            rk45_abs_tol: config.close_encounter.rk45_abs_tol,
+            rk45_rel_tol: config.close_encounter.rk45_rel_tol,
+            gauss_radau_max_iters: config.close_encounter.gauss_radau_max_iters as usize,
+            gauss_radau_tol: config.close_encounter.gauss_radau_tol,
+        };
+
+        result
+    }
+}
+
 /// Serializable integrator configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializableIntegratorConfig {
     pub dt: f64,
     pub substeps: u32,
     pub method: String,
+    pub close_encounter: SerializableCloseEncounterConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableCloseEncounterConfig {
+    pub enabled: bool,
+    pub integrator: String,
+    pub hill_factor: f64,
+    pub accel_threshold: f64,
+    pub jerk_threshold: f64,
+    pub max_subset_size: u32,
+    pub max_trial_substeps: u32,
+    pub rk45_abs_tol: f64,
+    pub rk45_rel_tol: f64,
+    pub gauss_radau_max_iters: u32,
+    pub gauss_radau_tol: f64,
 }
 
 impl From<&IntegratorConfig> for SerializableIntegratorConfig {
@@ -82,6 +135,19 @@ impl From<&IntegratorConfig> for SerializableIntegratorConfig {
             dt: config.dt,
             substeps: config.substeps,
             method: format!("{:?}", config.method),
+            close_encounter: SerializableCloseEncounterConfig {
+                enabled: config.close_encounter.enabled,
+                integrator: format!("{:?}", config.close_encounter.integrator),
+                hill_factor: config.close_encounter.hill_factor,
+                accel_threshold: config.close_encounter.accel_threshold,
+                jerk_threshold: config.close_encounter.jerk_threshold,
+                max_subset_size: config.close_encounter.max_subset_size as u32,
+                max_trial_substeps: config.close_encounter.max_trial_substeps as u32,
+                rk45_abs_tol: config.close_encounter.rk45_abs_tol,
+                rk45_rel_tol: config.close_encounter.rk45_rel_tol,
+                gauss_radau_max_iters: config.close_encounter.gauss_radau_max_iters as u32,
+                gauss_radau_tol: config.close_encounter.gauss_radau_tol,
+            },
         }
     }
 }
@@ -103,6 +169,35 @@ pub struct SnapshotMetadata {
     
     /// Original preset name if from a preset
     pub preset: Option<String>,
+
+    /// Close-encounter integrator switch events
+    pub close_encounter_events: Option<Vec<CloseEncounterEvent>>,
+}
+
+impl Default for SnapshotMetadata {
+    fn default() -> Self {
+        Self {
+            name: None,
+            description: None,
+            created_at: None,
+            author: None,
+            preset: None,
+            close_encounter_events: None,
+        }
+    }
+}
+
+/// Close-encounter switch event for snapshot metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloseEncounterEvent {
+    pub id: u64,
+    pub time: f64,
+    pub dt: f64,
+    pub integrator: String,
+    pub body_ids: Vec<u32>,
+    pub reason: String,
+    pub max_error: f64,
+    pub steps: u32,
 }
 
 impl Snapshot {

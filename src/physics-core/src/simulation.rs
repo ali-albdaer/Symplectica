@@ -5,10 +5,21 @@
 
 use crate::body::{Body, BodyId};
 use crate::force::{compute_accelerations_direct, compute_total_energy};
-use crate::integrator::{step_with_accel, AccelerationFn, IntegratorConfig, initialize_accelerations_with};
+use crate::integrator::{
+    step_with_accel,
+    AccelerationFn,
+    CloseEncounterConfig,
+    CloseEncounterIntegrator,
+    CloseEncounterTrialResult,
+    IntegratorConfig,
+    initialize_accelerations_with,
+    trial_integrate_subset_gauss_radau,
+    trial_integrate_subset_rk45,
+};
 use crate::octree::compute_accelerations_barnes_hut;
 use crate::prng::Pcg32;
-use crate::snapshot::Snapshot;
+use crate::snapshot::{CloseEncounterEvent, Snapshot, SnapshotMetadata};
+use crate::vector::Vec3;
 
 /// Force calculation method
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +80,12 @@ pub struct Simulation {
     
     /// Snapshot sequence number
     sequence: u64,
+
+    /// Close-encounter switch events (recent)
+    close_encounter_events: Vec<CloseEncounterEvent>,
+
+    /// Event ID counter
+    close_encounter_event_id: u64,
     
     /// Next body ID to assign
     next_id: BodyId,
@@ -87,6 +104,8 @@ impl Simulation {
             time: 0.0,
             tick: 0,
             sequence: 0,
+            close_encounter_events: Vec::with_capacity(32),
+            close_encounter_event_id: 1,
             next_id: 0,
             needs_init: true,
         }
@@ -209,24 +228,219 @@ impl Simulation {
     /// Advance simulation by one tick
     pub fn step(&mut self) {
         let accel_fn = self.resolve_accel_fn();
+        let dt = self.config.integrator.dt;
+        let close_cfg = self.config.integrator.close_encounter;
 
         if self.needs_init {
             initialize_accelerations_with(&mut self.bodies, &self.config.integrator.force_config, accel_fn);
             self.needs_init = false;
         }
 
-        // Advance physics
+        let (subset, reason) = self.detect_close_encounter_subset(&close_cfg);
+
+        if subset.is_empty() || !close_cfg.enabled || close_cfg.integrator == CloseEncounterIntegrator::None {
+            // Advance physics normally
+            step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn);
+            self.time += dt;
+            self.tick += 1;
+            self.sequence += 1;
+            return;
+        }
+
+        // Checkpoint full state for interpolation in close-encounter trial
+        let pre_positions: Vec<Vec3> = self.bodies.iter().map(|b| b.position).collect();
+        let pre_velocities: Vec<Vec3> = self.bodies.iter().map(|b| b.velocity).collect();
+
+        // Baseline step for all bodies (Velocity-Verlet / configured integrator)
         step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn);
-        
-        self.time += self.config.integrator.dt;
+        self.time += dt;
         self.tick += 1;
         self.sequence += 1;
+
+        let post_positions: Vec<Vec3> = self.bodies.iter().map(|b| b.position).collect();
+        let post_velocities: Vec<Vec3> = self.bodies.iter().map(|b| b.velocity).collect();
+
+        // Trial integrate subset using close-encounter integrator
+        let trial = match close_cfg.integrator {
+            CloseEncounterIntegrator::Rk45 => trial_integrate_subset_rk45(
+                &self.bodies,
+                &subset,
+                dt,
+                &pre_positions,
+                &pre_velocities,
+                &post_positions,
+                &post_velocities,
+                &self.config.integrator.force_config,
+                &close_cfg,
+            ),
+            CloseEncounterIntegrator::GaussRadau5 => trial_integrate_subset_gauss_radau(
+                &self.bodies,
+                &subset,
+                dt,
+                &pre_positions,
+                &pre_velocities,
+                &post_positions,
+                &post_velocities,
+                &self.config.integrator.force_config,
+                &close_cfg,
+            ),
+            CloseEncounterIntegrator::None => CloseEncounterTrialResult {
+                accepted: false,
+                steps: 0,
+                max_error: 0.0,
+                positions: Vec::new(),
+                velocities: Vec::new(),
+                reason: "disabled",
+            },
+        };
+
+        if trial.accepted {
+            // Commit refined subset state
+            for (local, idx) in subset.iter().enumerate() {
+                if *idx < self.bodies.len() {
+                    self.bodies[*idx].position = trial.positions[local];
+                    self.bodies[*idx].velocity = trial.velocities[local];
+                }
+            }
+
+            // Recompute accelerations for consistency
+            accel_fn(&mut self.bodies, &self.config.integrator.force_config);
+            for body in &mut self.bodies {
+                body.prev_acceleration = body.acceleration;
+            }
+
+            self.log_close_encounter_event(
+                close_cfg.integrator,
+                &subset,
+                dt,
+                reason,
+                trial.max_error,
+                trial.steps as u32,
+                trial.reason,
+            );
+        }
     }
 
     /// Advance simulation by multiple ticks
     pub fn step_n(&mut self, n: u64) {
         for _ in 0..n {
             self.step();
+        }
+    }
+
+    fn detect_close_encounter_subset(&self, cfg: &CloseEncounterConfig) -> (Vec<usize>, String) {
+        if !cfg.enabled || cfg.integrator == CloseEncounterIntegrator::None {
+            return (Vec::new(), String::new());
+        }
+
+        let dt = self.config.integrator.dt;
+        if dt <= 0.0 {
+            return (Vec::new(), String::new());
+        }
+
+        let mut subset = Vec::new();
+        let mut marked = vec![false; self.bodies.len()];
+        let mut reason = String::new();
+
+        for i in 0..self.bodies.len() {
+            let bi = &self.bodies[i];
+            if !bi.is_active || bi.mass <= 0.0 {
+                continue;
+            }
+            for j in (i + 1)..self.bodies.len() {
+                let bj = &self.bodies[j];
+                if !bj.is_active || bj.mass <= 0.0 {
+                    continue;
+                }
+
+                let dist = bi.position.distance(bj.position);
+                let hill = hill_radius_estimate(bi.mass, bj.mass, dist);
+                if hill <= 0.0 {
+                    continue;
+                }
+
+                if dist > cfg.hill_factor * hill {
+                    continue;
+                }
+
+                let accel_i = bi.acceleration.length();
+                let accel_j = bj.acceleration.length();
+                let jerk_i = (bi.acceleration - bi.prev_acceleration).length() / dt;
+                let jerk_j = (bj.acceleration - bj.prev_acceleration).length() / dt;
+
+                let accel_hit = accel_i.max(accel_j) >= cfg.accel_threshold;
+                let jerk_hit = jerk_i.max(jerk_j) >= cfg.jerk_threshold;
+
+                if accel_hit || jerk_hit {
+                    if !marked[i] {
+                        marked[i] = true;
+                        subset.push(i);
+                    }
+                    if !marked[j] {
+                        marked[j] = true;
+                        subset.push(j);
+                    }
+
+                    if reason.is_empty() {
+                        reason = format!(
+                            "dist={:.3e}, hill={:.3e}, accel={:.3e}, jerk={:.3e}",
+                            dist,
+                            hill,
+                            accel_i.max(accel_j),
+                            jerk_i.max(jerk_j),
+                        );
+                    }
+
+                    if subset.len() >= cfg.max_subset_size {
+                        return (subset, reason);
+                    }
+                }
+            }
+        }
+
+        (subset, reason)
+    }
+
+    fn log_close_encounter_event(
+        &mut self,
+        integrator: CloseEncounterIntegrator,
+        subset: &[usize],
+        dt: f64,
+        reason: String,
+        max_error: f64,
+        steps: u32,
+        trial_reason: &'static str,
+    ) {
+        let body_ids: Vec<u32> = subset.iter().filter_map(|idx| self.bodies.get(*idx)).map(|b| b.id).collect();
+        let integrator_name = match integrator {
+            CloseEncounterIntegrator::Rk45 => "rk45",
+            CloseEncounterIntegrator::GaussRadau5 => "gauss-radau",
+            CloseEncounterIntegrator::None => "none",
+        };
+
+        let mut reason_full = reason;
+        if !trial_reason.is_empty() {
+            if !reason_full.is_empty() {
+                reason_full.push_str("; ");
+            }
+            reason_full.push_str(trial_reason);
+        }
+
+        let event = CloseEncounterEvent {
+            id: self.close_encounter_event_id,
+            time: self.time,
+            dt,
+            integrator: integrator_name.to_string(),
+            body_ids,
+            reason: reason_full,
+            max_error,
+            steps,
+        };
+
+        self.close_encounter_event_id += 1;
+        self.close_encounter_events.push(event);
+        if self.close_encounter_events.len() > 256 {
+            self.close_encounter_events.remove(0);
         }
     }
 
@@ -252,7 +466,7 @@ impl Simulation {
 
     /// Create a snapshot of current state
     pub fn snapshot(&self) -> Snapshot {
-        Snapshot::new(
+        let mut snapshot = Snapshot::new(
             self.sequence,
             self.time,
             self.tick,
@@ -260,7 +474,15 @@ impl Simulation {
             self.bodies.clone(),
             &self.config.integrator.force_config,
             &self.config.integrator,
-        )
+        );
+
+        if !self.close_encounter_events.is_empty() {
+            let mut metadata = SnapshotMetadata::default();
+            metadata.close_encounter_events = Some(self.close_encounter_events.clone());
+            snapshot = snapshot.with_metadata(metadata);
+        }
+
+        snapshot
     }
 
     /// Restore from a snapshot
@@ -272,6 +494,7 @@ impl Simulation {
         self.tick = snapshot.tick;
         self.bodies = snapshot.bodies;
         self.rng = Pcg32::from_state(snapshot.rng_state.0, snapshot.rng_state.1);
+        self.config.integrator = (&snapshot.integrator_config).into();
         self.config.integrator.force_config = (&snapshot.force_config).into();
         self.needs_init = true;
 
@@ -346,6 +569,25 @@ impl Simulation {
         self.config.integrator.force_config.barnes_hut_theta = theta;
     }
 
+    /// Set close-encounter integrator (subset-scoped)
+    pub fn set_close_encounter_integrator(&mut self, integrator: CloseEncounterIntegrator) {
+        self.config.integrator.close_encounter.integrator = integrator;
+        self.config.integrator.close_encounter.enabled = integrator != CloseEncounterIntegrator::None;
+    }
+
+    /// Set close-encounter thresholds
+    pub fn set_close_encounter_thresholds(&mut self, hill_factor: f64, accel: f64, jerk: f64) {
+        if hill_factor > 0.0 {
+            self.config.integrator.close_encounter.hill_factor = hill_factor;
+        }
+        if accel > 0.0 {
+            self.config.integrator.close_encounter.accel_threshold = accel;
+        }
+        if jerk > 0.0 {
+            self.config.integrator.close_encounter.jerk_threshold = jerk;
+        }
+    }
+
     /// Set force method
     pub fn set_force_method(&mut self, method: ForceMethod) {
         self.config.force_method = method;
@@ -366,6 +608,23 @@ impl Simulation {
     pub fn body_count(&self) -> usize {
         self.bodies.iter().filter(|b| b.is_active).count()
     }
+
+    /// Drain close-encounter events for logging
+    pub fn take_close_encounter_events(&mut self) -> Vec<CloseEncounterEvent> {
+        std::mem::take(&mut self.close_encounter_events)
+    }
+}
+
+fn hill_radius_estimate(m1: f64, m2: f64, distance: f64) -> f64 {
+    if distance <= 0.0 {
+        return 0.0;
+    }
+    let m_small = m1.min(m2);
+    let m_large = m1.max(m2);
+    if m_small <= 0.0 || m_large <= 0.0 {
+        return 0.0;
+    }
+    distance * (m_small / (3.0 * m_large)).powf(1.0 / 3.0)
 }
 
 #[cfg(test)]

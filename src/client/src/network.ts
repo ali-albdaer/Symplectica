@@ -47,6 +47,7 @@ export interface AdminStatePayload {
     timeScale: number;
     paused: boolean;
     simMode: 'tick' | 'accumulator';
+    closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
 }
 
 

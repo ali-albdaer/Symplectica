@@ -19,6 +19,7 @@ interface ServerConfig {
     theta: number;
     substeps: number;
     simMode: 'tick' | 'accumulator';
+    closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
 }
 
 export class AdminPanel {
@@ -35,6 +36,7 @@ export class AdminPanel {
         theta: 0.5,
         substeps: 4,
         simMode: 'tick',
+        closeEncounterIntegrator: 'gauss-radau',
     };
 
     constructor(
@@ -142,6 +144,16 @@ export class AdminPanel {
                             <option value="direct">Direct Sum O(N²)</option>
                             <option value="barnes-hut">Barnes-Hut O(N log N)</option>
                         </select>
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Close-Encounter Integrator</label>
+                        <select id="admin-close-encounter">
+                            <option value="none">None (Verlet only)</option>
+                            <option value="gauss-radau" selected>Gauss-Radau 5th</option>
+                            <option value="rk45">Adaptive RK45</option>
+                        </select>
+                        <div class="admin-hint">Applies only to close-encounter subsets</div>
                     </div>
                     
                     <div class="admin-field" id="theta-field">
@@ -483,6 +495,7 @@ export class AdminPanel {
         const forceMethod = (document.getElementById('admin-force-method') as HTMLSelectElement).value;
         const theta = parseFloat((document.getElementById('admin-theta') as HTMLInputElement).value);
         const simMode = (document.getElementById('admin-sim-mode') as HTMLSelectElement).value as 'tick' | 'accumulator';
+        const closeIntegrator = (document.getElementById('admin-close-encounter') as HTMLSelectElement).value as 'none' | 'rk45' | 'gauss-radau';
 
         const warpSelect = document.getElementById('admin-time-warp') as HTMLSelectElement;
         const timeScale = parseFloat(warpSelect.value);
@@ -495,6 +508,7 @@ export class AdminPanel {
                 theta,
                 timeScale,
                 simMode,
+                closeEncounterIntegrator: closeIntegrator,
             } as AdminStatePayload);
         }
 
@@ -507,6 +521,7 @@ export class AdminPanel {
         } else {
             this.physics.useDirectForce();
         }
+        this.physics.setCloseEncounterIntegrator(closeIntegrator);
         this.timeController.setPhysicsTimestep(dt);
         this.timeController.setSpeedBySimRate(timeScale);
         this.onSimModeChange?.(simMode);
@@ -534,6 +549,7 @@ export class AdminPanel {
         const thetaField = document.getElementById('theta-field') as HTMLElement | null;
         const simModeSelect = document.getElementById('admin-sim-mode') as HTMLSelectElement | null;
         const warpSelect = document.getElementById('admin-time-warp') as HTMLSelectElement | null;
+        const closeIntegratorSelect = document.getElementById('admin-close-encounter') as HTMLSelectElement | null;
 
         if (dtInput) dtInput.value = settings.dt.toString();
         if (substepsInput) substepsInput.value = settings.substeps.toString();
@@ -544,6 +560,7 @@ export class AdminPanel {
         if (warpSelect) {
             warpSelect.value = settings.timeScale.toString();
         }
+        if (closeIntegratorSelect) closeIntegratorSelect.value = settings.closeEncounterIntegrator;
     }
 
     private setupDrag(container: HTMLElement): void {
