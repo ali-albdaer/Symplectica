@@ -6,6 +6,8 @@
  * - Standalone mode (no server)
  */
 
+import { APP_DEFAULTS } from './defaults';
+
 // Type definitions for WASM module
 type WasmSimulation = {
     step(): void;
@@ -472,11 +474,11 @@ export class PhysicsClient {
                 this.simulation = this.module.createSunEarthMoon(seed);
         }
 
-        // Set proper orbital mechanics timestep for all presets
-        this.simulation.setDt(3600); // 1 hour per step
-        this.simulation.setSubsteps(4);
+        // Set default timestep/substeps from global defaults
+        this.simulation.setDt(APP_DEFAULTS.adminDefaults.dt);
+        this.simulation.setSubsteps(APP_DEFAULTS.adminDefaults.substeps);
 
-        console.log(`[INFO] Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies, dt=3600s)`);
+            console.log(`[INFO] Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies, dt=${APP_DEFAULTS.adminDefaults.dt}s)`);
     }
 
     /** Add a custom body */

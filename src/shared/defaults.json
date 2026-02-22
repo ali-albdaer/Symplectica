@@ -27,7 +27,7 @@
   "optionsDefaults": {
     "showOrbitTrails": false,
     "showLabels": false,
-    "showAxisLines": true,
+    "showAxisLines": false,
     "showRefPlane": false,
     "showRefLine": false,
     "showRefPoint": false,
@@ -40,7 +40,7 @@
   },
   "visualPresetDefault": "Ultra",
   "cameraDefaults": {
-    "freeCamSpeedAuPerSec": 0.05,
+    "freeCamSpeedAuPerSec": 0.01,
     "freeCamSensitivity": 0.3
   }
 }

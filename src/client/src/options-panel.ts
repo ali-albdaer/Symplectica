@@ -687,6 +687,10 @@ export class OptionsPanel {
         this.presetSelect.value = this.presetName;
         this.presetRenderScaleInput.value = String(this.presetRenderScale);
         this.presetRenderScaleValue.textContent = `${this.presetRenderScale.toFixed(2)}x`;
+        this.freeCamSpeedInput.value = this.freeCamSpeed.toString();
+        this.freeCamSpeedValue.textContent = `${this.freeCamSpeed.toFixed(3)} AU/s`;
+        this.freeCamSensitivityInput.value = this.freeCamSensitivity.toString();
+        this.freeCamSensitivityValue.textContent = `${this.freeCamSensitivity.toFixed(1)}x`;
         this.ignoreEvents = false;
     }
 

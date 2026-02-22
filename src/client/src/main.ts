@@ -28,7 +28,7 @@ import { APP_DEFAULTS } from './defaults';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
-const LOCAL_TICK_RATE = 60;
+const LOCAL_TICK_RATE = APP_DEFAULTS.adminDefaults.tickRate;
 const LOCAL_PRESET_PLAYER = 'local';
 
 type SimMode = 'tick' | 'accumulator';
@@ -163,6 +163,8 @@ class NBodyClient {
         this.updateLoadingStatus('Loading physics engine...');
         await this.initPhysics();
 
+        this.applyLocalDefaults();
+
         this.updateLoadingStatus('Setting up controls...');
         this.initControls();
 
@@ -219,6 +221,8 @@ class NBodyClient {
         this.optionsPanel.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
         );
+        this.optionsPanel.setFreeCamSpeed(APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec);
+        this.optionsPanel.setFreeCamSensitivity(APP_DEFAULTS.cameraDefaults.freeCamSensitivity);
         this.camera.setFreeLookSensitivity(APP_DEFAULTS.cameraDefaults.freeCamSensitivity);
 
         // Initialize Touch Controls (disabled by default, enabled with /mobile command)
@@ -264,6 +268,42 @@ class NBodyClient {
         }
 
         this.start();
+    }
+
+    private applyLocalDefaults(): void {
+        const defaults = APP_DEFAULTS.adminDefaults;
+
+        this.physics.setTimeStep(defaults.dt);
+        this.physics.setSubsteps(defaults.substeps);
+        if (defaults.forceMethod === 'barnes-hut') {
+            this.physics.setTheta(defaults.theta);
+            this.physics.useBarnesHut();
+        } else {
+            this.physics.useDirectForce();
+        }
+        this.physics.setCloseEncounterIntegrator(defaults.closeEncounterIntegrator);
+        this.physics.setCloseEncounterThresholds(
+            defaults.closeEncounterHillFactor,
+            defaults.closeEncounterTidalRatio,
+            defaults.closeEncounterJerkNorm
+        );
+        this.physics.setCloseEncounterLimits(
+            defaults.closeEncounterMaxSubsetSize,
+            defaults.closeEncounterMaxTrialSubsteps
+        );
+        this.physics.setCloseEncounterRk45Tolerances(
+            defaults.closeEncounterRk45AbsTol,
+            defaults.closeEncounterRk45RelTol
+        );
+        this.physics.setCloseEncounterGaussRadau(
+            defaults.closeEncounterGaussRadauMaxIters,
+            defaults.closeEncounterGaussRadauTol
+        );
+
+        this.timeController.setPhysicsTimestep(defaults.dt);
+        this.timeController.setSpeedBySimRate(defaults.timeScale);
+        this.timeController.setPaused(defaults.paused);
+        this.setLocalSimMode(defaults.simMode);
     }
 
     private async initNetwork(): Promise<void> {

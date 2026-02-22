@@ -72,7 +72,31 @@ export class AdminPanel {
         this.onSimModeChange = onSimModeChange;
         this.container = this.createUI();
         document.body.appendChild(this.container);
+        this.applyServerSettings(this.defaultAdminState());
         this.setupKeyboardShortcut();
+    }
+
+    private defaultAdminState(): AdminStatePayload {
+        const defaults = APP_DEFAULTS.adminDefaults;
+        return {
+            dt: defaults.dt,
+            substeps: defaults.substeps,
+            forceMethod: defaults.forceMethod,
+            theta: defaults.theta,
+            timeScale: defaults.timeScale,
+            paused: defaults.paused,
+            simMode: defaults.simMode,
+            closeEncounterIntegrator: defaults.closeEncounterIntegrator,
+            closeEncounterHillFactor: defaults.closeEncounterHillFactor,
+            closeEncounterTidalRatio: defaults.closeEncounterTidalRatio,
+            closeEncounterJerkNorm: defaults.closeEncounterJerkNorm,
+            closeEncounterMaxSubsetSize: defaults.closeEncounterMaxSubsetSize,
+            closeEncounterMaxTrialSubsteps: defaults.closeEncounterMaxTrialSubsteps,
+            closeEncounterRk45AbsTol: defaults.closeEncounterRk45AbsTol,
+            closeEncounterRk45RelTol: defaults.closeEncounterRk45RelTol,
+            closeEncounterGaussRadauMaxIters: defaults.closeEncounterGaussRadauMaxIters,
+            closeEncounterGaussRadauTol: defaults.closeEncounterGaussRadauTol,
+        };
     }
 
     // Public method to update pause state from outside (e.g. keybind or server)
@@ -734,7 +758,13 @@ export class AdminPanel {
         if (thetaField) thetaField.classList.toggle('visible', settings.forceMethod === 'barnes-hut');
         if (simModeSelect) simModeSelect.value = settings.simMode;
         if (warpSelect) {
-            warpSelect.value = settings.timeScale.toString();
+            const target = settings.timeScale.toString();
+            if (Array.from(warpSelect.options).some(option => option.value === target)) {
+                warpSelect.value = target;
+            } else {
+                this.timeController.setSpeedBySimRate(settings.timeScale);
+                warpSelect.value = this.timeController.getCurrentSpeed().sim.toString();
+            }
         }
         if (closeIntegratorSelect) closeIntegratorSelect.value = settings.closeEncounterIntegrator;
         if (closeHillInput) closeHillInput.value = settings.closeEncounterHillFactor.toString();

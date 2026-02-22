@@ -1,3 +1,5 @@
+import { APP_DEFAULTS } from './defaults.js';
+
 const parseNumber = (value: string | undefined, fallback: number): number => {
     if (value === undefined) {
         return fallback;
@@ -22,7 +24,7 @@ const parseSeed = (): bigint => {
 
 export const CONFIG = {
     port: parseNumber(process.env.PORT, 8080),
-    tickRate: parseNumber(process.env.TICK_RATE, 60),
+    tickRate: parseNumber(process.env.TICK_RATE, APP_DEFAULTS.adminDefaults.tickRate),
     snapshotInterval: parseNumber(process.env.SNAPSHOT_INTERVAL, 300),
     stateUpdateInterval: parseNumber(process.env.STATE_UPDATE_INTERVAL, 1),
     seed: parseSeed(),
