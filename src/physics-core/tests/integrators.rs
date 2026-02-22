@@ -86,7 +86,6 @@ fn build_simulation(bodies: &[Body], force_method: ForceMethod, barnes_hut_thres
     let config = SimulationConfig {
         integrator,
         force_method,
-        enable_collisions: false,
         barnes_hut_threshold,
     };
 

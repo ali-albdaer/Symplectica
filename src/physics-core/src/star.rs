@@ -95,10 +95,6 @@ pub fn derive_star_properties(body: &mut Body) {
         body.escape_velocity_surface = (2.0 * G * body.mass / body.radius).sqrt();
     }
 
-    // ── Collision radius ──
-    if body.collision_radius == 0.0 {
-        body.collision_radius = body.radius;
-    }
 }
 
 // ─── Mass–Luminosity relation (piecewise main-sequence) ─────────

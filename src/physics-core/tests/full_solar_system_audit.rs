@@ -190,8 +190,7 @@ fn test_full_solar_system_audit() {
     println!("   - Timestep dt: {} s", config.integrator.dt);
     println!("   - Substeps: {}", config.integrator.substeps);
     println!("   - Effective substep: {} s", config.integrator.dt / config.integrator.substeps as f64);
-    println!("   - Force method: {:?}", config.force_method);
-    println!("   - Collisions enabled: {}\n", config.enable_collisions);
+    println!("   - Force method: {:?}\n", config.force_method);
     
     println!("3. DETERMINISM & RNG");
     println!("   - RNG algorithm: PCG-XSH-RR (PCG32)");
@@ -199,9 +198,9 @@ fn test_full_solar_system_audit() {
     println!("   - Stream selection: Default (1442695040888963407)\n");
     
     println!("4. BODY DATA INTEGRITY TABLE");
-    println!("   {:>3} | {:12} | {:12} | {:12} | {:12} | {:12} | {:12} | {:12} | {:12} | {:8} | {:8}",
-             "ID", "Name", "Type", "Mass (kg)", "Radius (m)", "Coll.R (m)", "Soft.(m)", "Rot.(rad/s)", "Tilt(rad)", "Seed", "Parent");
-    println!("   {}", "-".repeat(180));
+    println!("   {:>3} | {:12} | {:12} | {:12} | {:12} | {:12} | {:12} | {:12} | {:8} | {:8}",
+             "ID", "Name", "Type", "Mass (kg)", "Radius (m)", "Soft.(m)", "Rot.(rad/s)", "Tilt(rad)", "Seed", "Parent");
+    println!("   {}", "-".repeat(160));
     
     let bodies = preset_sim.bodies();
     for body in bodies {
@@ -213,13 +212,12 @@ fn test_full_solar_system_audit() {
         };
         let parent_str = body.parent_id.map(|p| p.to_string()).unwrap_or_else(|| "-".to_string());
         
-        println!("   {:3} | {:12} | {:12} | {:12.5e} | {:12.5e} | {:12.5e} | {:12.5e} | {:12.5e} | {:12.5e} | {:8} | {:8}",
+        println!("   {:3} | {:12} | {:12} | {:12.5e} | {:12.5e} | {:12.5e} | {:12.5e} | {:12.5e} | {:8} | {:8}",
                  body.id,
                  body.name,
                  body_type_str,
                  body.mass,
                  body.radius,
-                 body.collision_radius,
                  body.softening_length,
                  body.rotation_rate,
                  body.axial_tilt,

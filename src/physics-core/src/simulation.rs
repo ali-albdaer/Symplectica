@@ -4,7 +4,6 @@
 //! advanced by step, checkpointed, and serialized.
 
 use crate::body::{Body, BodyId};
-use crate::collision::process_collisions;
 use crate::force::{compute_accelerations_direct, compute_total_energy};
 use crate::integrator::{step_with_accel, AccelerationFn, IntegratorConfig, initialize_accelerations_with};
 use crate::octree::compute_accelerations_barnes_hut;
@@ -36,9 +35,6 @@ pub struct SimulationConfig {
     /// Force calculation method
     pub force_method: ForceMethod,
     
-    /// Enable collision detection and merging
-    pub enable_collisions: bool,
-    
     /// Threshold for auto-switching to Barnes-Hut
     pub barnes_hut_threshold: usize,
 }
@@ -48,7 +44,6 @@ impl Default for SimulationConfig {
         Self {
             integrator: IntegratorConfig::default(),
             force_method: ForceMethod::Direct,
-            enable_collisions: true,
             barnes_hut_threshold: 10000,
         }
     }
@@ -223,11 +218,6 @@ impl Simulation {
         // Advance physics
         step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn);
         
-        // Handle collisions
-        if self.config.enable_collisions {
-            process_collisions(&mut self.bodies);
-        }
-
         self.time += self.config.integrator.dt;
         self.tick += 1;
         self.sequence += 1;
@@ -285,7 +275,7 @@ impl Simulation {
         self.config.integrator.force_config = (&snapshot.force_config).into();
         self.needs_init = true;
 
-        // Update next_id to avoid collisions
+        // Update next_id to avoid ID reuse
         self.next_id = self.bodies.iter().map(|b| b.id).max().unwrap_or(0) + 1;
 
         Ok(())

@@ -36,11 +36,6 @@ pub fn derive_planet_properties(body: &mut Body, parent: Option<&Body>) {
         body.escape_velocity_surface = (2.0 * G * body.mass / body.radius).sqrt();
     }
 
-    // ── Collision radius ──
-    if body.collision_radius == 0.0 {
-        body.collision_radius = body.radius;
-    }
-
     // ── Equilibrium temperature (requires parent star) ──
     if body.equilibrium_temperature == 0.0 {
         if let Some(star) = parent {

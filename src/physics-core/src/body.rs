@@ -193,12 +193,6 @@ pub struct Body {
     pub feels_gravity: bool,
 
     // ─── physical properties (PROPERTIES.md CRITICAL) ──────────
-    /// Physics collision / contact radius in meters.
-    /// Collisions and escape-velocity computations use this, not `radius`.
-    /// Defaults to `radius` when zero.
-    #[serde(default)]
-    pub collision_radius: f64,
-
     /// Gravitational softening ε in meters.
     /// 0 means "use the global default from ForceConfig".
     /// Rule of thumb: ε = max(physical_radius * 0.001, 1 m) for particles.
@@ -371,7 +365,6 @@ impl Body {
             prev_acceleration: Vec3::ZERO,
             contributes_gravity: contributes,
             feels_gravity: true,
-            collision_radius: radius,
             softening_length: 0.0,
             rotation_rate: 0.0,
             axial_tilt: 0.0,
@@ -490,9 +483,6 @@ impl Body {
         if self.escape_velocity_surface == 0.0 {
             self.escape_velocity_surface = (2.0 * g * self.mass / self.radius).sqrt();
         }
-        if self.collision_radius == 0.0 {
-            self.collision_radius = self.radius;
-        }
 
         // Type-specific derives
         match self.body_type {
@@ -550,39 +540,6 @@ impl Body {
         semi_major_axis * (self.mass / (3.0 * parent_mass)).powf(1.0 / 3.0)
     }
 
-    /// Check if this body collides with another (uses collision_radius).
-    pub fn collides_with(&self, other: &Body) -> bool {
-        let distance = self.position.distance(other.position);
-        distance < self.collision_radius + other.collision_radius
-    }
-
-    /// Merge another body into this one (inelastic collision).
-    /// Conserves mass and linear momentum.
-    pub fn merge(&mut self, other: &Body) {
-        let total_mass = self.mass + other.mass;
-        if total_mass <= 0.0 {
-            return;
-        }
-
-        // Conserve momentum: m1*v1 + m2*v2 = (m1+m2)*v_new
-        self.velocity = (self.velocity * self.mass + other.velocity * other.mass) / total_mass;
-
-        // Position at center of mass
-        self.position = (self.position * self.mass + other.position * other.mass) / total_mass;
-
-        // Compute volume_ratio BEFORE updating mass
-        let volume_ratio = total_mass / self.mass;
-
-        // Update mass
-        self.mass = total_mass;
-
-        // Update radius assuming constant density (r ∝ m^(1/3))
-        self.radius *= volume_ratio.powf(1.0 / 3.0);
-        self.collision_radius *= volume_ratio.powf(1.0 / 3.0);
-
-        // Mark as still active
-        self.is_active = true;
-    }
 
     /// Validate that the body has physical values.
     pub fn is_valid(&self) -> bool {
@@ -614,7 +571,6 @@ impl Default for Body {
             prev_acceleration: Vec3::ZERO,
             contributes_gravity: true,
             feels_gravity: true,
-            collision_radius: 1.0,
             softening_length: 0.0,
             rotation_rate: 0.0,
             axial_tilt: 0.0,
@@ -683,39 +639,6 @@ mod tests {
         assert!((soi - 9.29e8).abs() < 1e8);
     }
 
-    #[test]
-    fn test_merge_momentum() {
-        let mut a = Body::new(0, "A", BodyType::Asteroid, 100.0, 10.0, Vec3::ZERO, Vec3::new(10.0, 0.0, 0.0));
-        let b = Body::new(1, "B", BodyType::Asteroid, 100.0, 10.0, Vec3::new(25.0, 0.0, 0.0), Vec3::new(-10.0, 0.0, 0.0));
-        
-        // Total momentum before: 100*10 + 100*(-10) = 0
-        let momentum_before = a.mass * a.velocity.x + b.mass * b.velocity.x;
-        
-        a.merge(&b);
-        
-        // Total momentum after should still be 0
-        let momentum_after = a.mass * a.velocity.x;
-        
-        assert!((momentum_before - momentum_after).abs() < 1e-10);
-        assert_eq!(a.mass, 200.0);
-    }
-
-    #[test]
-    fn test_merge_radius_update() {
-        // Two equal-mass, equal-radius bodies → merged radius = r * 2^(1/3)
-        let mut a = Body::new(0, "A", BodyType::Asteroid, 100.0, 10.0, Vec3::ZERO, Vec3::ZERO);
-        let b = Body::new(1, "B", BodyType::Asteroid, 100.0, 10.0, Vec3::new(15.0, 0.0, 0.0), Vec3::ZERO);
-
-        a.merge(&b);
-
-        let expected_radius = 10.0 * (2.0_f64).powf(1.0 / 3.0);
-        assert!(
-            (a.radius - expected_radius).abs() < 1e-10,
-            "Merged radius {} != expected {}",
-            a.radius,
-            expected_radius
-        );
-    }
 
     #[test]
     fn test_compute_derived() {
@@ -740,18 +663,6 @@ mod tests {
             "Bulk density {} kg/m³",
             earth.bulk_density
         );
-    }
-
-    #[test]
-    fn test_collision_uses_collision_radius() {
-        // Bodies 800m apart. render radius=1000, collision_radius=300.
-        // 300+300 = 600 < 800 → no collision
-        let mut a = Body::new(0, "A", BodyType::Asteroid, 1e10, 1000.0, Vec3::ZERO, Vec3::ZERO);
-        let mut b = Body::new(1, "B", BodyType::Asteroid, 1e10, 1000.0, Vec3::new(800.0, 0.0, 0.0), Vec3::ZERO);
-        a.collision_radius = 300.0;
-        b.collision_radius = 300.0;
-
-        assert!(!a.collides_with(&b), "Should NOT collide based on collision_radius");
     }
 
     #[test]

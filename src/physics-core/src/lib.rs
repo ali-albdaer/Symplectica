@@ -6,7 +6,6 @@
 //! # Features
 //! - Direct O(N²) and Barnes-Hut O(N log N) gravity solvers
 //! - Symplectic Velocity-Verlet integrator for energy conservation  
-//! - Inelastic collision detection and merging
 //! - Deterministic PRNG for reproducible simulations
 //! - Snapshot serialization for save/load and networking
 //!
@@ -27,7 +26,6 @@
 use wasm_bindgen::prelude::*;
 
 pub mod body;
-pub mod collision;
 pub mod constants;
 pub mod force;
 pub mod integrator;
