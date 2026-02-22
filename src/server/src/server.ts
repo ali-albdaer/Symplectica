@@ -22,6 +22,9 @@ interface PhysicsModule {
     createFullSolarSystemII?: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIIBarycentric?: (seed: bigint) => WasmSimulation;
     createPlayableSolarSystem: (seed: bigint) => WasmSimulation;
+    createIntegratorTest1?: (seed: bigint) => WasmSimulation;
+    createIntegratorTest2?: (seed: bigint) => WasmSimulation;
+    createIntegratorTest3?: (seed: bigint) => WasmSimulation;
     getG: () => number;
     getAU: () => number;
     getSolarMass: () => number;
@@ -275,6 +278,12 @@ class SimulationServer {
             } else {
                 this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
             }
+        } else if (presetId === 'integratorTest1' && typeof this.physics.createIntegratorTest1 === 'function') {
+            this.simulation = this.physics.createIntegratorTest1(CONFIG.seed);
+        } else if (presetId === 'integratorTest2' && typeof this.physics.createIntegratorTest2 === 'function') {
+            this.simulation = this.physics.createIntegratorTest2(CONFIG.seed);
+        } else if (presetId === 'integratorTest3' && typeof this.physics.createIntegratorTest3 === 'function') {
+            this.simulation = this.physics.createIntegratorTest3(CONFIG.seed);
         } else if (presetId === 'fullSolarSystem') {
             this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
         } else if (presetId === 'playableSolarSystem' && typeof this.physics.createPlayableSolarSystem === 'function') {

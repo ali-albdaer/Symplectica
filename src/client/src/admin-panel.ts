@@ -138,6 +138,9 @@ export class AdminPanel {
                             <option value="alphaCentauri">Alpha Centauri</option>
                             <option value="trappist1">TRAPPIST-1</option>
                             <option value="binaryPulsar">Binary Pulsar</option>
+                            <option value="integratorTest1">Integrator Test 1 (Two-Body)</option>
+                            <option value="integratorTest2">Integrator Test 2 (Jupiter-Saturn)</option>
+                            <option value="integratorTest3">Integrator Test 3 (Close Encounter)</option>
                             <option value="asteroidBelt">Asteroid Belt (5000+ bodies)</option>
                             <option value="starCluster">Star Cluster (2000 stars)</option>
                             <option value="worldBuilder" ${APP_DEFAULTS.defaultPreset.id === 'worldBuilder' ? 'selected' : ''}>+ World Builder</option>

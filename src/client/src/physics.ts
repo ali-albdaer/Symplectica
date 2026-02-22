@@ -57,6 +57,9 @@ interface PhysicsModule {
     createBinaryPulsar: (seed: bigint) => WasmSimulation;
     createAsteroidBelt: (seed: bigint, asteroidCount: number) => WasmSimulation;
     createStarCluster: (seed: bigint, starCount: number) => WasmSimulation;
+    createIntegratorTest1: (seed: bigint) => WasmSimulation;
+    createIntegratorTest2: (seed: bigint) => WasmSimulation;
+    createIntegratorTest3: (seed: bigint) => WasmSimulation;
     getG: () => number;
     getAU: () => number;
     getSolarMass: () => number;
@@ -147,7 +150,7 @@ export class PhysicsClient {
             await physicsModule.default();
             physicsModule.init();
 
-            this.module = physicsModule as PhysicsModule;
+            this.module = physicsModule as unknown as PhysicsModule;
 
             // Cache constants
             this.G = this.module.getG();
@@ -405,6 +408,15 @@ export class PhysicsClient {
         let loadedPreset = preset;
 
         switch (preset) {
+            case 'integratorTest1':
+                this.simulation = this.module.createIntegratorTest1(seed);
+                break;
+            case 'integratorTest2':
+                this.simulation = this.module.createIntegratorTest2(seed);
+                break;
+            case 'integratorTest3':
+                this.simulation = this.module.createIntegratorTest3(seed);
+                break;
             case 'innerSolarSystem':
                 this.simulation = this.module.createInnerSolarSystem(seed);
                 break;

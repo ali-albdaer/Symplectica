@@ -413,6 +413,12 @@ pub enum Preset {
     /// Dense Star Cluster: 1000-5000 equal-mass stars
     /// Plummer sphere distribution, virialized velocities
     StarCluster,
+    /// Integrator Test 1: Two-body circular orbit
+    IntegratorTest1,
+    /// Integrator Test 2: Jupiter-Saturn near-resonant interaction
+    IntegratorTest2,
+    /// Integrator Test 3: Strong close encounter
+    IntegratorTest3,
 }
 
 impl Preset {
@@ -431,6 +437,9 @@ impl Preset {
             Preset::BinaryPulsar => create_binary_pulsar(seed),
             Preset::AsteroidBelt => create_asteroid_belt(seed, 5000),
             Preset::StarCluster => create_star_cluster(seed, 2000),
+            Preset::IntegratorTest1 => create_integrator_test1(seed),
+            Preset::IntegratorTest2 => create_integrator_test2(seed),
+            Preset::IntegratorTest3 => create_integrator_test3(seed),
         }
     }
 
@@ -447,10 +456,169 @@ impl Preset {
                 // Star clusters are already centered
                 create_star_cluster(seed, 2000)
             },
+            Preset::IntegratorTest1 => create_integrator_test1(seed),
+            Preset::IntegratorTest2 => create_integrator_test2(seed),
+            Preset::IntegratorTest3 => create_integrator_test3(seed),
             // Other presets don't support barycentric mode; fall back to default
             _ => self.create(seed),
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INTEGRATOR TEST PRESETS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Test 1: Two-body circular orbit (Sun + Earth)
+pub fn create_integrator_test1(seed: u64) -> Simulation {
+    let mut sim = Simulation::new(seed);
+
+    let sun_id = sim.add_star("Test Sun", M_SUN, R_SUN);
+    if let Some(sun) = sim.get_body_mut(sun_id) {
+        sun.luminosity = L_SUN;
+        sun.effective_temperature = T_SUN;
+        sun.rotation_rate = OMEGA_SUN;
+        sun.mean_surface_temperature = T_SUN;
+        sun.seed = seed.wrapping_add(0);
+        sun.softening_length = compute_softening(R_SUN);
+        sun.compute_derived();
+    }
+
+    let mut planet = Body::new(
+        0,
+        "Test Earth",
+        BodyType::Planet,
+        M_EARTH,
+        R_EARTH,
+        Vec3::new(AU, 0.0, 0.0),
+        Vec3::new(0.0, 29_784.7, 0.0),
+    );
+    planet.parent_id = Some(sun_id);
+    planet.semi_major_axis = AU;
+    planet.eccentricity = 0.0;
+    planet.color = hex_to_rgb(0x4488ff);
+    planet.composition = PlanetComposition::Rocky;
+    planet.albedo = 0.306;
+    planet.softening_length = compute_softening(R_EARTH);
+    planet.compute_derived();
+    sim.add_body(planet);
+
+    sim.finalize_derived();
+    sim
+}
+
+/// Test 2: Jupiter-Saturn near-resonant interaction (Sun + Jupiter + Saturn)
+pub fn create_integrator_test2(seed: u64) -> Simulation {
+    let mut sim = Simulation::new(seed);
+
+    let sun_id = sim.add_star("Test Sun", M_SUN, R_SUN);
+    if let Some(sun) = sim.get_body_mut(sun_id) {
+        sun.luminosity = L_SUN;
+        sun.effective_temperature = T_SUN;
+        sun.rotation_rate = OMEGA_SUN;
+        sun.mean_surface_temperature = T_SUN;
+        sun.seed = seed.wrapping_add(0);
+        sun.softening_length = compute_softening(R_SUN);
+        sun.compute_derived();
+    }
+
+    let mut jupiter = Body::new(
+        0,
+        "Test Jupiter",
+        BodyType::Planet,
+        1.898e27,
+        6.9911e7,
+        Vec3::new(5.2044 * AU, 0.0, 0.0),
+        Vec3::new(0.0, 13_070.0, 0.0),
+    );
+    jupiter.parent_id = Some(sun_id);
+    jupiter.semi_major_axis = 5.2044 * AU;
+    jupiter.eccentricity = 0.0;
+    jupiter.color = hex_to_rgb(0xd4a574);
+    jupiter.composition = PlanetComposition::GasGiant;
+    jupiter.albedo = 0.503;
+    jupiter.softening_length = compute_softening(6.9911e7);
+    jupiter.compute_derived();
+    sim.add_body(jupiter);
+
+    let mut saturn = Body::new(
+        0,
+        "Test Saturn",
+        BodyType::Planet,
+        5.683e26,
+        5.8232e7,
+        Vec3::new(-9.5826 * AU, 0.0, 0.0),
+        Vec3::new(0.0, -9_680.0, 0.0),
+    );
+    saturn.parent_id = Some(sun_id);
+    saturn.semi_major_axis = 9.5826 * AU;
+    saturn.eccentricity = 0.0;
+    saturn.color = hex_to_rgb(0xead6a7);
+    saturn.composition = PlanetComposition::GasGiant;
+    saturn.albedo = 0.47;
+    saturn.softening_length = compute_softening(5.8232e7);
+    saturn.compute_derived();
+    sim.add_body(saturn);
+
+    sim.finalize_derived();
+    sim
+}
+
+/// Test 3: Strong close encounter (Sun + two Jupiter-mass planets)
+pub fn create_integrator_test3(seed: u64) -> Simulation {
+    let mut sim = Simulation::new(seed);
+
+    let sun_id = sim.add_star("Test Sun", M_SUN, R_SUN);
+    if let Some(sun) = sim.get_body_mut(sun_id) {
+        sun.luminosity = L_SUN;
+        sun.effective_temperature = T_SUN;
+        sun.rotation_rate = OMEGA_SUN;
+        sun.mean_surface_temperature = T_SUN;
+        sun.seed = seed.wrapping_add(0);
+        sun.softening_length = compute_softening(R_SUN);
+        sun.compute_derived();
+    }
+
+    let mut planet_a = Body::new(
+        0,
+        "Test Jupiter A",
+        BodyType::Planet,
+        1.898e27,
+        6.9911e7,
+        Vec3::new(5.2 * AU, 0.0, 0.0),
+        Vec3::new(0.0, 13_070.0, 0.0),
+    );
+    planet_a.parent_id = Some(sun_id);
+    planet_a.semi_major_axis = 5.2 * AU;
+    planet_a.eccentricity = 0.0;
+    planet_a.color = hex_to_rgb(0xd4a574);
+    planet_a.composition = PlanetComposition::GasGiant;
+    planet_a.albedo = 0.503;
+    planet_a.softening_length = compute_softening(6.9911e7);
+    planet_a.compute_derived();
+    sim.add_body(planet_a);
+
+    let mut planet_b = Body::new(
+        0,
+        "Test Jupiter B",
+        BodyType::Planet,
+        1.898e27,
+        6.9911e7,
+        Vec3::new(5.2 * AU, -0.05 * AU, 0.0),
+        Vec3::new(0.0, 13_500.0, 0.0),
+    );
+    planet_b.parent_id = Some(sun_id);
+    planet_b.semi_major_axis = 5.2 * AU;
+    planet_b.eccentricity = 0.0;
+    planet_b.color = hex_to_rgb(0xd4a574);
+    planet_b.composition = PlanetComposition::GasGiant;
+    planet_b.albedo = 0.503;
+    planet_b.softening_length = compute_softening(6.9911e7);
+    planet_b.compute_derived();
+    sim.add_body(planet_b);
+
+    sim.finalize_derived();
+    sim
 }
 
 /// Sun-Earth-Moon system
@@ -1631,6 +1799,9 @@ mod tests {
             Preset::AlphaCentauri,
             Preset::Trappist1,
             Preset::BinaryPulsar,
+            Preset::IntegratorTest1,
+            Preset::IntegratorTest2,
+            Preset::IntegratorTest3,
             // Note: AsteroidBelt and StarCluster are tested separately due to body count
         ];
         

@@ -13,6 +13,9 @@ export type PresetId =
     | 'alphaCentauri'
     | 'trappist1'
     | 'binaryPulsar'
+    | 'integratorTest1'
+    | 'integratorTest2'
+    | 'integratorTest3'
     | 'asteroidBelt'
     | 'starCluster'
     | 'worldBuilder';

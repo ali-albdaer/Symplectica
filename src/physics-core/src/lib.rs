@@ -436,6 +436,24 @@ pub fn create_star_cluster(seed: u64, star_count: u32) -> WasmSimulation {
     WasmSimulation { inner: presets::create_star_cluster(seed, star_count as usize) }
 }
 
+/// Integrator Test 1: Two-body circular orbit
+#[wasm_bindgen(js_name = createIntegratorTest1)]
+pub fn create_integrator_test1(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_integrator_test1(seed) }
+}
+
+/// Integrator Test 2: Jupiter-Saturn near-resonant interaction
+#[wasm_bindgen(js_name = createIntegratorTest2)]
+pub fn create_integrator_test2(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_integrator_test2(seed) }
+}
+
+/// Integrator Test 3: Strong close encounter
+#[wasm_bindgen(js_name = createIntegratorTest3)]
+pub fn create_integrator_test3(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_integrator_test3(seed) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
