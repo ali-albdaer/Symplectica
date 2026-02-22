@@ -45,7 +45,7 @@ export class AdminPanel {
         theta: 0.5,
         substeps: 4,
         simMode: 'tick',
-        closeEncounterIntegrator: 'gauss-radau',
+        closeEncounterIntegrator: 'none',
         closeEncounterHillFactor: 3.0,
         closeEncounterTidalRatio: 1.0e-3,
         closeEncounterJerkNorm: 0.1,
@@ -186,61 +186,68 @@ export class AdminPanel {
             <div class="opt-content admin-content" id="tab-admin-close" style="display: none;">
                 <section class="admin-section">
                     <h3>Switching</h3>
-                    <div class="admin-field">
-                        <label>Close-Encounter Integrator</label>
-                        <select id="admin-close-encounter">
-                            <option value="none">None (Verlet only)</option>
-                            <option value="gauss-radau" selected>Gauss-Radau 5th</option>
-                            <option value="rk45">Adaptive RK45</option>
-                        </select>
-                        <div class="admin-hint">Applies only to close-encounter subsets</div>
-                    </div>
-                    <div class="admin-field">
-                        <label>Hill Radius Factor</label>
-                        <input type="number" id="admin-close-hill" value="3" min="0.1" step="0.1">
-                    </div>
-                    <div class="admin-field">
-                        <label>Tidal Ratio Threshold</label>
-                        <input type="number" id="admin-close-tidal" value="0.001" min="0" step="0.0001">
-                        <div class="admin-hint">|a_perturber| / |a_primary|</div>
-                    </div>
-                    <div class="admin-field">
-                        <label>Normalized Jerk Threshold</label>
-                        <input type="number" id="admin-close-jerk" value="0.1" min="0" step="0.01">
-                        <div class="admin-hint">|jerk| × dt / |accel|</div>
-                    </div>
-                    <div class="admin-field">
-                        <label>Max Subset Size</label>
-                        <input type="number" id="admin-close-max-subset" value="8" min="1" step="1">
-                    </div>
-                    <div class="admin-field">
-                        <label>Max Trial Substeps</label>
-                        <input type="number" id="admin-close-max-substeps" value="128" min="1" step="1">
+                    <div class="admin-grid-two">
+                        <div class="admin-field">
+                            <label>Close-Encounter Integrator</label>
+                            <select id="admin-close-encounter">
+                                <option value="none" selected>None (Verlet only)</option>
+                                <option value="gauss-radau">Gauss-Radau 5th</option>
+                                <option value="rk45">Adaptive RK45</option>
+                            </select>
+                            <div class="admin-hint">Applies only to close-encounter subsets</div>
+                        </div>
+                        <div class="admin-field">
+                            <label>Hill Radius Factor</label>
+                            <input type="number" id="admin-close-hill" value="3" min="0.1" step="0.1">
+                        </div>
+                        <div class="admin-field">
+                            <label>Tidal Ratio Threshold</label>
+                            <input type="number" id="admin-close-tidal" value="0.001" min="0" step="0.0001">
+                            <div class="admin-hint">|a_perturber| / |a_primary|</div>
+                        </div>
+                        <div class="admin-field">
+                            <label>Normalized Jerk Threshold</label>
+                            <input type="number" id="admin-close-jerk" value="0.1" min="0" step="0.01">
+                            <div class="admin-hint">|jerk| × dt / |accel|</div>
+                        </div>
+                        <div class="admin-field">
+                            <label>Max Subset Size</label>
+                            <input type="number" id="admin-close-max-subset" value="8" min="1" step="1">
+                        </div>
+                        <div class="admin-field">
+                            <label>Max Trial Substeps</label>
+                            <input type="number" id="admin-close-max-substeps" value="128" min="1" step="1">
+                        </div>
                     </div>
                 </section>
 
                 <section class="admin-section">
                     <h3>RK45</h3>
-                    <div class="admin-field">
-                        <label>Absolute Tolerance</label>
-                        <input type="number" id="admin-close-rk45-abs" value="0.01" min="0" step="0.0001">
-                    </div>
-                    <div class="admin-field">
-                        <label>Relative Tolerance</label>
-                        <input type="number" id="admin-close-rk45-rel" value="0.000001" min="0" step="0.000001">
+                    <div class="admin-grid-two">
+                        <div class="admin-field">
+                            <label>Absolute Tolerance</label>
+                            <input type="number" id="admin-close-rk45-abs" value="0.01" min="0" step="0.0001">
+                        </div>
+                        <div class="admin-field">
+                            <label>Relative Tolerance</label>
+                            <input type="number" id="admin-close-rk45-rel" value="0.000001" min="0" step="0.000001">
+                        </div>
                     </div>
                 </section>
 
                 <section class="admin-section">
                     <h3>Gauss-Radau</h3>
-                    <div class="admin-field">
-                        <label>Max Iterations</label>
-                        <input type="number" id="admin-close-gr-iters" value="6" min="1" step="1">
+                    <div class="admin-grid-two">
+                        <div class="admin-field">
+                            <label>Max Iterations</label>
+                            <input type="number" id="admin-close-gr-iters" value="6" min="1" step="1">
+                        </div>
+                        <div class="admin-field">
+                            <label>Convergence Tolerance</label>
+                            <input type="number" id="admin-close-gr-tol" value="0.000000001" min="0" step="0.000000001">
+                        </div>
                     </div>
-                    <div class="admin-field">
-                        <label>Convergence Tolerance</label>
-                        <input type="number" id="admin-close-gr-tol" value="0.000000001" min="0" step="0.000000001">
-                    </div>
+                    <button class="admin-btn" id="admin-apply-close">Apply Close-Encounter Settings</button>
                 </section>
             </div>
         `;
@@ -252,14 +259,14 @@ export class AdminPanel {
                 position: fixed;
                 top: 80px;
                 right: 40px;
-                width: 260px;
+                width: 248px;
                 background: rgba(10, 15, 30, 0.95);
                 backdrop-filter: blur(20px);
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 12px;
                 color: #fff;
                 font-family: 'Segoe UI', system-ui, sans-serif;
-                font-size: 13px;
+                font-size: 12px;
                 z-index: 300;
                 display: none;
                 flex-direction: column;
@@ -274,7 +281,7 @@ export class AdminPanel {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 12px 15px;
+                padding: 10px 12px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
                 background: rgba(0, 0, 0, 0.3);
                 cursor: move;
@@ -282,7 +289,7 @@ export class AdminPanel {
             }
             
             .admin-header h2 {
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
                 margin: 0;
                 color: #4fc3f7;
@@ -303,7 +310,7 @@ export class AdminPanel {
             }
             
             .admin-content {
-                padding: 12px 15px;
+                padding: 10px 12px;
             }
 
             .opt-tabs {
@@ -317,8 +324,8 @@ export class AdminPanel {
                 background: none;
                 border: none;
                 color: rgba(255, 255, 255, 0.6);
-                padding: 10px 0;
-                font-size: 12px;
+                padding: 8px 0;
+                font-size: 11px;
                 font-weight: 600;
                 cursor: pointer;
                 border-bottom: 2px solid transparent;
@@ -335,11 +342,11 @@ export class AdminPanel {
                 border-bottom-color: #4fc3f7;
             }
 
-            .opt-content { padding: 12px 15px; }
+            .opt-content { padding: 10px 12px; }
             .opt-content.active { display: block; }
             
             .admin-section {
-                margin-bottom: 14px;
+                margin-bottom: 10px;
             }
             
             .admin-section:last-child {
@@ -347,7 +354,7 @@ export class AdminPanel {
             }
             
             .admin-section h3 {
-                font-size: 10px;
+                font-size: 9px;
                 font-weight: 600;
                 color: rgba(255, 255, 255, 0.5);
                 text-transform: uppercase;
@@ -356,14 +363,14 @@ export class AdminPanel {
             }
             
             .admin-field {
-                margin: 8px 0 6px 0;
+                margin: 6px 0 4px 0;
             }
             
             .admin-field label {
                 display: block;
-                font-size: 11px;
+                font-size: 10px;
                 color: rgba(255, 255, 255, 0.6);
-                margin-bottom: 6px;
+                margin-bottom: 4px;
             }
             
             .admin-field input,
@@ -373,8 +380,8 @@ export class AdminPanel {
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 4px;
                 color: #fff;
-                padding: 6px 8px;
-                font-size: 12px;
+                padding: 5px 6px;
+                font-size: 11px;
             }
 
             .admin-field input[type="range"] {
@@ -387,20 +394,20 @@ export class AdminPanel {
                 display: flex;
                 align-items: center;
                 gap: 10px;
-                margin-top: 6px;
+                margin-top: 4px;
             }
 
             .admin-slider-row span {
                 min-width: 70px;
                 text-align: right;
-                font-size: 12px;
+                font-size: 11px;
                 color: rgba(255, 255, 255, 0.7);
                 font-variant-numeric: tabular-nums;
             }
 
             .admin-hint {
-                margin-top: 6px;
-                font-size: 12px;
+                margin-top: 4px;
+                font-size: 11px;
                 color: rgba(255, 255, 255, 0.6);
                 font-variant-numeric: tabular-nums;
             }
@@ -417,11 +424,11 @@ export class AdminPanel {
                 border: 1px solid rgba(79, 195, 247, 0.6);
                 border-radius: 6px;
                 color: #dff3ff;
-                padding: 10px;
-                font-size: 12px;
+                padding: 8px;
+                font-size: 11px;
                 font-weight: 600;
                 cursor: pointer;
-                margin-bottom: 8px;
+                margin-bottom: 6px;
                 transition: background 0.2s, border-color 0.2s, color 0.2s;
             }
             
@@ -433,6 +440,12 @@ export class AdminPanel {
                 background: rgba(255, 107, 107, 0.2);
                 border-color: rgba(255, 107, 107, 0.6);
                 color: #ffe6e6;
+            }
+
+            .admin-grid-two {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 6px 8px;
             }
             
             #theta-field {
@@ -483,6 +496,10 @@ export class AdminPanel {
 
         // Apply button
         container.querySelector('#admin-apply')?.addEventListener('click', () => {
+            this.applySettings();
+        });
+
+        container.querySelector('#admin-apply-close')?.addEventListener('click', () => {
             this.applySettings();
         });
 

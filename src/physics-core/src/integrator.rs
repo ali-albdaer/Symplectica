@@ -39,7 +39,7 @@ pub enum CloseEncounterIntegrator {
 
 impl Default for CloseEncounterIntegrator {
     fn default() -> Self {
-        Self::GaussRadau5
+        Self::None
     }
 }
 
@@ -73,8 +73,8 @@ pub struct CloseEncounterConfig {
 impl Default for CloseEncounterConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
-            integrator: CloseEncounterIntegrator::GaussRadau5,
+            enabled: false,
+            integrator: CloseEncounterIntegrator::None,
             hill_factor: 3.0,
             tidal_ratio_threshold: 1.0e-3,
             jerk_norm_threshold: 0.1,

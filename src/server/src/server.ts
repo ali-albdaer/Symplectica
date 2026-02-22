@@ -158,7 +158,7 @@ class SimulationServer {
         timeScale: 1, // Matches dt * tickRate (1s/s)
         paused: false,
         simMode: 'tick',
-        closeEncounterIntegrator: 'gauss-radau',
+        closeEncounterIntegrator: 'none',
         closeEncounterHillFactor: 3.0,
         closeEncounterTidalRatio: 1.0e-3,
         closeEncounterJerkNorm: 0.1,
@@ -263,7 +263,7 @@ class SimulationServer {
             timeScale: 1.0 / CONFIG.tickRate * CONFIG.tickRate,
             paused: false,
             simMode: 'tick',
-            closeEncounterIntegrator: 'gauss-radau',
+            closeEncounterIntegrator: 'none',
             closeEncounterHillFactor: 3.0,
             closeEncounterTidalRatio: 1.0e-3,
             closeEncounterJerkNorm: 0.1,
