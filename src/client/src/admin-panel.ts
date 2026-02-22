@@ -12,6 +12,7 @@
 import { PhysicsClient } from './physics';
 import { TimeController } from './time-controller';
 import { AdminStatePayload, NetworkClient } from './network';
+import { APP_DEFAULTS } from './defaults';
 
 interface ServerConfig {
     tickRate: number;
@@ -40,21 +41,21 @@ export class AdminPanel {
     private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
     private isOpen = false;
     private config: ServerConfig = {
-        tickRate: 60,
-        forceMethod: 'direct',
-        theta: 0.5,
-        substeps: 4,
-        simMode: 'tick',
-        closeEncounterIntegrator: 'none',
-        closeEncounterHillFactor: 3.0,
-        closeEncounterTidalRatio: 1.0e-3,
-        closeEncounterJerkNorm: 0.1,
-        closeEncounterMaxSubsetSize: 8,
-        closeEncounterMaxTrialSubsteps: 128,
-        closeEncounterRk45AbsTol: 1.0e-2,
-        closeEncounterRk45RelTol: 1.0e-6,
-        closeEncounterGaussRadauMaxIters: 6,
-        closeEncounterGaussRadauTol: 1.0e-9,
+        tickRate: APP_DEFAULTS.adminDefaults.tickRate,
+        forceMethod: APP_DEFAULTS.adminDefaults.forceMethod,
+        theta: APP_DEFAULTS.adminDefaults.theta,
+        substeps: APP_DEFAULTS.adminDefaults.substeps,
+        simMode: APP_DEFAULTS.adminDefaults.simMode,
+        closeEncounterIntegrator: APP_DEFAULTS.adminDefaults.closeEncounterIntegrator,
+        closeEncounterHillFactor: APP_DEFAULTS.adminDefaults.closeEncounterHillFactor,
+        closeEncounterTidalRatio: APP_DEFAULTS.adminDefaults.closeEncounterTidalRatio,
+        closeEncounterJerkNorm: APP_DEFAULTS.adminDefaults.closeEncounterJerkNorm,
+        closeEncounterMaxSubsetSize: APP_DEFAULTS.adminDefaults.closeEncounterMaxSubsetSize,
+        closeEncounterMaxTrialSubsteps: APP_DEFAULTS.adminDefaults.closeEncounterMaxTrialSubsteps,
+        closeEncounterRk45AbsTol: APP_DEFAULTS.adminDefaults.closeEncounterRk45AbsTol,
+        closeEncounterRk45RelTol: APP_DEFAULTS.adminDefaults.closeEncounterRk45RelTol,
+        closeEncounterGaussRadauMaxIters: APP_DEFAULTS.adminDefaults.closeEncounterGaussRadauMaxIters,
+        closeEncounterGaussRadauTol: APP_DEFAULTS.adminDefaults.closeEncounterGaussRadauTol,
     };
 
     constructor(
@@ -103,10 +104,10 @@ export class AdminPanel {
                     <div class="admin-field">
                         <label>Load Preset</label>
                         <select id="admin-preset">
-                            <option value="sunEarthMoon">Sun-Earth-Moon</option>
-                            <option value="innerSolarSystem">Inner Solar System</option>
-                            <option value="fullSolarSystem">Full Solar System</option>
-                            <option value="fullSolarSystemII" selected>Full Solar System II (J2000)</option>
+                            <option value="sunEarthMoon" ${APP_DEFAULTS.defaultPreset.id === 'sunEarthMoon' ? 'selected' : ''}>Sun-Earth-Moon</option>
+                            <option value="innerSolarSystem" ${APP_DEFAULTS.defaultPreset.id === 'innerSolarSystem' ? 'selected' : ''}>Inner Solar System</option>
+                            <option value="fullSolarSystem" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystem' ? 'selected' : ''}>Full Solar System</option>
+                            <option value="fullSolarSystemII" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemII' ? 'selected' : ''}>Full Solar System II (J2000)</option>
                             <option value="playableSolarSystem">Playable Solar System</option>
                             <option value="jupiterSystem">Jupiter System</option>
                             <option value="saturnSystem">Saturn System</option>
@@ -115,12 +116,12 @@ export class AdminPanel {
                             <option value="binaryPulsar">Binary Pulsar</option>
                             <option value="asteroidBelt">Asteroid Belt (5000+ bodies)</option>
                             <option value="starCluster">Star Cluster (2000 stars)</option>
-                            <option value="worldBuilder">+ World Builder</option>
+                            <option value="worldBuilder" ${APP_DEFAULTS.defaultPreset.id === 'worldBuilder' ? 'selected' : ''}>+ World Builder</option>
                         </select>
                     </div>
                     <div class="admin-field" id="barycentric-field">
                         <label>
-                            <input type="checkbox" id="admin-barycentric" checked>
+                            <input type="checkbox" id="admin-barycentric" ${APP_DEFAULTS.defaultPreset.barycentric ? 'checked' : ''}>
                             Barycentric Mode
                         </label>
                         <div class="admin-hint">Shift to center-of-mass frame (zero system momentum)</div>
@@ -145,7 +146,7 @@ export class AdminPanel {
 
                     <div class="admin-field">
                         <label>Timestep (seconds)</label>
-                        <input type="number" id="admin-dt" value="3600" min="1" max="86400" step="60">
+                        <input type="number" id="admin-dt" value="${APP_DEFAULTS.adminDefaults.dt}" min="0.001" step="0.001">
                     </div>
 
                     <div class="admin-field">
@@ -158,7 +159,7 @@ export class AdminPanel {
 
                     <div class="admin-field">
                         <label>Substeps</label>
-                        <input type="number" id="admin-substeps" value="4" min="1" max="16">
+                        <input type="number" id="admin-substeps" value="${APP_DEFAULTS.adminDefaults.substeps}" min="1" max="16">
                     </div>
                     
                     <div class="admin-field">
@@ -171,7 +172,7 @@ export class AdminPanel {
                     
                     <div class="admin-field" id="theta-field">
                         <label>Barnes-Hut θ</label>
-                        <input type="number" id="admin-theta" value="0.5" min="0.1" max="2" step="0.1">
+                        <input type="number" id="admin-theta" value="${APP_DEFAULTS.adminDefaults.theta}" min="0.1" max="2" step="0.1">
                     </div>
                 </section>
                 
@@ -190,32 +191,32 @@ export class AdminPanel {
                         <div class="admin-field">
                             <label>Close-Encounter Integrator</label>
                             <select id="admin-close-encounter">
-                                <option value="none" selected>None (Verlet only)</option>
-                                <option value="gauss-radau">Gauss-Radau 5th</option>
-                                <option value="rk45">Adaptive RK45</option>
+                                <option value="none" ${APP_DEFAULTS.adminDefaults.closeEncounterIntegrator === 'none' ? 'selected' : ''}>None (Verlet only)</option>
+                                <option value="gauss-radau" ${APP_DEFAULTS.adminDefaults.closeEncounterIntegrator === 'gauss-radau' ? 'selected' : ''}>Gauss-Radau 5th</option>
+                                <option value="rk45" ${APP_DEFAULTS.adminDefaults.closeEncounterIntegrator === 'rk45' ? 'selected' : ''}>Adaptive RK45</option>
                             </select>
                         </div>
                         <div class="admin-field">
                             <label>Hill Radius Factor</label>
-                            <input type="number" id="admin-close-hill" value="3" min="0.1" step="0.1">
+                            <input type="number" id="admin-close-hill" value="${APP_DEFAULTS.adminDefaults.closeEncounterHillFactor}" min="0.1" step="0.1">
                         </div>
                         <div class="admin-field">
                             <label>Tidal Ratio Threshold</label>
-                            <input type="number" id="admin-close-tidal" value="0.001" min="0" step="0.0001">
+                            <input type="number" id="admin-close-tidal" value="${APP_DEFAULTS.adminDefaults.closeEncounterTidalRatio}" min="0" step="0.0001">
                             <div class="admin-hint">|a_perturber| / |a_primary|</div>
                         </div>
                         <div class="admin-field">
                             <label>Normalized Jerk Threshold</label>
-                            <input type="number" id="admin-close-jerk" value="0.1" min="0" step="0.01">
+                            <input type="number" id="admin-close-jerk" value="${APP_DEFAULTS.adminDefaults.closeEncounterJerkNorm}" min="0" step="0.01">
                             <div class="admin-hint">|jerk| × dt / |accel|</div>
                         </div>
                         <div class="admin-field">
                             <label>Max Subset Size</label>
-                            <input type="number" id="admin-close-max-subset" value="8" min="1" step="1">
+                            <input type="number" id="admin-close-max-subset" value="${APP_DEFAULTS.adminDefaults.closeEncounterMaxSubsetSize}" min="1" step="1">
                         </div>
                         <div class="admin-field">
                             <label>Max Trial Substeps</label>
-                            <input type="number" id="admin-close-max-substeps" value="128" min="1" step="1">
+                            <input type="number" id="admin-close-max-substeps" value="${APP_DEFAULTS.adminDefaults.closeEncounterMaxTrialSubsteps}" min="1" step="1">
                         </div>
                     </div>
                 </section>
@@ -225,11 +226,11 @@ export class AdminPanel {
                     <div class="admin-grid-two">
                         <div class="admin-field">
                             <label>Absolute Tolerance</label>
-                            <input type="number" id="admin-close-rk45-abs" value="0.01" min="0" step="0.0001">
+                            <input type="number" id="admin-close-rk45-abs" value="${APP_DEFAULTS.adminDefaults.closeEncounterRk45AbsTol}" min="0" step="0.0001">
                         </div>
                         <div class="admin-field">
                             <label>Relative Tolerance</label>
-                            <input type="number" id="admin-close-rk45-rel" value="0.000001" min="0" step="0.000001">
+                            <input type="number" id="admin-close-rk45-rel" value="${APP_DEFAULTS.adminDefaults.closeEncounterRk45RelTol}" min="0" step="0.000001">
                         </div>
                     </div>
                 </section>
@@ -239,11 +240,11 @@ export class AdminPanel {
                     <div class="admin-grid-two">
                         <div class="admin-field">
                             <label>Max Iterations</label>
-                            <input type="number" id="admin-close-gr-iters" value="6" min="1" step="1">
+                            <input type="number" id="admin-close-gr-iters" value="${APP_DEFAULTS.adminDefaults.closeEncounterGaussRadauMaxIters}" min="1" step="1">
                         </div>
                         <div class="admin-field">
                             <label>Convergence Tolerance</label>
-                            <input type="number" id="admin-close-gr-tol" value="0.000000001" min="0" step="0.000000001">
+                            <input type="number" id="admin-close-gr-tol" value="${APP_DEFAULTS.adminDefaults.closeEncounterGaussRadauTol}" min="0" step="0.000000001">
                         </div>
                     </div>
                     <button class="admin-btn" id="admin-apply-close">Apply Close-Encounter Settings</button>
@@ -696,8 +697,13 @@ export class AdminPanel {
         if (this.network?.isConnected()) {
             this.network.resetSimulation();
         } else {
-            this.physics.createPreset('fullSolarSystem', BigInt(Date.now()));
-            console.log('🔄 Simulation reset to Full Solar System');
+            this.physics.createPreset(
+                APP_DEFAULTS.defaultPreset.id,
+                BigInt(Date.now()),
+                APP_DEFAULTS.defaultPreset.barycentric,
+                APP_DEFAULTS.defaultPreset.bodyCount ?? undefined
+            );
+            console.log(`🔄 Simulation reset to ${APP_DEFAULTS.defaultPreset.id}`);
         }
         this.close();
     }

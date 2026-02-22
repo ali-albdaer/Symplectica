@@ -12,6 +12,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { CONFIG } from './config.js';
+import { APP_DEFAULTS } from './defaults.js';
 
 // Physics WASM module types (will be loaded dynamically)
 interface PhysicsModule {
@@ -151,23 +152,23 @@ class SimulationServer {
     private lastSnapshotTick = 0n;
     private simAccumulator = 0;
     private adminState: AdminStatePayload = {
-        dt: 1 / CONFIG.tickRate,
-        substeps: 4,
-        forceMethod: 'direct',
-        theta: 0.5,
-        timeScale: 1, // Matches dt * tickRate (1s/s)
-        paused: false,
-        simMode: 'tick',
-        closeEncounterIntegrator: 'none',
-        closeEncounterHillFactor: 3.0,
-        closeEncounterTidalRatio: 1.0e-3,
-        closeEncounterJerkNorm: 0.1,
-        closeEncounterMaxSubsetSize: 8,
-        closeEncounterMaxTrialSubsteps: 128,
-        closeEncounterRk45AbsTol: 1.0e-2,
-        closeEncounterRk45RelTol: 1.0e-6,
-        closeEncounterGaussRadauMaxIters: 6,
-        closeEncounterGaussRadauTol: 1.0e-9,
+        dt: APP_DEFAULTS.adminDefaults.dt,
+        substeps: APP_DEFAULTS.adminDefaults.substeps,
+        forceMethod: APP_DEFAULTS.adminDefaults.forceMethod,
+        theta: APP_DEFAULTS.adminDefaults.theta,
+        timeScale: APP_DEFAULTS.adminDefaults.timeScale,
+        paused: APP_DEFAULTS.adminDefaults.paused,
+        simMode: APP_DEFAULTS.adminDefaults.simMode,
+        closeEncounterIntegrator: APP_DEFAULTS.adminDefaults.closeEncounterIntegrator,
+        closeEncounterHillFactor: APP_DEFAULTS.adminDefaults.closeEncounterHillFactor,
+        closeEncounterTidalRatio: APP_DEFAULTS.adminDefaults.closeEncounterTidalRatio,
+        closeEncounterJerkNorm: APP_DEFAULTS.adminDefaults.closeEncounterJerkNorm,
+        closeEncounterMaxSubsetSize: APP_DEFAULTS.adminDefaults.closeEncounterMaxSubsetSize,
+        closeEncounterMaxTrialSubsteps: APP_DEFAULTS.adminDefaults.closeEncounterMaxTrialSubsteps,
+        closeEncounterRk45AbsTol: APP_DEFAULTS.adminDefaults.closeEncounterRk45AbsTol,
+        closeEncounterRk45RelTol: APP_DEFAULTS.adminDefaults.closeEncounterRk45RelTol,
+        closeEncounterGaussRadauMaxIters: APP_DEFAULTS.adminDefaults.closeEncounterGaussRadauMaxIters,
+        closeEncounterGaussRadauTol: APP_DEFAULTS.adminDefaults.closeEncounterGaussRadauTol,
     };
 
     // New properties for HTTP server
@@ -243,37 +244,84 @@ class SimulationServer {
     private createSimulation(): void {
         console.log('[INFO] Creating simulation...');
 
-        // Use Full Solar System II barycentric when available
-        if (typeof this.physics.createFullSolarSystemIIBarycentric === 'function') {
-            this.simulation = this.physics.createFullSolarSystemIIBarycentric(CONFIG.seed);
-        } else if (typeof this.physics.createFullSolarSystemII === 'function') {
-            this.simulation = this.physics.createFullSolarSystemII(CONFIG.seed);
+        this.adminState = {
+            dt: APP_DEFAULTS.adminDefaults.dt,
+            substeps: APP_DEFAULTS.adminDefaults.substeps,
+            forceMethod: APP_DEFAULTS.adminDefaults.forceMethod,
+            theta: APP_DEFAULTS.adminDefaults.theta,
+            timeScale: APP_DEFAULTS.adminDefaults.timeScale,
+            paused: APP_DEFAULTS.adminDefaults.paused,
+            simMode: APP_DEFAULTS.adminDefaults.simMode,
+            closeEncounterIntegrator: APP_DEFAULTS.adminDefaults.closeEncounterIntegrator,
+            closeEncounterHillFactor: APP_DEFAULTS.adminDefaults.closeEncounterHillFactor,
+            closeEncounterTidalRatio: APP_DEFAULTS.adminDefaults.closeEncounterTidalRatio,
+            closeEncounterJerkNorm: APP_DEFAULTS.adminDefaults.closeEncounterJerkNorm,
+            closeEncounterMaxSubsetSize: APP_DEFAULTS.adminDefaults.closeEncounterMaxSubsetSize,
+            closeEncounterMaxTrialSubsteps: APP_DEFAULTS.adminDefaults.closeEncounterMaxTrialSubsteps,
+            closeEncounterRk45AbsTol: APP_DEFAULTS.adminDefaults.closeEncounterRk45AbsTol,
+            closeEncounterRk45RelTol: APP_DEFAULTS.adminDefaults.closeEncounterRk45RelTol,
+            closeEncounterGaussRadauMaxIters: APP_DEFAULTS.adminDefaults.closeEncounterGaussRadauMaxIters,
+            closeEncounterGaussRadauTol: APP_DEFAULTS.adminDefaults.closeEncounterGaussRadauTol,
+        };
+
+        const presetId = APP_DEFAULTS.defaultPreset.id;
+        const barycentric = APP_DEFAULTS.defaultPreset.barycentric;
+
+        if (presetId === 'fullSolarSystemII') {
+            if (barycentric && typeof this.physics.createFullSolarSystemIIBarycentric === 'function') {
+                this.simulation = this.physics.createFullSolarSystemIIBarycentric(CONFIG.seed);
+            } else if (typeof this.physics.createFullSolarSystemII === 'function') {
+                this.simulation = this.physics.createFullSolarSystemII(CONFIG.seed);
+            } else {
+                this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
+            }
+        } else if (presetId === 'fullSolarSystem') {
+            this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
+        } else if (presetId === 'playableSolarSystem' && typeof this.physics.createPlayableSolarSystem === 'function') {
+            this.simulation = this.physics.createPlayableSolarSystem(CONFIG.seed);
+        } else if (presetId === 'sunEarthMoon') {
+            this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
         } else {
             this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
         }
 
-        // Configure for 60Hz tick rate
-        this.simulation.setDt(1.0 / CONFIG.tickRate);
-        this.simulation.setSubsteps(4);
-        this.adminState = {
-            dt: 1.0 / CONFIG.tickRate,
-            substeps: 4,
-            forceMethod: 'direct',
-            theta: 0.5,
-            timeScale: 1.0 / CONFIG.tickRate * CONFIG.tickRate,
-            paused: false,
-            simMode: 'tick',
-            closeEncounterIntegrator: 'none',
-            closeEncounterHillFactor: 3.0,
-            closeEncounterTidalRatio: 1.0e-3,
-            closeEncounterJerkNorm: 0.1,
-            closeEncounterMaxSubsetSize: 8,
-            closeEncounterMaxTrialSubsteps: 128,
-            closeEncounterRk45AbsTol: 1.0e-2,
-            closeEncounterRk45RelTol: 1.0e-6,
-            closeEncounterGaussRadauMaxIters: 6,
-            closeEncounterGaussRadauTol: 1.0e-9,
-        };
+        const dt = this.adminState.simMode === 'tick'
+            ? this.adminState.timeScale / CONFIG.tickRate
+            : this.adminState.dt;
+
+        if (this.adminState.simMode === 'tick' && this.adminState.dt !== dt) {
+            this.adminState = {
+                ...this.adminState,
+                dt,
+            };
+        }
+
+        this.simulation.setDt(dt);
+        this.simulation.setSubsteps(this.adminState.substeps);
+        if (this.adminState.forceMethod === 'barnes-hut') {
+            this.simulation.setTheta(this.adminState.theta);
+            this.simulation.useBarnesHut();
+        } else {
+            this.simulation.useDirectForce();
+        }
+        this.simulation.setCloseEncounterIntegrator(this.adminState.closeEncounterIntegrator);
+        this.simulation.setCloseEncounterThresholds(
+            this.adminState.closeEncounterHillFactor,
+            this.adminState.closeEncounterTidalRatio,
+            this.adminState.closeEncounterJerkNorm
+        );
+        this.simulation.setCloseEncounterLimits(
+            this.adminState.closeEncounterMaxSubsetSize,
+            this.adminState.closeEncounterMaxTrialSubsteps
+        );
+        this.simulation.setCloseEncounterRk45Tolerances(
+            this.adminState.closeEncounterRk45AbsTol,
+            this.adminState.closeEncounterRk45RelTol
+        );
+        this.simulation.setCloseEncounterGaussRadau(
+            this.adminState.closeEncounterGaussRadauMaxIters,
+            this.adminState.closeEncounterGaussRadauTol
+        );
 
         console.log(`   Bodies: ${this.simulation.bodyCount()}`);
         console.log(`   Initial energy: ${this.simulation.totalEnergy().toExponential(4)} J`);
@@ -309,7 +357,7 @@ class SimulationServer {
                         tickRate: CONFIG.tickRate,
                         serverTick: Number(this.simulation.tick()),
                         adminState: this.adminState,
-                        visualPresetDefault: 'Ultra',
+                        visualPresetDefault: APP_DEFAULTS.visualPresetDefault,
                     },
                 },
                 serverTick: Number(this.simulation.tick()),

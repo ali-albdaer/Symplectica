@@ -4,6 +4,8 @@
  * Consolidated settings for Visualization and Camera.
  */
 
+import { APP_DEFAULTS } from './defaults';
+
 export interface VisualizationOptions {
     showOrbitTrails: boolean;
     showLabels: boolean;
@@ -22,20 +24,7 @@ export interface VisualizationOptions {
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
 
 const AU = 1.495978707e11;
-const DEFAULTS: VisualizationOptions = {
-    showOrbitTrails: true,
-    showLabels: false,
-    showAxisLines: false,
-    showRefPlane: false,
-    showRefLine: false,
-    showRefPoint: false,
-    showGridXY: false,
-    showGridXZ: false,
-    showGridYZ: false,
-    gridSpacing: 0.1 * AU,
-    gridSize: 1000,
-    orbitTrailLength: 100,
-};
+const DEFAULTS: VisualizationOptions = { ...APP_DEFAULTS.optionsDefaults };
 
 export class OptionsPanel {
     private container: HTMLElement;
@@ -52,8 +41,8 @@ export class OptionsPanel {
     // State
     private presetName: VisualizationPresetName;
     private presetRenderScale = 1;
-    private freeCamSpeed = 0.1; // AU/s
-    private freeCamSensitivity = 0.3;
+    private freeCamSpeed = APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec;
+    private freeCamSensitivity = APP_DEFAULTS.cameraDefaults.freeCamSensitivity;
     private ignoreEvents = false;
 
     // UI Elements
@@ -108,7 +97,7 @@ export class OptionsPanel {
         onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void,
         onFreeCamSpeedChange?: (speed: number) => void,
         onFreeCamSensitivityChange?: (sensitivity: number) => void,
-        initialPreset: VisualizationPresetName = 'Low'
+        initialPreset: VisualizationPresetName = APP_DEFAULTS.visualPresetDefault
     ) {
         this.onChange = onChange;
         this.onPresetChange = onPresetChange;

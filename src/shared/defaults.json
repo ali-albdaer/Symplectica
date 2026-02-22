@@ -1,0 +1,46 @@
+{
+  "defaultPreset": {
+    "id": "fullSolarSystemII",
+    "barycentric": true,
+    "bodyCount": null
+  },
+  "adminDefaults": {
+    "tickRate": 60,
+    "dt": 0.016666666666666666,
+    "substeps": 4,
+    "forceMethod": "direct",
+    "theta": 0.5,
+    "timeScale": 1,
+    "paused": false,
+    "simMode": "tick",
+    "closeEncounterIntegrator": "none",
+    "closeEncounterHillFactor": 3,
+    "closeEncounterTidalRatio": 0.001,
+    "closeEncounterJerkNorm": 0.1,
+    "closeEncounterMaxSubsetSize": 8,
+    "closeEncounterMaxTrialSubsteps": 128,
+    "closeEncounterRk45AbsTol": 0.01,
+    "closeEncounterRk45RelTol": 0.000001,
+    "closeEncounterGaussRadauMaxIters": 6,
+    "closeEncounterGaussRadauTol": 0.000000001
+  },
+  "optionsDefaults": {
+    "showOrbitTrails": false,
+    "showLabels": false,
+    "showAxisLines": true,
+    "showRefPlane": false,
+    "showRefLine": false,
+    "showRefPoint": false,
+    "showGridXY": false,
+    "showGridXZ": false,
+    "showGridYZ": false,
+    "gridSpacing": 14959787070,
+    "gridSize": 1000,
+    "orbitTrailLength": 800
+  },
+  "visualPresetDefault": "Ultra",
+  "cameraDefaults": {
+    "freeCamSpeedAuPerSec": 0.05,
+    "freeCamSensitivity": 0.3
+  }
+}

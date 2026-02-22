@@ -24,6 +24,7 @@ import { registerVisualPresetFeatures } from './visual-preset-features';
 import { SkyRenderer } from './sky-renderer';
 import { TouchControls } from './touch-controls';
 import { BuildPanel, BuildBodyParams, BuildableBodyType, BodyListEntry } from './build-panel';
+import { APP_DEFAULTS } from './defaults';
 
 // Physical constants (SI units)
 const AU = 1.495978707e11; // meters
@@ -89,20 +90,7 @@ class NBodyClient {
     private lastServerPositions = new Float64Array(0);
 
     // Track visualization options to restore after body refresh
-    private currentVizOptions: VisualizationOptions = {
-        showOrbitTrails: true,
-        showLabels: false,
-        showAxisLines: false,
-        showRefPlane: false,
-        showRefLine: false,
-        showRefPoint: false,
-        showGridXY: false,
-        showGridXZ: false,
-        showGridYZ: false,
-        gridSpacing: 1.495978707e11,
-        gridSize: 40,
-        orbitTrailLength: 100,
-    };
+    private currentVizOptions: VisualizationOptions = { ...APP_DEFAULTS.optionsDefaults };
 
     // Time control (centralized)
     private timeController = new TimeController();
@@ -138,7 +126,7 @@ class NBodyClient {
 
     // Free camera mode
     private freeCamera = false;
-    private freeCamSpeedAuPerSec = 0.1;
+    private freeCamSpeedAuPerSec = APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec;
     private freeCamCrosshair: HTMLElement | null = null;
     private raycaster = new THREE.Raycaster();
     private skyRenderer!: SkyRenderer;
@@ -154,7 +142,7 @@ class NBodyClient {
 
     async init(): Promise<void> {
         VisualPresetRegistry.loadPresets(visualPresets as VisualPresetsFile);
-        VisualPresetRegistry.setDefaultPreset('Ultra');
+        VisualPresetRegistry.setDefaultPreset(APP_DEFAULTS.visualPresetDefault);
         registerVisualPresetFeatures();
         VisualPresetRegistry.registerFeature('bodyRenderer', {});
         VisualPresetRegistry.registerFeatureHooks('bodyRenderer', {
@@ -189,7 +177,7 @@ class NBodyClient {
             await this.network.connect();
         } catch (error) {
             console.warn('⚠️ Multiplayer server unavailable, running in local mode.', error);
-            this.ensureLocalPreset('Ultra');
+            this.ensureLocalPreset(APP_DEFAULTS.visualPresetDefault);
         }
 
         // Initialize Admin Panel
@@ -226,11 +214,12 @@ class NBodyClient {
             (sensitivity) => {
                 this.camera.setFreeLookSensitivity(sensitivity);
             },
-            VisualPresetRegistry.getPresetNameForPlayer(LOCAL_PRESET_PLAYER)
+            APP_DEFAULTS.visualPresetDefault
         );
         this.optionsPanel.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
         );
+        this.camera.setFreeLookSensitivity(APP_DEFAULTS.cameraDefaults.freeCamSensitivity);
 
         // Initialize Touch Controls (disabled by default, enabled with /mobile command)
         this.touchControls = new TouchControls({
@@ -496,9 +485,13 @@ class NBodyClient {
         this.physics = new PhysicsClient();
         await this.physics.init();
 
-        // Use local simulation for now - default to Full Solar System II with barycentric frame
-        // Barycentric ensures zero system momentum for proper conservation
-        this.physics.createPreset('fullSolarSystemII', BigInt(Date.now()), true);
+        // Use global default preset
+        this.physics.createPreset(
+            APP_DEFAULTS.defaultPreset.id,
+            BigInt(Date.now()),
+            APP_DEFAULTS.defaultPreset.barycentric,
+            APP_DEFAULTS.defaultPreset.bodyCount ?? undefined
+        );
 
         // TimeController manages simulation speed; physics dt is set by createPreset
 

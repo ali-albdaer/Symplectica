@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 
 const projectDir = dirname(fileURLToPath(import.meta.url));
 const physicsPkgDir = resolve(projectDir, '../physics-core/pkg');
+const sharedDefaultsDir = resolve(projectDir, '../shared');
 
 export default defineConfig({
     root: '.',
@@ -15,7 +16,7 @@ export default defineConfig({
     server: {
         port: 3000,
         fs: {
-            allow: [projectDir, physicsPkgDir],
+            allow: [projectDir, physicsPkgDir, sharedDefaultsDir],
         },
     },
     assetsInclude: ['**/*.wasm'],
