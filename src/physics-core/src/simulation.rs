@@ -86,6 +86,12 @@ pub struct Simulation {
 
     /// Event ID counter
     close_encounter_event_id: u64,
+
+    /// Whether the close-encounter integrator is currently active
+    close_encounter_active: bool,
+
+    /// Last close-encounter body ids (for exit logging)
+    close_encounter_last_body_ids: Vec<u32>,
     
     /// Next body ID to assign
     next_id: BodyId,
@@ -106,6 +112,8 @@ impl Simulation {
             sequence: 0,
             close_encounter_events: Vec::with_capacity(32),
             close_encounter_event_id: 1,
+            close_encounter_active: false,
+            close_encounter_last_body_ids: Vec::new(),
             next_id: 0,
             needs_init: true,
         }
@@ -239,6 +247,19 @@ impl Simulation {
         let (subset, reason) = self.detect_close_encounter_subset(&close_cfg);
 
         if subset.is_empty() || !close_cfg.enabled || close_cfg.integrator == CloseEncounterIntegrator::None {
+            if self.close_encounter_active {
+                self.log_close_encounter_event(
+                    close_cfg.integrator,
+                    self.close_encounter_last_body_ids.clone(),
+                    dt,
+                    "exit".to_string(),
+                    0.0,
+                    0,
+                    "",
+                );
+                self.close_encounter_active = false;
+                self.close_encounter_last_body_ids.clear();
+            }
             // Advance physics normally
             step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn);
             self.time += dt;
@@ -309,15 +330,43 @@ impl Simulation {
                 body.prev_acceleration = body.acceleration;
             }
 
+            let body_ids: Vec<u32> = subset
+                .iter()
+                .filter_map(|idx| self.bodies.get(*idx))
+                .map(|b| b.id)
+                .collect();
+
+            if !self.close_encounter_active {
+                let reason_tagged = if reason.is_empty() {
+                    "enter".to_string()
+                } else {
+                    format!("enter; {}", reason)
+                };
+                self.log_close_encounter_event(
+                    close_cfg.integrator,
+                    body_ids.clone(),
+                    dt,
+                    reason_tagged,
+                    trial.max_error,
+                    trial.steps as u32,
+                    trial.reason,
+                );
+            }
+
+            self.close_encounter_active = true;
+            self.close_encounter_last_body_ids = body_ids;
+        } else if self.close_encounter_active {
             self.log_close_encounter_event(
                 close_cfg.integrator,
-                &subset,
+                self.close_encounter_last_body_ids.clone(),
                 dt,
-                reason,
-                trial.max_error,
-                trial.steps as u32,
+                "exit".to_string(),
+                0.0,
+                0,
                 trial.reason,
             );
+            self.close_encounter_active = false;
+            self.close_encounter_last_body_ids.clear();
         }
     }
 
@@ -404,14 +453,13 @@ impl Simulation {
     fn log_close_encounter_event(
         &mut self,
         integrator: CloseEncounterIntegrator,
-        subset: &[usize],
+        body_ids: Vec<u32>,
         dt: f64,
         reason: String,
         max_error: f64,
         steps: u32,
         trial_reason: &'static str,
     ) {
-        let body_ids: Vec<u32> = subset.iter().filter_map(|idx| self.bodies.get(*idx)).map(|b| b.id).collect();
         let integrator_name = match integrator {
             CloseEncounterIntegrator::Rk45 => "rk45",
             CloseEncounterIntegrator::GaussRadau5 => "gauss-radau",
@@ -497,6 +545,8 @@ impl Simulation {
         self.config.integrator = (&snapshot.integrator_config).into();
         self.config.integrator.force_config = (&snapshot.force_config).into();
         self.needs_init = true;
+        self.close_encounter_active = false;
+        self.close_encounter_last_body_ids.clear();
 
         // Update next_id to avoid ID reuse
         self.next_id = self.bodies.iter().map(|b| b.id).max().unwrap_or(0) + 1;
