@@ -34,8 +34,9 @@ const STAR_FRAGMENT = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_fragment>
 uniform vec3 u_color;   // blackbody RGB [0,1]
-uniform float u_limbA;
-uniform float u_limbB;
+uniform vec4 u_limbCoeffsR;  // Claret 4-param for red channel
+uniform vec4 u_limbCoeffsG;  // Claret 4-param for green channel
+uniform vec4 u_limbCoeffsB;  // Claret 4-param for blue channel
 uniform sampler2D u_granulationMap;
 uniform float u_granulationStrength;
 uniform float u_time;
@@ -68,7 +69,7 @@ vec3 rotateY(vec3 v, float a) {
 
 float sampleGranulation(vec3 n, float scale, vec2 drift) {
     vec3 an = abs(n);
-    vec3 w = pow(an, vec3(5.0));
+    vec3 w = pow(an, vec3(3.0));  // softened tri-planar blending (was 5.0)
     float sum = w.x + w.y + w.z + 1e-6;
     w /= sum;
 
@@ -82,41 +83,108 @@ float sampleGranulation(vec3 n, float scale, vec2 drift) {
     return sx * w.x + sy * w.y + sz * w.z;
 }
 
+// Claret 4-parameter non-linear limb darkening per channel
+// I_λ(μ)/I_λ(1) = 1 − c1*(1−μ^0.5) − c2*(1−μ) − c3*(1−μ^1.5) − c4*(1−μ²)
+vec3 claretLimbDarkening(float mu, vec4 cR, vec4 cG, vec4 cB) {
+    float sqrtMu = sqrt(mu);
+    float mu15 = mu * sqrtMu;  // μ^1.5
+    float mu2 = mu * mu;
+
+    float t1 = 1.0 - sqrtMu;   // (1 − μ^0.5)
+    float t2 = 1.0 - mu;       // (1 − μ)
+    float t3 = 1.0 - mu15;     // (1 − μ^1.5)
+    float t4 = 1.0 - mu2;      // (1 − μ²)
+
+    float lr = 1.0 - cR.x*t1 - cR.y*t2 - cR.z*t3 - cR.w*t4;
+    float lg = 1.0 - cG.x*t1 - cG.y*t2 - cG.z*t3 - cG.w*t4;
+    float lb = 1.0 - cB.x*t1 - cB.y*t2 - cB.z*t3 - cB.w*t4;
+
+    return max(vec3(lr, lg, lb), vec3(0.0));
+}
+
 void main() {
     float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
-    float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
+    vec3 limb = claretLimbDarkening(mu, u_limbCoeffsR, u_limbCoeffsG, u_limbCoeffsB);
     vec3 objN = normalize(vObjNormal);
     vec2 drift = vec2(u_time * 0.0016, u_time * 0.0011);
     float granTex = sampleGranulation(objN, 5.8, drift);
-    float granulation = mix(1.0, 0.84 + 0.34 * granTex, u_granulationStrength);
 
-    // D6: Seeded starspots (Ultra) with slow drift
+    // Physical granulation: centers = 1.0, intergranular lanes = 0.88
+    // ~12% RMS contrast (Nordlund et al. 2009, Stein & Nordlund 1998)
+    float granBase = 0.88 + 0.12 * granTex;
+    // Center-to-limb variation: contrast drops toward the limb
+    float granCLV = mix(1.0, granBase, u_granulationStrength * mu);
+    // Facular brightening near the limb — intergranular lanes become
+    // brighter than the photosphere when viewed obliquely (hot-wall effect,
+    // Spruit 1976, Keller et al. 2004)
+    float faculae = (1.0 - granTex) * max(0.0, 1.0 - mu * 2.5) * 0.06;
+    float granulation = granCLV + faculae;
+
+    // Starspots with umbra/penumbra structure, Joy's Law latitude,
+    // penumbral filaments, and soft boundaries (Solanki 2003, Rempel & Schlichenmaier 2011)
     float spotCoverage = clamp(u_spotFraction / 0.3, 0.0, 1.0) * u_spotEnabled;
     float spotCount = floor(clamp(u_spotFraction * 80.0, 0.0, 24.0) + 0.5);
     float spotDarkening = 0.0;
+
+    // Joy's Law: peak latitude depends on activity level
+    float peakLat = mix(0.26, 0.52, clamp(u_spotFraction / 0.3, 0.0, 1.0)); // 15°–30°
+    float latSpread = 0.17; // ~10° spread
+
     for (int i = 0; i < 24; i++) {
         float fi = float(i);
         if (fi >= spotCount) {
-            continue;
+            break;
         }
 
-        vec3 center = randomOnSphere(fi + 1.0, u_spotSeed);
-
-        // Keep most spots away from poles for a more solar-like pattern
-        center.y *= 0.75;
-        center = normalize(center);
+        // Joy's Law latitude distribution — spots concentrate in activity belts
+        float rawLat = hash11(fi * 17.13 + u_spotSeed * 3.7);
+        float lat = peakLat + latSpread * (rawLat * 2.0 - 1.0);
+        float hemisphere = hash11(fi * 41.7 + u_spotSeed * 2.3) > 0.5 ? 1.0 : -1.0;
+        float lon = hash11(fi * 29.73 + u_spotSeed * 5.1) * 6.28318530718;
+        float cosLat = cos(lat);
+        vec3 center = normalize(vec3(
+            cosLat * cos(lon),
+            sin(lat) * hemisphere,
+            cosLat * sin(lon)
+        ));
 
         // Slow longitudinal drift (seeded)
         float driftAngle = 0.07 * sin(u_time * 0.00001 + fi * 1.7 + u_spotSeed * 0.01);
         center = normalize(rotateY(center, driftAngle));
 
-        float radius = mix(0.035, 0.095, hash11(fi * 11.3 + u_spotSeed * 0.7));
+        float spotRadius = mix(0.035, 0.095, hash11(fi * 11.3 + u_spotSeed * 0.7));
         float d = dot(objN, center);
-        float core = smoothstep(cos(radius), cos(radius * 0.55), d);
+        float angDist = acos(clamp(d, -1.0, 1.0));
 
-        // Darkness corresponds to cooler spot regions (ΔT-like visual approximation)
-        float darkness = mix(0.18, 0.38, hash11(fi * 23.7 + u_spotSeed * 1.9));
-        spotDarkening = max(spotDarkening, core * darkness);
+        // Umbra/penumbra structure (Solanki 2003: umbra ≈ 0.4 of total spot radius)
+        float umbraEdge = spotRadius * 0.4;
+        float penumbraEdge = spotRadius;
+
+        // Umbra: dark core with soft edge
+        float umbraFactor = 1.0 - smoothstep(umbraEdge * 0.7, umbraEdge, angDist);
+        // Penumbra: lighter ring around umbra, soft outer boundary
+        float penumbraFactor = (1.0 - smoothstep(penumbraEdge * 0.8, penumbraEdge, angDist))
+                             * (1.0 - umbraFactor);
+
+        // Penumbral filaments — radial spoke pattern
+        // Compute tangent basis for spoke angle around spot center
+        vec3 toPixel = normalize(objN - center * d);
+        vec3 tangent1 = normalize(cross(center, vec3(0.0, 1.0, 0.01)));
+        vec3 tangent2 = cross(center, tangent1);
+        float spokeAngle = atan(dot(toPixel, tangent1), dot(toPixel, tangent2));
+        float filament = 0.5 + 0.5 * sin(spokeAngle * 12.0 + hash11(fi * 7.3 + u_spotSeed) * 6.28);
+        penumbraFactor *= mix(0.7, 1.0, filament);
+
+        // Soft outer boundary — pow falloff for diffuse dissolution into photosphere
+        float outerFade = 1.0 - smoothstep(penumbraEdge * 0.6, penumbraEdge * 1.1, angDist);
+        outerFade = pow(outerFade, 0.6);
+
+        // Per-zone darkening (umbra: ΔT ≈ 1200–1800K, penumbra: ΔT ≈ 400–700K)
+        float umbraDarkness = mix(0.55, 0.65, hash11(fi * 23.7 + u_spotSeed * 1.9));
+        float penumbraDarkness = mix(0.15, 0.25, hash11(fi * 31.1 + u_spotSeed * 1.3));
+        float spotDark = (umbraFactor * umbraDarkness + penumbraFactor * penumbraDarkness) * outerFade;
+
+        spotDarkening = max(spotDarkening, spotDark);
     }
 
     vec3 finalColor = u_color * limb * granulation;
@@ -185,7 +253,7 @@ interface BodyData {
     metallicity?: number;
     age?: number;
     spectralType?: string;
-    limbDarkeningCoeffs?: [number, number];
+    limbDarkeningCoeffs?: number[];
     flareRate?: number;
     spotFraction?: number;
     composition?: string;
@@ -221,21 +289,16 @@ function scaleRadius(realRadius: number): number {
     return realRadius;
 }
 
-function mulberry32(seed: number): () => number {
-    let t = seed >>> 0;
+function splitmix32(seed: number): () => number {
+    let state = seed | 0;
     return () => {
-        t += 0x6D2B79F5;
-        let r = Math.imul(t ^ (t >>> 15), t | 1);
-        r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
-        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+        state = (state + 0x9e3779b9) | 0;
+        let z = state;
+        z = Math.imul(z ^ (z >>> 16), 0x85ebca6b);
+        z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35);
+        z = (z ^ (z >>> 16)) >>> 0;
+        return z / 0x100000000;
     };
-}
-
-function hash01(ix: number, iy: number, seed: number): number {
-    let h = (ix * 374761393) ^ (iy * 668265263) ^ (seed * 1442695041);
-    h = (h ^ (h >>> 13)) * 1274126177;
-    h = h ^ (h >>> 16);
-    return (h >>> 0) / 4294967296;
 }
 
 function convectiveField(u: number, v: number, density: number, seed: number): number {
@@ -252,8 +315,8 @@ function convectiveField(u: number, v: number, density: number, seed: number): n
             const cellX = cx + ox;
             const cellY = cy + oy;
 
-            const jitterX = (hash01(cellX, cellY, seed) - 0.5) * 0.75;
-            const jitterY = (hash01(cellX, cellY, seed + 97) - 0.5) * 0.75;
+            const jitterX = (hashUnit(seed, cellX * 65537 + cellY, 0) - 0.5) * 0.75;
+            const jitterY = (hashUnit(seed + 97, cellX * 65537 + cellY, 1) - 0.5) * 0.75;
 
             const px = cellX + 0.5 + jitterX;
             const py = cellY + 0.5 + jitterY;
@@ -291,10 +354,10 @@ function valueNoise2D(u: number, v: number, frequency: number, seed: number): nu
     const sx = fx * fx * (3 - 2 * fx);
     const sy = fy * fy * (3 - 2 * fy);
 
-    const n00 = hash01(x0, y0, seed);
-    const n10 = hash01(x1, y0, seed);
-    const n01 = hash01(x0, y1, seed);
-    const n11 = hash01(x1, y1, seed);
+    const n00 = hashUnit(seed, x0 * 65537 + y0, 0);
+    const n10 = hashUnit(seed, x1 * 65537 + y0, 0);
+    const n01 = hashUnit(seed, x0 * 65537 + y1, 0);
+    const n11 = hashUnit(seed, x1 * 65537 + y1, 0);
 
     const nx0 = n00 * (1 - sx) + n10 * sx;
     const nx1 = n01 * (1 - sx) + n11 * sx;
@@ -309,7 +372,7 @@ function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture
     const image = ctx.createImageData(size, size);
     const data = image.data;
 
-    const random = mulberry32(seed);
+    const random = splitmix32(seed);
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
             const i = (y * size + x) * 4;
@@ -1691,7 +1754,17 @@ class BodyMesh {
         if (body.type === 'star') {
             const teff = body.effectiveTemperature ?? 5778;
             const [r, g, b] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
-            const [limbA, limbB] = body.limbDarkeningCoeffs ?? [0.6, 0.0];
+            // Parse 12-element Claret 4-param limb darkening coefficients [R_c1..c4, G_c1..c4, B_c1..c4]
+            const ldc = body.limbDarkeningCoeffs ?? [];
+            const limbR = ldc.length >= 12
+                ? new THREE.Vector4(ldc[0], ldc[1], ldc[2], ldc[3])
+                : new THREE.Vector4(0.38, 0.18, 0.02, 0.0);   // Solar defaults
+            const limbG = ldc.length >= 12
+                ? new THREE.Vector4(ldc[4], ldc[5], ldc[6], ldc[7])
+                : new THREE.Vector4(0.50, 0.08, 0.15, -0.02);
+            const limbB = ldc.length >= 12
+                ? new THREE.Vector4(ldc[8], ldc[9], ldc[10], ldc[11])
+                : new THREE.Vector4(0.64, -0.08, 0.30, -0.08);
             const seed = (body.seed ?? body.id) | 0;
             this.granulationTexture = createGranulationTexture(seed === 0 ? 1 : seed);
             const spotFraction = Math.max(0, Math.min(0.3, body.spotFraction ?? 0));
@@ -1701,8 +1774,9 @@ class BodyMesh {
                 fragmentShader: STAR_FRAGMENT,
                 uniforms: {
                     u_color: { value: new THREE.Vector3(r, g, b) },
-                    u_limbA: { value: limbA },
-                    u_limbB: { value: limbB },
+                    u_limbCoeffsR: { value: limbR },
+                    u_limbCoeffsG: { value: limbG },
+                    u_limbCoeffsB: { value: limbB },
                     u_granulationMap: { value: this.granulationTexture },
                     u_granulationStrength: { value: starOptions.granulationEnabled ? 1.0 : 0.0 },
                     u_time: { value: 0.0 },

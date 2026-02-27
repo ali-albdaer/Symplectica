@@ -12,6 +12,9 @@
       "flareQuality": "Low",
       "lodBias": 0.5,
       "maxShaderSamples": 16,
+      "bloomStrength": 0.3,
+      "bloomRadius": 0.25,
+      "bloomThreshold": 1.0,
       "performanceBudgetMs": 8
     },
     "High": {
@@ -25,6 +28,9 @@
       "flareQuality": "High",
       "lodBias": 0.0,
       "maxShaderSamples": 48,
+      "bloomStrength": 0.7,
+      "bloomRadius": 0.4,
+      "bloomThreshold": 0.85,
       "performanceBudgetMs": 12
     },
     "Ultra": {
@@ -38,6 +44,9 @@
       "flareQuality": "Ultra",
       "lodBias": -0.5,
       "maxShaderSamples": 96,
+      "bloomStrength": 1.0,
+      "bloomRadius": 0.5,
+      "bloomThreshold": 0.7,
       "performanceBudgetMs": 16
     }
   }

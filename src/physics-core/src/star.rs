@@ -60,8 +60,8 @@ pub fn derive_star_properties(body: &mut Body) {
         body.spectral_type = spectral_type_from_teff(body.effective_temperature);
     }
 
-    // ── Limb-darkening coefficients (quadratic law) ──
-    if body.limb_darkening_coeffs == [0.0, 0.0] && body.effective_temperature > 0.0 {
+    // ── Limb-darkening coefficients (Claret 4-param non-linear, per-channel) ──
+    if body.limb_darkening_coeffs == [0.0; 12] && body.effective_temperature > 0.0 {
         body.limb_darkening_coeffs = limb_darkening_from_teff(body.effective_temperature);
     }
 
@@ -155,41 +155,106 @@ fn spectral_type_from_teff(t_eff: f64) -> String {
 
 // ─── Limb-darkening coefficients ────────────────────────────────
 
-/// Approximate quadratic limb-darkening coefficients [a, b] from T_eff.
-/// Uses a simple interpolation across 6 control points spanning OBAFGKM.
-/// More accurate tables exist (Claret 2000) but this is sufficient for
-/// visual rendering.
+/// Claret 4-parameter non-linear limb-darkening coefficients per channel (RGB).
+/// Returns `[R_c1..R_c4, G_c1..G_c4, B_c1..B_c4]` (12 values).
 ///
-/// Quadratic law: I(μ)/I(1) = 1 − a(1−μ) − b(1−μ)²
-fn limb_darkening_from_teff(t_eff: f64) -> [f64; 2] {
-    // Control points: (T_eff, a, b)
-    // Derived from Claret (2000) V-band bolometric approximations.
-    const TABLE: &[(f64, f64, f64)] = &[
-        (3000.0, 0.85, -0.15),  // Cool M
-        (4000.0, 0.70, 0.00),   // Late K
-        (5000.0, 0.55, 0.15),   // Early K
-        (5800.0, 0.45, 0.25),   // G (Sun-like)
-        (7500.0, 0.35, 0.20),   // A
-        (10000.0, 0.25, 0.10),  // B
-        (30000.0, 0.15, 0.05),  // O
+/// Law per channel:
+///   I_λ(μ)/I_λ(1) = 1 − c1*(1−μ^0.5) − c2*(1−μ) − c3*(1−μ^1.5) − c4*(1−μ²)
+///
+/// Interpolation control points derived from Claret & Bloemen (2011, A&A 529, A75)
+/// bolometric/broadband passband tables, mapped to approximate R, G, B channels
+/// (Cousins R ≈ red, Johnson V ≈ green, Johnson B ≈ blue).
+fn limb_darkening_from_teff(t_eff: f64) -> [f64; 12] {
+    // Each row: (T_eff, [c1,c2,c3,c4]_R, [c1,c2,c3,c4]_G, [c1,c2,c3,c4]_B)
+    // 12 control points spanning M through O spectral types.
+    const TABLE: &[(f64, [f64; 4], [f64; 4], [f64; 4])] = &[
+        // Cool M dwarfs — heavy limb darkening, strongly chromatic
+        (2800.0,
+            [0.85, -0.50,  0.72, -0.28],   // R
+            [1.10, -0.75,  0.90, -0.35],   // G
+            [1.40, -1.10,  1.20, -0.50]),   // B
+        (3500.0,
+            [0.70, -0.30,  0.50, -0.18],
+            [0.90, -0.50,  0.65, -0.22],
+            [1.15, -0.80,  0.90, -0.35]),
+        // Late K
+        (4000.0,
+            [0.58, -0.15,  0.35, -0.10],
+            [0.75, -0.30,  0.48, -0.15],
+            [0.95, -0.55,  0.68, -0.25]),
+        // Early K
+        (4500.0,
+            [0.50, -0.05,  0.25, -0.05],
+            [0.65, -0.18,  0.38, -0.10],
+            [0.82, -0.38,  0.52, -0.18]),
+        // Late G
+        (5200.0,
+            [0.42,  0.10,  0.12, -0.02],
+            [0.55, -0.02,  0.25, -0.05],
+            [0.70, -0.20,  0.40, -0.12]),
+        // Solar (G2V) — reference point
+        (5778.0,
+            [0.38,  0.18,  0.02,  0.00],
+            [0.50,  0.08,  0.15, -0.02],
+            [0.64, -0.08,  0.30, -0.08]),
+        // Late F
+        (6200.0,
+            [0.34,  0.22, -0.05,  0.02],
+            [0.45,  0.14,  0.08,  0.00],
+            [0.58,  0.00,  0.22, -0.05]),
+        // A
+        (7500.0,
+            [0.28,  0.30, -0.15,  0.05],
+            [0.35,  0.22, -0.05,  0.02],
+            [0.45,  0.10,  0.08, -0.02]),
+        // Late B
+        (10000.0,
+            [0.22,  0.32, -0.18,  0.06],
+            [0.28,  0.28, -0.12,  0.04],
+            [0.35,  0.20, -0.02,  0.00]),
+        // Mid B
+        (15000.0,
+            [0.18,  0.30, -0.16,  0.05],
+            [0.22,  0.28, -0.12,  0.04],
+            [0.28,  0.22, -0.06,  0.02]),
+        // Early B
+        (25000.0,
+            [0.14,  0.25, -0.12,  0.04],
+            [0.18,  0.22, -0.08,  0.03],
+            [0.22,  0.18, -0.04,  0.01]),
+        // O
+        (40000.0,
+            [0.10,  0.20, -0.08,  0.02],
+            [0.14,  0.18, -0.06,  0.02],
+            [0.18,  0.15, -0.02,  0.00]),
     ];
 
     // Clamp to table range
     let t = t_eff.clamp(TABLE[0].0, TABLE[TABLE.len() - 1].0);
 
-    // Find bracketing interval
+    // Find bracketing interval and linearly interpolate
     for i in 0..TABLE.len() - 1 {
         if t <= TABLE[i + 1].0 {
             let frac = (t - TABLE[i].0) / (TABLE[i + 1].0 - TABLE[i].0);
-            let a = TABLE[i].1 + frac * (TABLE[i + 1].1 - TABLE[i].1);
-            let b = TABLE[i].2 + frac * (TABLE[i + 1].2 - TABLE[i].2);
-            return [a, b];
+            let mut result = [0.0f64; 12];
+            for k in 0..4 {
+                result[k]     = TABLE[i].1[k] + frac * (TABLE[i + 1].1[k] - TABLE[i].1[k]); // R
+                result[4 + k] = TABLE[i].2[k] + frac * (TABLE[i + 1].2[k] - TABLE[i].2[k]); // G
+                result[8 + k] = TABLE[i].3[k] + frac * (TABLE[i + 1].3[k] - TABLE[i].3[k]); // B
+            }
+            return result;
         }
     }
 
     // Fallback (should not reach here)
-    let last = TABLE[TABLE.len() - 1];
-    [last.1, last.2]
+    let last = &TABLE[TABLE.len() - 1];
+    let mut result = [0.0f64; 12];
+    for k in 0..4 {
+        result[k]     = last.1[k];
+        result[4 + k] = last.2[k];
+        result[8 + k] = last.3[k];
+    }
+    result
 }
 
 #[cfg(test)]
@@ -244,9 +309,15 @@ mod tests {
             L_SUN
         );
 
-        // Limb darkening coefficients should be reasonable
-        assert!(sun.limb_darkening_coeffs[0] > 0.0, "LD coeff a should be > 0");
-        assert!(sun.limb_darkening_coeffs[1] > 0.0, "LD coeff b should be > 0");
+        // Limb darkening coefficients should be reasonable (12 values: 4 per RGB channel)
+        // R channel c1 should be positive (primary limb darkening term)
+        assert!(sun.limb_darkening_coeffs[0] > 0.0, "LD R_c1 should be > 0, got {}", sun.limb_darkening_coeffs[0]);
+        // G channel c1 should be > R (green darkens more than red)
+        assert!(sun.limb_darkening_coeffs[4] > sun.limb_darkening_coeffs[0],
+            "LD G_c1 ({}) should be > R_c1 ({})", sun.limb_darkening_coeffs[4], sun.limb_darkening_coeffs[0]);
+        // B channel c1 should be > G (blue darkens most)
+        assert!(sun.limb_darkening_coeffs[8] > sun.limb_darkening_coeffs[4],
+            "LD B_c1 ({}) should be > G_c1 ({})", sun.limb_darkening_coeffs[8], sun.limb_darkening_coeffs[4]);
 
         // Lifetime should be ~10 Gyr
         let lifetime_gyr = sun.stellar_lifetime / (1.0e9 * SECONDS_PER_YEAR);
@@ -282,7 +353,8 @@ mod tests {
         derive_star_properties(&mut star);
 
         assert_eq!(star.spectral_type, "G");
-        assert!(star.limb_darkening_coeffs[0] > 0.3);
+        // R channel c1 for a G-type star should be significant
+        assert!(star.limb_darkening_coeffs[0] > 0.3, "Alpha Cen A LD R_c1 = {}", star.limb_darkening_coeffs[0]);
     }
 
     #[test]
@@ -299,9 +371,29 @@ mod tests {
     #[test]
     fn test_limb_darkening_sun() {
         let ld = limb_darkening_from_teff(5778.0);
-        // Sun-like: a ≈ 0.45, b ≈ 0.25
-        assert!((ld[0] - 0.45).abs() < 0.1, "Sun LD a = {}", ld[0]);
-        assert!((ld[1] - 0.25).abs() < 0.1, "Sun LD b = {}", ld[1]);
+        // Solar (G2V): R_c1 ≈ 0.38, G_c1 ≈ 0.50, B_c1 ≈ 0.64
+        assert!((ld[0] - 0.38).abs() < 0.1, "Sun LD R_c1 = {}", ld[0]);
+        assert!((ld[4] - 0.50).abs() < 0.1, "Sun LD G_c1 = {}", ld[4]);
+        assert!((ld[8] - 0.64).abs() < 0.1, "Sun LD B_c1 = {}", ld[8]);
+        // Chromatic ordering: B_c1 > G_c1 > R_c1
+        assert!(ld[8] > ld[4] && ld[4] > ld[0], "Expected B > G > R limb darkening");
+    }
+
+    #[test]
+    fn test_limb_darkening_chromatic_cool() {
+        // Cool M star should have very strong chromatic separation
+        let ld = limb_darkening_from_teff(3000.0);
+        let diff_br = ld[8] - ld[0]; // B_c1 - R_c1
+        assert!(diff_br > 0.3, "Cool star B-R chromatic difference = {}", diff_br);
+    }
+
+    #[test]
+    fn test_limb_darkening_hot_star() {
+        // Hot O star should have weak, nearly achromatic limb darkening
+        let ld = limb_darkening_from_teff(35000.0);
+        assert!(ld[0] < 0.2, "O star R_c1 = {} (should be small)", ld[0]);
+        let diff_br = ld[8] - ld[0];
+        assert!(diff_br < 0.15, "Hot star B-R chromatic difference = {} (should be small)", diff_br);
     }
 
     #[test]

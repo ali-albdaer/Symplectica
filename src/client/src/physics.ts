@@ -87,7 +87,7 @@ export interface BodyInfo {
     metallicity: number;
     age: number;
     spectralType: string;
-    limbDarkeningCoeffs: [number, number];
+    limbDarkeningCoeffs: number[];
     flareRate: number;
     spotFraction: number;
     composition: string;
@@ -319,7 +319,7 @@ export class PhysicsClient {
                 metallicity?: number;
                 age?: number;
                 spectral_type?: string;
-                limb_darkening_coeffs?: [number, number];
+                limb_darkening_coeffs?: number[];
                 flare_rate?: number;
                 spot_fraction?: number;
                 composition?: string;
@@ -356,7 +356,7 @@ export class PhysicsClient {
                 metallicity: b.metallicity ?? 0,
                 age: b.age ?? 0,
                 spectralType: b.spectral_type ?? '',
-                limbDarkeningCoeffs: b.limb_darkening_coeffs ?? [0, 0],
+                limbDarkeningCoeffs: b.limb_darkening_coeffs ?? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 flareRate: b.flare_rate ?? 0,
                 spotFraction: b.spot_fraction ?? 0,
                 composition: b.composition ?? 'Rocky',

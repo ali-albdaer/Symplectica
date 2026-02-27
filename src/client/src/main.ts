@@ -9,6 +9,10 @@
  */
 
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
 import { AdminStatePayload, NetworkClient } from './network';
@@ -54,6 +58,8 @@ interface NetworkStatePayload {
 class NBodyClient {
     private scene!: THREE.Scene;
     private renderer!: THREE.WebGLRenderer;
+    private composer!: EffectComposer;
+    private bloomPass!: UnrealBloomPass;
     private camera!: OrbitCamera;
     private bodyRenderer!: BodyRenderer;
     private network!: NetworkClient;
@@ -439,6 +445,18 @@ class NBodyClient {
             starspotsEnabled: starParams.flareQuality === 'Ultra',
             flareQuality: starParams.flareQuality ?? 'Off',
         });
+
+        // Apply bloom parameters from postProcessRenderer preset
+        const ppParams = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'postProcessRenderer') as {
+            bloomStrength?: number;
+            bloomRadius?: number;
+            bloomThreshold?: number;
+        };
+        if (this.bloomPass) {
+            this.bloomPass.strength = ppParams.bloomStrength ?? 0.7;
+            this.bloomPass.radius = ppParams.bloomRadius ?? 0.4;
+            this.bloomPass.threshold = ppParams.bloomThreshold ?? 0.85;
+        }
     }
 
     private ensureLocalPreset(preset: VisualizationPresetName): void {
@@ -518,6 +536,32 @@ class NBodyClient {
         // Add ambient light (space is dark but we need some fill)
         const ambient = new THREE.AmbientLight(0x111122, 0.3);
         this.scene.add(ambient);
+
+        // ── HDR post-processing pipeline ──
+        // EffectComposer with RGBA16F render target for HDR bloom
+        const renderTarget = new THREE.WebGLRenderTarget(
+            window.innerWidth,
+            window.innerHeight,
+            {
+                type: THREE.HalfFloatType,
+                format: THREE.RGBAFormat,
+                colorSpace: THREE.LinearSRGBColorSpace,
+            }
+        );
+        this.composer = new EffectComposer(this.renderer, renderTarget);
+        this.composer.addPass(new RenderPass(this.scene, this.camera));
+
+        // Bloom pass — params will be overridden by preset in applyPresetToRenderer
+        this.bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.7,   // strength (default High preset)
+            0.4,   // radius
+            0.85,  // threshold
+        );
+        this.composer.addPass(this.bloomPass);
+
+        // Output pass — applies tone mapping + sRGB encoding
+        this.composer.addPass(new OutputPass());
 
         // Handle resize
         window.addEventListener('resize', () => this.onResize());
@@ -1191,6 +1235,7 @@ class NBodyClient {
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(width, height);
+        this.composer.setSize(width, height);
     }
 
     private start(): void {
@@ -1341,7 +1386,7 @@ class NBodyClient {
 
         // --- Render timing ---
         const renderStart = performance.now();
-        this.renderer.render(this.scene, this.camera);
+        this.composer.render();
         const renderEnd = performance.now();
         this.frameTiming.render = renderEnd - renderStart;
 

@@ -16,6 +16,9 @@ export interface VisualPresetParams {
     flareQuality: FlareQuality;
     lodBias: number;
     maxShaderSamples: number;
+    bloomStrength: number;
+    bloomRadius: number;
+    bloomThreshold: number;
     performanceBudgetMs: number;
 }
 

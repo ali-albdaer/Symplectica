@@ -259,10 +259,11 @@ pub struct Body {
     #[serde(default)]
     pub mass_loss_rate: f64,
 
-    /// Quadratic limb-darkening coefficients [a, b]
-    /// I(μ)/I(1) = 1 − a(1−μ) − b(1−μ)²
+    /// Claret 4-parameter non-linear limb-darkening coefficients [c1..c4] × RGB.
+    /// Layout: [R_c1, R_c2, R_c3, R_c4, G_c1, G_c2, G_c3, G_c4, B_c1, B_c2, B_c3, B_c4]
+    /// I_λ(μ)/I_λ(1) = 1 − c1*(1−μ^0.5) − c2*(1−μ) − c3*(1−μ^1.5) − c4*(1−μ²)
     #[serde(default)]
-    pub limb_darkening_coeffs: [f64; 2],
+    pub limb_darkening_coeffs: [f64; 12],
 
     /// Flare rate in events/second (activity parameter)
     #[serde(default)]
@@ -379,7 +380,7 @@ impl Body {
             age: 0.0,
             spectral_type: String::new(),
             mass_loss_rate: 0.0,
-            limb_darkening_coeffs: [0.0, 0.0],
+            limb_darkening_coeffs: [0.0; 12],
             flare_rate: 0.0,
             spot_fraction: 0.0,
             stellar_lifetime: 0.0,
@@ -585,7 +586,7 @@ impl Default for Body {
             age: 0.0,
             spectral_type: String::new(),
             mass_loss_rate: 0.0,
-            limb_darkening_coeffs: [0.0, 0.0],
+            limb_darkening_coeffs: [0.0; 12],
             flare_rate: 0.0,
             spot_fraction: 0.0,
             stellar_lifetime: 0.0,

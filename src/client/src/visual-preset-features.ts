@@ -137,14 +137,17 @@ export function registerVisualPresetFeatures(): void {
     });
 
     VisualPresetRegistry.registerFeature('postProcessRenderer', {
-        Low: { maxShaderSamples: 16 },
-        High: { maxShaderSamples: 48 },
-        Ultra: { maxShaderSamples: 96 },
+        Low: { maxShaderSamples: 16, bloomStrength: 0.3, bloomRadius: 0.25, bloomThreshold: 1.0 },
+        High: { maxShaderSamples: 48, bloomStrength: 0.7, bloomRadius: 0.4, bloomThreshold: 0.85 },
+        Ultra: { maxShaderSamples: 96, bloomStrength: 1.0, bloomRadius: 0.5, bloomThreshold: 0.7 },
     });
 
     VisualPresetRegistry.registerFeatureHooks('postProcessRenderer', {
         defaultParams: {
             maxShaderSamples: 48,
+            bloomStrength: 0.7,
+            bloomRadius: 0.4,
+            bloomThreshold: 0.85,
         },
         applyPreset: (params, preset) => ({
             ...params,
@@ -152,6 +155,9 @@ export function registerVisualPresetFeatures(): void {
                 typeof params.maxShaderSamples === 'number' ? params.maxShaderSamples : preset.maxShaderSamples,
                 preset.maxShaderSamples
             ),
+            bloomStrength: typeof params.bloomStrength === 'number' ? params.bloomStrength : preset.bloomStrength,
+            bloomRadius: typeof params.bloomRadius === 'number' ? params.bloomRadius : preset.bloomRadius,
+            bloomThreshold: typeof params.bloomThreshold === 'number' ? params.bloomThreshold : preset.bloomThreshold,
         }),
         validatePresetMapping: (params) => {
             if (typeof params.maxShaderSamples === 'number' && params.maxShaderSamples <= 0) {
