@@ -236,8 +236,6 @@ class SimulationServer {
 
             this.physics = module as PhysicsModule;
             console.log('[OK] WASM physics loaded');
-            console.log(`   G = ${this.physics.getG()} m³/(kg·s²)`);
-            console.log(`   AU = ${this.physics.getAU()} m`);
         } catch (error) {
             console.error('[ERROR] Failed to load WASM:', error);
             throw error;
