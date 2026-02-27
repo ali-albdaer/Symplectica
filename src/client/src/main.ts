@@ -121,7 +121,7 @@ class NBodyClient {
     private readonly EMA_ALPHA = 0.05; // Smoothing factor (lower = smoother)
 
     // Body following
-    private followBodyIndex = -1; // -1 = follow origin, 0+ = body index
+    private followBodyIndex = 0; // -1 = follow origin, 0+ = body index (initialized in initPhysics)
     private lastFollowBodyIndex = -1;
 
     // Free camera mode
@@ -468,6 +468,8 @@ class NBodyClient {
         this.state.bodyCount = newBodyCount;
         this.updateUIBodyCount();
         this.timeController.resetAccumulator();
+        
+        this.initializeFollowTarget();
     }
 
     private applyServerState(state: NetworkStatePayload): void {
@@ -541,6 +543,8 @@ class NBodyClient {
         // Initialize body meshes
         this.refreshBodies();
 
+        // Set initial follow target (first body if available, else origin)
+        this.initializeFollowTarget();
     }
 
     private refreshBodies(): void {
@@ -599,7 +603,9 @@ class NBodyClient {
             }
 
             switch (e.key) {
-                // Space keybind removed (moved to Pause button in Admin Panel)
+                case '0':
+                    this.followOrigin();
+                    break;
                 case '1':
                     this.toggleSimulationSection('sim');
                     break;
@@ -936,13 +942,29 @@ class NBodyClient {
         this.network.sendTimeScale(simRate);
     }
 
+    private initializeFollowTarget(): void {
+        const bodyCount = this.physics.bodyCount();
+        // Default to first body if available, otherwise origin
+        if (bodyCount > 0 && this.followBodyIndex >= bodyCount) {
+            this.followBodyIndex = 0;
+        } else if (bodyCount === 0) {
+            this.followBodyIndex = -1; // Fallback to origin when no bodies
+        }
+        this.updateFollowUI();
+    }
+
+    private followOrigin(): void {
+        this.followBodyIndex = -1;
+        this.updateFollowUI();
+    }
+
     private followNextBody(): void {
         const bodyCount = this.physics.bodyCount();
         if (bodyCount === 0) return;
 
         this.followBodyIndex++;
         if (this.followBodyIndex >= bodyCount) {
-            this.followBodyIndex = -1; // Back to origin
+            this.followBodyIndex = 0; // Wrap to first body (skip origin)
         }
         this.updateFollowUI();
     }
@@ -952,8 +974,8 @@ class NBodyClient {
         if (bodyCount === 0) return;
 
         this.followBodyIndex--;
-        if (this.followBodyIndex < -1) {
-            this.followBodyIndex = bodyCount - 1; // Wrap to last body
+        if (this.followBodyIndex < 0) {
+            this.followBodyIndex = bodyCount - 1; // Wrap to last body (skip origin)
         }
         this.updateFollowUI();
     }
