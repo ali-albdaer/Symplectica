@@ -214,11 +214,7 @@ interface StarRenderOptions {
 // Body scaling for visualization
 // Real world: Sun radius = 6.96e8m, Earth = 6.37e6m, Moon = 1.74e6m
 // Moon-Earth distance = 3.84e8m, Earth-Sun distance = 1.496e11m (1 AU)
-// 
-// Standard approaches for large-scale visualization:
-// 1. Linear: preserves relative sizes exactly (used here)
-// 2. Logarithmic: compresses huge range, loses proportions
-// 3. Power-law: compromise between linear and log
+
 const AU = 1.495978707e11;
 
 function scaleRadius(realRadius: number): number {
