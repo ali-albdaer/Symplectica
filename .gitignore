@@ -12,3 +12,4 @@ src/physics-core/pkg/
 .env
 # Temporarily ignore .github
 .github/
+.vscode/
