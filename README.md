@@ -1,6 +1,6 @@
 # Symplectica
 
-**Symplectica** is a high-fidelity, multiplayer, N-body space simulator focused on scientific accuracy. Built with **Rust + WebAssembly**, **TypeScript**, **Three.js**, and **Node.js**.
+**Symplectica** is a high-fidelity, multiplayer, N-body space simulator focused on scientific accuracy. Built with **Rust + WebAssembly**, **TypeScript**, **Three.js**, and **Node.js**. Currently in early development phases.
 
 ## Key Features 
 - N-body gravity with `Pairwise`, `Barnes–Hut` and `FMM` solvers.
@@ -14,12 +14,31 @@
 
 See [FEATURES.md](FEATURES.md) for a comprehensive list of implemented, in progress, and planned features.
 
-## Status
-The project is in early research and development stages.
+## Installation & Setup
 
-## Build & Run
-- Install dependencies and build wasm: `npm install` in root.
-- Run dev server + client: `npm run dev` also in root.
+### Prerequisites
+- Node.js 18+
+- Rust 1.70+
+- wasm-pack
+
+### Development
+
+1. Clone and install:
+   ```bash
+   git clone <repo>
+   cd Symplectica
+   npm install  # Also builds wasm
+   ```
+
+2. Start development:
+   ```bash
+   npm run dev
+   ```
+
+3. Build for production:
+   ```bash
+   npm run build
+   ```
 
 ## Sources
 All sources I used while researching physics, numerical methods, and simulation design will be listed in [SOURCES.md](SOURCES.md).
