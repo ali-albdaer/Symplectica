@@ -25,7 +25,7 @@ See [FEATURES.md](FEATURES.md) for a comprehensive list of implemented, in progr
 
 1. Clone and install:
    ```bash
-   git clone <repo>
+   git clone https://github.com/ali-albdaer/Symplectica.git
    cd Symplectica
    npm install  # Also builds wasm
    ```
