@@ -44,4 +44,4 @@ See [FEATURES.md](FEATURES.md) for a comprehensive list of implemented, in progr
 All sources I used while researching physics, numerical methods, and simulation design will be listed in [SOURCES.md](SOURCES.md).
 
 ## License
-TBD
+Symplectica is licensed under the [MIT LICENSE](LICENSE).
