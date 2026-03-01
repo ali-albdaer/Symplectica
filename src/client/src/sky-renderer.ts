@@ -126,6 +126,7 @@ export class SkyRenderer {
             vertexColors: true,
             transparent: true,
             opacity,
+            toneMapped: false,  // Keep sky stars in LDR — prevent bloom pickup
         });
 
         this.starfield = new THREE.Points(geometry, material);

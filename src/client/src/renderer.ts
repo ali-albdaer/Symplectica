@@ -37,6 +37,7 @@ uniform vec3 u_color;   // blackbody RGB [0,1]
 uniform vec4 u_limbCoeffsR;  // Claret 4-param for red channel
 uniform vec4 u_limbCoeffsG;  // Claret 4-param for green channel
 uniform vec4 u_limbCoeffsB;  // Claret 4-param for blue channel
+uniform float u_emissiveIntensity; // HDR brightness scaling from luminosity
 uniform sampler2D u_granulationMap;
 uniform float u_granulationStrength;
 uniform float u_time;
@@ -190,7 +191,8 @@ void main() {
     vec3 finalColor = u_color * limb * granulation;
     finalColor *= (1.0 - spotCoverage * spotDarkening);
 
-    gl_FragColor = vec4(finalColor, 1.0);
+    // Scale into HDR range so bloom picks up star surfaces
+    gl_FragColor = vec4(finalColor * u_emissiveIntensity, 1.0);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -284,6 +286,7 @@ interface StarRenderOptions {
 // Moon-Earth distance = 3.84e8m, Earth-Sun distance = 1.496e11m (1 AU)
 
 const AU = 1.495978707e11;
+const L_SUN = 3.828e26; // Solar luminosity in Watts
 
 function scaleRadius(realRadius: number): number {
     return realRadius;
@@ -879,8 +882,8 @@ void main() {
             : this.flareQuality === 'High'
                 ? 1 / 150
                 : 1 / 95;
-        // TEMP TEST TUNING: 10x flare frequency for quick visual validation
-        return Math.min(0.8, (baseline + this.flareRate * 90.0) * 10.0);
+        // Effective flare rate from quality preset + body flare rate
+        return Math.min(0.8, baseline + this.flareRate * 90.0);
     }
 
     private spawnEvent(startTime: number): void {
@@ -1147,14 +1150,17 @@ export class BodyRenderer {
         mesh.setScale(radius);
 
         // F5: Physically-based point light for stars — tinted to blackbody, intensity from luminosity
+        // Phase 1.4: Recalibrated for HDR pipeline — use L/L_sun ratio, inverse-square decay
         if (body.type === 'star') {
             const teff = body.effectiveTemperature ?? 5778;
             const [lr, lg, lb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
             const lightColor = new THREE.Color(lr, lg, lb);
-            // Intensity proportional to luminosity (log scale, clamped)
-            const lum = body.luminosity ?? 1;
-            const intensity = Math.min(10, Math.max(0.5, 1.5 + Math.log10(Math.max(lum, 0.001))));
-            const light = new THREE.PointLight(lightColor, intensity, 0, 0);
+            // Intensity from luminosity ratio (log scale, HDR-safe)
+            const lum = body.luminosity ?? L_SUN;
+            const L_ratio = lum / L_SUN;
+            const intensity = Math.min(3.0, Math.max(0.3, 0.5 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
+            // distance = 10 AU max range, decay = 2 (physically correct inverse-square)
+            const light = new THREE.PointLight(lightColor, intensity, 10 * AU, 2);
             mesh.group.add(light);
         }
 
@@ -1658,7 +1664,7 @@ export class BodyRenderer {
 
         this.gridGroup = new THREE.Group();
         const material = new THREE.LineBasicMaterial({
-            color: 0xffffff,
+            color: 0x555555,
             transparent: true,
             opacity: 0.25,
         });
@@ -1769,6 +1775,12 @@ class BodyMesh {
             this.granulationTexture = createGranulationTexture(seed === 0 ? 1 : seed);
             const spotFraction = Math.max(0, Math.min(0.3, body.spotFraction ?? 0));
 
+            // Phase 1.2: Emissive intensity from luminosity — drives HDR bloom
+            // Sun-like star = 1.0, brighter stars bloom more
+            const luminosity = body.luminosity ?? L_SUN;
+            const L_ratio = luminosity / L_SUN;
+            const emissiveIntensity = 1.0 + Math.log10(Math.max(L_ratio, 0.01)) * 0.8;
+
             this.material = new THREE.ShaderMaterial({
                 vertexShader: STAR_VERTEX,
                 fragmentShader: STAR_FRAGMENT,
@@ -1777,6 +1789,7 @@ class BodyMesh {
                     u_limbCoeffsR: { value: limbR },
                     u_limbCoeffsG: { value: limbG },
                     u_limbCoeffsB: { value: limbB },
+                    u_emissiveIntensity: { value: emissiveIntensity },
                     u_granulationMap: { value: this.granulationTexture },
                     u_granulationStrength: { value: starOptions.granulationEnabled ? 1.0 : 0.0 },
                     u_time: { value: 0.0 },
@@ -1811,17 +1824,6 @@ class BodyMesh {
         if (this.flareSystem) {
             // Attach to the scaled star mesh so flare placement tracks stellar radius
             this.mesh.add(this.flareSystem.group);
-        }
-
-        // Add glow effect for stars — tinted to blackbody color (D3)
-        if (body.type === 'star') {
-            const teff = body.effectiveTemperature ?? 5778;
-            const [cr, cg, cb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
-            const bbHex = ((Math.round(cr * 255) & 0xff) << 16) |
-                          ((Math.round(cg * 255) & 0xff) << 8)  |
-                           (Math.round(cb * 255) & 0xff);
-            const luminosity = body.luminosity ?? 1;
-            this.addStarGlow(bbHex, luminosity);
         }
 
         // F3: Atmosphere shell for bodies with atmosphere data
@@ -1954,61 +1956,12 @@ class BodyMesh {
             }
         }
 
-        // Also scale glow sprites for stars
-        for (const child of this.group.children) {
-            if (child instanceof THREE.Sprite) {
-                child.scale.set(radius * 8, radius * 8, 1);
-            }
-        }
     }
 
     setSegments(segmentsWidth: number, segmentsHeight: number): void {
         this.geometry.dispose();
         this.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
         this.mesh.geometry = this.geometry;
-    }
-
-    private addStarGlow(color: number, luminosity: number): void {
-        // Glow intensity scales with luminosity (log, clamped)
-        const glowOpacity = Math.min(1.0, 0.3 + 0.15 * Math.log10(Math.max(luminosity, 0.01)));
-
-        const spriteMaterial = new THREE.SpriteMaterial({
-            map: this.createGlowTexture(),
-            color: color,
-            transparent: true,
-            opacity: glowOpacity,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-        });
-
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(1, 1, 1); // Will be scaled by setScale
-        this.group.add(sprite);
-    }
-
-    private createGlowTexture(): THREE.Texture {
-        const size = 256;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-
-        const ctx = canvas.getContext('2d')!;
-        const gradient = ctx.createRadialGradient(
-            size / 2, size / 2, 0,
-            size / 2, size / 2, size / 2
-        );
-
-        // Neutral white gradient — colour is applied via SpriteMaterial.color
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.15, 'rgba(255, 255, 255, 0.85)');
-        gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.3)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, size, size);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
     }
 
     dispose(): void {
