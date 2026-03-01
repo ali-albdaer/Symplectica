@@ -60,6 +60,7 @@ export class OptionsPanel {
         granulationEnabled: true,
         starspotsEnabled: false,
         flareQuality: 'Low',
+        glareEnabled: false,
     };
     private ignoreEvents = false;
 
@@ -799,6 +800,7 @@ export class OptionsPanel {
         this.granulationCheckbox.checked = this.starSurface.granulationEnabled;
         this.starspotsCheckbox.checked = this.starSurface.starspotsEnabled;
         this.flareQualitySelect.value = this.starSurface.flareQuality;
+        this.glareCheckbox.checked = this.starSurface.glareEnabled ?? false;
         this.ignoreEvents = false;
     }
 

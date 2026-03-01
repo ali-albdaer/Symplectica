@@ -187,7 +187,9 @@ void main() {
 
         // Penumbral filaments — radial spoke pattern
         // Compute tangent basis for spoke angle around spot center
-        vec3 toPixel = normalize(objN - center * d);
+        vec3 pixelOffset = objN - center * d;
+        float pLen = length(pixelOffset);
+        vec3 toPixel = pLen > 1e-6 ? pixelOffset / pLen : vec3(1.0, 0.0, 0.0);
         vec3 tangent1 = normalize(cross(center, vec3(0.0, 1.0, 0.01)));
         vec3 tangent2 = cross(center, tangent1);
         float spokeAngle = atan(dot(toPixel, tangent1), dot(toPixel, tangent2));
@@ -308,6 +310,7 @@ float phaseMie(float cosTheta, float g) {
 // occluded by the planet surface (the sample is in shadow).
 vec2 sunRayMarch(vec3 samplePos, vec3 sunDir) {
     vec2 tSunAtmo = raySphere(samplePos, sunDir, u_planetCenter, u_atmoRadius);
+    if (tSunAtmo.y <= 0.0) return vec2(-1.0);
     float sunStepLen = tSunAtmo.y / float(u_sunSteps);
     float optR = 0.0;
     float optM = 0.0;
@@ -410,7 +413,7 @@ void main() {
 
     // Transmittance for alpha blending (view-ray only, independent of stars)
     vec3 totalTau = u_betaR * opticalDepthR + u_betaM * opticalDepthM;
-    float transmittance = exp(-dot(totalTau, vec3(0.333)));
+    float transmittance = exp(-(totalTau.x + totalTau.y + totalTau.z) / 3.0);
     float alpha = 1.0 - transmittance;
 
     gl_FragColor = vec4(inScatter, clamp(alpha, 0.0, 1.0));
@@ -1238,6 +1241,11 @@ export class BodyRenderer {
     // Shared blackbody LUT texture for all star shaders
     private readonly blackbodyLUT: THREE.DataTexture;
 
+    // Cached scratch vectors for per-frame atmosphere updates (avoids GC pressure)
+    private readonly _scratchPos = new THREE.Vector3();
+    private readonly _scratchBodyPos = new THREE.Vector3();
+    private readonly _scratchColor = new THREE.Vector3();
+
     // Grid
     private gridGroup: THREE.Group | null = null;
     private gridSpacing = AU;
@@ -1769,14 +1777,15 @@ export class BodyRenderer {
         const stars: { pos: THREE.Vector3; color: THREE.Vector3; luminosity: number }[] = [];
         for (const mesh of this.bodies.values()) {
             if (mesh.type === 'star') {
-                const pos = new THREE.Vector3();
-                mesh.group.getWorldPosition(pos);
+                this._scratchPos.set(0, 0, 0);
+                mesh.group.getWorldPosition(this._scratchPos);
                 // Extract star color from point light if available
                 const light = mesh.group.children.find(c => c instanceof THREE.PointLight) as THREE.PointLight | undefined;
                 const color = light
-                    ? new THREE.Vector3(light.color.r, light.color.g, light.color.b).multiplyScalar(light.intensity)
-                    : new THREE.Vector3(1, 1, 1);
-                stars.push({ pos, color, luminosity: light?.intensity ?? 1 });
+                    ? this._scratchColor.set(light.color.r, light.color.g, light.color.b).multiplyScalar(light.intensity)
+                    : this._scratchColor.set(1, 1, 1);
+                // Clone into the array since we need stable references
+                stars.push({ pos: this._scratchPos.clone(), color: color.clone(), luminosity: light?.intensity ?? 1 });
             }
         }
 
@@ -1785,12 +1794,13 @@ export class BodyRenderer {
         // For each body with an atmosphere, find the nearest 2 stars and update
         for (const mesh of this.bodies.values()) {
             if (mesh.type === 'star') continue;
-            const bodyPos = new THREE.Vector3();
-            mesh.group.getWorldPosition(bodyPos);
+            if (!mesh.atmosphereMesh) continue;
+            this._scratchBodyPos.set(0, 0, 0);
+            mesh.group.getWorldPosition(this._scratchBodyPos);
 
             // Sort by distance and take up to 2 nearest stars
             const sorted = stars
-                .map(s => ({ ...s, dist: bodyPos.distanceToSquared(s.pos) }))
+                .map(s => ({ ...s, dist: this._scratchBodyPos.distanceToSquared(s.pos) }))
                 .sort((a, b) => a.dist - b.dist)
                 .slice(0, 2);
 
@@ -1970,7 +1980,7 @@ class BodyMesh {
     private mesh: THREE.Mesh;
     private geometry: THREE.SphereGeometry;
     private material: THREE.Material;
-    private atmosphereMesh: THREE.Mesh | null = null;
+    atmosphereMesh: THREE.Mesh | null = null;
     private starMaterial: THREE.ShaderMaterial | null = null;
     private granulationTexture: THREE.Texture | null = null;
     private flareSystem: StarFlareSystem | null = null;
@@ -1983,6 +1993,11 @@ class BodyMesh {
     // Body rotation
     private rotationRate = 0;
     private spinAxis: THREE.Vector3 | null = null;
+
+    // Pre-allocated scratch objects for per-frame methods
+    private readonly _cachedQuat = new THREE.Quaternion();
+    private readonly _cachedPlanetCenter = new THREE.Vector3();
+    private readonly _cachedDir = new THREE.Vector3();
 
     constructor(
         body: BodyData,
@@ -2160,19 +2175,19 @@ class BodyMesh {
         if (!mat.uniforms.u_sunDirection) return;
 
         // Planet center in world space = group position
-        const planetCenter = new THREE.Vector3();
-        this.group.getWorldPosition(planetCenter);
-        mat.uniforms.u_planetCenter.value.copy(planetCenter);
+        this._cachedPlanetCenter.set(0, 0, 0);
+        this.group.getWorldPosition(this._cachedPlanetCenter);
+        mat.uniforms.u_planetCenter.value.copy(this._cachedPlanetCenter);
 
         // Star 1: direction FROM planet TO star
-        const dir1 = stars[0].pos.clone().sub(planetCenter).normalize();
-        mat.uniforms.u_sunDirection.value.copy(dir1);
+        this._cachedDir.copy(stars[0].pos).sub(this._cachedPlanetCenter).normalize();
+        mat.uniforms.u_sunDirection.value.copy(this._cachedDir);
         mat.uniforms.u_sunColor.value.copy(stars[0].color);
 
         // Star 2 (if present)
         if (stars.length > 1) {
-            const dir2 = stars[1].pos.clone().sub(planetCenter).normalize();
-            mat.uniforms.u_sunDirection2.value.copy(dir2);
+            this._cachedDir.copy(stars[1].pos).sub(this._cachedPlanetCenter).normalize();
+            mat.uniforms.u_sunDirection2.value.copy(this._cachedDir);
             mat.uniforms.u_sunColor2.value.copy(stars[1].color);
             mat.uniforms.u_starCount.value = 2;
         } else {
@@ -2232,8 +2247,8 @@ class BodyMesh {
 
         if (!this.spinAxis || this.rotationRate === 0) return;
         const angle = this.rotationRate * simTime;
-        const q = new THREE.Quaternion().setFromAxisAngle(this.spinAxis, angle);
-        this.group.quaternion.copy(q);
+        this._cachedQuat.setFromAxisAngle(this.spinAxis, angle);
+        this.group.quaternion.copy(this._cachedQuat);
     }
 
     /** Update per-frame camera distance² for distance-dependent effects */

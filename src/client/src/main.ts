@@ -144,6 +144,11 @@ class NBodyClient {
     private autoExposureLumTarget!: THREE.WebGLRenderTarget;
     private autoExposureReadBuffer = new Float32Array(4 * 4 * 4); // 4×4 RGBA float
     private autoExposureFrameCounter = 0;
+    // Pre-allocated blit resources for auto-exposure readback
+    private autoExposureBlitMat = new THREE.MeshBasicMaterial();
+    private autoExposureBlitQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.autoExposureBlitMat);
+    private autoExposureBlitScene = new THREE.Scene();
+    private autoExposureBlitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     private bodyRenderer!: BodyRenderer;
     private network!: NetworkClient;
     private physics!: PhysicsClient;
@@ -529,20 +534,6 @@ class NBodyClient {
             opacity: starParams.starOpacity,
             brightStarCount: starParams.brightStarCount,
         });
-        const starSurfaceFromPreset = {
-            limbDarkeningEnabled: true,
-            granulationEnabled: typeof starParams.granulationEnabled === 'boolean'
-                ? starParams.granulationEnabled
-                : true,
-            granulationSize: typeof starParams.granulationSize === 'number'
-                ? starParams.granulationSize
-                : 256,
-            starspotsEnabled: starParams.flareQuality === 'Ultra',
-            flareQuality: (starParams.flareQuality ?? 'Off') as 'Off' | 'Low' | 'High' | 'Ultra',
-            glareEnabled: false, // updated below from ppParams
-        };
-        this.bodyRenderer.setStarRenderOptions(starSurfaceFromPreset);
-
         // Apply bloom and glare parameters from postProcessRenderer preset
         const ppParams = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'postProcessRenderer') as {
             bloomStrength?: number;
@@ -564,7 +555,20 @@ class NBodyClient {
         if (!this.autoExposureEnabled) {
             this.renderer.toneMappingExposure = 1.0;
         }
-        starSurfaceFromPreset.glareEnabled = glareOn;
+
+        const starSurfaceFromPreset = {
+            limbDarkeningEnabled: true,
+            granulationEnabled: typeof starParams.granulationEnabled === 'boolean'
+                ? starParams.granulationEnabled
+                : true,
+            granulationSize: typeof starParams.granulationSize === 'number'
+                ? starParams.granulationSize
+                : 256,
+            starspotsEnabled: starParams.flareQuality === 'Ultra',
+            flareQuality: (starParams.flareQuality ?? 'Off') as 'Off' | 'Low' | 'High' | 'Ultra',
+            glareEnabled: glareOn,
+        };
+        this.bodyRenderer.setStarRenderOptions(starSurfaceFromPreset);
         this.optionsPanel?.setStarSurface(starSurfaceFromPreset);
 
         // Apply atmosphere ray march quality from preset
@@ -693,6 +697,8 @@ class NBodyClient {
             type: THREE.FloatType,
             format: THREE.RGBAFormat,
         });
+        // Add pre-allocated blit quad to the blit scene
+        this.autoExposureBlitScene.add(this.autoExposureBlitQuad);
 
         // Handle resize
         window.addEventListener('resize', () => this.onResize());
@@ -1385,20 +1391,15 @@ class NBodyClient {
         if (this.autoExposureFrameCounter % 4 === 0) {
             const rt = this.composer.readBuffer;
             this.renderer.setRenderTarget(this.autoExposureLumTarget);
-            // Blit from the composer's read buffer (post-bloom) to the 4×4 target
-            const blitMat = new THREE.MeshBasicMaterial({ map: rt.texture });
-            const blitQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blitMat);
-            const blitScene = new THREE.Scene();
-            blitScene.add(blitQuad);
-            const blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-            this.renderer.render(blitScene, blitCam);
+            // Blit from the composer's read buffer (post-bloom, pre-glare) to the 4×4 target
+            this.autoExposureBlitMat.map = rt.texture;
+            this.autoExposureBlitMat.needsUpdate = true;
+            this.renderer.render(this.autoExposureBlitScene, this.autoExposureBlitCam);
 
             this.renderer.readRenderTargetPixels(
                 this.autoExposureLumTarget, 0, 0, 4, 4, this.autoExposureReadBuffer
             );
             this.renderer.setRenderTarget(null);
-            blitMat.dispose();
-            blitQuad.geometry.dispose();
 
             // Compute log-average luminance over the 4×4 grid
             let logSum = 0;
