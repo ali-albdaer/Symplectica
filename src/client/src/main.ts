@@ -13,13 +13,14 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
 import { AdminStatePayload, NetworkClient } from './network';
 import { PhysicsClient, BodyInfo } from './physics';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
-import { OptionsPanel, VisualizationOptions, VisualizationPresetName } from './options-panel';
+import { OptionsPanel, VisualizationOptions, VisualizationPresetName, StarSurfaceOptions } from './options-panel';
 import { TimeController } from './time-controller';
 import { getWebSocketUrl } from './config';
 import { VisualPresetRegistry, VisualPresetsFile } from './visual-preset-registry';
@@ -34,6 +35,80 @@ import { APP_DEFAULTS } from './defaults';
 const AU = 1.495978707e11; // meters
 const LOCAL_TICK_RATE = APP_DEFAULTS.adminDefaults.tickRate;
 const LOCAL_PRESET_PLAYER = 'local';
+
+// Diffraction spike (glare) post-process shader — simulates 4-spike telescope
+// diffraction pattern on bright HDR pixels after bloom.
+const GlareShader = {
+    uniforms: {
+        tDiffuse: { value: null as THREE.Texture | null },
+        u_resolution: { value: new THREE.Vector2(1, 1) },
+        u_spikeIntensity: { value: 0.35 },
+    },
+    vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse;
+        uniform vec2 u_resolution;
+        uniform float u_spikeIntensity;
+        varying vec2 vUv;
+
+        void main() {
+            vec4 center = texture2D(tDiffuse, vUv);
+
+            // Only apply spikes to bright pixels (HDR range)
+            float brightness = dot(center.rgb, vec3(0.2126, 0.7152, 0.0722));
+            float mask = smoothstep(0.8, 2.0, brightness);
+            if (mask < 0.001) {
+                gl_FragColor = center;
+                return;
+            }
+
+            vec2 texel = 1.0 / u_resolution;
+
+            // 4 spike directions: horizontal, vertical, and two diagonals
+            vec2 dirs[4];
+            dirs[0] = vec2(1.0, 0.0);
+            dirs[1] = vec2(0.0, 1.0);
+            dirs[2] = vec2(0.7071, 0.7071);
+            dirs[3] = vec2(0.7071, -0.7071);
+
+            vec3 spikes = vec3(0.0);
+            float totalWeight = 0.0;
+            const int SAMPLES = 32;
+
+            for (int d = 0; d < 4; d++) {
+                vec3 dirAccum = vec3(0.0);
+                float dirWeight = 0.0;
+
+                for (int i = 1; i <= SAMPLES; i++) {
+                    float fi = float(i);
+                    // Exponential falloff along the spike
+                    float weight = exp(-fi * 0.12);
+                    vec2 offset = dirs[d] * texel * fi * 2.0;
+
+                    vec3 s1 = texture2D(tDiffuse, vUv + offset).rgb;
+                    vec3 s2 = texture2D(tDiffuse, vUv - offset).rgb;
+                    dirAccum += (s1 + s2) * weight;
+                    dirWeight += weight * 2.0;
+                }
+
+                spikes += dirAccum / max(dirWeight, 1.0);
+                totalWeight += 1.0;
+            }
+
+            spikes /= totalWeight;
+
+            // Blend spikes into the original image, scaled by brightness mask
+            vec3 result = center.rgb + spikes * mask * u_spikeIntensity;
+            gl_FragColor = vec4(result, center.a);
+        }
+    `,
+};
 
 type SimMode = 'tick' | 'accumulator';
 
@@ -60,7 +135,15 @@ class NBodyClient {
     private renderer!: THREE.WebGLRenderer;
     private composer!: EffectComposer;
     private bloomPass!: UnrealBloomPass;
+    private glarePass!: ShaderPass;
     private camera!: OrbitCamera;
+
+    // Auto-exposure (Ultra preset only)
+    private autoExposureEnabled = false;
+    private autoExposureTarget = 1.0;
+    private autoExposureLumTarget!: THREE.WebGLRenderTarget;
+    private autoExposureReadBuffer = new Float32Array(4 * 4 * 4); // 4×4 RGBA float
+    private autoExposureFrameCounter = 0;
     private bodyRenderer!: BodyRenderer;
     private network!: NetworkClient;
     private physics!: PhysicsClient;
@@ -217,12 +300,17 @@ class NBodyClient {
             },
             (speed) => {
                 this.freeCamSpeedAuPerSec = speed;
-                // Save preference?
             },
             (sensitivity) => {
                 this.camera.setFreeLookSensitivity(sensitivity);
             },
-            APP_DEFAULTS.visualPresetDefault
+            APP_DEFAULTS.visualPresetDefault,
+            (starOpts: StarSurfaceOptions) => {
+                this.bodyRenderer.setStarRenderOptions(starOpts);
+                if (this.glarePass && typeof starOpts.glareEnabled === 'boolean') {
+                    this.glarePass.enabled = starOpts.glareEnabled;
+                }
+            },
         );
         this.optionsPanel.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
@@ -430,33 +518,64 @@ class NBodyClient {
             starCount?: number;
             starSize?: number;
             starOpacity?: number;
+            brightStarCount?: number;
             granulationEnabled?: boolean;
+            granulationSize?: number;
             flareQuality?: 'Off' | 'Low' | 'High' | 'Ultra';
         };
         this.skyRenderer.setOptions({
             starCount: starParams.starCount,
             starSize: starParams.starSize,
             opacity: starParams.starOpacity,
+            brightStarCount: starParams.brightStarCount,
         });
-        this.bodyRenderer.setStarRenderOptions({
+        const starSurfaceFromPreset = {
+            limbDarkeningEnabled: true,
             granulationEnabled: typeof starParams.granulationEnabled === 'boolean'
                 ? starParams.granulationEnabled
                 : true,
+            granulationSize: typeof starParams.granulationSize === 'number'
+                ? starParams.granulationSize
+                : 256,
             starspotsEnabled: starParams.flareQuality === 'Ultra',
-            flareQuality: starParams.flareQuality ?? 'Off',
-        });
+            flareQuality: (starParams.flareQuality ?? 'Off') as 'Off' | 'Low' | 'High' | 'Ultra',
+            glareEnabled: false, // updated below from ppParams
+        };
+        this.bodyRenderer.setStarRenderOptions(starSurfaceFromPreset);
 
-        // Apply bloom parameters from postProcessRenderer preset
+        // Apply bloom and glare parameters from postProcessRenderer preset
         const ppParams = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'postProcessRenderer') as {
             bloomStrength?: number;
             bloomRadius?: number;
             bloomThreshold?: number;
+            glareEnabled?: boolean;
+            autoExposureEnabled?: boolean;
         };
         if (this.bloomPass) {
             this.bloomPass.strength = ppParams.bloomStrength ?? 0.6;
-            this.bloomPass.radius = ppParams.bloomRadius ?? 0.85;
+            this.bloomPass.radius = ppParams.bloomRadius ?? 1.0;
             this.bloomPass.threshold = ppParams.bloomThreshold ?? 0.9;
         }
+        const glareOn = ppParams.glareEnabled ?? false;
+        if (this.glarePass) {
+            this.glarePass.enabled = glareOn;
+        }
+        this.autoExposureEnabled = ppParams.autoExposureEnabled ?? false;
+        if (!this.autoExposureEnabled) {
+            this.renderer.toneMappingExposure = 1.0;
+        }
+        starSurfaceFromPreset.glareEnabled = glareOn;
+        this.optionsPanel?.setStarSurface(starSurfaceFromPreset);
+
+        // Apply atmosphere ray march quality from preset
+        const atmoParams = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'atmosphereRenderer') as {
+            atmoViewSteps?: number;
+            atmoSunSteps?: number;
+        };
+        this.bodyRenderer.setAtmosphereQuality(
+            atmoParams.atmoViewSteps ?? 8,
+            atmoParams.atmoSunSteps ?? 4,
+        );
     }
 
     private ensureLocalPreset(preset: VisualizationPresetName): void {
@@ -555,13 +674,25 @@ class NBodyClient {
         this.bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
             0.6,   // strength (default High preset)
-            0.85,  // radius
+            1.0,   // radius
             0.9,   // threshold
         );
         this.composer.addPass(this.bloomPass);
 
+        // Glare / diffraction spike pass (disabled by default, Ultra quality only)
+        this.glarePass = new ShaderPass(GlareShader);
+        this.glarePass.uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+        this.glarePass.enabled = false;
+        this.composer.addPass(this.glarePass);
+
         // Output pass — applies tone mapping + sRGB encoding
         this.composer.addPass(new OutputPass());
+
+        // Auto-exposure luminance readback target (4×4 pixel downsampled)
+        this.autoExposureLumTarget = new THREE.WebGLRenderTarget(4, 4, {
+            type: THREE.FloatType,
+            format: THREE.RGBAFormat,
+        });
 
         // Handle resize
         window.addEventListener('resize', () => this.onResize());
@@ -1236,6 +1367,62 @@ class NBodyClient {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(width, height);
         this.composer.setSize(width, height);
+        if (this.glarePass) {
+            this.glarePass.uniforms.u_resolution.value.set(width, height);
+        }
+    }
+
+    /**
+     * Smooth auto-exposure: reads back a 4×4 downsampled luminance from the
+     * main render target every 4 frames, computes log-average luminance, and
+     * smoothly interpolates toneMappingExposure toward a target value.
+     */
+    private updateAutoExposure(delta: number): void {
+        if (!this.autoExposureEnabled) return;
+
+        // Only sample luminance every 4 frames to avoid read-back stalls
+        this.autoExposureFrameCounter++;
+        if (this.autoExposureFrameCounter % 4 === 0) {
+            const rt = this.composer.readBuffer;
+            this.renderer.setRenderTarget(this.autoExposureLumTarget);
+            // Blit from the composer's read buffer (post-bloom) to the 4×4 target
+            const blitMat = new THREE.MeshBasicMaterial({ map: rt.texture });
+            const blitQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blitMat);
+            const blitScene = new THREE.Scene();
+            blitScene.add(blitQuad);
+            const blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+            this.renderer.render(blitScene, blitCam);
+
+            this.renderer.readRenderTargetPixels(
+                this.autoExposureLumTarget, 0, 0, 4, 4, this.autoExposureReadBuffer
+            );
+            this.renderer.setRenderTarget(null);
+            blitMat.dispose();
+            blitQuad.geometry.dispose();
+
+            // Compute log-average luminance over the 4×4 grid
+            let logSum = 0;
+            let count = 0;
+            for (let i = 0; i < 16; i++) {
+                const r = this.autoExposureReadBuffer[i * 4];
+                const g = this.autoExposureReadBuffer[i * 4 + 1];
+                const b = this.autoExposureReadBuffer[i * 4 + 2];
+                const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                logSum += Math.log(Math.max(lum, 0.001));
+                count++;
+            }
+            const avgLogLum = Math.exp(logSum / count);
+
+            // Map log-average luminance to target exposure
+            // Key value 0.18 (middle gray) is the standard photographic target
+            const targetExposure = 0.18 / Math.max(avgLogLum, 0.001);
+            // Clamp to reasonable range
+            this.autoExposureTarget = Math.max(0.3, Math.min(3.0, targetExposure));
+        }
+
+        // Smooth interpolation toward target (~0.5s adaptation time)
+        const adaptSpeed = 1.0 - Math.exp(-delta * 2.0);
+        this.renderer.toneMappingExposure += (this.autoExposureTarget - this.renderer.toneMappingExposure) * adaptSpeed;
     }
 
     private start(): void {
@@ -1381,12 +1568,16 @@ class NBodyClient {
             this.bodyRenderer.updateGhostPosition(localX, localY, localZ);
         }
 
-        // Update star rotations from simulation time
-        this.bodyRenderer.updateBodies(this.state.time);
+        // Update star rotations from simulation time + camera distance for apparent radiance
+        this.bodyRenderer.updateBodies(this.state.time, this.camera.position);
+
+        // Update atmosphere sun direction/color for Nishita scattering
+        this.bodyRenderer.updateAtmospheres();
 
         // --- Render timing ---
         const renderStart = performance.now();
         this.composer.render();
+        this.updateAutoExposure(delta);
         const renderEnd = performance.now();
         this.frameTiming.render = renderEnd - renderStart;
 

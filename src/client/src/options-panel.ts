@@ -23,6 +23,17 @@ export interface VisualizationOptions {
 
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
 
+export type FlareQuality = 'Off' | 'Low' | 'High' | 'Ultra';
+
+export interface StarSurfaceOptions {
+    limbDarkeningEnabled: boolean;
+    granulationEnabled: boolean;
+    granulationSize?: number;
+    starspotsEnabled: boolean;
+    flareQuality: FlareQuality;
+    glareEnabled?: boolean;
+}
+
 const AU = 1.495978707e11;
 const DEFAULTS: VisualizationOptions = { ...APP_DEFAULTS.optionsDefaults };
 
@@ -37,12 +48,19 @@ export class OptionsPanel {
     private onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void;
     private onFreeCamSpeedChange?: (speed: number) => void;
     private onFreeCamSensitivityChange?: (sensitivity: number) => void;
+    private onStarSurfaceChange?: (options: StarSurfaceOptions) => void;
 
     // State
     private presetName: VisualizationPresetName;
     private presetRenderScale = 1;
     private freeCamSpeed = APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec;
     private freeCamSensitivity = APP_DEFAULTS.cameraDefaults.freeCamSensitivity;
+    private starSurface: StarSurfaceOptions = {
+        limbDarkeningEnabled: true,
+        granulationEnabled: true,
+        starspotsEnabled: false,
+        flareQuality: 'Low',
+    };
     private ignoreEvents = false;
 
     // UI Elements
@@ -65,6 +83,13 @@ export class OptionsPanel {
     private refPlaneCheckbox!: HTMLInputElement;
     private refLineCheckbox!: HTMLInputElement;
     private refPointCheckbox!: HTMLInputElement;
+
+    // Star surface UI elements
+    private limbDarkeningCheckbox!: HTMLInputElement;
+    private granulationCheckbox!: HTMLInputElement;
+    private starspotsCheckbox!: HTMLInputElement;
+    private flareQualitySelect!: HTMLSelectElement;
+    private glareCheckbox!: HTMLInputElement;
 
     // Grid Spacing Helpers (Logarithmic)
     private sliderToSpacing(t: number): number {
@@ -97,13 +122,15 @@ export class OptionsPanel {
         onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void,
         onFreeCamSpeedChange?: (speed: number) => void,
         onFreeCamSensitivityChange?: (sensitivity: number) => void,
-        initialPreset: VisualizationPresetName = APP_DEFAULTS.visualPresetDefault
+        initialPreset: VisualizationPresetName = APP_DEFAULTS.visualPresetDefault,
+        onStarSurfaceChange?: (options: StarSurfaceOptions) => void,
     ) {
         this.onChange = onChange;
         this.onPresetChange = onPresetChange;
         this.onPresetEdit = onPresetEdit;
         this.onFreeCamSpeedChange = onFreeCamSpeedChange;
         this.onFreeCamSensitivityChange = onFreeCamSensitivityChange;
+        this.onStarSurfaceChange = onStarSurfaceChange;
         this.presetName = initialPreset;
         this.options = { ...DEFAULTS };
         this.container = this.createUI();
@@ -221,6 +248,41 @@ export class OptionsPanel {
                     <div class="opt-slider-row">
                         <input type="range" id="opt-trail-length" min="10" max="2000" step="10">
                         <span id="opt-trail-value">100</span>
+                    </div>
+                </section>
+
+                <section class="opt-section">
+                    <h3>Star Surface</h3>
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-limb-darkening" checked>
+                            <span>Limb Darkening</span>
+                        </label>
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-granulation" checked>
+                            <span>Granulation</span>
+                        </label>
+                    </div>
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-starspots">
+                            <span>Starspots</span>
+                        </label>
+                    </div>
+                    <div class="opt-field">
+                        <label>Flares</label>
+                        <select id="opt-flare-quality">
+                            <option value="Off">Off</option>
+                            <option value="Low">Low</option>
+                            <option value="High">High</option>
+                            <option value="Ultra">Ultra</option>
+                        </select>
+                    </div>
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-glare">
+                            <span>Diffraction Spikes</span>
+                        </label>
                     </div>
                 </section>
             </div>
@@ -460,6 +522,12 @@ export class OptionsPanel {
         this.freeCamSpeedValue = this.container.querySelector('#opt-freecam-speed-value')!;
         this.freeCamSensitivityInput = this.container.querySelector('#opt-freecam-sensitivity')!;
         this.freeCamSensitivityValue = this.container.querySelector('#opt-freecam-sensitivity-value')!;
+
+        this.limbDarkeningCheckbox = this.container.querySelector('#opt-limb-darkening')!;
+        this.granulationCheckbox = this.container.querySelector('#opt-granulation')!;
+        this.starspotsCheckbox = this.container.querySelector('#opt-starspots')!;
+        this.flareQualitySelect = this.container.querySelector('#opt-flare-quality')!;
+        this.glareCheckbox = this.container.querySelector('#opt-glare')!;
     }
 
     private bindEvents(): void {
@@ -588,6 +656,37 @@ export class OptionsPanel {
             this.freeCamSensitivityValue.textContent = `${sensitivity.toFixed(1)}x`;
             this.onFreeCamSensitivityChange?.(sensitivity);
         });
+
+        // Star surface events
+        this.limbDarkeningCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.starSurface.limbDarkeningEnabled = this.limbDarkeningCheckbox.checked;
+            this.emitStarSurfaceChange();
+        });
+
+        this.granulationCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.starSurface.granulationEnabled = this.granulationCheckbox.checked;
+            this.emitStarSurfaceChange();
+        });
+
+        this.starspotsCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.starSurface.starspotsEnabled = this.starspotsCheckbox.checked;
+            this.emitStarSurfaceChange();
+        });
+
+        this.flareQualitySelect.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.starSurface.flareQuality = this.flareQualitySelect.value as FlareQuality;
+            this.emitStarSurfaceChange();
+        });
+
+        this.glareCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.starSurface.glareEnabled = this.glareCheckbox.checked;
+            this.emitStarSurfaceChange();
+        });
     }
 
     private setupTabs(): void {
@@ -662,6 +761,10 @@ export class OptionsPanel {
         this.onChange({ ...this.options });
     }
 
+    private emitStarSurfaceChange(): void {
+        this.onStarSurfaceChange?.({ ...this.starSurface });
+    }
+
     private syncUIFromOptions(): void {
         this.ignoreEvents = true;
 
@@ -691,6 +794,11 @@ export class OptionsPanel {
         this.freeCamSpeedValue.textContent = `${this.freeCamSpeed.toFixed(3)} AU/s`;
         this.freeCamSensitivityInput.value = this.freeCamSensitivity.toString();
         this.freeCamSensitivityValue.textContent = `${this.freeCamSensitivity.toFixed(1)}x`;
+
+        this.limbDarkeningCheckbox.checked = this.starSurface.limbDarkeningEnabled;
+        this.granulationCheckbox.checked = this.starSurface.granulationEnabled;
+        this.starspotsCheckbox.checked = this.starSurface.starspotsEnabled;
+        this.flareQualitySelect.value = this.starSurface.flareQuality;
         this.ignoreEvents = false;
     }
 
@@ -744,5 +852,30 @@ export class OptionsPanel {
         this.freeCamSensitivity = sensitivity;
         this.freeCamSensitivityInput.value = sensitivity.toString();
         this.freeCamSensitivityValue.textContent = `${sensitivity.toFixed(1)}x`;
+    }
+
+    setStarSurface(options: Partial<StarSurfaceOptions>): void {
+        this.ignoreEvents = true;
+        if (typeof options.limbDarkeningEnabled === 'boolean') {
+            this.starSurface.limbDarkeningEnabled = options.limbDarkeningEnabled;
+        }
+        if (typeof options.granulationEnabled === 'boolean') {
+            this.starSurface.granulationEnabled = options.granulationEnabled;
+        }
+        if (typeof options.starspotsEnabled === 'boolean') {
+            this.starSurface.starspotsEnabled = options.starspotsEnabled;
+        }
+        if (options.flareQuality) {
+            this.starSurface.flareQuality = options.flareQuality;
+        }
+        if (typeof options.glareEnabled === 'boolean') {
+            this.starSurface.glareEnabled = options.glareEnabled;
+        }
+        this.limbDarkeningCheckbox.checked = this.starSurface.limbDarkeningEnabled;
+        this.granulationCheckbox.checked = this.starSurface.granulationEnabled;
+        this.starspotsCheckbox.checked = this.starSurface.starspotsEnabled;
+        this.flareQualitySelect.value = this.starSurface.flareQuality;
+        this.glareCheckbox.checked = this.starSurface.glareEnabled ?? false;
+        this.ignoreEvents = false;
     }
 }

@@ -13,12 +13,17 @@ export interface VisualPresetParams {
     shadowQuality: ShadowQuality;
     reflectionMode: ReflectionMode;
     granulationEnabled: boolean;
+    granulationSize: number;
     flareQuality: FlareQuality;
     lodBias: number;
     maxShaderSamples: number;
     bloomStrength: number;
     bloomRadius: number;
     bloomThreshold: number;
+    glareEnabled: boolean;
+    autoExposureEnabled: boolean;
+    atmoViewSteps: number;
+    atmoSunSteps: number;
     performanceBudgetMs: number;
 }
 

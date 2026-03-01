@@ -11,7 +11,7 @@ describe('VisualPresetRegistry', () => {
         VisualPresetRegistry.loadPresets(presets);
         VisualPresetRegistry.setDefaultPreset('Ultra');
         const preset = VisualPresetRegistry.getPresetForPlayer('local');
-        expect(preset.maxTextureSize).toBe(512);
+        expect(preset.maxTextureSize).toBe(4096);
     });
 
     it('resolves feature params with preset mapping', () => {

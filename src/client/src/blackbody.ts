@@ -8,6 +8,8 @@
  * Reference: http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code/
  */
 
+import * as THREE from 'three';
+
 /**
  * Convert a blackbody temperature to a THREE.js-compatible hex color.
  * @param tempK Temperature in Kelvin (clamped to 1000–40000)
@@ -69,6 +71,44 @@ export function blackbodyToRGB(tempK: number): [number, number, number] {
         Math.round(Math.max(0, Math.min(255, g))),
         Math.round(Math.max(0, Math.min(255, b))),
     ];
+}
+
+/**
+ * Create a GPU-side blackbody lookup table as a DataTexture.
+ * Samples blackbodyToRGBNorm from 1000K to 40000K across `width` texels.
+ * Enables per-pixel temperature-dependent color in the star shader
+ * (granulation color variation, starspot umbral color shift).
+ *
+ * @param width Number of samples (default 512 — more than sufficient
+ *              given the Helland curve has no sub-100K features)
+ * @returns THREE.DataTexture with LinearFilter, ClampToEdge wrapping
+ */
+export function createBlackbodyLUT(width: number = 512): THREE.DataTexture {
+    const data = new Float32Array(width * 4);
+    const minT = 1000;
+    const maxT = 40000;
+    const range = maxT - minT;
+
+    for (let i = 0; i < width; i++) {
+        const t = minT + (i / (width - 1)) * range;
+        const [r, g, b] = blackbodyToRGBNorm(t);
+        data[i * 4]     = r;
+        data[i * 4 + 1] = g;
+        data[i * 4 + 2] = b;
+        data[i * 4 + 3] = 1.0;
+    }
+
+    const texture = new THREE.DataTexture(
+        data, width, 1,
+        THREE.RGBAFormat,
+        THREE.FloatType,
+    );
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
 }
 
 /**

@@ -8,7 +8,8 @@
  * Features:
  * - Seeded starfield with IMF-weighted star color distribution
  * - Configurable density, size, and opacity
- * - Future: nebula overlays, Milky Way band
+ * - Two-tier rendering: bright stars as instanced billboard quads with
+ *   smooth radial falloff, faint stars as standard GL points.
  */
 
 import * as THREE from 'three';
@@ -30,17 +31,72 @@ function splitmix32(seed: number): () => number {
     };
 }
 
+// ── Bright-star billboard quad shaders ──
+// Instanced billboard quad — always faces camera, smooth circular glow.
+const BRIGHT_STAR_VERTEX = /* glsl */ `
+attribute vec3 a_starPos;
+attribute vec3 a_starColor;
+attribute float a_starSize;
+
+varying vec2 vUv;
+varying vec3 vColor;
+
+void main() {
+    vUv = uv;
+    vColor = a_starColor;
+
+    // Billboard: compute star center in view space, then offset quad corners
+    vec4 mvCenter = viewMatrix * vec4(a_starPos, 1.0);
+    // position.xy is the local quad corner (±0.5), scaled by star size in world units
+    mvCenter.xy += position.xy * a_starSize;
+    gl_Position = projectionMatrix * mvCenter;
+}
+`;
+
+const BRIGHT_STAR_FRAGMENT = /* glsl */ `
+varying vec2 vUv;
+varying vec3 vColor;
+
+void main() {
+    vec2 p = vUv - 0.5;
+    float r = length(p) * 2.0; // 0 at center, 1 at quad edge
+
+    // Smooth circular glow with tight core + soft halo
+    float core = exp(-r * r * 12.0);   // tight bright center
+    float glow = exp(-r * r * 3.0);    // soft glow halo
+
+    // Composite: bright core + dim halo, clipped to circle
+    float circle = smoothstep(1.0, 0.75, r);
+    float intensity = (core * 1.5 + glow * 0.3) * circle;
+    float alpha = (core * 0.9 + glow * 0.15) * circle;
+
+    gl_FragColor = vec4(vColor * intensity, alpha);
+}
+`;
+
+// ── Internal star data for sorting/partitioning ──
+interface StarDatum {
+    x: number; y: number; z: number;
+    r: number; g: number; b: number;
+    tempK: number;
+    size: number;
+    intensity: number; // spectral-class luminosity scaling
+    brightness: number; // composite metric for tier assignment
+}
+
 export interface SkyRendererOptions {
     /** Number of background stars (default: 10000) */
     starCount?: number;
-    /** Visual size of star points in meters (default: 1e12) */
+    /** Visual size of star points in meters (default: 3e12) */
     starSize?: number;
-    /** Opacity of the starfield (default: 0.8) */
+    /** Opacity of the faint-star points (default: 0.8) */
     opacity?: number;
     /** Seed for deterministic generation (default: 42) */
     seed?: number;
     /** Distance of the sky sphere in meters (default: 5e14 = ~3300 AU) */
     skyRadius?: number;
+    /** Number of brightest stars rendered as instanced quads (default: 200) */
+    brightStarCount?: number;
 }
 
 const DEFAULT_OPTIONS: Required<SkyRendererOptions> = {
@@ -49,11 +105,14 @@ const DEFAULT_OPTIONS: Required<SkyRendererOptions> = {
     opacity: 0.8,
     seed: 42,
     skyRadius: 5e14,
+    brightStarCount: 200,
 };
 
 export class SkyRenderer {
     private scene: THREE.Scene;
     private starfield: THREE.Points | null = null;
+    /** Instanced billboard quads for the brightest sky stars */
+    private brightStars: THREE.Mesh | null = null;
     private options: Required<SkyRendererOptions>;
 
     constructor(scene: THREE.Scene, options?: SkyRendererOptions) {
@@ -80,41 +139,156 @@ export class SkyRenderer {
 
     /**
      * Generate (or regenerate) the starfield.
-     * Call this once at init, and again if seed or options change.
+     * Two-tier rendering: bright stars as instanced billboard quads,
+     * faint stars as standard GL points.
      */
     generate(): void {
         this.dispose();
 
-        const { starCount, starSize, opacity, seed, skyRadius } = this.options;
+        const { starCount, starSize, opacity, seed, skyRadius, brightStarCount } = this.options;
         const count = Math.max(100, Math.round(starCount));
         const rng = splitmix32(seed);
 
-        const positions = new Float32Array(count * 3);
-        const colors = new Float32Array(count * 3);
-        const sizes = new Float32Array(count);
-
+        // First pass: generate all star data
+        const stars: StarDatum[] = [];
         for (let i = 0; i < count; i++) {
-            // Uniform distribution on sphere surface
             const theta = rng() * Math.PI * 2;
             const phi = Math.acos(2 * rng() - 1);
 
-            positions[i * 3] = skyRadius * Math.sin(phi) * Math.cos(theta);
-            positions[i * 3 + 1] = skyRadius * Math.sin(phi) * Math.sin(theta);
-            positions[i * 3 + 2] = skyRadius * Math.cos(phi);
-
-            // IMF-weighted blackbody color, dimmed to stay below bloom threshold
-            // (bloom threshold ≥ 0.7; max channel after ×0.65 ≈ 0.65 — safe margin)
             const tempK = sampleStarTemperature(rng());
             const [r, g, b] = blackbodyToRGBNorm(tempK);
-            const skyDim = 0.65;
-            colors[i * 3] = r * skyDim;
-            colors[i * 3 + 1] = g * skyDim;
-            colors[i * 3 + 2] = b * skyDim;
 
-            // Apparent size: IMF-weighted magnitude variation
-            // Brighter (hotter) stars appear larger
-            const brightnessFactor = tempK > 6000 ? 1.5 : tempK > 4000 ? 1.0 : 0.6;
-            sizes[i] = (rng() * 1.5 + 0.5) * brightnessFactor;
+            // Size and intensity tuned by spectral class for HDR bloom response
+            let sizeScale: number;
+            let intensityScale: number;
+            if (tempK >= 30000) {
+                // O-type: hot, massive, very luminous
+                sizeScale = 2.0; intensityScale = 6.0;
+            } else if (tempK >= 10000) {
+                // B-type: blue-white
+                sizeScale = 1.8; intensityScale = 4.0;
+            } else if (tempK >= 7500) {
+                // A-type: white
+                sizeScale = 1.5; intensityScale = 2.5;
+            } else if (tempK >= 6000) {
+                // F-type: yellow-white
+                sizeScale = 1.2; intensityScale = 2.0;
+            } else if (tempK >= 5200) {
+                // G-type: yellow (Sun-like)
+                sizeScale = 1.0; intensityScale = 1.0;
+            } else if (tempK >= 3700) {
+                // K-type: orange
+                sizeScale = 0.7; intensityScale = 0.5;
+            } else {
+                // M-type: red dwarf
+                sizeScale = 0.5; intensityScale = 0.3;
+            }
+
+            const size = (rng() * 1.5 + 0.5) * sizeScale;
+            // Composite brightness = peak channel × size × intensity — used for tier sorting
+            const brightness = Math.max(r, g, b) * size * intensityScale;
+
+            stars.push({
+                x: skyRadius * Math.sin(phi) * Math.cos(theta),
+                y: skyRadius * Math.sin(phi) * Math.sin(theta),
+                z: skyRadius * Math.cos(phi),
+                r, g, b,
+                tempK, size, intensity: intensityScale, brightness,
+            });
+        }
+
+        // Sort by brightness descending — brightest stars get instanced quads
+        stars.sort((a, b) => b.brightness - a.brightness);
+
+        const nBright = Math.min(Math.max(0, brightStarCount), count);
+        const brightSlice = stars.slice(0, nBright);
+        const faintSlice = stars.slice(nBright);
+
+        // Tier 1: Bright stars → instanced billboard quads (smooth, no flicker)
+        if (nBright > 0) {
+            this.createBrightStars(brightSlice, starSize);
+        }
+
+        // Tier 2: Faint stars → GL Points (unchanged behavior)
+        if (faintSlice.length > 0) {
+            this.createFaintStars(faintSlice, starSize, opacity);
+        }
+    }
+
+    /**
+     * Render the top-N brightest sky stars as instanced billboard quads
+     * with a custom shader that draws a smooth circular glow.
+     * Eliminates square-point artifacts and subpixel flicker.
+     */
+    private createBrightStars(stars: StarDatum[], baseSize: number): void {
+        const quadGeo = new THREE.PlaneGeometry(1, 1, 1, 1);
+        const instGeo = new THREE.InstancedBufferGeometry();
+        instGeo.index = quadGeo.index;
+        instGeo.setAttribute('position', quadGeo.getAttribute('position'));
+        instGeo.setAttribute('uv', quadGeo.getAttribute('uv'));
+
+        const n = stars.length;
+        const starPos = new Float32Array(n * 3);
+        const starColor = new Float32Array(n * 3);
+        const starSizes = new Float32Array(n);
+
+        for (let i = 0; i < n; i++) {
+            const s = stars[i];
+            starPos[i * 3]     = s.x;
+            starPos[i * 3 + 1] = s.y;
+            starPos[i * 3 + 2] = s.z;
+
+            // Scale vertex colors by spectral-class intensity for HDR bloom
+            const skyDim = 0.7 * s.intensity;
+            starColor[i * 3]     = s.r * skyDim;
+            starColor[i * 3 + 1] = s.g * skyDim;
+            starColor[i * 3 + 2] = s.b * skyDim;
+
+            // Bright stars rendered ~1.8× larger than point-based size
+            starSizes[i] = s.size * baseSize * 1.8;
+        }
+
+        instGeo.setAttribute('a_starPos',   new THREE.InstancedBufferAttribute(starPos, 3));
+        instGeo.setAttribute('a_starColor', new THREE.InstancedBufferAttribute(starColor, 3));
+        instGeo.setAttribute('a_starSize',  new THREE.InstancedBufferAttribute(starSizes, 1));
+        instGeo.instanceCount = n;
+
+        const material = new THREE.ShaderMaterial({
+            vertexShader: BRIGHT_STAR_VERTEX,
+            fragmentShader: BRIGHT_STAR_FRAGMENT,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            toneMapped: false,
+        });
+
+        const mesh = new THREE.Mesh(instGeo, material);
+        mesh.frustumCulled = false;
+        mesh.name = 'bright-stars';
+        this.brightStars = mesh;
+        this.scene.add(mesh);
+    }
+
+    /** Render faint stars as standard GL Points (existing behavior) */
+    private createFaintStars(stars: StarDatum[], starSize: number, opacity: number): void {
+        const n = stars.length;
+        const positions = new Float32Array(n * 3);
+        const colors = new Float32Array(n * 3);
+        const sizes = new Float32Array(n);
+
+        for (let i = 0; i < n; i++) {
+            const s = stars[i];
+            positions[i * 3]     = s.x;
+            positions[i * 3 + 1] = s.y;
+            positions[i * 3 + 2] = s.z;
+
+            // Scale by spectral-class intensity but keep faint below bloom threshold
+            const skyDim = 0.65 * Math.min(s.intensity, 1.5);
+            colors[i * 3]     = s.r * skyDim;
+            colors[i * 3 + 1] = s.g * skyDim;
+            colors[i * 3 + 2] = s.b * skyDim;
+
+            sizes[i] = s.size;
         }
 
         const geometry = new THREE.BufferGeometry();
@@ -144,10 +318,16 @@ export class SkyRenderer {
             (this.starfield.material as THREE.Material).dispose();
             this.starfield = null;
         }
+        if (this.brightStars) {
+            this.scene.remove(this.brightStars);
+            this.brightStars.geometry.dispose();
+            (this.brightStars.material as THREE.Material).dispose();
+            this.brightStars = null;
+        }
     }
 
     /** Returns true if the starfield is currently in the scene */
     get isActive(): boolean {
-        return this.starfield !== null;
+        return this.starfield !== null || this.brightStars !== null;
     }
 }
