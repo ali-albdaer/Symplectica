@@ -1150,7 +1150,10 @@ export class BodyRenderer {
         mesh.setScale(radius);
 
         // F5: Physically-based point light for stars — tinted to blackbody, intensity from luminosity
-        // Phase 1.4: Recalibrated for HDR pipeline — use L/L_sun ratio, inverse-square decay
+        // Phase 1.4: Recalibrated for HDR pipeline — use L/L_sun ratio, capped intensity
+        // NOTE: decay=0, distance=0 (uniform intensity, no falloff) because
+        // physical inverse-square falloff is unusable at astronomical distances
+        // in Three.js (1 AU ≈ 1.5e11 m → 1/d² ≈ 4.5e-23).
         if (body.type === 'star') {
             const teff = body.effectiveTemperature ?? 5778;
             const [lr, lg, lb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
@@ -1159,8 +1162,7 @@ export class BodyRenderer {
             const lum = body.luminosity ?? L_SUN;
             const L_ratio = lum / L_SUN;
             const intensity = Math.min(3.0, Math.max(0.3, 0.5 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
-            // distance = 10 AU max range, decay = 2 (physically correct inverse-square)
-            const light = new THREE.PointLight(lightColor, intensity, 10 * AU, 2);
+            const light = new THREE.PointLight(lightColor, intensity, 0, 0);
             mesh.group.add(light);
         }
 
@@ -1776,10 +1778,11 @@ class BodyMesh {
             const spotFraction = Math.max(0, Math.min(0.3, body.spotFraction ?? 0));
 
             // Phase 1.2: Emissive intensity from luminosity — drives HDR bloom
-            // Sun-like star = 1.0, brighter stars bloom more
+            // Min 1.5 ensures even dim cool stars' peak channel exceeds bloom threshold.
+            // Cap at 4.0 prevents extreme bloom pyramidal artifacts on very bright stars.
             const luminosity = body.luminosity ?? L_SUN;
             const L_ratio = luminosity / L_SUN;
-            const emissiveIntensity = 1.0 + Math.log10(Math.max(L_ratio, 0.01)) * 0.8;
+            const emissiveIntensity = Math.min(4.0, Math.max(1.5, 1.5 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
 
             this.material = new THREE.ShaderMaterial({
                 vertexShader: STAR_VERTEX,

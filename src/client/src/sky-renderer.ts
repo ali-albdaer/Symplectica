@@ -102,12 +102,14 @@ export class SkyRenderer {
             positions[i * 3 + 1] = skyRadius * Math.sin(phi) * Math.sin(theta);
             positions[i * 3 + 2] = skyRadius * Math.cos(phi);
 
-            // IMF-weighted blackbody color
+            // IMF-weighted blackbody color, dimmed to stay below bloom threshold
+            // (bloom threshold ≥ 0.7; max channel after ×0.65 ≈ 0.65 — safe margin)
             const tempK = sampleStarTemperature(rng());
             const [r, g, b] = blackbodyToRGBNorm(tempK);
-            colors[i * 3] = r;
-            colors[i * 3 + 1] = g;
-            colors[i * 3 + 2] = b;
+            const skyDim = 0.65;
+            colors[i * 3] = r * skyDim;
+            colors[i * 3 + 1] = g * skyDim;
+            colors[i * 3 + 2] = b * skyDim;
 
             // Apparent size: IMF-weighted magnitude variation
             // Brighter (hotter) stars appear larger
