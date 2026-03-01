@@ -31,6 +31,34 @@ function splitmix32(seed: number): () => number {
     };
 }
 
+/**
+ * Create a small circular-falloff DataTexture for PointsMaterial.
+ * Replaces the default square GL_POINTS rasterization with a soft circle.
+ * Uses a quadratic falloff: alpha = max(0, 1 − r²).
+ */
+function createCirclePointTexture(size: number = 32): THREE.DataTexture {
+    const data = new Uint8Array(size * size * 4);
+    const half = size / 2;
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const dx = (x + 0.5 - half) / half;
+            const dy = (y + 0.5 - half) / half;
+            const r2 = dx * dx + dy * dy;
+            const alpha = Math.max(0, 1 - r2);
+            const idx = (y * size + x) * 4;
+            data[idx]     = 255; // R
+            data[idx + 1] = 255; // G
+            data[idx + 2] = 255; // B
+            data[idx + 3] = Math.round(alpha * 255); // A
+        }
+    }
+    const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+}
+
 // ── Bright-star billboard quad shaders ──
 // Instanced billboard quad — always faces camera, smooth circular glow.
 const BRIGHT_STAR_VERTEX = /* glsl */ `
@@ -114,10 +142,13 @@ export class SkyRenderer {
     /** Instanced billboard quads for the brightest sky stars */
     private brightStars: THREE.Mesh | null = null;
     private options: Required<SkyRendererOptions>;
+    /** Circular falloff texture for faint-star GL points (shared across regenerations) */
+    private pointTexture: THREE.DataTexture;
 
     constructor(scene: THREE.Scene, options?: SkyRendererOptions) {
         this.scene = scene;
         this.options = { ...DEFAULT_OPTIONS, ...options };
+        this.pointTexture = createCirclePointTexture();
     }
 
     /** Update options and regenerate the starfield */
@@ -226,6 +257,7 @@ export class SkyRenderer {
         instGeo.index = quadGeo.index;
         instGeo.setAttribute('position', quadGeo.getAttribute('position'));
         instGeo.setAttribute('uv', quadGeo.getAttribute('uv'));
+        quadGeo.dispose(); // Free the temporary PlaneGeometry wrapper
 
         const n = stars.length;
         const starPos = new Float32Array(n * 3);
@@ -297,12 +329,14 @@ export class SkyRenderer {
         geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
         const material = new THREE.PointsMaterial({
-            size: starSize,
-            sizeAttenuation: true,
+            size: 1.5,                    // Fixed pixel size — stars at infinity have no distance-based scaling
+            sizeAttenuation: false,       // Screen-space sizing eliminates sub-pixel aliasing/twinkle
             vertexColors: true,
             transparent: true,
             opacity,
-            toneMapped: false,  // Keep sky stars in LDR — prevent bloom pickup
+            toneMapped: false,            // Keep sky stars in LDR — prevent bloom pickup
+            map: this.pointTexture,       // Circular falloff — eliminates square GL_POINTS artifact
+            alphaTest: 0.01,              // Discard fully transparent fragments
         });
 
         this.starfield = new THREE.Points(geometry, material);
