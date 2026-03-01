@@ -45,7 +45,7 @@ export interface SkyRendererOptions {
 
 const DEFAULT_OPTIONS: Required<SkyRendererOptions> = {
     starCount: 10000,
-    starSize: 1.0e12,
+    starSize: 3.0e12,
     opacity: 0.8,
     seed: 42,
     skyRadius: 5e14,

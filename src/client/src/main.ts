@@ -453,9 +453,9 @@ class NBodyClient {
             bloomThreshold?: number;
         };
         if (this.bloomPass) {
-            this.bloomPass.strength = ppParams.bloomStrength ?? 0.7;
-            this.bloomPass.radius = ppParams.bloomRadius ?? 0.4;
-            this.bloomPass.threshold = ppParams.bloomThreshold ?? 0.85;
+            this.bloomPass.strength = ppParams.bloomStrength ?? 0.6;
+            this.bloomPass.radius = ppParams.bloomRadius ?? 0.85;
+            this.bloomPass.threshold = ppParams.bloomThreshold ?? 0.9;
         }
     }
 
@@ -554,9 +554,9 @@ class NBodyClient {
         // Bloom pass — params will be overridden by preset in applyPresetToRenderer
         this.bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.7,   // strength (default High preset)
-            0.4,   // radius
-            0.85,  // threshold
+            0.6,   // strength (default High preset)
+            0.85,  // radius
+            0.9,   // threshold
         );
         this.composer.addPass(this.bloomPass);
 

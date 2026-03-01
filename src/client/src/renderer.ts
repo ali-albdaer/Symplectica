@@ -1159,9 +1159,10 @@ export class BodyRenderer {
             const [lr, lg, lb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
             const lightColor = new THREE.Color(lr, lg, lb);
             // Intensity from luminosity ratio (log scale, HDR-safe)
+            // Sun = 1.5, brighter stars up to 4.0 for visible planet illumination
             const lum = body.luminosity ?? L_SUN;
             const L_ratio = lum / L_SUN;
-            const intensity = Math.min(3.0, Math.max(0.3, 0.5 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
+            const intensity = Math.min(4.0, Math.max(0.8, 1.5 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
             const light = new THREE.PointLight(lightColor, intensity, 0, 0);
             mesh.group.add(light);
         }
@@ -1778,11 +1779,11 @@ class BodyMesh {
             const spotFraction = Math.max(0, Math.min(0.3, body.spotFraction ?? 0));
 
             // Phase 1.2: Emissive intensity from luminosity — drives HDR bloom
-            // Min 1.5 ensures even dim cool stars' peak channel exceeds bloom threshold.
-            // Cap at 4.0 prevents extreme bloom pyramidal artifacts on very bright stars.
+            // Min 2.0 ensures even cool red giants bloom visibly.
+            // Cap at 3.0 keeps ACES tonemapping from washing out star color to white.
             const luminosity = body.luminosity ?? L_SUN;
             const L_ratio = luminosity / L_SUN;
-            const emissiveIntensity = Math.min(4.0, Math.max(1.5, 1.5 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
+            const emissiveIntensity = Math.min(3.0, Math.max(2.0, 2.0 + Math.log10(Math.max(L_ratio, 0.01)) * 0.3));
 
             this.material = new THREE.ShaderMaterial({
                 vertexShader: STAR_VERTEX,
