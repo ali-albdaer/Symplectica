@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import { blackbodyToRGBNorm, createBlackbodyLUT } from './blackbody';
+import { blackbodyToRGBNorm, blackbodyToLinearRGBNorm, createBlackbodyLUT } from './blackbody';
 
 // ── Star surface shader ────────────────────────────────────────────────
 // Implements blackbody coloring + quadratic limb-darkening:
@@ -216,23 +216,53 @@ void main() {
     vec3 spotColor = texture2D(u_blackbodyLUT, vec2(tSpotNorm, 0.5)).rgb;
 
     // Blend surface with spot: where spotDarkening > 0, shift to cooler color + darken
+    // spotCount already gates how many spots exist via spotFraction, so per-pixel
+    // blend depends only on per-pixel darkness — no global coverage attenuation.
     vec3 colorInSpot = spotColor * (1.0 - spotDarkening * 0.6);
-    float spotBlend = spotCoverage * min(spotDarkening * 2.0, 1.0);
+    float spotBlend = min(spotDarkening * 2.0, 1.0);
     vec3 colorWithSpots = mix(surfaceColor, colorInSpot, spotBlend);
 
     // Apply limb darkening (toggle-able)
     vec3 limbFactor = mix(vec3(1.0), limb, u_limbDarkeningEnabled);
     vec3 finalColor = colorWithSpots * limbFactor;
 
-    // Center-weighted HDR profile: concentrate bloom-driving brightness at disk center
-    // so UnrealBloomPass sees a more point-like source → rounder bloom shape.
-    // At the limb (mu→0), output stays at 0.5× emissive (enough for surface detail),
-    // at center (mu=1), output hits full emissive. Limb darkening already provides
-    // some falloff, but this adds an explicit HDR concentration.
-    float hdrProfile = mix(0.5, 1.0, mu * mu);
+    // ── Adaptive HDR bloom ──────────────────────────────────────
+    // Problem: bloom threshold operates on pixel luminance, but the
+    // apparent luminance of a star's blackbody color varies 2.5× with
+    // temperature (0.38 for 2500K M-dwarf vs 0.95 for 10000K B-star).
+    // A fixed multiplier either: (a) over-blooms hot stars to white, or
+    // (b) gives no bloom to cool stars.  Both defects are visible in
+    // the previous approach.
+    //
+    // Solution: compute the bloom boost adaptively so the disk CENTER
+    // always reaches a target luminance of 1.2 (above any bloom
+    // threshold), regardless of color temperature.  The boost is
+    // derived from the BASE blackbody color (constant across the
+    // surface), not from finalColor, so granulation/spot contrast is
+    // preserved in the multiplication.
+    //
+    // Center-weighted mu² profile: limb pixels stay at base brightness
+    // (full detail: granulation, limb darkening, faculae), while center
+    // pixels drive the bloom kernel.
+    //
+    // Luminous stars (u_emissiveIntensity > 2.0) add extra drive on
+    // top, producing larger/brighter bloom halos for giants.
 
-    // Scale into HDR range so bloom picks up star surfaces
-    gl_FragColor = vec4(finalColor * u_emissiveIntensity * hdrProfile, 1.0);
+    // Base blackbody luminance (T_eff dependent, constant across surface)
+    float baseLum = dot(bbColor, vec3(0.2126, 0.7152, 0.0722));
+
+    // How much center boost is needed to reach bloom target luminance
+    float bloomTarget = 1.2;
+    float neededDrive = max(0.0, bloomTarget / max(baseLum, 0.01) - 1.0);
+
+    // Extra drive for luminous stars (L > L_sun)
+    float lumExtra = max(0.0, u_emissiveIntensity - 2.0);
+
+    // Center-weighted bloom: mu² falls to zero at limb → preserves
+    // all surface detail there.  Center gets full bloom drive.
+    float bloomBoost = (neededDrive + lumExtra) * mu * mu;
+
+    gl_FragColor = vec4(finalColor * (1.0 + bloomBoost), 1.0);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -1375,13 +1405,14 @@ export class BodyRenderer {
         // in Three.js (1 AU ≈ 1.5e11 m → 1/d² ≈ 4.5e-23).
         if (body.type === 'star') {
             const teff = body.effectiveTemperature ?? 5778;
-            const [lr, lg, lb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
+            // Use linear-light RGB for PointLight (Three.js treats Color as linear)
+            const [lr, lg, lb] = blackbodyToLinearRGBNorm(teff > 0 ? teff : 5778);
             const lightColor = new THREE.Color(lr, lg, lb);
             // Intensity from luminosity ratio (log scale, HDR-safe)
-            // Sun = 1.5, brighter stars up to 4.0 for visible planet illumination
+            // Sun = 2.0, brighter stars up to 4.0 for visible planet illumination
             const lum = body.luminosity ?? L_SUN;
             const L_ratio = lum / L_SUN;
-            const intensity = Math.min(4.0, Math.max(0.8, 1.5 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
+            const intensity = Math.min(4.0, Math.max(0.8, 2.0 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
             const light = new THREE.PointLight(lightColor, intensity, 0, 0);
             mesh.group.add(light);
         }
@@ -2048,10 +2079,13 @@ class BodyMesh {
             const spotFraction = Math.max(0, Math.min(0.3, body.spotFraction ?? 0));
 
             // Emissive intensity from luminosity — drives HDR bloom
-            // Min 2.0 ensures even cool red giants bloom; cap at 3.0 prevents wash-out.
+            // Range [1.0, 5.0]: dim M-dwarfs get 1.0 (no bloom), Sun gets 2.0,
+            // luminous giants up to 5.0.  The shader applies this as a
+            // center-weighted bloom boost (mu^4 profile), so the value
+            // controls peak bloom brightness, not uniform disk scaling.
             const luminosity = body.luminosity ?? L_SUN;
             const L_ratio = luminosity / L_SUN;
-            const emissiveIntensity = Math.min(3.0, Math.max(2.0, 2.0 + Math.log10(Math.max(L_ratio, 0.01)) * 0.3));
+            const emissiveIntensity = Math.min(5.0, Math.max(1.0, 2.0 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
 
             // 1-pixel-tall DataTexture as LUT fallback (white)
             const defaultLUT = new THREE.DataTexture(
@@ -2080,6 +2114,7 @@ class BodyMesh {
                     u_luminosity: { value: L_ratio },
                     u_cameraDistanceSq: { value: 1.0e22 }, // default ~1 AU²
                 },
+                toneMapped: false,
             });
             this.starMaterial = this.material as THREE.ShaderMaterial;
 
@@ -2320,6 +2355,12 @@ class BodyMesh {
         this.geometry.dispose();
         this.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
         this.mesh.geometry = this.geometry;
+
+        // Update atmosphere shell geometry to match new tessellation
+        if (this.atmosphereMesh) {
+            this.atmosphereMesh.geometry.dispose();
+            this.atmosphereMesh.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
+        }
     }
 
     dispose(): void {

@@ -60,9 +60,12 @@ const GlareShader = {
         void main() {
             vec4 center = texture2D(tDiffuse, vUv);
 
-            // Only apply spikes to bright pixels (HDR range)
+            // Only apply spikes to very bright pixels (bloom core, not disk)
+            // Threshold raised from 0.8 to 1.5 so the diffraction spikes
+            // emanate from the intense bloom core, not from the star disk
+            // surface (which would wash out surface detail).
             float brightness = dot(center.rgb, vec3(0.2126, 0.7152, 0.0722));
-            float mask = smoothstep(0.8, 2.0, brightness);
+            float mask = smoothstep(1.5, 3.0, brightness);
             if (mask < 0.001) {
                 gl_FragColor = center;
                 return;
@@ -564,7 +567,7 @@ class NBodyClient {
             granulationSize: typeof starParams.granulationSize === 'number'
                 ? starParams.granulationSize
                 : 256,
-            starspotsEnabled: starParams.flareQuality === 'Ultra',
+            starspotsEnabled: starParams.flareQuality === 'High' || starParams.flareQuality === 'Ultra',
             flareQuality: (starParams.flareQuality ?? 'Off') as 'Off' | 'Low' | 'High' | 'Ultra',
             glareEnabled: glareOn,
         };
@@ -1401,7 +1404,13 @@ class NBodyClient {
             );
             this.renderer.setRenderTarget(null);
 
-            // Compute log-average luminance over the 4×4 grid
+            // Compute log-average luminance over the 4×4 grid.
+            // Exclude emissive HDR pixels (luminance > 1.5) — these are star
+            // surfaces / bloom halos that should NOT drive exposure down.
+            // Without this exclusion, a close-up star fills the readback grid,
+            // pushes avgLogLum to ~2.0, drops exposure to minimum (0.8),
+            // and makes the star 20–30% dimmer than on presets without
+            // auto-exposure (High), which is the exact bug the user reported.
             let logSum = 0;
             let count = 0;
             for (let i = 0; i < 16; i++) {
@@ -1409,16 +1418,25 @@ class NBodyClient {
                 const g = this.autoExposureReadBuffer[i * 4 + 1];
                 const b = this.autoExposureReadBuffer[i * 4 + 2];
                 const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                // Skip emissive HDR sources (stars, bloom halos)
+                if (lum > 1.5) continue;
                 logSum += Math.log(Math.max(lum, 0.001));
                 count++;
             }
-            const avgLogLum = Math.exp(logSum / count);
 
-            // Map log-average luminance to target exposure
-            // Key value 0.18 (middle gray) is the standard photographic target
-            const targetExposure = 0.18 / Math.max(avgLogLum, 0.001);
-            // Clamp to reasonable range
-            this.autoExposureTarget = Math.max(0.3, Math.min(3.0, targetExposure));
+            if (count > 0) {
+                const avgLogLum = Math.exp(logSum / count);
+                // Map log-average luminance to target exposure
+                // Key value 0.18 (middle gray) is the standard photographic target
+                const targetExposure = 0.18 / Math.max(avgLogLum, 0.001);
+                // Clamp — minimum 0.8 keeps exposure close to 1.0 so stars
+                // maintain full brightness and surface contrast
+                this.autoExposureTarget = Math.max(0.8, Math.min(3.0, targetExposure));
+            } else {
+                // All pixels are bright emissive sources (e.g. close-up star
+                // fills entire screen) — keep exposure at 1.0
+                this.autoExposureTarget = 1.0;
+            }
         }
 
         // Smooth interpolation toward target (~0.5s adaptation time)
