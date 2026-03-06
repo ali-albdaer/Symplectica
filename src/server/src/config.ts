@@ -28,4 +28,5 @@ export const CONFIG = {
     snapshotInterval: parseNumber(process.env.SNAPSHOT_INTERVAL, 300),
     stateUpdateInterval: parseNumber(process.env.STATE_UPDATE_INTERVAL, 1),
     seed: parseSeed(),
+    adminPassword: process.env.ADMIN_PASSWORD || '',
 };

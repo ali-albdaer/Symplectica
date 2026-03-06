@@ -143,6 +143,8 @@ interface Client {
     displayName: string;
     lastPing: number;
     latency: number;
+    role: 'viewer' | 'admin';
+    messageTimestamps: number[];
 }
 
 class SimulationServer {
@@ -347,6 +349,8 @@ class SimulationServer {
                 displayName,
                 lastPing: Date.now(),
                 latency: 0,
+                role: CONFIG.adminPassword ? 'viewer' : 'admin',
+                messageTimestamps: [],
             };
 
             this.clients.set(clientId, client);
@@ -378,6 +382,10 @@ class SimulationServer {
 
             ws.on('message', (data: Buffer) => {
                 try {
+                    if (this.isRateLimited(client)) {
+                        this.sendChatToClient(client, { sender: 'System', text: 'Rate limited. Slow down.' });
+                        return;
+                    }
                     const message = JSON.parse(data.toString()) as ClientMessage;
                     this.handleMessage(client, message);
                 } catch (error) {
@@ -414,44 +422,79 @@ class SimulationServer {
 
             if (!parsed || typeof parsed !== 'object') return snapshot;
 
+            // Fill in missing fields with current admin defaults — preserve existing snapshot values
             const integrator = parsed.integrator_config ?? {};
+            integrator.dt = integrator.dt ?? this.adminState.dt;
+            integrator.substeps = integrator.substeps ?? this.adminState.substeps;
+            integrator.method = integrator.method ?? 'VelocityVerlet';
+
             const close = (integrator.close_encounter ?? {}) as Record<string, unknown>;
-
-            integrator.dt = this.adminState.dt;
-            integrator.substeps = this.adminState.substeps;
-            if (!integrator.method) {
-                integrator.method = 'VelocityVerlet';
-            }
-
-            const integratorName = this.adminState.closeEncounterIntegrator === 'rk45'
-                ? 'Rk45'
-                : this.adminState.closeEncounterIntegrator === 'gauss-radau'
-                    ? 'GaussRadau5'
-                    : 'None';
-
-            close.enabled = this.adminState.closeEncounterIntegrator !== 'none';
-            close.integrator = integratorName;
-            close.hill_factor = this.adminState.closeEncounterHillFactor;
-            close.tidal_ratio_threshold = this.adminState.closeEncounterTidalRatio;
-            close.jerk_norm_threshold = this.adminState.closeEncounterJerkNorm;
-            close.max_subset_size = this.adminState.closeEncounterMaxSubsetSize;
-            close.max_trial_substeps = this.adminState.closeEncounterMaxTrialSubsteps;
-            close.rk45_abs_tol = this.adminState.closeEncounterRk45AbsTol;
-            close.rk45_rel_tol = this.adminState.closeEncounterRk45RelTol;
-            close.gauss_radau_max_iters = this.adminState.closeEncounterGaussRadauMaxIters;
-            close.gauss_radau_tol = this.adminState.closeEncounterGaussRadauTol;
+            close.enabled = close.enabled ?? (this.adminState.closeEncounterIntegrator !== 'none');
+            close.integrator = close.integrator ?? 'None';
+            close.hill_factor = close.hill_factor ?? this.adminState.closeEncounterHillFactor;
+            close.tidal_ratio_threshold = close.tidal_ratio_threshold ?? this.adminState.closeEncounterTidalRatio;
+            close.jerk_norm_threshold = close.jerk_norm_threshold ?? this.adminState.closeEncounterJerkNorm;
+            close.max_subset_size = close.max_subset_size ?? this.adminState.closeEncounterMaxSubsetSize;
+            close.max_trial_substeps = close.max_trial_substeps ?? this.adminState.closeEncounterMaxTrialSubsteps;
+            close.rk45_abs_tol = close.rk45_abs_tol ?? this.adminState.closeEncounterRk45AbsTol;
+            close.rk45_rel_tol = close.rk45_rel_tol ?? this.adminState.closeEncounterRk45RelTol;
+            close.gauss_radau_max_iters = close.gauss_radau_max_iters ?? this.adminState.closeEncounterGaussRadauMaxIters;
+            close.gauss_radau_tol = close.gauss_radau_tol ?? this.adminState.closeEncounterGaussRadauTol;
 
             integrator.close_encounter = close;
             parsed.integrator_config = integrator;
 
             const force = parsed.force_config ?? {};
-            force.barnes_hut_theta = this.adminState.theta;
+            force.barnes_hut_theta = force.barnes_hut_theta ?? this.adminState.theta;
             parsed.force_config = force;
 
             return JSON.stringify(parsed);
         } catch {
             return snapshot;
         }
+    }
+
+    private updateAdminStateFromSnapshot(snapshot: string): void {
+        try {
+            const parsed = JSON.parse(snapshot) as {
+                force_config?: { softening?: number; barnes_hut_theta?: number };
+                integrator_config?: {
+                    dt?: number;
+                    substeps?: number;
+                    close_encounter?: Record<string, unknown>;
+                };
+            };
+            if (!parsed || typeof parsed !== 'object') return;
+
+            const integrator = parsed.integrator_config;
+            if (integrator) {
+                if (typeof integrator.dt === 'number') this.adminState.dt = integrator.dt;
+                if (typeof integrator.substeps === 'number') this.adminState.substeps = integrator.substeps;
+
+                const close = integrator.close_encounter;
+                if (close) {
+                    const intName = String(close.integrator ?? 'None');
+                    if (intName === 'Rk45') this.adminState.closeEncounterIntegrator = 'rk45';
+                    else if (intName === 'GaussRadau5') this.adminState.closeEncounterIntegrator = 'gauss-radau';
+                    else this.adminState.closeEncounterIntegrator = 'none';
+
+                    if (typeof close.hill_factor === 'number') this.adminState.closeEncounterHillFactor = close.hill_factor;
+                    if (typeof close.tidal_ratio_threshold === 'number') this.adminState.closeEncounterTidalRatio = close.tidal_ratio_threshold;
+                    if (typeof close.jerk_norm_threshold === 'number') this.adminState.closeEncounterJerkNorm = close.jerk_norm_threshold;
+                    if (typeof close.max_subset_size === 'number') this.adminState.closeEncounterMaxSubsetSize = close.max_subset_size;
+                    if (typeof close.max_trial_substeps === 'number') this.adminState.closeEncounterMaxTrialSubsteps = close.max_trial_substeps;
+                    if (typeof close.rk45_abs_tol === 'number') this.adminState.closeEncounterRk45AbsTol = close.rk45_abs_tol;
+                    if (typeof close.rk45_rel_tol === 'number') this.adminState.closeEncounterRk45RelTol = close.rk45_rel_tol;
+                    if (typeof close.gauss_radau_max_iters === 'number') this.adminState.closeEncounterGaussRadauMaxIters = close.gauss_radau_max_iters;
+                    if (typeof close.gauss_radau_tol === 'number') this.adminState.closeEncounterGaussRadauTol = close.gauss_radau_tol;
+                }
+            }
+
+            const force = parsed.force_config;
+            if (force) {
+                if (typeof force.barnes_hut_theta === 'number') this.adminState.theta = force.barnes_hut_theta;
+            }
+        } catch { /* snapshot already loaded successfully, just skip state sync */ }
     }
 
     private handleMessage(client: Client, message: ClientMessage): void {
@@ -481,6 +524,10 @@ class SimulationServer {
                 break;
 
             case 'set_time_scale': {
+                if (client.role !== 'admin') {
+                    this.sendChatToClient(client, { sender: 'System', text: 'Permission denied. Use /admin <password> to authenticate.' });
+                    return;
+                }
                 const payload = message.payload as { simSecondsPerRealSecond?: number } | undefined;
                 const scale = payload?.simSecondsPerRealSecond;
                 if (typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0) {
@@ -504,6 +551,10 @@ class SimulationServer {
             }
 
             case 'admin_settings': {
+                if (client.role !== 'admin') {
+                    this.sendChatToClient(client, { sender: 'System', text: 'Permission denied. Use /admin <password> to authenticate.' });
+                    return;
+                }
                 const payload = message.payload as Partial<AdminStatePayload> | undefined;
                 if (!payload) return;
 
@@ -628,6 +679,10 @@ class SimulationServer {
             }
 
             case 'set_pause': {
+                if (client.role !== 'admin') {
+                    this.sendChatToClient(client, { sender: 'System', text: 'Permission denied. Use /admin <password> to authenticate.' });
+                    return;
+                }
                 const payload = message.payload as { paused?: boolean } | undefined;
                 if (typeof payload?.paused !== 'boolean') return;
                 this.adminState = {
@@ -644,12 +699,18 @@ class SimulationServer {
 
 
             case 'apply_snapshot': {
+                if (client.role !== 'admin') {
+                    this.sendChatToClient(client, { sender: 'System', text: 'Permission denied. Use /admin <password> to authenticate.' });
+                    return;
+                }
                 const payload = message.payload as { snapshot?: string; presetName?: string } | undefined;
                 if (!payload?.snapshot) return;
                 const normalized = this.normalizeSnapshotForAdmin(payload.snapshot);
                 const ok = this.simulation.fromJson(normalized);
                 if (ok) {
+                    this.updateAdminStateFromSnapshot(normalized);
                     this.broadcastSnapshot();
+                    this.broadcastAdminState();
                     const name = payload.presetName || 'Custom Snapshot';
                     this.broadcastChat({
                         sender: 'Admin',
@@ -660,6 +721,10 @@ class SimulationServer {
             }
 
             case 'reset_simulation':
+                if (client.role !== 'admin') {
+                    this.sendChatToClient(client, { sender: 'System', text: 'Permission denied. Use /admin <password> to authenticate.' });
+                    return;
+                }
                 this.createSimulation();
                 this.broadcastSnapshot();
                 this.broadcastAdminState();
@@ -863,9 +928,35 @@ class SimulationServer {
             case 'help':
                 this.sendChatToClient(client, {
                     sender: 'System',
-                    text: 'Commands: /help, /name <name>, /players',
+                    text: CONFIG.adminPassword
+                        ? 'Commands: /help, /name <name>, /players, /admin <password>'
+                        : 'Commands: /help, /name <name>, /players',
                 });
                 break;
+
+            case 'admin': {
+                if (!CONFIG.adminPassword) {
+                    this.sendChatToClient(client, {
+                        sender: 'System',
+                        text: 'Admin authentication is disabled (no password configured).',
+                    });
+                    break;
+                }
+                const password = args.join(' ');
+                if (password === CONFIG.adminPassword) {
+                    client.role = 'admin';
+                    this.sendChatToClient(client, {
+                        sender: 'System',
+                        text: 'Admin access granted.',
+                    });
+                } else {
+                    this.sendChatToClient(client, {
+                        sender: 'System',
+                        text: 'Invalid password.',
+                    });
+                }
+                break;
+            }
 
             case 'name': {
                 const requested = args.join(' ').replace(/\s+/g, ' ').trim();
@@ -923,6 +1014,18 @@ class SimulationServer {
 
     private getPlayerNames(): string[] {
         return Array.from(this.clients.values()).map((client) => client.displayName);
+    }
+
+    private isRateLimited(client: Client): boolean {
+        const now = Date.now();
+        const windowMs = 1000;
+        const maxMessages = 10;
+        client.messageTimestamps.push(now);
+        // Remove timestamps outside the window
+        while (client.messageTimestamps.length > 0 && client.messageTimestamps[0] <= now - windowMs) {
+            client.messageTimestamps.shift();
+        }
+        return client.messageTimestamps.length > maxMessages;
     }
 
     private generateClientId(): string {
