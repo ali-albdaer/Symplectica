@@ -8,8 +8,6 @@
  * Reference: http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code/
  */
 
-import * as THREE from 'three';
-
 /**
  * Convert a blackbody temperature to a THREE.js-compatible hex color.
  * @param tempK Temperature in Kelvin (clamped to 1000–40000)
@@ -71,70 +69,6 @@ export function blackbodyToRGB(tempK: number): [number, number, number] {
         Math.round(Math.max(0, Math.min(255, g))),
         Math.round(Math.max(0, Math.min(255, b))),
     ];
-}
-
-/**
- * Convert an sRGB component (0–1) to linear light.
- * The Helland approximation produces sRGB-encoded values; the HDR
- * rendering pipeline (RGBA16F → ACES tone mapping → linearToSRGB in
- * OutputPass) expects linear input.  Storing linear values in the LUT
- * avoids the double-gamma problem that washes out star colors.
- */
-export function srgbToLinear(c: number): number {
-    return c <= 0.04045
-        ? c / 12.92
-        : Math.pow((c + 0.055) / 1.055, 2.4);
-}
-
-/**
- * Convert blackbody temperature to linear-light [0,1] RGB.
- * Suitable for Three.js materials/lights which expect linear input
- * (the renderer applies linearToSRGB in the output stage).
- * @param tempK Temperature in Kelvin
- * @returns [r, g, b] each in [0, 1], linear light
- */
-export function blackbodyToLinearRGBNorm(tempK: number): [number, number, number] {
-    const [r, g, b] = blackbodyToRGBNorm(tempK);
-    return [srgbToLinear(r), srgbToLinear(g), srgbToLinear(b)];
-}
-
-/**
- * Create a GPU-side blackbody lookup table as a DataTexture.
- * Samples blackbodyToRGBNorm from 1000K to 40000K across `width` texels
- * and converts from sRGB to linear light so the HDR pipeline produces
- * correct colors after ACES tone mapping + sRGB encoding in OutputPass.
- *
- * @param width Number of samples (default 512 — more than sufficient
- *              given the Helland curve has no sub-100K features)
- * @returns THREE.DataTexture with LinearFilter, ClampToEdge wrapping
- */
-export function createBlackbodyLUT(width: number = 512): THREE.DataTexture {
-    const data = new Float32Array(width * 4);
-    const minT = 1000;
-    const maxT = 40000;
-    const range = maxT - minT;
-
-    for (let i = 0; i < width; i++) {
-        const t = minT + (i / (width - 1)) * range;
-        const [r, g, b] = blackbodyToRGBNorm(t);
-        // Store in linear light — the OutputPass applies linearToSRGB
-        data[i * 4]     = srgbToLinear(r);
-        data[i * 4 + 1] = srgbToLinear(g);
-        data[i * 4 + 2] = srgbToLinear(b);
-        data[i * 4 + 3] = 1.0;
-    }
-
-    const texture = new THREE.DataTexture(
-        data, width, 1,
-        THREE.RGBAFormat,
-        THREE.FloatType,
-    );
-    texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.needsUpdate = true;
-    return texture;
 }
 
 /**

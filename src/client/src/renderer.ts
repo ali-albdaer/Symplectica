@@ -8,7 +8,7 @@
  */
 
 import * as THREE from 'three';
-import { blackbodyToRGBNorm, blackbodyToLinearRGBNorm, createBlackbodyLUT } from './blackbody';
+import { blackbodyToRGBNorm } from './blackbody';
 
 // ── Star surface shader ────────────────────────────────────────────────
 // Implements blackbody coloring + quadratic limb-darkening:
@@ -33,22 +33,15 @@ void main() {
 const STAR_FRAGMENT = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_fragment>
-uniform vec3 u_color;   // blackbody RGB [0,1] (CPU fallback)
-uniform vec4 u_limbCoeffsR;  // Claret 4-param for red channel
-uniform vec4 u_limbCoeffsG;  // Claret 4-param for green channel
-uniform vec4 u_limbCoeffsB;  // Claret 4-param for blue channel
-uniform float u_emissiveIntensity; // HDR brightness scaling from luminosity
-uniform float u_limbDarkeningEnabled; // 1.0 = enabled, 0.0 = disabled
+uniform vec3 u_color;   // blackbody RGB [0,1]
+uniform float u_limbA;
+uniform float u_limbB;
 uniform sampler2D u_granulationMap;
 uniform float u_granulationStrength;
 uniform float u_time;
 uniform float u_spotFraction;
 uniform float u_spotEnabled;
 uniform float u_spotSeed;
-uniform sampler2D u_blackbodyLUT;  // blackbody LUT for per-pixel temperature color
-uniform float u_teff;              // effective temperature in Kelvin
-uniform float u_luminosity;        // luminosity in solar units
-uniform float u_cameraDistanceSq;  // distance² in meters²
 varying vec3 vNormal;
 varying vec3 vViewDir;
 varying vec3 vObjNormal;
@@ -75,7 +68,7 @@ vec3 rotateY(vec3 v, float a) {
 
 float sampleGranulation(vec3 n, float scale, vec2 drift) {
     vec3 an = abs(n);
-    vec3 w = pow(an, vec3(3.0));  // softened tri-planar blending (was 5.0)
+    vec3 w = pow(an, vec3(5.0));
     float sum = w.x + w.y + w.z + 1e-6;
     w /= sum;
 
@@ -89,199 +82,64 @@ float sampleGranulation(vec3 n, float scale, vec2 drift) {
     return sx * w.x + sy * w.y + sz * w.z;
 }
 
-// Claret 4-parameter non-linear limb darkening per channel
-// I_λ(μ)/I_λ(1) = 1 − c1*(1−μ^0.5) − c2*(1−μ) − c3*(1−μ^1.5) − c4*(1−μ²)
-vec3 claretLimbDarkening(float mu, vec4 cR, vec4 cG, vec4 cB) {
-    float sqrtMu = sqrt(mu);
-    float mu15 = mu * sqrtMu;  // μ^1.5
-    float mu2 = mu * mu;
-
-    float t1 = 1.0 - sqrtMu;   // (1 − μ^0.5)
-    float t2 = 1.0 - mu;       // (1 − μ)
-    float t3 = 1.0 - mu15;     // (1 − μ^1.5)
-    float t4 = 1.0 - mu2;      // (1 − μ²)
-
-    float lr = 1.0 - cR.x*t1 - cR.y*t2 - cR.z*t3 - cR.w*t4;
-    float lg = 1.0 - cG.x*t1 - cG.y*t2 - cG.z*t3 - cG.w*t4;
-    float lb = 1.0 - cB.x*t1 - cB.y*t2 - cB.z*t3 - cB.w*t4;
-
-    return max(vec3(lr, lg, lb), vec3(0.0));
-}
-
 void main() {
     float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
-    vec3 limb = claretLimbDarkening(mu, u_limbCoeffsR, u_limbCoeffsG, u_limbCoeffsB);
+    float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
     vec3 objN = normalize(vObjNormal);
     vec2 drift = vec2(u_time * 0.0016, u_time * 0.0011);
     float granTex = sampleGranulation(objN, 5.8, drift);
+    float granulation = mix(1.0, 0.84 + 0.34 * granTex, u_granulationStrength);
 
-    // Base blackbody color from LUT
-    float tNorm = clamp((u_teff - 1000.0) / 39000.0, 0.0, 1.0);
-    vec3 bbColor = texture2D(u_blackbodyLUT, vec2(tNorm, 0.5)).rgb;
-
-    // Granulation: brightness modulation + color variation
-    // 12% RMS contrast (Nordlund et al. 2009, Stein & Nordlund 1998)
-    float granBase = 0.88 + 0.12 * granTex;
-    float granCLV = mix(1.0, granBase, u_granulationStrength * mu);
-
-    // Color: ΔT ≈ 200K between granule centers and lanes
-    float tGran = u_teff + 200.0 * (granTex - 0.5);
-    float tGranNorm = clamp((tGran - 1000.0) / 39000.0, 0.0, 1.0);
-    vec3 granColor = texture2D(u_blackbodyLUT, vec2(tGranNorm, 0.5)).rgb;
-
-    // Mix color at disk center, fade to base at limb; apply brightness modulation
-    vec3 surfaceColor = mix(bbColor, granColor, u_granulationStrength * mu);
-    surfaceColor *= granCLV;
-
-    // Facular brightening near the limb — intergranular lanes become
-    // brighter than the photosphere when viewed obliquely (hot-wall effect,
-    // Spruit 1976, Keller et al. 2004)
-    float faculae = (1.0 - granTex) * max(0.0, 1.0 - mu * 2.5) * 0.06;
-    surfaceColor *= (1.0 + faculae);
-
-    // Starspots with umbra/penumbra structure, Joy's Law latitude,
-    // penumbral filaments, and soft boundaries (Solanki 2003, Rempel & Schlichenmaier 2011)
+    // D6: Seeded starspots (Ultra) with slow drift
     float spotCoverage = clamp(u_spotFraction / 0.3, 0.0, 1.0) * u_spotEnabled;
-    float spotCount = floor(clamp(u_spotFraction * 80.0, 0.0, 24.0) + 0.5) * u_spotEnabled;
+    float spotCount = floor(clamp(u_spotFraction * 80.0, 0.0, 24.0) + 0.5);
     float spotDarkening = 0.0;
-
-    // Joy's Law: peak latitude depends on activity level
-    float peakLat = mix(0.26, 0.52, clamp(u_spotFraction / 0.3, 0.0, 1.0)); // 15°–30°
-    float latSpread = 0.17; // ~10° spread
-
     for (int i = 0; i < 24; i++) {
         float fi = float(i);
         if (fi >= spotCount) {
-            break;
+            continue;
         }
 
-        // Joy's Law latitude distribution — spots concentrate in activity belts
-        float rawLat = hash11(fi * 17.13 + u_spotSeed * 3.7);
-        float lat = peakLat + latSpread * (rawLat * 2.0 - 1.0);
-        float hemisphere = hash11(fi * 41.7 + u_spotSeed * 2.3) > 0.5 ? 1.0 : -1.0;
-        float lon = hash11(fi * 29.73 + u_spotSeed * 5.1) * 6.28318530718;
-        float cosLat = cos(lat);
-        vec3 center = normalize(vec3(
-            cosLat * cos(lon),
-            sin(lat) * hemisphere,
-            cosLat * sin(lon)
-        ));
+        vec3 center = randomOnSphere(fi + 1.0, u_spotSeed);
+
+        // Keep most spots away from poles for a more solar-like pattern
+        center.y *= 0.75;
+        center = normalize(center);
 
         // Slow longitudinal drift (seeded)
         float driftAngle = 0.07 * sin(u_time * 0.00001 + fi * 1.7 + u_spotSeed * 0.01);
         center = normalize(rotateY(center, driftAngle));
 
-        float spotRadius = mix(0.035, 0.095, hash11(fi * 11.3 + u_spotSeed * 0.7));
+        float radius = mix(0.035, 0.095, hash11(fi * 11.3 + u_spotSeed * 0.7));
         float d = dot(objN, center);
-        float angDist = acos(clamp(d, -1.0, 1.0));
+        float core = smoothstep(cos(radius), cos(radius * 0.55), d);
 
-        // Umbra/penumbra structure (Solanki 2003: umbra ≈ 0.4 of total spot radius)
-        float umbraEdge = spotRadius * 0.4;
-        float penumbraEdge = spotRadius;
-
-        // Umbra: dark core with soft edge
-        float umbraFactor = 1.0 - smoothstep(umbraEdge * 0.7, umbraEdge, angDist);
-        // Penumbra: lighter ring around umbra, soft outer boundary
-        float penumbraFactor = (1.0 - smoothstep(penumbraEdge * 0.8, penumbraEdge, angDist))
-                             * (1.0 - umbraFactor);
-
-        // Penumbral filaments — radial spoke pattern
-        // Compute tangent basis for spoke angle around spot center
-        vec3 pixelOffset = objN - center * d;
-        float pLen = length(pixelOffset);
-        vec3 toPixel = pLen > 1e-6 ? pixelOffset / pLen : vec3(1.0, 0.0, 0.0);
-        vec3 tangent1 = normalize(cross(center, vec3(0.0, 1.0, 0.01)));
-        vec3 tangent2 = cross(center, tangent1);
-        float spokeAngle = atan(dot(toPixel, tangent1), dot(toPixel, tangent2));
-        float filament = 0.5 + 0.5 * sin(spokeAngle * 12.0 + hash11(fi * 7.3 + u_spotSeed) * 6.28);
-        penumbraFactor *= mix(0.7, 1.0, filament);
-
-        // Soft outer boundary — pow falloff for diffuse dissolution into photosphere
-        float outerFade = 1.0 - smoothstep(penumbraEdge * 0.6, penumbraEdge * 1.1, angDist);
-        outerFade = pow(outerFade, 0.6);
-
-        // Per-zone darkening (umbra: ΔT ≈ 1200–1800K, penumbra: ΔT ≈ 400–700K)
-        float umbraDarkness = mix(0.55, 0.65, hash11(fi * 23.7 + u_spotSeed * 1.9));
-        float penumbraDarkness = mix(0.15, 0.25, hash11(fi * 31.1 + u_spotSeed * 1.3));
-        float spotDark = (umbraFactor * umbraDarkness + penumbraFactor * penumbraDarkness) * outerFade;
-
-        spotDarkening = max(spotDarkening, spotDark);
+        // Darkness corresponds to cooler spot regions (ΔT-like visual approximation)
+        float darkness = mix(0.18, 0.38, hash11(fi * 23.7 + u_spotSeed * 1.9));
+        spotDarkening = max(spotDarkening, core * darkness);
     }
 
-    // Starspot color shift: maps darkening to a ΔT and samples the cooler
-    // blackbody color, producing the characteristic orange/red umbral glow.
-    float deltaT_spot = spotDarkening * 2300.0;
-    float tSpot = max(1000.0, u_teff - deltaT_spot);
-    float tSpotNorm = clamp((tSpot - 1000.0) / 39000.0, 0.0, 1.0);
-    vec3 spotColor = texture2D(u_blackbodyLUT, vec2(tSpotNorm, 0.5)).rgb;
+    vec3 finalColor = u_color * limb * granulation;
+    finalColor *= (1.0 - spotCoverage * spotDarkening);
 
-    // Blend surface with spot: where spotDarkening > 0, shift to cooler color + darken
-    // spotCount already gates how many spots exist via spotFraction, so per-pixel
-    // blend depends only on per-pixel darkness — no global coverage attenuation.
-    vec3 colorInSpot = spotColor * (1.0 - spotDarkening * 0.6);
-    float spotBlend = min(spotDarkening * 2.0, 1.0);
-    vec3 colorWithSpots = mix(surfaceColor, colorInSpot, spotBlend);
-
-    // Apply limb darkening (toggle-able)
-    vec3 limbFactor = mix(vec3(1.0), limb, u_limbDarkeningEnabled);
-    vec3 finalColor = colorWithSpots * limbFactor;
-
-    // ── Adaptive HDR bloom ──────────────────────────────────────
-    // Problem: bloom threshold operates on pixel luminance, but the
-    // apparent luminance of a star's blackbody color varies 2.5× with
-    // temperature (0.38 for 2500K M-dwarf vs 0.95 for 10000K B-star).
-    // A fixed multiplier either: (a) over-blooms hot stars to white, or
-    // (b) gives no bloom to cool stars.  Both defects are visible in
-    // the previous approach.
-    //
-    // Solution: compute the bloom boost adaptively so the disk CENTER
-    // always reaches a target luminance of 1.2 (above any bloom
-    // threshold), regardless of color temperature.  The boost is
-    // derived from the BASE blackbody color (constant across the
-    // surface), not from finalColor, so granulation/spot contrast is
-    // preserved in the multiplication.
-    //
-    // Center-weighted mu² profile: limb pixels stay at base brightness
-    // (full detail: granulation, limb darkening, faculae), while center
-    // pixels drive the bloom kernel.
-    //
-    // Luminous stars (u_emissiveIntensity > 2.0) add extra drive on
-    // top, producing larger/brighter bloom halos for giants.
-
-    // Base blackbody luminance (T_eff dependent, constant across surface)
-    float baseLum = dot(bbColor, vec3(0.2126, 0.7152, 0.0722));
-
-    // How much center boost is needed to reach bloom target luminance
-    float bloomTarget = 1.2;
-    float neededDrive = max(0.0, bloomTarget / max(baseLum, 0.01) - 1.0);
-
-    // Extra drive for luminous stars (L > L_sun)
-    float lumExtra = max(0.0, u_emissiveIntensity - 2.0);
-
-    // Center-weighted bloom: mu² falls to zero at limb → preserves
-    // all surface detail there.  Center gets full bloom drive.
-    float bloomBoost = (neededDrive + lumExtra) * mu * mu;
-
-    gl_FragColor = vec4(finalColor * (1.0 + bloomBoost), 1.0);
+    gl_FragColor = vec4(finalColor, 1.0);
     #include <logdepthbuf_fragment>
 }
 `;
 
 // ── Atmosphere shell shader ─────────────────────────────────────────────
-// Nishita (1993) single-scattering analytical atmosphere model.
-// Produces physically correct sky color, sunset reddening, limb glow,
-// and terminator illumination — all emergent from Rayleigh/Mie physics.
+// Fresnel-edge glow: bright at limb, transparent at center, tinted by
+// Rayleigh scattering coefficients.
 
 const ATMO_VERTEX = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_vertex>
-varying vec3 vWorldPosition;
-varying vec3 vViewRay;
+varying vec3 vNormal;
+varying vec3 vViewDir;
 void main() {
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPosition = worldPos.xyz;
-    vViewRay = worldPos.xyz - cameraPosition;
     vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    vNormal = normalize(normalMatrix * normal);
+    vViewDir = normalize(-mvPos.xyz);
     gl_Position = projectionMatrix * mvPos;
     #include <logdepthbuf_vertex>
 }
@@ -290,163 +148,19 @@ void main() {
 const ATMO_FRAGMENT = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_fragment>
-
-uniform vec3 u_planetCenter;
-uniform float u_planetRadius;
-uniform float u_atmoRadius;
-uniform vec3 u_sunDirection;    // normalized direction TO star 1 from the planet
-uniform vec3 u_sunColor;        // star 1 blackbody color × intensity
-uniform vec3 u_sunDirection2;   // normalized direction TO star 2 (if present)
-uniform vec3 u_sunColor2;       // star 2 blackbody color × intensity
-uniform int u_starCount;        // number of active stars (1 or 2)
-uniform vec3 u_betaR;           // Rayleigh scattering coefficients (RGB)
-uniform float u_betaM;          // Mie scattering coefficient
-uniform float u_mieG;           // Mie asymmetry parameter (Henyey-Greenstein g)
-uniform vec3 u_mieColor;        // Mie scattering albedo color
-uniform float u_scaleHeightR;   // Rayleigh scale height (meters)
-uniform float u_scaleHeightM;   // Mie scale height (meters)
-uniform int u_viewSteps;        // ray march steps along view ray
-uniform int u_sunSteps;         // secondary ray steps toward sun
-
-varying vec3 vWorldPosition;
-varying vec3 vViewRay;
-
-// Ray-sphere intersection — returns (tNear, tFar) or (-1, -1) on miss
-vec2 raySphere(vec3 ro, vec3 rd, vec3 center, float radius) {
-    vec3 oc = ro - center;
-    float b = dot(oc, rd);
-    float c = dot(oc, oc) - radius * radius;
-    float disc = b * b - c;
-    if (disc < 0.0) return vec2(-1.0);
-    float sq = sqrt(disc);
-    return vec2(-b - sq, -b + sq);
-}
-
-// Rayleigh phase function
-float phaseRayleigh(float cosTheta) {
-    return 0.05968310 * (1.0 + cosTheta * cosTheta); // 3/(16π) = 0.05968310
-}
-
-// Henyey-Greenstein phase function for Mie scattering
-float phaseMie(float cosTheta, float g) {
-    float g2 = g * g;
-    float num = 1.0 - g2;
-    float denom = 4.0 * 3.14159265 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5);
-    return num / denom;
-}
-
-// March a secondary ray from a sample point toward a star.
-// Returns vec2(opticalDepthR, opticalDepthM), or (-1, -1) if the ray is
-// occluded by the planet surface (the sample is in shadow).
-vec2 sunRayMarch(vec3 samplePos, vec3 sunDir) {
-    vec2 tSunAtmo = raySphere(samplePos, sunDir, u_planetCenter, u_atmoRadius);
-    if (tSunAtmo.y <= 0.0) return vec2(-1.0);
-    float sunStepLen = tSunAtmo.y / float(u_sunSteps);
-    float optR = 0.0;
-    float optM = 0.0;
-
-    for (int j = 0; j < 6; j++) {
-        if (j >= u_sunSteps) break;
-        float tSun = (float(j) + 0.5) * sunStepLen;
-        vec3 sunSample = samplePos + sunDir * tSun;
-        float sunAlt = length(sunSample - u_planetCenter) - u_planetRadius;
-        if (sunAlt < 0.0) return vec2(-1.0);
-        optR += exp(-sunAlt / u_scaleHeightR) * sunStepLen;
-        optM += exp(-sunAlt / u_scaleHeightM) * sunStepLen;
-    }
-    return vec2(optR, optM);
-}
-
+uniform vec3 u_rayleighColor;
+uniform vec3 u_mieColor;
+uniform float u_mieWeight;   // 0 = pure Rayleigh, 1 = pure Mie
+uniform float u_intensity;
+varying vec3 vNormal;
+varying vec3 vViewDir;
 void main() {
-    vec3 viewDir = normalize(vViewRay);
-    vec3 ro = cameraPosition;
-
-    // Intersect view ray with atmosphere sphere
-    vec2 tAtmo = raySphere(ro, viewDir, u_planetCenter, u_atmoRadius);
-    if (tAtmo.y < 0.0) {
-        discard;
-    }
-
-    // Clip near intersection to camera position (if camera is inside atmosphere)
-    float tStart = max(tAtmo.x, 0.0);
-    float tEnd = tAtmo.y;
-
-    // Clip far intersection to planet surface (atmosphere is occluded by the planet)
-    vec2 tPlanet = raySphere(ro, viewDir, u_planetCenter, u_planetRadius);
-    if (tPlanet.x > 0.0 && tPlanet.x < tEnd) {
-        tEnd = tPlanet.x;
-    }
-
-    if (tEnd <= tStart) {
-        discard;
-    }
-
-    float stepLength = (tEnd - tStart) / float(u_viewSteps);
-
-    // Phase functions for star 1
-    float cosTheta1 = dot(viewDir, u_sunDirection);
-    float pR1 = phaseRayleigh(cosTheta1);
-    float pM1 = phaseMie(cosTheta1, u_mieG);
-
-    // Phase functions for star 2 (computed unconditionally; cost is negligible)
-    float cosTheta2 = dot(viewDir, u_sunDirection2);
-    float pR2 = phaseRayleigh(cosTheta2);
-    float pM2 = phaseMie(cosTheta2, u_mieG);
-
-    // Per-star in-scattering accumulators
-    vec3 totalR1 = vec3(0.0);
-    vec3 totalM1 = vec3(0.0);
-    vec3 totalR2 = vec3(0.0);
-    vec3 totalM2 = vec3(0.0);
-    float opticalDepthR = 0.0;
-    float opticalDepthM = 0.0;
-
-    for (int i = 0; i < 16; i++) {
-        if (i >= u_viewSteps) break;
-
-        float t = tStart + (float(i) + 0.5) * stepLength;
-        vec3 samplePos = ro + viewDir * t;
-        float altitude = length(samplePos - u_planetCenter) - u_planetRadius;
-
-        float densityR = exp(-altitude / u_scaleHeightR);
-        float densityM = exp(-altitude / u_scaleHeightM);
-
-        opticalDepthR += densityR * stepLength;
-        opticalDepthM += densityM * stepLength;
-
-        // Star 1 contribution
-        vec2 sunOpt1 = sunRayMarch(samplePos, u_sunDirection);
-        if (sunOpt1.x >= 0.0) {
-            vec3 tau = u_betaR * (opticalDepthR + sunOpt1.x) + u_betaM * (opticalDepthM + sunOpt1.y);
-            vec3 atten = exp(-tau);
-            totalR1 += densityR * atten * stepLength;
-            totalM1 += densityM * atten * stepLength;
-        }
-
-        // Star 2 contribution (skipped when only one star is active)
-        if (u_starCount > 1) {
-            vec2 sunOpt2 = sunRayMarch(samplePos, u_sunDirection2);
-            if (sunOpt2.x >= 0.0) {
-                vec3 tau = u_betaR * (opticalDepthR + sunOpt2.x) + u_betaM * (opticalDepthM + sunOpt2.y);
-                vec3 atten = exp(-tau);
-                totalR2 += densityR * atten * stepLength;
-                totalM2 += densityM * atten * stepLength;
-            }
-        }
-    }
-
-    // Sum in-scattered light from all active stars
-    vec3 inScatter = u_sunColor * (totalR1 * u_betaR * pR1 + totalM1 * u_betaM * u_mieColor * pM1);
-    if (u_starCount > 1) {
-        inScatter += u_sunColor2 * (totalR2 * u_betaR * pR2 + totalM2 * u_betaM * u_mieColor * pM2);
-    }
-
-    // Transmittance for alpha blending (view-ray only, independent of stars)
-    vec3 totalTau = u_betaR * opticalDepthR + u_betaM * opticalDepthM;
-    float transmittance = exp(-(totalTau.x + totalTau.y + totalTau.z) / 3.0);
-    float alpha = 1.0 - transmittance;
-
-    gl_FragColor = vec4(inScatter, clamp(alpha, 0.0, 1.0));
+    float mu = dot(normalize(vNormal), normalize(vViewDir));
+    // Fresnel-like: bright at edges (mu→0), transparent at center (mu→1)
+    float rim = pow(1.0 - max(mu, 0.0), 3.0);
+    // Blend Rayleigh (molecular) and Mie (aerosol/dust) scattering colors
+    vec3 color = mix(u_rayleighColor, u_mieColor, u_mieWeight);
+    gl_FragColor = vec4(color, rim * u_intensity);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -471,7 +185,7 @@ interface BodyData {
     metallicity?: number;
     age?: number;
     spectralType?: string;
-    limbDarkeningCoeffs?: number[];
+    limbDarkeningCoeffs?: [number, number];
     flareRate?: number;
     spotFraction?: number;
     composition?: string;
@@ -492,9 +206,7 @@ interface BodyData {
 type FlareQuality = 'Off' | 'Low' | 'High' | 'Ultra';
 
 interface StarRenderOptions {
-    limbDarkeningEnabled: boolean;
     granulationEnabled: boolean;
-    granulationSize: number;
     starspotsEnabled: boolean;
     flareQuality: FlareQuality;
 }
@@ -504,22 +216,26 @@ interface StarRenderOptions {
 // Moon-Earth distance = 3.84e8m, Earth-Sun distance = 1.496e11m (1 AU)
 
 const AU = 1.495978707e11;
-const L_SUN = 3.828e26; // Solar luminosity in Watts
 
 function scaleRadius(realRadius: number): number {
     return realRadius;
 }
 
-function splitmix32(seed: number): () => number {
-    let state = seed | 0;
+function mulberry32(seed: number): () => number {
+    let t = seed >>> 0;
     return () => {
-        state = (state + 0x9e3779b9) | 0;
-        let z = state;
-        z = Math.imul(z ^ (z >>> 16), 0x85ebca6b);
-        z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35);
-        z = (z ^ (z >>> 16)) >>> 0;
-        return z / 0x100000000;
+        t += 0x6D2B79F5;
+        let r = Math.imul(t ^ (t >>> 15), t | 1);
+        r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
     };
+}
+
+function hash01(ix: number, iy: number, seed: number): number {
+    let h = (ix * 374761393) ^ (iy * 668265263) ^ (seed * 1442695041);
+    h = (h ^ (h >>> 13)) * 1274126177;
+    h = h ^ (h >>> 16);
+    return (h >>> 0) / 4294967296;
 }
 
 function convectiveField(u: number, v: number, density: number, seed: number): number {
@@ -536,8 +252,8 @@ function convectiveField(u: number, v: number, density: number, seed: number): n
             const cellX = cx + ox;
             const cellY = cy + oy;
 
-            const jitterX = (hashUnit(seed, cellX * 65537 + cellY, 0) - 0.5) * 0.75;
-            const jitterY = (hashUnit(seed + 97, cellX * 65537 + cellY, 1) - 0.5) * 0.75;
+            const jitterX = (hash01(cellX, cellY, seed) - 0.5) * 0.75;
+            const jitterY = (hash01(cellX, cellY, seed + 97) - 0.5) * 0.75;
 
             const px = cellX + 0.5 + jitterX;
             const py = cellY + 0.5 + jitterY;
@@ -575,10 +291,10 @@ function valueNoise2D(u: number, v: number, frequency: number, seed: number): nu
     const sx = fx * fx * (3 - 2 * fx);
     const sy = fy * fy * (3 - 2 * fy);
 
-    const n00 = hashUnit(seed, x0 * 65537 + y0, 0);
-    const n10 = hashUnit(seed, x1 * 65537 + y0, 0);
-    const n01 = hashUnit(seed, x0 * 65537 + y1, 0);
-    const n11 = hashUnit(seed, x1 * 65537 + y1, 0);
+    const n00 = hash01(x0, y0, seed);
+    const n10 = hash01(x1, y0, seed);
+    const n01 = hash01(x0, y1, seed);
+    const n11 = hash01(x1, y1, seed);
 
     const nx0 = n00 * (1 - sx) + n10 * sx;
     const nx1 = n01 * (1 - sx) + n11 * sx;
@@ -593,7 +309,7 @@ function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture
     const image = ctx.createImageData(size, size);
     const data = image.data;
 
-    const random = splitmix32(seed);
+    const random = mulberry32(seed);
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
             const i = (y * size + x) * 4;
@@ -606,13 +322,7 @@ function createGranulationTexture(seed: number, size = 256): THREE.CanvasTexture
             const microNoise = (random() * 2.0 - 1.0) * 0.06;
 
             const field = 0.62 * layerA + 0.38 * layerB;
-
-            // Extra high-frequency noise octave at large sizes (512+)
-            const hiFreq = size >= 512
-                ? valueNoise2D(gx, gy, 120.0, seed + 2741) * 0.04
-                : 0;
-
-            const modulated = field * (0.9 + 0.18 * macro) + microNoise + hiFreq;
+            const modulated = field * (0.9 + 0.18 * macro) + microNoise;
             const v = Math.max(0, Math.min(255, Math.round(modulated * 255)));
 
             data[i] = v;
@@ -1106,8 +816,8 @@ void main() {
             : this.flareQuality === 'High'
                 ? 1 / 150
                 : 1 / 95;
-        // Effective flare rate from quality preset + body flare rate
-        return Math.min(0.8, baseline + this.flareRate * 90.0);
+        // TEMP TEST TUNING: 10x flare frequency for quick visual validation
+        return Math.min(0.8, (baseline + this.flareRate * 90.0) * 10.0);
     }
 
     private spawnEvent(startTime: number): void {
@@ -1268,13 +978,6 @@ void main() {
 export class BodyRenderer {
     private scene: THREE.Scene;
     private bodies: Map<number, BodyMesh> = new Map();
-    // Shared blackbody LUT texture for all star shaders
-    private readonly blackbodyLUT: THREE.DataTexture;
-
-    // Cached scratch vectors for per-frame atmosphere updates (avoids GC pressure)
-    private readonly _scratchPos = new THREE.Vector3();
-    private readonly _scratchBodyPos = new THREE.Vector3();
-    private readonly _scratchColor = new THREE.Vector3();
 
     // Grid
     private gridGroup: THREE.Group | null = null;
@@ -1288,9 +991,7 @@ export class BodyRenderer {
     private renderScale = 1;
     private sphereSegments = { width: 64, height: 32 };
     private starRenderOptions: StarRenderOptions = {
-        limbDarkeningEnabled: true,
         granulationEnabled: true,
-        granulationSize: 256,
         starspotsEnabled: false,
         flareQuality: 'Low',
     };
@@ -1319,7 +1020,6 @@ export class BodyRenderer {
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
-        this.blackbodyLUT = createBlackbodyLUT();
     }
 
     setRenderScale(scale: number): void {
@@ -1329,11 +1029,6 @@ export class BodyRenderer {
     }
 
     setStarRenderOptions(options: Partial<StarRenderOptions>): void {
-        const nextLimbDarkeningEnabled =
-            typeof options.limbDarkeningEnabled === 'boolean'
-                ? options.limbDarkeningEnabled
-                : this.starRenderOptions.limbDarkeningEnabled;
-
         const nextGranulationEnabled =
             typeof options.granulationEnabled === 'boolean'
                 ? options.granulationEnabled
@@ -1350,7 +1045,6 @@ export class BodyRenderer {
                 : this.starRenderOptions.flareQuality;
 
         if (
-            nextLimbDarkeningEnabled === this.starRenderOptions.limbDarkeningEnabled &&
             nextGranulationEnabled === this.starRenderOptions.granulationEnabled &&
             nextStarspotsEnabled === this.starRenderOptions.starspotsEnabled &&
             nextFlareQuality === this.starRenderOptions.flareQuality
@@ -1358,22 +1052,13 @@ export class BodyRenderer {
             return;
         }
 
-        this.starRenderOptions.limbDarkeningEnabled = nextLimbDarkeningEnabled;
         this.starRenderOptions.granulationEnabled = nextGranulationEnabled;
         this.starRenderOptions.starspotsEnabled = nextStarspotsEnabled;
         this.starRenderOptions.flareQuality = nextFlareQuality;
         for (const mesh of this.bodies.values()) {
-            mesh.setLimbDarkeningEnabled(nextLimbDarkeningEnabled);
             mesh.setGranulationEnabled(nextGranulationEnabled);
             mesh.setStarspotsEnabled(nextStarspotsEnabled);
             mesh.setFlareQuality(nextFlareQuality);
-        }
-    }
-
-    /** Set atmosphere ray march quality for all bodies (preset-driven) */
-    setAtmosphereQuality(viewSteps: number, sunSteps: number): void {
-        for (const mesh of this.bodies.values()) {
-            mesh.setAtmosphereQuality(viewSteps, sunSteps);
         }
     }
 
@@ -1390,7 +1075,6 @@ export class BodyRenderer {
             this.sphereSegments.width,
             this.sphereSegments.height,
             this.starRenderOptions,
-            this.blackbodyLUT,
         );
         this.bodies.set(body.id, mesh);
         this.scene.add(mesh.group);
@@ -1399,20 +1083,14 @@ export class BodyRenderer {
         const radius = scaleRadius(body.radius * this.renderScale);
         mesh.setScale(radius);
 
-        // Physically-based point light — tinted to blackbody, intensity from luminosity
-        // decay=0, distance=0 (uniform intensity, no falloff) because
-        // physical inverse-square falloff is unusable at astronomical distances
-        // in Three.js (1 AU ≈ 1.5e11 m → 1/d² ≈ 4.5e-23).
+        // F5: Physically-based point light for stars — tinted to blackbody, intensity from luminosity
         if (body.type === 'star') {
             const teff = body.effectiveTemperature ?? 5778;
-            // Use linear-light RGB for PointLight (Three.js treats Color as linear)
-            const [lr, lg, lb] = blackbodyToLinearRGBNorm(teff > 0 ? teff : 5778);
+            const [lr, lg, lb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
             const lightColor = new THREE.Color(lr, lg, lb);
-            // Intensity from luminosity ratio (log scale, HDR-safe)
-            // Sun = 2.0, brighter stars up to 4.0 for visible planet illumination
-            const lum = body.luminosity ?? L_SUN;
-            const L_ratio = lum / L_SUN;
-            const intensity = Math.min(4.0, Math.max(0.8, 2.0 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
+            // Intensity proportional to luminosity (log scale, clamped)
+            const lum = body.luminosity ?? 1;
+            const intensity = Math.min(10, Math.max(0.5, 1.5 + Math.log10(Math.max(lum, 0.001))));
             const light = new THREE.PointLight(lightColor, intensity, 0, 0);
             mesh.group.add(light);
         }
@@ -1789,53 +1467,9 @@ export class BodyRenderer {
     }
 
     /** Update body rotations based on simulation time */
-    updateBodies(simTime: number, cameraPos?: THREE.Vector3): void {
+    updateBodies(simTime: number): void {
         for (const mesh of this.bodies.values()) {
             mesh.updateRotation(simTime);
-            if (cameraPos) {
-                mesh.updateCameraDistance(cameraPos);
-            }
-        }
-    }
-
-    /**
-     * Update atmosphere uniforms for all bodies with atmospheres.
-     * Finds the brightest/nearest star and passes its position and color
-     * to each atmosphere shader for Nishita single-scattering lighting.
-     */
-    updateAtmospheres(): void {
-        // Find all star positions and colors
-        const stars: { pos: THREE.Vector3; color: THREE.Vector3; luminosity: number }[] = [];
-        for (const mesh of this.bodies.values()) {
-            if (mesh.type === 'star') {
-                this._scratchPos.set(0, 0, 0);
-                mesh.group.getWorldPosition(this._scratchPos);
-                // Extract star color from point light if available
-                const light = mesh.group.children.find(c => c instanceof THREE.PointLight) as THREE.PointLight | undefined;
-                const color = light
-                    ? this._scratchColor.set(light.color.r, light.color.g, light.color.b).multiplyScalar(light.intensity)
-                    : this._scratchColor.set(1, 1, 1);
-                // Clone into the array since we need stable references
-                stars.push({ pos: this._scratchPos.clone(), color: color.clone(), luminosity: light?.intensity ?? 1 });
-            }
-        }
-
-        if (stars.length === 0) return;
-
-        // For each body with an atmosphere, find the nearest 2 stars and update
-        for (const mesh of this.bodies.values()) {
-            if (mesh.type === 'star') continue;
-            if (!mesh.atmosphereMesh) continue;
-            this._scratchBodyPos.set(0, 0, 0);
-            mesh.group.getWorldPosition(this._scratchBodyPos);
-
-            // Sort by distance and take up to 2 nearest stars
-            const sorted = stars
-                .map(s => ({ ...s, dist: this._scratchBodyPos.distanceToSquared(s.pos) }))
-                .sort((a, b) => a.dist - b.dist)
-                .slice(0, 2);
-
-            mesh.updateAtmosphere(sorted);
         }
     }
 
@@ -1961,7 +1595,7 @@ export class BodyRenderer {
 
         this.gridGroup = new THREE.Group();
         const material = new THREE.LineBasicMaterial({
-            color: 0x555555,
+            color: 0xffffff,
             transparent: true,
             opacity: 0.25,
         });
@@ -2011,7 +1645,7 @@ class BodyMesh {
     private mesh: THREE.Mesh;
     private geometry: THREE.SphereGeometry;
     private material: THREE.Material;
-    atmosphereMesh: THREE.Mesh | null = null;
+    private atmosphereMesh: THREE.Mesh | null = null;
     private starMaterial: THREE.ShaderMaterial | null = null;
     private granulationTexture: THREE.Texture | null = null;
     private flareSystem: StarFlareSystem | null = null;
@@ -2025,17 +1659,11 @@ class BodyMesh {
     private rotationRate = 0;
     private spinAxis: THREE.Vector3 | null = null;
 
-    // Pre-allocated scratch objects for per-frame methods
-    private readonly _cachedQuat = new THREE.Quaternion();
-    private readonly _cachedPlanetCenter = new THREE.Vector3();
-    private readonly _cachedDir = new THREE.Vector3();
-
     constructor(
         body: BodyData,
         segmentsWidth: number,
         segmentsHeight: number,
         starOptions: StarRenderOptions,
-        blackbodyLUT?: THREE.DataTexture,
     ) {
         this.realRadius = body.radius;
         this.type = body.type;
@@ -2063,58 +1691,25 @@ class BodyMesh {
         if (body.type === 'star') {
             const teff = body.effectiveTemperature ?? 5778;
             const [r, g, b] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
-            // Parse 12-element Claret 4-param limb darkening coefficients [R_c1..c4, G_c1..c4, B_c1..c4]
-            const ldc = body.limbDarkeningCoeffs ?? [];
-            const limbR = ldc.length >= 12
-                ? new THREE.Vector4(ldc[0], ldc[1], ldc[2], ldc[3])
-                : new THREE.Vector4(0.38, 0.18, 0.02, 0.0);   // Solar defaults
-            const limbG = ldc.length >= 12
-                ? new THREE.Vector4(ldc[4], ldc[5], ldc[6], ldc[7])
-                : new THREE.Vector4(0.50, 0.08, 0.15, -0.02);
-            const limbB = ldc.length >= 12
-                ? new THREE.Vector4(ldc[8], ldc[9], ldc[10], ldc[11])
-                : new THREE.Vector4(0.64, -0.08, 0.30, -0.08);
+            const [limbA, limbB] = body.limbDarkeningCoeffs ?? [0.6, 0.0];
             const seed = (body.seed ?? body.id) | 0;
-            this.granulationTexture = createGranulationTexture(seed === 0 ? 1 : seed, starOptions.granulationSize);
+            this.granulationTexture = createGranulationTexture(seed === 0 ? 1 : seed);
             const spotFraction = Math.max(0, Math.min(0.3, body.spotFraction ?? 0));
-
-            // Emissive intensity from luminosity — drives HDR bloom
-            // Range [1.0, 5.0]: dim M-dwarfs get 1.0 (no bloom), Sun gets 2.0,
-            // luminous giants up to 5.0.  The shader applies this as a
-            // center-weighted bloom boost (mu^4 profile), so the value
-            // controls peak bloom brightness, not uniform disk scaling.
-            const luminosity = body.luminosity ?? L_SUN;
-            const L_ratio = luminosity / L_SUN;
-            const emissiveIntensity = Math.min(5.0, Math.max(1.0, 2.0 + Math.log10(Math.max(L_ratio, 0.01)) * 0.5));
-
-            // 1-pixel-tall DataTexture as LUT fallback (white)
-            const defaultLUT = new THREE.DataTexture(
-                new Float32Array([1, 1, 1, 1]), 1, 1, THREE.RGBAFormat, THREE.FloatType,
-            );
-            defaultLUT.needsUpdate = true;
 
             this.material = new THREE.ShaderMaterial({
                 vertexShader: STAR_VERTEX,
                 fragmentShader: STAR_FRAGMENT,
                 uniforms: {
                     u_color: { value: new THREE.Vector3(r, g, b) },
-                    u_limbCoeffsR: { value: limbR },
-                    u_limbCoeffsG: { value: limbG },
-                    u_limbCoeffsB: { value: limbB },
-                    u_emissiveIntensity: { value: emissiveIntensity },
-                    u_limbDarkeningEnabled: { value: starOptions.limbDarkeningEnabled ? 1.0 : 0.0 },
+                    u_limbA: { value: limbA },
+                    u_limbB: { value: limbB },
                     u_granulationMap: { value: this.granulationTexture },
                     u_granulationStrength: { value: starOptions.granulationEnabled ? 1.0 : 0.0 },
                     u_time: { value: 0.0 },
                     u_spotFraction: { value: spotFraction },
                     u_spotEnabled: { value: starOptions.starspotsEnabled ? 1.0 : 0.0 },
                     u_spotSeed: { value: seed === 0 ? 1 : seed },
-                    u_blackbodyLUT: { value: blackbodyLUT ?? defaultLUT },
-                    u_teff: { value: Math.max(1000, teff) },
-                    u_luminosity: { value: L_ratio },
-                    u_cameraDistanceSq: { value: 1.0e22 }, // default ~1 AU²
                 },
-                toneMapped: false,
             });
             this.starMaterial = this.material as THREE.ShaderMaterial;
 
@@ -2144,101 +1739,65 @@ class BodyMesh {
             this.mesh.add(this.flareSystem.group);
         }
 
+        // Add glow effect for stars — tinted to blackbody color (D3)
+        if (body.type === 'star') {
+            const teff = body.effectiveTemperature ?? 5778;
+            const [cr, cg, cb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
+            const bbHex = ((Math.round(cr * 255) & 0xff) << 16) |
+                          ((Math.round(cg * 255) & 0xff) << 8)  |
+                           (Math.round(cb * 255) & 0xff);
+            const luminosity = body.luminosity ?? 1;
+            this.addStarGlow(bbHex, luminosity);
+        }
+
         // F3: Atmosphere shell for bodies with atmosphere data
         if (body.atmosphere && body.atmosphere.height > 0) {
             this.addAtmosphereShell(body, segmentsWidth, segmentsHeight);
         }
     }
 
-    /** Nishita single-scattering atmosphere shell */
+    /** F3: Add atmosphere glow shell */
     private addAtmosphereShell(body: BodyData, segW: number, segH: number): void {
         const atm = body.atmosphere!;
-        const rc = atm.rayleighCoefficients;
-        const mc = atm.mieColor ?? [1, 1, 1];
-        const relHeight = atm.height / body.radius;
 
-        // Mie scale height is roughly 1.2× Rayleigh scale height
-        const scaleHeightR = atm.scaleHeight;
-        const scaleHeightM = atm.scaleHeight * 1.2;
+        // Rayleigh coefficients → normalized visible color [0,1]
+        const rc = atm.rayleighCoefficients;
+        const maxR = Math.max(rc[0], rc[1], rc[2], 1e-10);
+        const rayleighColor = new THREE.Vector3(rc[0] / maxR, rc[1] / maxR, rc[2] / maxR);
+
+        // Mie scattering color from dust/haze composition
+        const mc = atm.mieColor ?? [1, 1, 1];
+        const mieColor = new THREE.Vector3(mc[0], mc[1], mc[2]);
+
+        // Weight: how much Mie dominates vs Rayleigh
+        // Uses ratio of mie coefficient to average Rayleigh coefficient
+        const avgRayleigh = (rc[0] + rc[1] + rc[2]) / 3;
+        const mieWeight = atm.mieCoefficient / (atm.mieCoefficient + avgRayleigh + 1e-15);
+
+        // Intensity based on atmosphere thickness relative to body size
+        const relHeight = atm.height / body.radius;
+        const intensity = Math.min(1.0, 0.4 + relHeight * 2.0);
 
         const atmoGeo = new THREE.SphereGeometry(1, segW, segH);
         const atmoMat = new THREE.ShaderMaterial({
             vertexShader: ATMO_VERTEX,
             fragmentShader: ATMO_FRAGMENT,
             uniforms: {
-                u_planetCenter:  { value: new THREE.Vector3(0, 0, 0) },
-                u_planetRadius:  { value: body.radius },
-                u_atmoRadius:    { value: body.radius + atm.height },
-                u_sunDirection:  { value: new THREE.Vector3(0, 1, 0) },
-                u_sunColor:      { value: new THREE.Vector3(1, 1, 1) },
-                u_sunDirection2: { value: new THREE.Vector3(0, 1, 0) },
-                u_sunColor2:     { value: new THREE.Vector3(0, 0, 0) },
-                u_starCount:     { value: 1 },
-                u_betaR:         { value: new THREE.Vector3(rc[0], rc[1], rc[2]) },
-                u_betaM:         { value: atm.mieCoefficient },
-                u_mieG:          { value: atm.mieDirection },
-                u_mieColor:      { value: new THREE.Vector3(mc[0], mc[1], mc[2]) },
-                u_scaleHeightR:  { value: scaleHeightR },
-                u_scaleHeightM:  { value: scaleHeightM },
-                u_viewSteps:     { value: 8 },  // overridden by preset
-                u_sunSteps:      { value: 4 },   // overridden by preset
+                u_rayleighColor: { value: rayleighColor },
+                u_mieColor:      { value: mieColor },
+                u_mieWeight:     { value: mieWeight },
+                u_intensity:     { value: intensity },
             },
             transparent: true,
             side: THREE.BackSide,
             depthWrite: false,
-            blending: THREE.NormalBlending,
-            toneMapped: false,
+            blending: THREE.AdditiveBlending,
         });
 
         this.atmosphereMesh = new THREE.Mesh(atmoGeo, atmoMat);
+        // Scale will be set in setScale — atmosphere is slightly larger than body
         this.atmosphereMesh.userData.atmosphereScale = 1 + relHeight;
-        this.atmosphereMesh.userData.bodyRadius = body.radius;
-        this.atmosphereMesh.userData.baseScaleHeightR = scaleHeightR;
-        this.atmosphereMesh.userData.baseScaleHeightM = scaleHeightM;
         this.group.add(this.atmosphereMesh);
-    }
-
-    /**
-     * Update atmosphere uniforms each frame: sun direction, sun color,
-     * and world-space planet center (tracks floating origin).
-     */
-    updateAtmosphere(
-        stars: { pos: THREE.Vector3; color: THREE.Vector3 }[],
-    ): void {
-        if (!this.atmosphereMesh || stars.length === 0) return;
-        const mat = this.atmosphereMesh.material as THREE.ShaderMaterial;
-        if (!mat.uniforms.u_sunDirection) return;
-
-        // Planet center in world space = group position
-        this._cachedPlanetCenter.set(0, 0, 0);
-        this.group.getWorldPosition(this._cachedPlanetCenter);
-        mat.uniforms.u_planetCenter.value.copy(this._cachedPlanetCenter);
-
-        // Star 1: direction FROM planet TO star
-        this._cachedDir.copy(stars[0].pos).sub(this._cachedPlanetCenter).normalize();
-        mat.uniforms.u_sunDirection.value.copy(this._cachedDir);
-        mat.uniforms.u_sunColor.value.copy(stars[0].color);
-
-        // Star 2 (if present)
-        if (stars.length > 1) {
-            this._cachedDir.copy(stars[1].pos).sub(this._cachedPlanetCenter).normalize();
-            mat.uniforms.u_sunDirection2.value.copy(this._cachedDir);
-            mat.uniforms.u_sunColor2.value.copy(stars[1].color);
-            mat.uniforms.u_starCount.value = 2;
-        } else {
-            mat.uniforms.u_sunColor2.value.set(0, 0, 0);
-            mat.uniforms.u_starCount.value = 1;
-        }
-    }
-
-    /** Set atmosphere ray march quality (steps along view/sun rays) */
-    setAtmosphereQuality(viewSteps: number, sunSteps: number): void {
-        if (!this.atmosphereMesh) return;
-        const mat = this.atmosphereMesh.material as THREE.ShaderMaterial;
-        if (mat.uniforms.u_viewSteps) {
-            mat.uniforms.u_viewSteps.value = viewSteps;
-            mat.uniforms.u_sunSteps.value = sunSteps;
-        }
     }
 
     /** F4: Derive a reasonable surface color from physics when no named color exists */
@@ -2282,24 +1841,8 @@ class BodyMesh {
 
         if (!this.spinAxis || this.rotationRate === 0) return;
         const angle = this.rotationRate * simTime;
-        this._cachedQuat.setFromAxisAngle(this.spinAxis, angle);
-        this.group.quaternion.copy(this._cachedQuat);
-    }
-
-    /** Update per-frame camera distance² for distance-dependent effects */
-    updateCameraDistance(cameraPos: THREE.Vector3): void {
-        if (!this.starMaterial?.uniforms.u_cameraDistanceSq) return;
-        const dx = this.group.position.x - cameraPos.x;
-        const dy = this.group.position.y - cameraPos.y;
-        const dz = this.group.position.z - cameraPos.z;
-        const distSq = dx * dx + dy * dy + dz * dz;
-        this.starMaterial.uniforms.u_cameraDistanceSq.value = Math.max(distSq, 1.0);
-    }
-
-    setLimbDarkeningEnabled(enabled: boolean): void {
-        if (this.starMaterial?.uniforms.u_limbDarkeningEnabled) {
-            this.starMaterial.uniforms.u_limbDarkeningEnabled.value = enabled ? 1.0 : 0.0;
-        }
+        const q = new THREE.Quaternion().setFromAxisAngle(this.spinAxis, angle);
+        this.group.quaternion.copy(q);
     }
 
     setGranulationEnabled(enabled: boolean): void {
@@ -2335,32 +1878,63 @@ class BodyMesh {
             } else {
                 this.atmosphereMesh.scale.setScalar(atmoR);
             }
-
-            // Update atmosphere shader radii to match visual scale.
-            // The scale factor = visual radius / physical radius.
-            const mat = this.atmosphereMesh.material as THREE.ShaderMaterial;
-            if (mat.uniforms.u_planetRadius) {
-                const physRadius = this.atmosphereMesh.userData.bodyRadius as number;
-                const scaleFactor = radius / (physRadius || 1);
-                mat.uniforms.u_planetRadius.value = radius;
-                mat.uniforms.u_atmoRadius.value = atmoR;
-                mat.uniforms.u_scaleHeightR.value = (this.atmosphereMesh.userData.baseScaleHeightR as number) * scaleFactor;
-                mat.uniforms.u_scaleHeightM.value = (this.atmosphereMesh.userData.baseScaleHeightM as number) * scaleFactor;
-            }
         }
 
+        // Also scale glow sprites for stars
+        for (const child of this.group.children) {
+            if (child instanceof THREE.Sprite) {
+                child.scale.set(radius * 8, radius * 8, 1);
+            }
+        }
     }
 
     setSegments(segmentsWidth: number, segmentsHeight: number): void {
         this.geometry.dispose();
         this.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
         this.mesh.geometry = this.geometry;
+    }
 
-        // Update atmosphere shell geometry to match new tessellation
-        if (this.atmosphereMesh) {
-            this.atmosphereMesh.geometry.dispose();
-            this.atmosphereMesh.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
-        }
+    private addStarGlow(color: number, luminosity: number): void {
+        // Glow intensity scales with luminosity (log, clamped)
+        const glowOpacity = Math.min(1.0, 0.3 + 0.15 * Math.log10(Math.max(luminosity, 0.01)));
+
+        const spriteMaterial = new THREE.SpriteMaterial({
+            map: this.createGlowTexture(),
+            color: color,
+            transparent: true,
+            opacity: glowOpacity,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(1, 1, 1); // Will be scaled by setScale
+        this.group.add(sprite);
+    }
+
+    private createGlowTexture(): THREE.Texture {
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx = canvas.getContext('2d')!;
+        const gradient = ctx.createRadialGradient(
+            size / 2, size / 2, 0,
+            size / 2, size / 2, size / 2
+        );
+
+        // Neutral white gradient — colour is applied via SpriteMaterial.color
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.15, 'rgba(255, 255, 255, 0.85)');
+        gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.3)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        return texture;
     }
 
     dispose(): void {
