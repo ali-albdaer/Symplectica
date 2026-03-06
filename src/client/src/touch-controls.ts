@@ -30,6 +30,11 @@ export class TouchControls {
     private lastTouchY = 0;
     private isTouching = false;
 
+    // Bound event handler references for proper cleanup
+    private boundTouchStart = this.handleTouchStart.bind(this);
+    private boundTouchMove = this.handleTouchMove.bind(this);
+    private boundTouchEnd = this.handleTouchEnd.bind(this);
+
     constructor(callbacks: TouchControlCallbacks) {
         this.callbacks = callbacks;
     }
@@ -253,18 +258,18 @@ export class TouchControls {
         if (!canvas) return;
 
         // Touch start
-        canvas.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
-        canvas.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
-        canvas.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
+        canvas.addEventListener('touchstart', this.boundTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+        canvas.addEventListener('touchend', this.boundTouchEnd, { passive: false });
     }
 
     private removeCameraGestures(): void {
         const canvas = document.getElementById('canvas-container');
         if (!canvas) return;
 
-        canvas.removeEventListener('touchstart', this.handleTouchStart.bind(this));
-        canvas.removeEventListener('touchmove', this.handleTouchMove.bind(this));
-        canvas.removeEventListener('touchend', this.handleTouchEnd.bind(this));
+        canvas.removeEventListener('touchstart', this.boundTouchStart);
+        canvas.removeEventListener('touchmove', this.boundTouchMove);
+        canvas.removeEventListener('touchend', this.boundTouchEnd);
     }
 
     private handleTouchStart(e: TouchEvent): void {
