@@ -23,7 +23,7 @@ export interface VisualizationOptions {
 
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
 
-const AU = 1.495978707e11;
+import { AU } from '../../shared/constants';
 const DEFAULTS: VisualizationOptions = { ...APP_DEFAULTS.optionsDefaults };
 
 export class OptionsPanel {

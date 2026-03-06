@@ -9,14 +9,7 @@
  * - Physics contribution toggle
  */
 
-// Physical constants
-const AU = 1.495978707e11;
-const M_SUN = 1.98892e30;
-const M_EARTH = 5.9722e24;
-const M_MOON = 7.342e22;
-const R_SUN = 6.9634e8;
-const R_EARTH = 6.371e6;
-const R_MOON = 1.7374e6;
+import { AU, G, M_SUN, M_EARTH, M_MOON, R_SUN, R_EARTH, R_MOON } from '../../shared/constants';
 
 export type BuildableBodyType = 'star' | 'planet' | 'moon' | 'asteroid' | 'comet' | 'spacecraft';
 
@@ -864,7 +857,6 @@ export class BuildPanel {
     private calculateOrbitalVelocity(): void {
         // Calculate circular orbital velocity around central mass at current position
         // v = sqrt(G * M / r)
-        const G = 6.6743e-11;
         const r = Math.sqrt(this.params.x ** 2 + this.params.y ** 2 + this.params.z ** 2);
         
         if (r < 1e6) {

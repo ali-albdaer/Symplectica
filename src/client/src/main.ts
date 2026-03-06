@@ -26,8 +26,7 @@ import { TouchControls } from './touch-controls';
 import { BuildPanel, BuildBodyParams, BuildableBodyType, BodyListEntry } from './build-panel';
 import { APP_DEFAULTS } from './defaults';
 
-// Physical constants (SI units)
-const AU = 1.495978707e11; // meters
+import { AU, G, M_SUN, L_SUN } from '../../shared/constants';
 const LOCAL_TICK_RATE = APP_DEFAULTS.adminDefaults.tickRate;
 const LOCAL_PRESET_PLAYER = 'local';
 
@@ -46,6 +45,7 @@ interface NetworkStatePayload {
     tick: number;
     time: number;
     positions: number[];
+    velocities?: number[];
     energy: number;
 }
 
@@ -88,6 +88,7 @@ class NBodyClient {
 
     private lastServerState?: NetworkStatePayload;
     private lastServerPositions = new Float64Array(0);
+    private lastServerVelocities = new Float64Array(0);
 
     // Track visualization options to restore after body refresh
     private currentVizOptions: VisualizationOptions = { ...APP_DEFAULTS.optionsDefaults };
@@ -475,6 +476,7 @@ class NBodyClient {
     private applyServerState(state: NetworkStatePayload): void {
         this.lastServerState = state;
         this.lastServerPositions = new Float64Array(state.positions);
+        this.lastServerVelocities = state.velocities ? new Float64Array(state.velocities) : this.lastServerVelocities;
     }
 
     private initRenderer(): void {
@@ -1038,9 +1040,6 @@ class NBodyClient {
         const body = bodies[this.followBodyIndex];
         const isStar = body.type === 'star';
         const isPlanetOrMoon = body.type === 'planet' || body.type === 'moon';
-        const AU = 1.495978707e11;
-        const L_SUN = 3.828e26;
-        const M_SUN = 1.98892e30;
 
         clearDetails();
 
@@ -1057,7 +1056,6 @@ class NBodyClient {
         }
 
         // Surface gravity
-        const G = 6.6743e-11;
         if (body.mass > 0 && body.radius > 0) {
             const g = G * body.mass / (body.radius * body.radius);
             setText('follow-gravity', g < 100 ? g.toFixed(2) + ' m/s²' : g.toExponential(2) + ' m/s²');
@@ -1223,6 +1221,7 @@ class NBodyClient {
             this.state.tick = this.lastServerState!.tick;
             this.state.time = this.lastServerState!.time;
             this.state.positions = this.lastServerPositions;
+            this.state.velocities = this.lastServerVelocities;
             this.state.energy = this.lastServerState!.energy;
             this.state.bodyCount = Math.floor(this.lastServerPositions.length / 3);
         } else {
@@ -1251,7 +1250,7 @@ class NBodyClient {
                     }
 
                     if (steps >= maxSteps) {
-                        this.localTickAccumulator = 0;
+                        this.localTickAccumulator = Math.min(this.localTickAccumulator, maxSteps * tickInterval);
                     }
                     stepsThisFrame = steps;
                 }

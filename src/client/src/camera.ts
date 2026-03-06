@@ -9,8 +9,7 @@
  */
 
 import * as THREE from 'three';
-
-const AU = 1.495978707e11;
+import { AU } from '../../shared/constants';
 
 export class OrbitCamera extends THREE.PerspectiveCamera {
     // Orbital parameters
