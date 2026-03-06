@@ -130,14 +130,23 @@ impl OrbitalElements {
         
         // Newton-Raphson iteration
         let mut eccentric_anomaly = m; // Initial guess
+        let mut converged = false;
         for _ in 0..50 {
             let f = eccentric_anomaly - e * eccentric_anomaly.sin() - m;
             let f_prime = 1.0 - e * eccentric_anomaly.cos();
             let delta = f / f_prime;
             eccentric_anomaly -= delta;
             if delta.abs() < 1e-12 {
+                converged = true;
                 break;
             }
+        }
+        if !converged {
+            let residual = (eccentric_anomaly - e * eccentric_anomaly.sin() - m).abs();
+            eprintln!(
+                "WARNING: Kepler solver did not converge after 50 iterations (e={:.6}, M={:.6}, residual={:.2e})",
+                e, m, residual
+            );
         }
         eccentric_anomaly
     }
