@@ -730,6 +730,29 @@ export class AdminPanel {
                 APP_DEFAULTS.defaultPreset.barycentric,
                 APP_DEFAULTS.defaultPreset.bodyCount ?? undefined
             );
+
+            // Reset local physics settings to defaults
+            const defaults = this.defaultAdminState();
+            this.physics.setTimeStep(defaults.dt);
+            this.physics.setSubsteps(defaults.substeps);
+            if (defaults.forceMethod === 'barnes-hut') {
+                this.physics.setTheta(defaults.theta);
+                this.physics.useBarnesHut();
+            } else {
+                this.physics.useDirectForce();
+            }
+            this.physics.setCloseEncounterIntegrator(defaults.closeEncounterIntegrator);
+            this.physics.setCloseEncounterThresholds(defaults.closeEncounterHillFactor, defaults.closeEncounterTidalRatio, defaults.closeEncounterJerkNorm);
+            this.physics.setCloseEncounterLimits(defaults.closeEncounterMaxSubsetSize, defaults.closeEncounterMaxTrialSubsteps);
+            this.physics.setCloseEncounterRk45Tolerances(defaults.closeEncounterRk45AbsTol, defaults.closeEncounterRk45RelTol);
+            this.physics.setCloseEncounterGaussRadau(defaults.closeEncounterGaussRadauMaxIters, defaults.closeEncounterGaussRadauTol);
+            this.timeController.setPhysicsTimestep(defaults.dt);
+            this.timeController.setSpeedBySimRate(defaults.timeScale);
+            this.onSimModeChange?.(defaults.simMode);
+
+            // Update admin panel UI to match defaults
+            this.applyServerSettings(defaults);
+
             console.log(`🔄 Simulation reset to ${APP_DEFAULTS.defaultPreset.id}`);
         }
         this.close();
