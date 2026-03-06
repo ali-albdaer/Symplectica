@@ -311,11 +311,11 @@ pub fn compute_accelerations_barnes_hut(bodies: &mut [Body], config: &ForceConfi
             continue;
         }
         
-        // TODO(softening_bh): Barnes-Hut currently uses global softening for all pairs.
-        //   For full per-body softening support, the octree nodes would need to store
-        //   softening info per-leaf, or use the target body's effective_softening as
-        //   a minimum. Current approach: use max(body.effective_softening, global).
-        let eps = body.effective_softening(config.softening);
+        // NOTE(softening_bh): Barnes-Hut cannot do per-pair softening like direct-sum
+        //   (which uses max(body_i, body_j) for each pair). The octree aggregates source
+        //   bodies, so only the target body's softening is available. We floor it at the
+        //   global softening to ensure BH is never less smooth than the global baseline.
+        let eps = body.effective_softening(config.softening).max(config.softening);
         let eps_sq = eps * eps;
 
         body.acceleration = octree.calculate_acceleration(
