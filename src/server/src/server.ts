@@ -82,7 +82,7 @@ interface WasmSimulation {
 
 // Message types
 interface ClientMessage {
-    type: 'join' | 'input' | 'ping' | 'request_snapshot' | 'chat' | 'admin_settings' | 'set_time_scale' | 'apply_snapshot' | 'reset_simulation' | 'set_pause';
+    type: 'join' | 'ping' | 'request_snapshot' | 'chat' | 'admin_settings' | 'set_time_scale' | 'apply_snapshot' | 'reset_simulation' | 'set_pause';
     payload?: unknown;
     clientTick?: number;
 }
@@ -133,7 +133,6 @@ interface Client {
     id: string;
     displayName: string;
     lastPing: number;
-    latency: number;
     role: 'viewer' | 'admin';
     messageTimestamps: number[];
 }
@@ -144,6 +143,7 @@ class SimulationServer {
     private wss!: WebSocketServer;
     private clients: Map<string, Client> = new Map();
     private tickInterval?: ReturnType<typeof setInterval>;
+    private cleanupInterval?: ReturnType<typeof setInterval>;
     private running = false;
     private lastSnapshotTick = 0n;
     private simAccumulator = 0;
@@ -339,7 +339,6 @@ class SimulationServer {
                 id: clientId,
                 displayName,
                 lastPing: Date.now(),
-                latency: 0,
                 role: CONFIG.adminPassword ? 'viewer' : 'admin',
                 messageTimestamps: [],
             };
@@ -509,10 +508,7 @@ class SimulationServer {
                 });
                 break;
 
-            case 'input':
-                // Handle player input - to be implemented
-                // For now, just acknowledge
-                break;
+
 
             case 'set_time_scale': {
                 if (client.role !== 'admin') {
@@ -748,6 +744,18 @@ class SimulationServer {
         this.running = true;
         const tickMs = 1000 / CONFIG.tickRate;
         let lastTime = performance.now();
+
+        // Periodically clean up dead clients (no ping in 60s)
+        this.cleanupInterval = setInterval(() => {
+            const now = Date.now();
+            for (const [id, client] of this.clients) {
+                if (now - client.lastPing > 60_000) {
+                    console.log(`[INFO] Closing dead client ${id} (no ping for 60s)`);
+                    client.ws.close();
+                    this.clients.delete(id);
+                }
+            }
+        }, 15_000);
 
         this.tickInterval = setInterval(() => {
             const now = performance.now();
@@ -1036,6 +1044,10 @@ class SimulationServer {
 
         if (this.tickInterval) {
             clearInterval(this.tickInterval);
+        }
+
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
         }
 
         if (this.simulation) {
