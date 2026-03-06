@@ -133,6 +133,7 @@ interface Client {
     id: string;
     displayName: string;
     lastPing: number;
+    isAlive: boolean;
     role: 'viewer' | 'admin';
     messageTimestamps: number[];
 }
@@ -339,6 +340,7 @@ class SimulationServer {
                 id: clientId,
                 displayName,
                 lastPing: Date.now(),
+                isAlive: true,
                 role: CONFIG.adminPassword ? 'viewer' : 'admin',
                 messageTimestamps: [],
             };
@@ -381,6 +383,10 @@ class SimulationServer {
                 } catch (error) {
                     console.error('Invalid message from client:', error);
                 }
+            });
+
+            ws.on('pong', () => {
+                client.isAlive = true;
             });
 
             ws.on('close', () => {
@@ -734,17 +740,19 @@ class SimulationServer {
         const tickMs = 1000 / CONFIG.tickRate;
         let lastTime = performance.now();
 
-        // Periodically clean up dead clients (no ping in 60s)
+        // Periodically ping clients and clean up dead connections
         this.cleanupInterval = setInterval(() => {
-            const now = Date.now();
             for (const [id, client] of this.clients) {
-                if (now - client.lastPing > 60_000) {
-                    console.log(`[INFO] Closing dead client ${id} (no ping for 60s)`);
-                    client.ws.close();
+                if (!client.isAlive) {
+                    console.log(`[INFO] Closing dead client ${id} (no pong response)`);
+                    client.ws.terminate();
                     this.clients.delete(id);
+                    continue;
                 }
+                client.isAlive = false;
+                client.ws.ping();
             }
-        }, 15_000);
+        }, 30_000);
 
         this.tickInterval = setInterval(() => {
             const now = performance.now();
