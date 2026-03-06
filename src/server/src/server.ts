@@ -584,8 +584,6 @@ class SimulationServer {
                     ? payload.timeScale
                     : this.adminState.timeScale;
 
-                const changes: string[] = [];
-
                 if (timeScale !== this.adminState.timeScale) {
                     const label = getSpeedLabel(timeScale);
                     this.broadcastChat({
@@ -653,15 +651,6 @@ class SimulationServer {
                     };
                 }
                 this.broadcastAdminState();
-
-                /*
-                if (changes.length > 0) {
-                    this.broadcastChat({
-                        sender: 'System',
-                        text: `Admin updated settings: ${changes.join(', ')}`
-                    });
-                }
-                */
                 break;
             }
 

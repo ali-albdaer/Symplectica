@@ -52,6 +52,15 @@ export class VisualPresetRegistry {
         this.presets = file.presets;
     }
 
+    static reset(): void {
+        this.presets = null;
+        this.defaultPreset = 'Low';
+        this.featureDescriptors.clear();
+        this.featureHooks.clear();
+        this.playerPresets.clear();
+        this.subscribers.clear();
+    }
+
     static setDefaultPreset(presetName: PresetName): void {
         this.defaultPreset = presetName;
     }

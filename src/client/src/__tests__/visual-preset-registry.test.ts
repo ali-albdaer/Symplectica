@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import visualPresets from '../visualPresets.json';
 import {
     VisualPresetRegistry,
@@ -6,6 +6,10 @@ import {
 } from '../visual-preset-registry';
 
 describe('VisualPresetRegistry', () => {
+    beforeEach(() => {
+        VisualPresetRegistry.reset();
+    });
+
     it('loads presets and returns the active preset', () => {
         const presets = visualPresets as VisualPresetsFile;
         VisualPresetRegistry.loadPresets(presets);

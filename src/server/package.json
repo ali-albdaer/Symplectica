@@ -1,7 +1,7 @@
 {
   "name": "@nbody/server",
   "version": "0.1.0",
-  "description": "WebSocket server for Symlectica",
+  "description": "WebSocket server for Symplectica",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {

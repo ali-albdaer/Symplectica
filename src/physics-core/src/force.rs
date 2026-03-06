@@ -107,7 +107,6 @@ pub fn compute_accelerations_direct(bodies: &mut [Body], config: &ForceConfig) {
 ///
 /// Includes all active bodies that contribute gravity.
 pub fn compute_potential_energy(bodies: &[Body], softening: f64) -> f64 {
-    let softening_squared = softening * softening;
     let mut energy = 0.0;
     let n = bodies.len();
 
@@ -121,6 +120,10 @@ pub fn compute_potential_energy(bodies: &[Body], softening: f64) -> f64 {
                 continue;
             }
 
+            // Per-pair softening consistent with compute_accelerations_direct
+            let eps = bodies[i].effective_softening(softening)
+                .max(bodies[j].effective_softening(softening));
+            let softening_squared = eps * eps;
             let r_squared = bodies[i].position.distance_squared(bodies[j].position);
             let r = (r_squared + softening_squared).sqrt();
             

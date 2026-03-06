@@ -115,7 +115,17 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             const deltaY = e.clientY - this.lastMouseY;
 
             if (this.isRightDrag) {
-                // UNIMPLEMENTED
+                // Pan: move focus in the camera's local right/up plane
+                const panSpeed = this.radius * 0.001;
+                const rightX = Math.cos(this.azimuth);
+                const rightZ = -Math.sin(this.azimuth);
+                const upX = -Math.sin(this.elevation) * Math.sin(this.azimuth);
+                const upY = Math.cos(this.elevation);
+                const upZ = -Math.sin(this.elevation) * Math.cos(this.azimuth);
+                this.focusX += (-deltaX * rightX + deltaY * upX) * panSpeed;
+                this.focusY += (deltaY * upY) * panSpeed;
+                this.focusZ += (-deltaX * rightZ + deltaY * upZ) * panSpeed;
+                this.updatePosition();
             } else {
                 // Rotate
                 const sensitivity = 0.005;
