@@ -18,6 +18,7 @@ interface StatePayload {
     tick: number;
     time: number;
     positions: number[];
+    velocities: number[];
     energy: number;
 }
 

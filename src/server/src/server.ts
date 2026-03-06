@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { CONFIG } from './config.js';
 import { APP_DEFAULTS } from './defaults.js';
+import { SPEED_LEVELS } from './constants.js';
 
 // Physics WASM module types (will be loaded dynamically)
 interface PhysicsModule {
@@ -32,17 +33,6 @@ interface PhysicsModule {
     circularVelocity: (mass: number, distance: number) => number;
     init: () => void;
 }
-
-// Speed levels for label lookup (should match time-controller.ts)
-const SPEED_LEVELS = [
-    { sim: 1, label: '1s/s' },
-    { sim: 60, label: '1min/s' },
-    { sim: 3600, label: '1hr/s' },
-    { sim: 86400, label: '1day/s' },
-    { sim: 604800, label: '1wk/s' },
-    { sim: 2592000, label: '1mo/s' },
-    { sim: 31536000, label: '1yr/s' },
-];
 
 function getSpeedLabel(sim: number): string {
     // Find exact match
@@ -108,6 +98,7 @@ interface StatePayload {
     tick: number;
     time: number;
     positions: number[];
+    velocities: number[];
     energy: number;
 }
 
@@ -775,7 +766,8 @@ class SimulationServer {
                         steps++;
                     }
                     if (steps >= maxSteps) {
-                        this.simAccumulator = 0;
+                        console.warn(`[WARN] Accumulator overflow: clamped to ${maxSteps} steps (${this.simAccumulator.toFixed(4)}s remaining)`);
+                        this.simAccumulator = Math.min(this.simAccumulator, maxSteps * this.adminState.dt);
                     }
                 } else {
                     this.simulation.step();
@@ -828,11 +820,13 @@ class SimulationServer {
 
     private broadcastState(): void {
         const positions = this.simulation.getPositions();
+        const velocities = this.simulation.getVelocities();
 
         const state: StatePayload = {
             tick: Number(this.simulation.tick()),
             time: this.simulation.time(),
             positions: Array.from(positions),
+            velocities: Array.from(velocities),
             energy: this.simulation.totalEnergy(),
         };
 

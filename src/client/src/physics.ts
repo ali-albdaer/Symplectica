@@ -132,6 +132,8 @@ export class PhysicsClient {
     private module!: PhysicsModule;
     private simulation!: WasmSimulation;
     private initialized = false;
+    private _cachedBodies: BodyInfo[] | null = null;
+    private _cachedBodyCount = -1;
 
     // Physical constants
     G = 0;
@@ -295,9 +297,14 @@ export class PhysicsClient {
         return this.simulation?.totalEnergy() ?? 0;
     }
 
-    /** Get body info for rendering */
+    /** Get body info for rendering. Cached — only re-parses JSON when body count changes. */
     getBodies(): BodyInfo[] {
         if (!this.simulation) return [];
+
+        const count = this.simulation.bodyCount();
+        if (this._cachedBodies && count === this._cachedBodyCount) {
+            return this._cachedBodies;
+        }
 
         try {
             const json = this.simulation.getBodiesJson();
@@ -337,7 +344,7 @@ export class PhysicsClient {
                 mean_surface_temperature?: number;
             }>;
 
-            return bodies.map(b => ({
+            const result = bodies.map(b => ({
                 id: b.id,
                 name: b.name,
                 type: this.parseBodyType(b.body_type),
@@ -373,6 +380,10 @@ export class PhysicsClient {
                 eccentricity: b.eccentricity ?? 0,
                 meanSurfaceTemperature: b.mean_surface_temperature ?? 0,
             }));
+
+            this._cachedBodies = result;
+            this._cachedBodyCount = count;
+            return result;
         } catch (e) {
             console.error('Failed to parse bodies:', e);
             return [];

@@ -7,27 +7,13 @@
  * - Accumulator ensures deterministic simulation regardless of framerate
  */
 
-export interface SpeedLevel {
-    /** Simulation seconds per real second */
-    sim: number;
-    /** Human-readable label for display */
-    label: string;
-}
+import { SpeedLevel, SPEED_LEVELS } from '../../shared/constants';
+
+export type { SpeedLevel };
 
 export class TimeController {
     // Fixed physics timestep (simulation seconds per step)
     private physicsTimestep = 3600;
-
-    // Speed levels (simulation seconds per real second)
-    private readonly SPEED_LEVELS: SpeedLevel[] = [
-        { sim: 1, label: '1s/s' },           // Real-time
-        { sim: 60, label: '1min/s' },        // 1 minute per second
-        { sim: 3600, label: '1hr/s' },       // 1 hour per second
-        { sim: 86400, label: '1day/s' },     // 1 day per second
-        { sim: 604800, label: '1wk/s' },     // 1 week per second
-        { sim: 2592000, label: '1mo/s' },    // ~30 days per second
-        { sim: 31536000, label: '1yr/s' },   // 1 year per second
-    ];
 
     // Default to 1s/s to match server mode
     private speedIndex = 0;
@@ -46,7 +32,7 @@ export class TimeController {
     update(realDeltaSeconds: number): number {
         if (this.paused) return 0;
 
-        const speed = this.SPEED_LEVELS[this.speedIndex].sim;
+        const speed = SPEED_LEVELS[this.speedIndex].sim;
         this.accumulator += realDeltaSeconds * speed;
 
         let steps = 0;
@@ -57,7 +43,7 @@ export class TimeController {
 
         const maxSteps = 1000;
         if (steps > maxSteps) {
-            this.accumulator = 0;
+            this.accumulator = Math.min(this.accumulator, maxSteps * this.physicsTimestep);
             return maxSteps;
         }
 
@@ -78,12 +64,12 @@ export class TimeController {
 
     /** Get the current speed level */
     getCurrentSpeed(): SpeedLevel {
-        return this.SPEED_LEVELS[this.speedIndex];
+        return SPEED_LEVELS[this.speedIndex];
     }
 
     /** Get all available speed levels */
     getSpeedLevels(): SpeedLevel[] {
-        return [...this.SPEED_LEVELS];
+        return [...SPEED_LEVELS];
     }
 
     /** Get current speed index */
@@ -93,7 +79,7 @@ export class TimeController {
 
     /** Increase speed (> key) */
     increaseSpeed(): boolean {
-        if (this.speedIndex < this.SPEED_LEVELS.length - 1) {
+        if (this.speedIndex < SPEED_LEVELS.length - 1) {
             this.speedIndex++;
             this.onSpeedChange?.(this.getCurrentSpeed());
             return true;
@@ -113,7 +99,7 @@ export class TimeController {
 
     /** Set speed by index */
     setSpeedIndex(index: number): void {
-        if (index >= 0 && index < this.SPEED_LEVELS.length) {
+        if (index >= 0 && index < SPEED_LEVELS.length) {
             this.speedIndex = index;
             this.onSpeedChange?.(this.getCurrentSpeed());
         }
@@ -124,10 +110,10 @@ export class TimeController {
         if (!Number.isFinite(simSecondsPerRealSecond) || simSecondsPerRealSecond <= 0) return;
 
         let closestIndex = 0;
-        let closestDelta = Math.abs(this.SPEED_LEVELS[0].sim - simSecondsPerRealSecond);
+        let closestDelta = Math.abs(SPEED_LEVELS[0].sim - simSecondsPerRealSecond);
 
-        for (let i = 1; i < this.SPEED_LEVELS.length; i++) {
-            const delta = Math.abs(this.SPEED_LEVELS[i].sim - simSecondsPerRealSecond);
+        for (let i = 1; i < SPEED_LEVELS.length; i++) {
+            const delta = Math.abs(SPEED_LEVELS[i].sim - simSecondsPerRealSecond);
             if (delta < closestDelta) {
                 closestDelta = delta;
                 closestIndex = i;
@@ -160,7 +146,7 @@ export class TimeController {
         if (this.paused) {
             return '⏸ PAUSED';
         }
-        return `⏱ ${this.SPEED_LEVELS[this.speedIndex].label}`;
+        return `⏱ ${SPEED_LEVELS[this.speedIndex].label}`;
     }
 
     /** Set callback for speed changes */
