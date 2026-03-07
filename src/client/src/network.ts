@@ -8,59 +8,16 @@
  */
 
 import { logger } from './logger';
+import {
+    AdminStatePayload,
+    ChatPayload,
+    ServerMessage,
+    StatePayload,
+    WelcomePayload,
+    decodeBinaryState,
+} from '../../shared/protocol';
 
-interface ServerMessage {
-    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state';
-    payload: unknown;
-    serverTick?: number;
-    timestamp?: number;
-}
-
-interface StatePayload {
-    tick: number;
-    time: number;
-    positions: number[];
-    velocities: number[];
-    energy: number;
-}
-
-interface WelcomePayload {
-    clientId: string;
-    displayName?: string;
-    snapshot: string;
-    players?: string[];
-    config: {
-        tickRate: number;
-        serverTick: number;
-        adminState?: AdminStatePayload;
-        visualPresetDefault?: 'Low' | 'High' | 'Ultra';
-    };
-}
-
-interface ChatPayload {
-    sender: string;
-    text: string;
-}
-
-export interface AdminStatePayload {
-    dt: number;
-    substeps: number;
-    forceMethod: 'direct' | 'barnes-hut';
-    theta: number;
-    timeScale: number;
-    paused: boolean;
-    simMode: 'tick' | 'accumulator';
-    closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
-    closeEncounterHillFactor: number;
-    closeEncounterTidalRatio: number;
-    closeEncounterJerkNorm: number;
-    closeEncounterMaxSubsetSize: number;
-    closeEncounterMaxTrialSubsteps: number;
-    closeEncounterRk45AbsTol: number;
-    closeEncounterRk45RelTol: number;
-    closeEncounterGaussRadauMaxIters: number;
-    closeEncounterGaussRadauTol: number;
-}
+export type { AdminStatePayload } from '../../shared/protocol';
 
 
 type MessageHandler = (message: ServerMessage) => void;
@@ -123,8 +80,21 @@ export class NetworkClient {
                 }
             };
 
+            this.ws.binaryType = 'arraybuffer';
+
             this.ws.onmessage = (event) => {
                 try {
+                    // Binary frames are state broadcasts
+                    if (event.data instanceof ArrayBuffer) {
+                        const state = decodeBinaryState(event.data);
+                        const message: ServerMessage = {
+                            type: 'state',
+                            payload: state,
+                            serverTick: state.tick,
+                        };
+                        this.handleMessage(message);
+                        return;
+                    }
                     const message = JSON.parse(event.data) as ServerMessage;
                     this.handleMessage(message);
                 } catch (e) {

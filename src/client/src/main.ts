@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { OrbitCamera } from './camera';
 import { BodyRenderer } from './renderer';
 import { AdminStatePayload, NetworkClient } from './network';
+import { StatePayload } from '../../shared/protocol';
 import { PhysicsClient, BodyInfo } from './physics';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
@@ -40,14 +41,6 @@ interface SimState {
     velocities: Float64Array;
     energy: number;
     bodyCount: number;
-}
-
-interface NetworkStatePayload {
-    tick: number;
-    time: number;
-    positions: number[];
-    velocities?: number[];
-    energy: number;
 }
 
 
@@ -87,7 +80,7 @@ class NBodyClient {
     private localTickAccumulator = 0;
     private localSimMode: SimMode = 'tick';
 
-    private lastServerState?: NetworkStatePayload;
+    private lastServerState?: StatePayload;
     private lastServerPositions = new Float64Array(0);
     private lastServerVelocities = new Float64Array(0);
 
@@ -340,7 +333,7 @@ class NBodyClient {
         });
 
         this.network.on('state', (message) => {
-            const state = message.payload as NetworkStatePayload;
+            const state = message.payload as StatePayload;
             if (state?.positions) {
                 this.applyServerState(state);
             }
@@ -479,10 +472,10 @@ class NBodyClient {
         this.initializeFollowTarget();
     }
 
-    private applyServerState(state: NetworkStatePayload): void {
+    private applyServerState(state: StatePayload): void {
         this.lastServerState = state;
         this.lastServerPositions = new Float64Array(state.positions);
-        this.lastServerVelocities = state.velocities ? new Float64Array(state.velocities) : this.lastServerVelocities;
+        this.lastServerVelocities = new Float64Array(state.velocities);
     }
 
     private initRenderer(): void {

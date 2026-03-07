@@ -15,6 +15,13 @@ import { CONFIG } from './config.js';
 import { APP_DEFAULTS } from './defaults.js';
 import { SPEED_LEVELS, getSpeedLabel } from './constants.js';
 import { logger } from './logger.js';
+import {
+    AdminStatePayload,
+    ChatPayload,
+    ClientMessage,
+    ServerMessage,
+    encodeBinaryState,
+} from './protocol.js';
 
 // Physics WASM module types (will be loaded dynamically)
 interface PhysicsModule {
@@ -67,52 +74,7 @@ interface WasmSimulation {
     free(): void;
 }
 
-// Message types
-interface ClientMessage {
-    type: 'join' | 'ping' | 'request_snapshot' | 'chat' | 'admin_settings' | 'set_time_scale' | 'apply_snapshot' | 'reset_simulation' | 'set_pause';
-    payload?: unknown;
-    clientTick?: number;
-}
-
-interface ServerMessage {
-    type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state';
-    payload: unknown;
-    serverTick?: number;
-    timestamp?: number;
-}
-
-interface StatePayload {
-    tick: number;
-    time: number;
-    positions: number[];
-    velocities: number[];
-    energy: number;
-}
-
-interface ChatPayload {
-    sender: string;
-    text: string;
-}
-
-interface AdminStatePayload {
-    dt: number;
-    substeps: number;
-    forceMethod: 'direct' | 'barnes-hut';
-    theta: number;
-    timeScale: number;
-    paused: boolean;
-    simMode: 'tick' | 'accumulator';
-    closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
-    closeEncounterHillFactor: number;
-    closeEncounterTidalRatio: number;
-    closeEncounterJerkNorm: number;
-    closeEncounterMaxSubsetSize: number;
-    closeEncounterMaxTrialSubsteps: number;
-    closeEncounterRk45AbsTol: number;
-    closeEncounterRk45RelTol: number;
-    closeEncounterGaussRadauMaxIters: number;
-    closeEncounterGaussRadauTol: number;
-}
+// Message types imported from ./protocol.js
 
 
 interface Client {
@@ -735,27 +697,15 @@ class SimulationServer {
     private broadcastState(): void {
         const positions = this.simulation.getPositions();
         const velocities = this.simulation.getVelocities();
+        const tick = Number(this.simulation.tick());
+        const time = this.simulation.time();
+        const energy = this.simulation.totalEnergy();
 
-        const state: StatePayload = {
-            tick: Number(this.simulation.tick()),
-            time: this.simulation.time(),
-            positions: Array.from(positions),
-            velocities: Array.from(velocities),
-            energy: this.simulation.totalEnergy(),
-        };
-
-        const message: ServerMessage = {
-            type: 'state',
-            payload: state,
-            serverTick: state.tick,
-            timestamp: Date.now(),
-        };
-
-        const data = JSON.stringify(message);
+        const binaryFrame = encodeBinaryState(tick, time, energy, positions, velocities);
 
         for (const client of this.clients.values()) {
             if (client.ws.readyState === WebSocket.OPEN) {
-                client.ws.send(data);
+                client.ws.send(binaryFrame);
             }
         }
     }
