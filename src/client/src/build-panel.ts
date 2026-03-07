@@ -10,6 +10,7 @@
  */
 
 import { AU, G, M_SUN, M_EARTH, M_MOON, R_SUN, R_EARTH, R_MOON } from '../../shared/constants';
+import { logger } from './logger';
 
 export type BuildableBodyType = 'star' | 'planet' | 'moon' | 'asteroid' | 'comet' | 'spacecraft';
 
@@ -860,7 +861,7 @@ export class BuildPanel {
         const r = Math.sqrt(this.params.x ** 2 + this.params.y ** 2 + this.params.z ** 2);
         
         if (r < 1e6) {
-            console.warn('Position too close to origin for orbital calculation');
+            logger.warn('Position too close to origin for orbital calculation');
             return;
         }
 

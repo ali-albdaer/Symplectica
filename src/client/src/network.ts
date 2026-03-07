@@ -7,6 +7,8 @@
  * - Latency measurement
  */
 
+import { logger } from './logger';
+
 interface ServerMessage {
     type: 'welcome' | 'state' | 'snapshot' | 'pong' | 'error' | 'chat' | 'admin_state';
     payload: unknown;
@@ -89,7 +91,7 @@ export class NetworkClient {
 
     async connect(timeoutMs: number = 5000): Promise<void> {
         return new Promise((resolve, reject) => {
-            console.log(`[INFO] Connecting to ${this.url}...`);
+            logger.info(`Connecting to ${this.url}...`);
 
             this.ws = new WebSocket(this.url);
 
@@ -102,19 +104,19 @@ export class NetworkClient {
 
             this.ws.onopen = () => {
                 clearTimeout(timer);
-                console.log('[OK] Connected to server');
+                logger.info('Connected to server');
                 this.reconnecting = false;
                 this.reconnectAttempts = 0;
                 resolve();
             };
 
             this.ws.onclose = () => {
-                console.log('[INFO] Disconnected from server');
+                logger.info('Disconnected from server');
                 this.handleDisconnect();
             };
 
             this.ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
+                logger.error('WebSocket error:', error);
                 if (!this.reconnecting) {
                     clearTimeout(timer);
                     reject(new Error('WebSocket connection failed'));
@@ -126,7 +128,7 @@ export class NetworkClient {
                     const message = JSON.parse(event.data) as ServerMessage;
                     this.handleMessage(message);
                 } catch (e) {
-                    console.error('Failed to parse message:', e);
+                    logger.error('Failed to parse message:', e);
                 }
             };
         });
@@ -169,9 +171,9 @@ export class NetworkClient {
         this.clientId = payload.clientId;
         this.serverTick = payload.config.serverTick;
 
-        console.log(`[INFO] Welcome! Client ID: ${this.clientId}`);
-        console.log(`   Server tick: ${this.serverTick}`);
-        console.log(`   Tick rate: ${payload.config.tickRate} Hz`);
+        logger.info(`Welcome! Client ID: ${this.clientId}`);
+        logger.info(`Server tick: ${this.serverTick}`);
+        logger.info(`Tick rate: ${payload.config.tickRate} Hz`);
 
         // Dispatch to handlers
         const handlers = this.handlers.get('welcome') || [];
@@ -199,7 +201,7 @@ export class NetworkClient {
         this.reconnectAttempts++;
 
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000);
-        console.log(`[INFO] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+        logger.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
 
         setTimeout(() => {
             this.connect().catch(() => {

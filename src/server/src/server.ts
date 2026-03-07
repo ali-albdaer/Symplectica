@@ -14,6 +14,7 @@ import { dirname, join } from 'path';
 import { CONFIG } from './config.js';
 import { APP_DEFAULTS } from './defaults.js';
 import { SPEED_LEVELS } from './constants.js';
+import { logger } from './logger.js';
 
 // Physics WASM module types (will be loaded dynamically)
 interface PhysicsModule {
@@ -173,7 +174,7 @@ class SimulationServer {
     private httpServer!: http.Server;
 
     async start(): Promise<void> {
-        console.log('[INFO] Starting N-Body Simulation Server...');
+        logger.info('Starting N-Body Simulation Server...');
 
         // Load WASM module
         await this.loadPhysics();
@@ -188,7 +189,7 @@ class SimulationServer {
         // Serve static files from client build
         const clientDist = join(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
         this.app.use(express.static(clientDist));
-        console.log(`[INFO] Serving static files from: ${clientDist}`);
+        logger.info(`Serving static files from: ${clientDist}`);
 
         // Start WebSocket server (attached to HTTP server)
         this.startWebSocketServer();
@@ -198,14 +199,14 @@ class SimulationServer {
 
         // Start listening
         this.httpServer.listen(CONFIG.port, () => {
-            console.log(`[OK] Server running on port ${CONFIG.port}`);
-            console.log(`   Tick rate: ${CONFIG.tickRate} Hz`);
-            console.log(`   Seed: ${CONFIG.seed}`);
+            logger.info(`Server running on port ${CONFIG.port}`);
+            logger.info(`Tick rate: ${CONFIG.tickRate} Hz`);
+            logger.info(`Seed: ${CONFIG.seed}`);
         });
     }
 
     private async loadPhysics(): Promise<void> {
-        console.log('[INFO] Loading WASM physics module...');
+        logger.info('Loading WASM physics module...');
 
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = dirname(__filename);
@@ -229,15 +230,15 @@ class SimulationServer {
             module.init();
 
             this.physics = module as PhysicsModule;
-            console.log('[OK] WASM physics loaded');
+            logger.info('WASM physics loaded');
         } catch (error) {
-            console.error('[ERROR] Failed to load WASM:', error);
+            logger.error('Failed to load WASM:', error);
             throw error;
         }
     }
 
     private createSimulation(): void {
-        console.log('[INFO] Creating simulation...');
+        logger.info('Creating simulation...');
 
         this.adminState = {
             dt: APP_DEFAULTS.adminDefaults.dt,
@@ -324,8 +325,8 @@ class SimulationServer {
             this.adminState.closeEncounterGaussRadauTol
         );
 
-        console.log(`   Bodies: ${this.simulation.bodyCount()}`);
-        console.log(`   Initial energy: ${this.simulation.totalEnergy().toExponential(4)} J`);
+        logger.info(`Bodies: ${this.simulation.bodyCount()}`);
+        logger.info(`Initial energy: ${this.simulation.totalEnergy().toExponential(4)} J`);
     }
 
     private startWebSocketServer(): void {
@@ -346,7 +347,7 @@ class SimulationServer {
             };
 
             this.clients.set(clientId, client);
-            console.log(`[INFO] Client connected: ${clientId} (${this.clients.size} total)`);
+            logger.info(`Client connected: ${clientId} (${this.clients.size} total)`);
 
             // Send welcome message with full snapshot
             this.sendMessage(ws, {
@@ -381,7 +382,7 @@ class SimulationServer {
                     const message = JSON.parse(data.toString()) as ClientMessage;
                     this.handleMessage(client, message);
                 } catch (error) {
-                    console.error('Invalid message from client:', error);
+                    logger.error('Invalid message from client:', error);
                 }
             });
 
@@ -391,7 +392,7 @@ class SimulationServer {
 
             ws.on('close', () => {
                 this.clients.delete(clientId);
-                console.log(`[INFO] Client disconnected: ${clientId} (${this.clients.size} remaining)`);
+                logger.info(`Client disconnected: ${clientId} (${this.clients.size} remaining)`);
                 this.broadcastChat({
                     sender: 'System',
                     text: `${client.displayName} left`,
@@ -399,7 +400,7 @@ class SimulationServer {
             });
 
             ws.on('error', (error) => {
-                console.error(`Client error ${clientId}:`, error);
+                logger.error(`Client error ${clientId}:`, error);
             });
         });
     }
@@ -731,7 +732,7 @@ class SimulationServer {
             }
 
             default:
-                console.warn(`Unknown message type: ${message.type}`);
+                logger.warn(`Unknown message type: ${message.type}`);
         }
     }
 
@@ -744,7 +745,7 @@ class SimulationServer {
         this.cleanupInterval = setInterval(() => {
             for (const [id, client] of this.clients) {
                 if (!client.isAlive) {
-                    console.log(`[INFO] Closing dead client ${id} (no pong response)`);
+                    logger.info(`Closing dead client ${id} (no pong response)`);
                     client.ws.terminate();
                     this.clients.delete(id);
                     continue;
@@ -771,7 +772,7 @@ class SimulationServer {
                         steps++;
                     }
                     if (steps >= maxSteps) {
-                        console.warn(`[WARN] Accumulator overflow: clamped to ${maxSteps} steps (${this.simAccumulator.toFixed(4)}s remaining)`);
+                        logger.warn(`Accumulator overflow: clamped to ${maxSteps} steps (${this.simAccumulator.toFixed(4)}s remaining)`);
                         this.simAccumulator = Math.min(this.simAccumulator, maxSteps * this.adminState.dt);
                     }
                 } else {
@@ -794,12 +795,12 @@ class SimulationServer {
                         steps: number;
                     }>;
                     for (const ev of events) {
-                        console.log(
+                        logger.debug(
                             `[CE] id=${ev.id} t=${ev.time.toFixed(2)} dt=${ev.dt} integrator=${ev.integrator} bodies=${ev.body_ids.join(',')} reason=${ev.reason} err=${ev.max_error.toExponential(2)} steps=${ev.steps}`
                         );
                     }
                 } catch {
-                    console.warn('[CE] Failed to parse close-encounter events');
+                    logger.warn('Failed to parse close-encounter events');
                 }
             }
 
@@ -818,7 +819,7 @@ class SimulationServer {
 
             // Log performance occasionally
             if (Number(currentTick) % (CONFIG.tickRate * 10) === 0) {
-                console.log(`[STATS] Tick ${currentTick} | Time: ${this.simulation.time().toFixed(2)}s | Energy: ${this.simulation.totalEnergy().toExponential(4)} J | Clients: ${this.clients.size}`);
+                logger.debug(`Tick ${currentTick} | Time: ${this.simulation.time().toFixed(2)}s | Energy: ${this.simulation.totalEnergy().toExponential(4)} J | Clients: ${this.clients.size}`);
             }
         }, tickMs);
     }
@@ -1059,7 +1060,7 @@ class SimulationServer {
             this.httpServer.close();
         }
 
-        console.log('[INFO] Server stopped');
+        logger.info('Server stopped');
     }
 }
 
@@ -1067,13 +1068,13 @@ class SimulationServer {
 const server = new SimulationServer();
 
 server.start().catch((error) => {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
 });
 
 // Handle shutdown
 process.on('SIGINT', () => {
-    console.log('\n[INFO] Shutting down...');
+    logger.info('Shutting down...');
     server.stop();
     process.exit(0);
 });

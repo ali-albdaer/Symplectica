@@ -10,6 +10,7 @@
  */
 
 import { NetworkClient } from './network';
+import { logger } from './logger';
 
 interface ChatMessage {
     id: number;
@@ -362,7 +363,7 @@ export class Chat {
                 timestamp: Date.now(),
                 isSystem: false,
             });
-            console.warn('Chat message not sent: not connected to server');
+            logger.warn('Chat message not sent: not connected to server');
         }
 
         this.input.value = '';

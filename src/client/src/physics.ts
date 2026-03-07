@@ -7,6 +7,7 @@
  */
 
 import { APP_DEFAULTS } from './defaults';
+import { logger } from './logger';
 
 // Type definitions for WASM module
 type WasmSimulation = {
@@ -142,7 +143,7 @@ export class PhysicsClient {
     M_EARTH = 0;
 
     async init(): Promise<void> {
-        console.log('[INFO] Loading WASM physics...');
+        logger.info('Loading WASM physics...');
 
         try {
             // Import WASM module built in physics-core/pkg
@@ -161,11 +162,11 @@ export class PhysicsClient {
             this.M_EARTH = this.module.getEarthMass();
 
             this.initialized = true;
-            console.log('[OK] WASM physics loaded');
-            console.log(`   G = ${this.G} m³/(kg·s²)`);
-            console.log(`   AU = ${this.AU} m`);
+            logger.info('WASM physics loaded');
+            logger.info(`G = ${this.G} m³/(kg·s²)`);
+            logger.info(`AU = ${this.AU} m`);
         } catch (error) {
-            console.error('[ERROR] Failed to load WASM:', error);
+            logger.error('Failed to load WASM:', error);
             throw error;
         }
     }
@@ -180,7 +181,7 @@ export class PhysicsClient {
         this.simulation.setDt(3600);
         this.simulation.setSubsteps(4);
 
-        console.log(`[INFO] Created Sun-Earth-Moon system (${this.simulation.bodyCount()} bodies)`);
+        logger.info(`Created Sun-Earth-Moon system (${this.simulation.bodyCount()} bodies)`);
     }
 
     createNew(seed?: bigint): void {
@@ -385,7 +386,7 @@ export class PhysicsClient {
             this._cachedBodyCount = count;
             return result;
         } catch (e) {
-            console.error('Failed to parse bodies:', e);
+            logger.error('Failed to parse bodies:', e);
             return [];
         }
     }
@@ -440,7 +441,7 @@ export class PhysicsClient {
                 } else if (typeof this.module.createFullSolarSystemII === 'function') {
                     this.simulation = this.module.createFullSolarSystemII(seed);
                 } else {
-                    console.warn('[WARN] Full Solar System II preset unavailable. Falling back to Full Solar System.');
+                    logger.warn('Full Solar System II preset unavailable. Falling back to Full Solar System.');
                     this.simulation = this.module.createFullSolarSystem(seed);
                     loadedPreset = 'fullSolarSystem';
                 }
@@ -449,7 +450,7 @@ export class PhysicsClient {
                 if (typeof this.module.createPlayableSolarSystem === 'function') {
                     this.simulation = this.module.createPlayableSolarSystem(seed);
                 } else {
-                    console.warn('[WARN] Playable Solar System preset unavailable in WASM build. Falling back to Full Solar System.');
+                    logger.warn('Playable Solar System preset unavailable in WASM build. Falling back to Full Solar System.');
                     this.simulation = this.module.createFullSolarSystem(seed);
                     loadedPreset = 'fullSolarSystem';
                 }
@@ -475,7 +476,7 @@ export class PhysicsClient {
                 if (typeof this.module.createAsteroidBelt === 'function') {
                     this.simulation = this.module.createAsteroidBelt(seed, asteroidCount);
                 } else {
-                    console.warn('[WARN] Asteroid Belt preset unavailable. Falling back to Full Solar System II.');
+                    logger.warn('Asteroid Belt preset unavailable. Falling back to Full Solar System II.');
                     this.simulation = this.module.createFullSolarSystemII(seed);
                     loadedPreset = 'fullSolarSystemII';
                 }
@@ -487,7 +488,7 @@ export class PhysicsClient {
                 if (typeof this.module.createStarCluster === 'function') {
                     this.simulation = this.module.createStarCluster(seed, starCount);
                 } else {
-                    console.warn('[WARN] Star Cluster preset unavailable. Falling back to Sun-Earth-Moon.');
+                    logger.warn('Star Cluster preset unavailable. Falling back to Sun-Earth-Moon.');
                     this.simulation = this.module.createSunEarthMoon(seed);
                     loadedPreset = 'sunEarthMoon';
                 }
@@ -501,7 +502,7 @@ export class PhysicsClient {
         this.simulation.setDt(APP_DEFAULTS.adminDefaults.dt);
         this.simulation.setSubsteps(APP_DEFAULTS.adminDefaults.substeps);
 
-            console.log(`[INFO] Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies, dt=${APP_DEFAULTS.adminDefaults.dt}s)`);
+            logger.info(`Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies, dt=${APP_DEFAULTS.adminDefaults.dt}s)`);
     }
 
     /** Add a custom body */
@@ -533,7 +534,7 @@ export class PhysicsClient {
             );
         }
 
-        console.log(`[INFO] Added body: ${body.name} (id: ${id})`);
+        logger.info(`Added body: ${body.name} (id: ${id})`);
         return id;
     }
 
@@ -565,7 +566,7 @@ export class PhysicsClient {
             body.vx, body.vy, body.vz
         );
 
-        console.log(`[INFO] Added body: ${body.name} (id: ${id}, type: ${body.bodyType})`);
+        logger.info(`Added body: ${body.name} (id: ${id}, type: ${body.bodyType})`);
         return id;
     }
 
@@ -575,9 +576,9 @@ export class PhysicsClient {
 
         const result = this.simulation.removeBody(id);
         if (result) {
-            console.log(`[INFO] Removed body id=${id}`);
+            logger.info(`Removed body id=${id}`);
         } else {
-            console.log(`[WARN] Body id=${id} not found`);
+            logger.warn(`Body id=${id} not found`);
         }
         return result;
     }

@@ -13,6 +13,7 @@ import { PhysicsClient } from './physics';
 import { TimeController } from './time-controller';
 import { AdminStatePayload, NetworkClient } from './network';
 import { APP_DEFAULTS } from './defaults';
+import { logger } from './logger';
 
 interface ServerConfig {
     tickRate: number;
@@ -715,7 +716,7 @@ export class AdminPanel {
         this.timeController.setSpeedBySimRate(timeScale);
         this.onSimModeChange?.(simMode);
 
-        console.log(`⚙️ Applied settings: dt=${dt}s, substeps=${substeps}, method=${forceMethod}, θ=${theta}`);
+        logger.info(`Applied settings: dt=${dt}s, substeps=${substeps}, method=${forceMethod}, θ=${theta}`);
 
         // this.close();
     }
@@ -753,7 +754,7 @@ export class AdminPanel {
             // Update admin panel UI to match defaults
             this.applyServerSettings(defaults);
 
-            console.log(`🔄 Simulation reset to ${APP_DEFAULTS.defaultPreset.id}`);
+            logger.info(`Simulation reset to ${APP_DEFAULTS.defaultPreset.id}`);
         }
         this.close();
     }
