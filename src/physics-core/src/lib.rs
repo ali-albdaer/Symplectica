@@ -134,13 +134,13 @@ impl WasmSimulation {
     /// Add a body from a JSON string with all properties.
     /// Accepts the full Body JSON structure from PROPERTIES.md.
     #[wasm_bindgen(js_name = addBodyFromJson)]
-    pub fn add_body_from_json(&mut self, json: &str) -> u32 {
+    pub fn add_body_from_json(&mut self, json: &str) -> Result<u32, JsValue> {
         match serde_json::from_str::<body::Body>(json) {
             Ok(mut b) => {
                 b.compute_derived();
-                self.inner.add_body(b)
+                Ok(self.inner.add_body(b))
             }
-            Err(_) => u32::MAX, // Error sentinel
+            Err(e) => Err(JsValue::from_str(&format!("Invalid body JSON: {}", e))),
         }
     }
 

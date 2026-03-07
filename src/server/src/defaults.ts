@@ -69,7 +69,13 @@ let raw: string;
 try {
     raw = readFileSync(primaryPath, 'utf-8');
 } catch {
-    raw = readFileSync(fallbackPath, 'utf-8');
+    try {
+        raw = readFileSync(fallbackPath, 'utf-8');
+    } catch {
+        throw new Error(
+            `Failed to load defaults.json from either:\n  - ${primaryPath}\n  - ${fallbackPath}\nEnsure src/shared/defaults.json exists.`
+        );
+    }
 }
 
 export const APP_DEFAULTS = JSON.parse(raw) as AppDefaults;

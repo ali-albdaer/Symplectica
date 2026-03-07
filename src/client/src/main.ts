@@ -25,6 +25,7 @@ import { SkyRenderer } from './sky-renderer';
 import { TouchControls } from './touch-controls';
 import { BuildPanel, BuildBodyParams, BuildableBodyType, BodyListEntry } from './build-panel';
 import { APP_DEFAULTS } from './defaults';
+import { logger } from './logger';
 
 import { AU, G, M_SUN, L_SUN } from '../../shared/constants';
 const LOCAL_TICK_RATE = APP_DEFAULTS.adminDefaults.tickRate;
@@ -179,7 +180,7 @@ class NBodyClient {
         try {
             await this.network.connect();
         } catch (error) {
-            console.warn('⚠️ Multiplayer server unavailable, running in local mode.', error);
+            logger.warn('Multiplayer server unavailable, running in local mode.', error);
             this.ensureLocalPreset(APP_DEFAULTS.visualPresetDefault);
         }
 
@@ -362,6 +363,11 @@ class NBodyClient {
     }
 
     private applyAdminState(settings: AdminStatePayload): void {
+        // Validate critical settings to prevent crashes
+        if (!Number.isFinite(settings.dt) || settings.dt <= 0) return;
+        if (!Number.isFinite(settings.timeScale) || settings.timeScale <= 0) return;
+        if (!Number.isInteger(settings.substeps) || settings.substeps < 1) return;
+
         this.physics.setTimeStep(settings.dt);
         this.timeController.setPhysicsTimestep(settings.dt);
         this.timeController.setSpeedBySimRate(settings.timeScale);
@@ -456,7 +462,7 @@ class NBodyClient {
         const oldBodyCount = this.physics.bodyCount();
         const restored = this.physics.restoreSnapshot(snapshot);
         if (!restored) {
-            console.warn('⚠️ Failed to apply server snapshot');
+            logger.warn('Failed to apply server snapshot');
             return;
         }
 
@@ -1741,7 +1747,7 @@ class NBodyClient {
 
     private onDeleteBodyFromBuildPanel(id: number): void {
         if (!this.buildMode) {
-            console.warn('[Build] Cannot delete body - not in build mode');
+            logger.warn('Cannot delete body - not in build mode');
             return;
         }
 
@@ -1756,7 +1762,7 @@ class NBodyClient {
                 this.network.sendSnapshot(snapshot, 'World Builder');
             }
 
-            console.log(`[Build] Deleted body id=${id}`);
+            logger.info(`Deleted body id=${id}`);
         }
     }
 
@@ -1766,7 +1772,7 @@ class NBodyClient {
 
     private onBuildSpawn(params: BuildBodyParams): void {
         if (!this.buildMode) {
-            console.warn('[Build] Cannot spawn body - not in build mode');
+            logger.warn('Cannot spawn body - not in build mode');
             return;
         }
 
@@ -1805,7 +1811,7 @@ class NBodyClient {
             this.network.sendSnapshot(snapshot, 'World Builder');
         }
 
-        console.log(`[Build] Spawned ${params.type}: ${params.name}`);
+        logger.info(`Spawned ${params.type}: ${params.name}`);
     }
 
     showError(message: string): void {
@@ -1827,8 +1833,8 @@ client.init().then(() => {
     // Expose for browser console testing
     (window as any).physics = client.getPhysics();
     (window as any).timeController = client.getTimeController();
-    console.log('Space Simulator client initialized');
+    logger.info('Space Simulator client initialized');
 }).catch((error) => {
-    console.error('Fatal initialization error:', error);
+    logger.error('Fatal initialization error:', error);
     client.showError(`Failed to initialize: ${error.message || 'Unknown error'}`);
 });

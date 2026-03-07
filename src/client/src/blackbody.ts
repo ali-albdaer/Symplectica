@@ -3,14 +3,14 @@
  * 
  * Converts a blackbody temperature (in Kelvin) to an sRGB color.
  * Uses the CIE 1931 2° observer → sRGB analytic approximation
- * from Tanner Helland (2012), covering 1000 K – 40000 K.
+ * from Tanner Helland (2012), covering 1000 K – 55000 K.
  * 
  * Reference: http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code/
  */
 
 /**
  * Convert a blackbody temperature to a THREE.js-compatible hex color.
- * @param tempK Temperature in Kelvin (clamped to 1000–40000)
+ * @param tempK Temperature in Kelvin (clamped to 1000–55000)
  * @returns Hex integer 0xRRGGBB
  */
 export function blackbodyToHex(tempK: number): number {
@@ -35,7 +35,7 @@ export function blackbodyToRGBNorm(tempK: number): [number, number, number] {
  */
 export function blackbodyToRGB(tempK: number): [number, number, number] {
     // Clamp temperature
-    const temp = Math.max(1000, Math.min(40000, tempK)) / 100;
+    const temp = Math.max(1000, Math.min(55000, tempK)) / 100;
 
     let r: number;
     let g: number;
