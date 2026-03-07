@@ -182,8 +182,8 @@ class NBodyClient {
             this.physics,
             this.timeController,
             this.network,
-            (presetId, name, barycentric, bodyCount) => {
-                this.loadPresetFromAdmin(presetId, name, barycentric, bodyCount);
+            (presetId, name, barycentric, bodyCount, stressTestCounts) => {
+                this.loadPresetFromAdmin(presetId, name, barycentric, bodyCount, stressTestCounts);
             },
             (mode) => {
                 this.setLocalSimMode(mode);
@@ -701,7 +701,7 @@ class NBodyClient {
         }
     }
 
-    private loadPresetFromAdmin(presetId: string, name: string, barycentric: boolean = false, bodyCount?: number): void {
+    private loadPresetFromAdmin(presetId: string, name: string, barycentric: boolean = false, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }): void {
         if (presetId === 'worldBuilder') {
             // World Builder: create empty simulation
             this.physics.createNew(BigInt(Date.now()));
@@ -730,7 +730,7 @@ class NBodyClient {
         } else {
             this.buildMode = false;
             this.buildPanel.setBuildMode(false);
-            this.physics.createPreset(presetId, BigInt(Date.now()), barycentric, bodyCount);
+            this.physics.createPreset(presetId, BigInt(Date.now()), barycentric, bodyCount, stressTestCounts);
         }
 
         // Configure camera scale based on preset type
@@ -740,6 +740,11 @@ class NBodyClient {
             this.camera.configureForScale('galactic');
             this.camera.setInitialDistance(5 * PARSEC);
             this.camera.setElevation(0.3);
+        } else if (presetId === 'stressTest') {
+            // Stress test: compact star cluster (~80 AU scale), start at 200 AU
+            this.camera.configureForScale('solar');
+            this.camera.setDistance(200 * AU);
+            this.camera.setElevation(0.5);
         } else if (presetId !== 'worldBuilder') {
             // Solar system scale presets (worldBuilder already handled above)
             this.camera.configureForScale('solar');
@@ -907,11 +912,58 @@ class NBodyClient {
 
         // Format: "instant (avg)" for better readability
         if (frameEl) frameEl.textContent = `${this.frameTiming.total.toFixed(1)} (${this.frameTimingAvg.total.toFixed(1)}) ms`;
-        if (physicsEl) physicsEl.textContent = `${this.frameTiming.physics.toFixed(1)} (${this.frameTimingAvg.physics.toFixed(1)}) ms`;
+        if (physicsEl) {
+            const useServer = this.network?.isConnected() && this.lastServerState;
+            const label = useServer ? 'Physics (server)' : 'Physics';
+            const span = physicsEl.closest('.perf-row')?.querySelector('.label');
+            if (span) span.textContent = label;
+            physicsEl.textContent = `${this.frameTiming.physics.toFixed(1)} (${this.frameTimingAvg.physics.toFixed(1)}) ms`;
+        }
         if (renderEl) renderEl.textContent = `${this.frameTiming.render.toFixed(1)} (${this.frameTimingAvg.render.toFixed(1)}) ms`;
         if (uiEl) uiEl.textContent = `${this.frameTiming.ui.toFixed(1)} (${this.frameTimingAvg.ui.toFixed(1)}) ms`;
         if (stepsEl) stepsEl.textContent = `${this.frameTiming.stepsThisFrame} (${this.frameTimingAvg.stepsThisFrame.toFixed(1)})`;
         if (bodiesEl) bodiesEl.textContent = this.state.bodyCount.toString();
+
+        // Three.js renderer stats
+        const info = this.renderer.info;
+        const drawCallsEl = document.getElementById('perf-draw-calls');
+        const trianglesEl = document.getElementById('perf-triangles');
+        const geometriesEl = document.getElementById('perf-geometries');
+        const texturesEl = document.getElementById('perf-textures');
+        if (drawCallsEl) drawCallsEl.textContent = info.render.calls.toString();
+        if (trianglesEl) trianglesEl.textContent = info.render.triangles.toLocaleString();
+        if (geometriesEl) geometriesEl.textContent = info.memory.geometries.toString();
+        if (texturesEl) texturesEl.textContent = info.memory.textures.toString();
+
+        // Trail stats
+        const trailStats = this.bodyRenderer.getTrailStats();
+        const trailLinesEl = document.getElementById('perf-trail-lines');
+        const trailVertsEl = document.getElementById('perf-trail-verts');
+        if (trailLinesEl) trailLinesEl.textContent = trailStats.lineCount.toString();
+        if (trailVertsEl) trailVertsEl.textContent = trailStats.totalVertices.toLocaleString();
+
+        // Network latency
+        const latencyEl = document.getElementById('perf-latency');
+        if (latencyEl) {
+            if (this.network?.isConnected()) {
+                const lat = this.network.getLatency();
+                latencyEl.textContent = lat > 0 ? `${lat.toFixed(0)} ms` : 'pending';
+            } else {
+                latencyEl.textContent = 'local';
+            }
+        }
+
+        // JS heap memory (Chrome only)
+        const memoryEl = document.getElementById('perf-memory');
+        if (memoryEl) {
+            const perf = performance as Performance & { memory?: { usedJSHeapSize: number } };
+            if (perf.memory) {
+                const mb = perf.memory.usedJSHeapSize / (1024 * 1024);
+                memoryEl.textContent = `${mb.toFixed(1)} MB`;
+            } else {
+                memoryEl.textContent = 'N/A';
+            }
+        }
 
         // Show simulation status for debugging
         const statusEl = document.getElementById('perf-status');

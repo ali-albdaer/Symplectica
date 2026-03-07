@@ -1545,6 +1545,14 @@ export class BodyRenderer {
         this.ghostVisible = false;
     }
 
+    getTrailStats(): { lineCount: number; totalVertices: number } {
+        let totalVertices = 0;
+        for (const history of this.orbitHistory.values()) {
+            totalVertices += history.length;
+        }
+        return { lineCount: this.orbitLines.size, totalVertices };
+    }
+
     dispose(): void {
         for (const mesh of this.bodies.values()) {
             this.scene.remove(mesh.group);

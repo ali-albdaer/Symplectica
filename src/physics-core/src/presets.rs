@@ -422,6 +422,9 @@ pub enum Preset {
     /// Dense Star Cluster: 1000-5000 equal-mass stars
     /// Plummer sphere distribution, virialized velocities
     StarCluster,
+    /// Stress Test: Configurable mix of stars, planets, and asteroids
+    /// Deterministic (fixed seed), designed for benchmarking and replicability
+    StressTest,
     /// Integrator Test 1: Two-body circular orbit
     IntegratorTest1,
     /// Integrator Test 2: Jupiter-Saturn near-resonant interaction
@@ -446,6 +449,7 @@ impl Preset {
             Preset::BinaryPulsar => create_binary_pulsar(seed),
             Preset::AsteroidBelt => create_asteroid_belt(seed, 5000),
             Preset::StarCluster => create_star_cluster(seed, 2000),
+            Preset::StressTest => create_stress_test(seed, 30, 100, 0),
             Preset::IntegratorTest1 => create_integrator_test1(seed),
             Preset::IntegratorTest2 => create_integrator_test2(seed),
             Preset::IntegratorTest3 => create_integrator_test3(seed),
@@ -464,6 +468,10 @@ impl Preset {
             Preset::StarCluster => {
                 // Star clusters are already centered
                 create_star_cluster(seed, 2000)
+            },
+            Preset::StressTest => {
+                // Stress test is already barycentric
+                create_stress_test(seed, 30, 100, 0)
             },
             Preset::IntegratorTest1 => create_integrator_test1(seed),
             Preset::IntegratorTest2 => create_integrator_test2(seed),
@@ -1808,6 +1816,258 @@ pub fn create_star_cluster(seed: u64, star_count: usize) -> Simulation {
     sim
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// STRESS TEST PRESET
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Create a configurable stress test simulation for benchmarking.
+///
+/// Uses a fixed, deterministic seed internally so that results are always
+/// reproducible regardless of the `seed` parameter — the outer seed is
+/// only used for the Simulation PRNG, the body generation always uses
+/// seed `0xBENCH` for exact replicability.
+///
+/// Configuration:
+/// - `star_count`     stars in a Plummer-sphere cluster (IMF-weighted)
+/// - `planet_count`   planets placed in circular orbits around nearest star
+/// - `asteroid_count` asteroids in a belt-like toroidal distribution
+///
+/// The system is always recentered to the barycentric frame.
+/// Default timestep: 1 s, substeps: 4 (suitable for 1 s/s real-time).
+pub fn create_stress_test(
+    seed: u64,
+    star_count: usize,
+    planet_count: usize,
+    asteroid_count: usize,
+) -> Simulation {
+    let mut sim = Simulation::new(seed);
+
+    // Deterministic RNG for body generation — always the same bodies
+    let bench_seed: u64 = 0xBE9C4;
+    let mut rng = Pcg32::new(bench_seed);
+
+    // ── Stars ────────────────────────────────────────────────────────────
+    // Plummer sphere with IMF-weighted spectral types (same table as star cluster)
+    let scale_radius = 80.0 * AU; // Compact cluster (~80 AU scale radius)
+
+    // OBAFGKM spectral types: (weight, T_min, T_max, mass/M☉, radius/R☉, luminosity/L☉)
+    let spectral_types: [(f64, f64, f64, f64, f64, f64); 7] = [
+        (0.01, 30000.0, 50000.0, 20.0,  8.0, 100000.0), // O
+        (0.05, 10000.0, 30000.0,  5.0,  3.5,    500.0),  // B
+        (0.08,  7500.0, 10000.0,  2.0,  1.7,     10.0),  // A
+        (0.12,  6000.0,  7500.0,  1.3,  1.3,      3.0),  // F
+        (0.20,  5200.0,  6000.0,  1.0,  1.0,      1.0),  // G
+        (0.25,  3700.0,  5200.0,  0.7,  0.8,      0.3),  // K
+        (0.29,  2400.0,  3700.0,  0.3,  0.4,      0.04), // M
+    ];
+    let total_weight: f64 = spectral_types.iter().map(|s| s.0).sum();
+
+    // Store star positions/masses for planet placement
+    let mut star_positions: Vec<Vec3> = Vec::with_capacity(star_count);
+    let mut star_masses: Vec<f64> = Vec::with_capacity(star_count);
+
+    for i in 0..star_count {
+        let r = sample_plummer_radius(&mut rng, scale_radius);
+        let (nx, ny, nz) = sample_unit_sphere(&mut rng);
+        let position = Vec3::new(r * nx, r * ny, r * nz);
+
+        // Velocity dispersion for virial equilibrium
+        let total_star_mass = M_SUN * star_count as f64; // Approximate
+        let v_disp = ((3.0 * PI / 64.0) * G * total_star_mass / scale_radius).sqrt();
+        let sigma_1d = v_disp / 3.0_f64.sqrt();
+        let vx = sample_gaussian(&mut rng, 0.0, sigma_1d);
+        let vy = sample_gaussian(&mut rng, 0.0, sigma_1d);
+        let vz = sample_gaussian(&mut rng, 0.0, sigma_1d);
+        let velocity = Vec3::new(vx, vy, vz);
+
+        // Sample spectral type
+        let mut roll = rng.next_f64() * total_weight;
+        let mut spec = &spectral_types[6]; // default M
+        for s in &spectral_types {
+            roll -= s.0;
+            if roll <= 0.0 {
+                spec = s;
+                break;
+            }
+        }
+        let (_, t_min, t_max, mass_frac, radius_frac, lum_frac) = *spec;
+        let this_mass = M_SUN * mass_frac;
+        let this_radius = R_SUN * radius_frac;
+
+        let name = format!("Star_{}", i + 1);
+        let star_id = sim.add_star(&name, this_mass, this_radius);
+        if let Some(star) = sim.get_body_mut(star_id) {
+            star.position = position;
+            star.velocity = velocity;
+            star.luminosity = L_SUN * lum_frac * (0.8 + rng.next_f64() * 0.4);
+            star.effective_temperature = t_min + rng.next_f64() * (t_max - t_min);
+            star.rotation_rate = OMEGA_SUN * (0.5 + rng.next_f64());
+            star.seed = bench_seed.wrapping_add(i as u64);
+            star.metallicity = sample_gaussian(&mut rng, 0.0, 0.3);
+            star.age = AGE_SUN * (0.1 + rng.next_f64() * 1.8);
+            star.softening_length = R_SUN * 50.0;
+            star.compute_derived();
+        }
+
+        star_positions.push(position);
+        star_masses.push(this_mass);
+    }
+
+    // ── Planets ──────────────────────────────────────────────────────────
+    // Each planet orbits the nearest star in a random circular orbit
+    for i in 0..planet_count {
+        // Pick a host star (round-robin with jitter for variety)
+        let host_idx = if star_count > 0 { i % star_count } else { 0 };
+        let host_pos = if star_count > 0 { star_positions[host_idx] } else { Vec3::ZERO };
+        let host_mass = if star_count > 0 { star_masses[host_idx] } else { M_SUN };
+        let mu = G * host_mass;
+
+        // Semi-major axis: log-uniform between 0.3 AU and 30 AU
+        let log_a_min = (0.3 * AU).ln();
+        let log_a_max = (30.0 * AU).ln();
+        let semi_major = (log_a_min + rng.next_f64() * (log_a_max - log_a_min)).exp();
+
+        // Circular velocity
+        let v_circ = (mu / semi_major).sqrt();
+
+        // Random orbital orientation (inclination up to 15°, random Ω and ω)
+        let inc = sample_rayleigh(&mut rng, 5.0 * PI / 180.0).min(15.0 * PI / 180.0);
+        let omega = rng.next_f64() * 2.0 * PI; // longitude of ascending node
+        let theta = rng.next_f64() * 2.0 * PI; // true anomaly (position in orbit)
+
+        // Position in orbital plane then rotate
+        let x_orb = semi_major * theta.cos();
+        let y_orb = semi_major * theta.sin();
+
+        // Rotate by inclination about x, then by Ω about z
+        let x1 = x_orb;
+        let y1 = y_orb * inc.cos();
+        let z1 = y_orb * inc.sin();
+        let x_rot = x1 * omega.cos() - y1 * omega.sin();
+        let y_rot = x1 * omega.sin() + y1 * omega.cos();
+        let z_rot = z1;
+
+        let pos = host_pos + Vec3::new(x_rot, y_rot, z_rot);
+
+        // Velocity perpendicular to position in orbital plane
+        let vx_orb = -v_circ * theta.sin();
+        let vy_orb = v_circ * theta.cos();
+        let vx1 = vx_orb;
+        let vy1 = vy_orb * inc.cos();
+        let vz1 = vy_orb * inc.sin();
+        let vx_rot = vx1 * omega.cos() - vy1 * omega.sin();
+        let vy_rot = vx1 * omega.sin() + vy1 * omega.cos();
+        let vz_rot = vz1;
+
+        // Add host star's velocity for proper frame
+        let host_vel = if star_count > 0 {
+            if let Some(host) = sim.get_body(host_idx as u32) {
+                host.velocity
+            } else {
+                Vec3::ZERO
+            }
+        } else {
+            Vec3::ZERO
+        };
+        let vel = host_vel + Vec3::new(vx_rot, vy_rot, vz_rot);
+
+        // Planet mass: log-uniform from super-Earth to super-Jupiter
+        let log_m_min = (0.5 * M_EARTH).ln();
+        let log_m_max = (5.0 * M_JUPITER).ln();
+        let mass = (log_m_min + rng.next_f64() * (log_m_max - log_m_min)).exp();
+
+        // Radius from mass (rough scaling)
+        let radius = if mass < 10.0 * M_EARTH {
+            // Rocky: R ∝ M^0.27
+            R_EARTH * (mass / M_EARTH).powf(0.27)
+        } else {
+            // Gas giant: R ∝ M^0.06 (nearly constant around Jupiter radius)
+            R_JUPITER * (mass / M_JUPITER).powf(0.06)
+        };
+
+        let name = format!("Planet_{}", i + 1);
+        let mut planet = Body::new(0, &name, BodyType::Planet, mass, radius, pos, vel);
+        planet.semi_major_axis = semi_major;
+        planet.eccentricity = 0.0; // Circular
+        planet.inclination = inc;
+        planet.parent_id = Some(host_idx as u32);
+        planet.composition = if mass < 10.0 * M_EARTH {
+            PlanetComposition::Rocky
+        } else {
+            PlanetComposition::GasGiant
+        };
+        planet.albedo = 0.1 + rng.next_f64() * 0.5;
+        planet.axial_tilt = rng.next_f64() * 30.0 * PI / 180.0;
+        planet.rotation_rate = 2.0 * PI / (SECONDS_PER_DAY * (0.4 + rng.next_f64() * 2.0));
+        planet.seed = bench_seed.wrapping_add(1000 + i as u64);
+        let gray = 0x60 + (rng.next_bounded(0x80) as u32);
+        let r_col = (gray + rng.next_bounded(0x30) as u32).min(0xFF);
+        let g_col = gray;
+        let b_col = (gray.saturating_sub(rng.next_bounded(0x30) as u32)).max(0x30);
+        planet.color = hex_to_rgb((r_col << 16) | (g_col << 8) | b_col);
+        planet.softening_length = compute_softening(radius);
+        planet.compute_derived();
+        sim.add_body(planet);
+    }
+
+    // ── Asteroids ────────────────────────────────────────────────────────
+    // Toroidal belt around the system barycenter
+    if asteroid_count > 0 {
+        let belt_inner = 35.0 * AU;
+        let belt_outer = 50.0 * AU;
+        let total_central_mass: f64 = star_masses.iter().sum::<f64>() + M_SUN; // fallback
+
+        for i in 0..asteroid_count {
+            let semi_major = rng.next_f64_range(belt_inner, belt_outer);
+            let ecc = sample_rayleigh(&mut rng, 0.08).min(0.3);
+            let inc = sample_rayleigh(&mut rng, 8.0 * PI / 180.0);
+            let lon_asc = rng.next_f64() * 2.0 * PI;
+            let arg_peri = rng.next_f64() * 2.0 * PI;
+            let mean_anom = rng.next_f64() * 2.0 * PI;
+
+            let elements = OrbitalElements {
+                semi_major_axis: semi_major,
+                eccentricity: ecc,
+                inclination: inc,
+                longitude_asc_node: lon_asc,
+                arg_periapsis: arg_peri,
+                mean_anomaly: mean_anom,
+            };
+
+            let mu_central = G * total_central_mass;
+            let (pos, vel) = elements.to_cartesian(mu_central);
+
+            let mass = sample_power_law(&mut rng, 1e12, 1e18, 2.3);
+            let density = 2500.0;
+            let volume = mass / density;
+            let radius = (3.0 * volume / (4.0 * PI)).powf(1.0 / 3.0);
+
+            let name = format!("Asteroid_{}", i + 1);
+            let mut asteroid = Body::new(0, &name, BodyType::Asteroid, mass, radius, pos, vel);
+            asteroid.semi_major_axis = semi_major;
+            asteroid.eccentricity = ecc;
+            asteroid.inclination = inc;
+            let g = 0x60 + (rng.next_bounded(0x40) as u32);
+            asteroid.color = hex_to_rgb((g << 16) | (g << 8) | g);
+            asteroid.composition = PlanetComposition::Rocky;
+            asteroid.albedo = 0.05 + rng.next_f64() * 0.15;
+            asteroid.softening_length = compute_softening(radius);
+            asteroid.compute_derived();
+            sim.add_body(asteroid);
+        }
+    }
+
+    // Recenter to barycentric frame
+    recenter_to_barycenter(&mut sim);
+
+    // 1 s timestep — suitable for 1 s/s real-time benchmarking
+    sim.set_dt(1.0);
+    sim.set_substeps(4);
+
+    sim.finalize_derived();
+    sim
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1827,7 +2087,7 @@ mod tests {
             Preset::IntegratorTest1,
             Preset::IntegratorTest2,
             Preset::IntegratorTest3,
-            // Note: AsteroidBelt and StarCluster are tested separately due to body count
+            // Note: AsteroidBelt, StarCluster, and StressTest are tested separately due to body count
         ];
         
         for preset in presets {

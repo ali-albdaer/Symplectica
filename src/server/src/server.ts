@@ -34,6 +34,9 @@ interface PhysicsModule {
     createIntegratorTest1?: (seed: bigint) => WasmSimulation;
     createIntegratorTest2?: (seed: bigint) => WasmSimulation;
     createIntegratorTest3?: (seed: bigint) => WasmSimulation;
+    createAsteroidBelt?: (seed: bigint, asteroidCount: number) => WasmSimulation;
+    createStarCluster?: (seed: bigint, starCount: number) => WasmSimulation;
+    createStressTest?: (seed: bigint, starCount: number, planetCount: number, asteroidCount: number) => WasmSimulation;
     getG: () => number;
     getAU: () => number;
     getSolarMass: () => number;
@@ -231,6 +234,12 @@ class SimulationServer {
             this.simulation = this.physics.createPlayableSolarSystem(CONFIG.seed);
         } else if (presetId === 'sunEarthMoon') {
             this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
+        } else if (presetId === 'stressTest' && typeof this.physics.createStressTest === 'function') {
+            this.simulation = this.physics.createStressTest(CONFIG.seed, 30, 100, 0);
+        } else if (presetId === 'asteroidBelt' && typeof this.physics.createAsteroidBelt === 'function') {
+            this.simulation = this.physics.createAsteroidBelt(CONFIG.seed, 5000);
+        } else if (presetId === 'starCluster' && typeof this.physics.createStarCluster === 'function') {
+            this.simulation = this.physics.createStarCluster(CONFIG.seed, 2000);
         } else {
             this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
         }

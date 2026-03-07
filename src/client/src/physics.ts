@@ -58,6 +58,7 @@ interface PhysicsModule {
     createBinaryPulsar: (seed: bigint) => WasmSimulation;
     createAsteroidBelt: (seed: bigint, asteroidCount: number) => WasmSimulation;
     createStarCluster: (seed: bigint, starCount: number) => WasmSimulation;
+    createStressTest: (seed: bigint, starCount: number, planetCount: number, asteroidCount: number) => WasmSimulation;
     createIntegratorTest1: (seed: bigint) => WasmSimulation;
     createIntegratorTest2: (seed: bigint) => WasmSimulation;
     createIntegratorTest3: (seed: bigint) => WasmSimulation;
@@ -414,7 +415,7 @@ export class PhysicsClient {
     }
 
     /** Create a preset simulation */
-    createPreset(preset: string, seed: bigint, barycentric: boolean = false, bodyCount?: number): void {
+    createPreset(preset: string, seed: bigint, barycentric: boolean = false, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }): void {
         if (!this.initialized || !this.module) throw new Error('Physics not initialized');
 
         let loadedPreset = preset;
@@ -489,6 +490,21 @@ export class PhysicsClient {
                     this.simulation = this.module.createStarCluster(seed, starCount);
                 } else {
                     logger.warn('Star Cluster preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
+                }
+                break;
+            }
+            case 'stressTest': {
+                // Stress test with configurable star/planet/asteroid counts
+                // bodyCount encodes: stars | planets | asteroids via stressTestCounts
+                const stStars = stressTestCounts?.stars ?? 30;
+                const stPlanets = stressTestCounts?.planets ?? 100;
+                const stAsteroids = stressTestCounts?.asteroids ?? 0;
+                if (typeof this.module.createStressTest === 'function') {
+                    this.simulation = this.module.createStressTest(seed, stStars, stPlanets, stAsteroids);
+                } else {
+                    logger.warn('Stress Test preset unavailable. Falling back to Sun-Earth-Moon.');
                     this.simulation = this.module.createSunEarthMoon(seed);
                     loadedPreset = 'sunEarthMoon';
                 }

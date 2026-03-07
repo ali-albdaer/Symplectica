@@ -38,7 +38,7 @@ export class AdminPanel {
     private physics: PhysicsClient;
     private timeController: TimeController;
     private network?: NetworkClient;
-    private onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number) => void;
+    private onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }) => void;
     private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
     private isOpen = false;
     private config: ServerConfig = {
@@ -63,7 +63,7 @@ export class AdminPanel {
         physics: PhysicsClient,
         timeController: TimeController,
         network?: NetworkClient,
-        onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number) => void,
+        onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }) => void,
         onSimModeChange?: (mode: 'tick' | 'accumulator') => void
     ) {
         this.physics = physics;
@@ -144,6 +144,7 @@ export class AdminPanel {
                             <option value="integratorTest3">Integrator Test 3 (Close Encounter)</option>
                             <option value="asteroidBelt">Asteroid Belt (5000+ bodies)</option>
                             <option value="starCluster">Star Cluster (2000 stars)</option>
+                            <option value="stressTest">Stress Test (Benchmark)</option>
                             <option value="worldBuilder" ${APP_DEFAULTS.defaultPreset.id === 'worldBuilder' ? 'selected' : ''}>+ World Builder</option>
                         </select>
                     </div>
@@ -158,6 +159,21 @@ export class AdminPanel {
                         <label>Number of Bodies</label>
                         <input type="number" id="admin-body-count" min="0" step="1" value="5000">
                         <div class="admin-hint" id="body-count-hint">More bodies = slower simulation</div>
+                    </div>
+                    <div id="stress-test-fields" style="display: none;">
+                        <div class="admin-field">
+                            <label>Stars</label>
+                            <input type="number" id="stress-stars" min="1" max="200" step="1" value="30">
+                        </div>
+                        <div class="admin-field">
+                            <label>Planets</label>
+                            <input type="number" id="stress-planets" min="0" max="2000" step="1" value="100">
+                        </div>
+                        <div class="admin-field">
+                            <label>Asteroids</label>
+                            <input type="number" id="stress-asteroids" min="0" max="10000" step="1" value="0">
+                        </div>
+                        <div class="admin-hint">Deterministic layout — same bodies every run</div>
                     </div>
                     <button class="admin-btn" id="admin-load-preset">Load Preset</button>
                 </section>
@@ -548,7 +564,20 @@ export class AdminPanel {
                 bodyCount = Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
             }
             
-            this.onPresetChange?.(presetId, name, barycentric, bodyCount);
+            // Get stress test counts
+            let stressTestCounts: { stars: number; planets: number; asteroids: number } | undefined;
+            if (presetId === 'stressTest') {
+                const starsInput = container.querySelector('#stress-stars') as HTMLInputElement | null;
+                const planetsInput = container.querySelector('#stress-planets') as HTMLInputElement | null;
+                const asteroidsInput = container.querySelector('#stress-asteroids') as HTMLInputElement | null;
+                stressTestCounts = {
+                    stars: Math.max(1, parseInt(starsInput?.value ?? '30', 10) || 30),
+                    planets: Math.max(0, parseInt(planetsInput?.value ?? '100', 10) || 0),
+                    asteroids: Math.max(0, parseInt(asteroidsInput?.value ?? '0', 10) || 0),
+                };
+            }
+            
+            this.onPresetChange?.(presetId, name, barycentric, bodyCount, stressTestCounts);
         });
 
         // Show/hide barycentric option and body count based on preset selection
@@ -557,6 +586,7 @@ export class AdminPanel {
         const bodyCountField = container.querySelector('#body-count-field') as HTMLElement | null;
         const bodyCountInput = container.querySelector('#admin-body-count') as HTMLInputElement | null;
         const bodyCountHint = container.querySelector('#body-count-hint') as HTMLElement | null;
+        const stressTestFields = container.querySelector('#stress-test-fields') as HTMLElement | null;
         
         const updatePresetOptions = () => {
             if (!presetSelect) return;
@@ -565,6 +595,11 @@ export class AdminPanel {
             // Show barycentric for Full Solar System II and World Builder
             if (barycentricField) {
                 barycentricField.style.display = (presetId === 'fullSolarSystemII' || presetId === 'worldBuilder') ? 'block' : 'none';
+            }
+            
+            // Show stress test fields
+            if (stressTestFields) {
+                stressTestFields.style.display = presetId === 'stressTest' ? 'block' : 'none';
             }
             
             // Show body count input for asteroid belt and star cluster
