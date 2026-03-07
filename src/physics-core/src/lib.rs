@@ -217,6 +217,39 @@ impl WasmSimulation {
         self.inner.total_energy()
     }
 
+    /// Get kinetic energy of the system
+    #[wasm_bindgen(js_name = kineticEnergy)]
+    pub fn kinetic_energy(&self) -> f64 {
+        self.inner.kinetic_energy()
+    }
+
+    /// Get potential energy of the system
+    #[wasm_bindgen(js_name = potentialEnergy)]
+    pub fn potential_energy(&self) -> f64 {
+        self.inner.potential_energy()
+    }
+
+    /// Get total linear momentum as [px, py, pz]
+    #[wasm_bindgen(js_name = totalMomentum)]
+    pub fn total_momentum(&self) -> Vec<f64> {
+        let p = self.inner.total_momentum();
+        vec![p.x, p.y, p.z]
+    }
+
+    /// Get center of mass as [x, y, z]
+    #[wasm_bindgen(js_name = centerOfMass)]
+    pub fn center_of_mass(&self) -> Vec<f64> {
+        let com = self.inner.center_of_mass();
+        vec![com.x, com.y, com.z]
+    }
+
+    /// Get total angular momentum about center of mass as [Lx, Ly, Lz]
+    #[wasm_bindgen(js_name = angularMomentum)]
+    pub fn angular_momentum(&self) -> Vec<f64> {
+        let l = self.inner.angular_momentum();
+        vec![l.x, l.y, l.z]
+    }
+
     /// Set timestep in seconds
     #[wasm_bindgen(js_name = setDt)]
     pub fn set_dt(&mut self, dt: f64) {

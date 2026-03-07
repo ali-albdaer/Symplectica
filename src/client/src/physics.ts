@@ -22,6 +22,11 @@ type WasmSimulation = {
     toJson(): string;
     fromJson(json: string): boolean;
     totalEnergy(): number;
+    kineticEnergy(): number;
+    potentialEnergy(): number;
+    totalMomentum(): Float64Array;
+    centerOfMass(): Float64Array;
+    angularMomentum(): Float64Array;
     addStar(name: string, mass: number, radius: number): number;
     addPlanet(name: string, mass: number, radius: number, distance: number, velocity: number): number;
     addBody(name: string, bodyType: number, mass: number, radius: number, px: number, py: number, pz: number, vx: number, vy: number, vz: number): number;
@@ -297,6 +302,26 @@ export class PhysicsClient {
 
     totalEnergy(): number {
         return this.simulation?.totalEnergy() ?? 0;
+    }
+
+    kineticEnergy(): number {
+        return this.simulation?.kineticEnergy() ?? 0;
+    }
+
+    potentialEnergy(): number {
+        return this.simulation?.potentialEnergy() ?? 0;
+    }
+
+    totalMomentum(): Float64Array {
+        return this.simulation?.totalMomentum() ?? new Float64Array(3);
+    }
+
+    centerOfMass(): Float64Array {
+        return this.simulation?.centerOfMass() ?? new Float64Array(3);
+    }
+
+    angularMomentum(): Float64Array {
+        return this.simulation?.angularMomentum() ?? new Float64Array(3);
     }
 
     /** Get body info for rendering. Cached — only re-parses JSON when body count changes. */

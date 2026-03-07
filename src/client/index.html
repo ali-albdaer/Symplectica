@@ -94,8 +94,28 @@
       display: block;
     }
 
-    #sim-params-section {
+    #sim-monitor-section {
       display: none;
+    }
+
+    #sim-monitor-section .monitor-group {
+      margin-top: 6px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    #sim-monitor-section .monitor-group:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    #sim-monitor-section .group-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(79,195,247,0.6);
+      margin-bottom: 2px;
     }
 
     #follow-section {
@@ -312,6 +332,7 @@
       padding-top: 0;
       border-top: none;
     }
+
   </style>
 </head>
 
@@ -327,43 +348,78 @@
 
   <div id="ui-overlay">
     <div id="stats">
-      <div id="sim-params-section" class="stats-card">
+      <div id="sim-monitor-section" class="stats-card">
         <h3>Simulation</h3>
-        <div class="stat-row">
-          <span class="label">Time</span>
-          <span class="value" id="sim-time">0.00 s</span>
+        <div class="monitor-group">
+          <div class="stat-row">
+            <span class="label">Time</span>
+            <span class="value" id="sim-time">0.00 s</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Warp</span>
+            <span class="value" id="time-warp">1x</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Bodies</span>
+            <span class="value" id="sim-bodies">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">FPS</span>
+            <span class="value" id="render-fps">0</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Warp</span>
-          <span class="value" id="time-warp">1x</span>
+        <div class="monitor-group">
+          <div class="group-label">Energy</div>
+          <div class="stat-row">
+            <span class="label">Total Mass</span>
+            <span class="value" id="sim-mass">0 kg</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Kinetic</span>
+            <span class="value" id="drift-ke">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Potential</span>
+            <span class="value" id="drift-pe">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Total</span>
+            <span class="value" id="drift-total-e">---</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Tick</span>
-          <span class="value" id="sim-tick">0</span>
+        <div class="monitor-group">
+          <div class="group-label">Momentum</div>
+          <div class="stat-row">
+            <span class="label">Linear |p|</span>
+            <span class="value" id="drift-momentum-abs">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Angular |L|</span>
+            <span class="value" id="drift-angular-abs">---</span>
+          </div>
         </div>
-        <div class="stat-row">
-          <span class="label">Bodies</span>
-          <span class="value" id="sim-bodies">0</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">Energy</span>
-          <span class="value" id="sim-energy">0 J</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">Mass</span>
-          <span class="value" id="sim-mass">0 kg</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">Lin Mom</span>
-          <span class="value" id="sim-linear-momentum">0 kg·m/s</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">Ang Mom</span>
-          <span class="value" id="sim-angular-momentum">0 kg·m²/s</span>
-        </div>
-        <div class="stat-row">
-          <span class="label">FPS</span>
-          <span class="value" id="render-fps">0</span>
+        <div class="monitor-group">
+          <div class="group-label">Conservation Drift</div>
+          <div class="stat-row">
+            <span class="label">ΔE / |E₀|</span>
+            <span class="value" id="drift-energy">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Δp / p_char</span>
+            <span class="value" id="drift-momentum">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">ΔL / |L₀|</span>
+            <span class="value" id="drift-angular">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">CoM shift</span>
+            <span class="value" id="drift-com">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Steps</span>
+            <span class="value" id="drift-steps">0</span>
+          </div>
         </div>
       </div>
       <div id="follow-section" class="stats-card">
@@ -522,7 +578,7 @@
       <h3>Keybinds</h3>
       <ul>
         <li><span>K</span>Keybinds</li>
-        <li><span>1</span>Simulation Stats</li>
+        <li><span>1</span>Simulation Monitor</li>
         <li><span>2</span>Following Stats</li>
         <li><span>3</span>Performance Monitor</li>
         <li><span>O</span>Options</li>

@@ -25,6 +25,7 @@ import { registerVisualPresetFeatures } from './visual-preset-features';
 import { SkyRenderer } from './sky-renderer';
 import { TouchControls } from './touch-controls';
 import { BuildPanel, BuildBodyParams, BuildableBodyType, BodyListEntry } from './build-panel';
+import { DriftMonitor } from './drift-monitor';
 import { APP_DEFAULTS } from './defaults';
 import { logger } from './logger';
 
@@ -58,6 +59,7 @@ class NBodyClient {
     private touchControls!: TouchControls;
     private buildPanel!: BuildPanel;
     private buildMode = false; // True when in world builder mode
+    private driftMonitor!: DriftMonitor;
 
     private state: SimState = {
         tick: 0,
@@ -156,6 +158,7 @@ class NBodyClient {
         this.applyPresetToRenderer();
 
         this.updateLoadingStatus('Loading physics engine...');
+        this.driftMonitor = new DriftMonitor();
         await this.initPhysics();
 
         this.applyLocalDefaults();
@@ -546,6 +549,9 @@ class NBodyClient {
 
         // Set initial follow target (first body if available, else origin)
         this.initializeFollowTarget();
+
+        // Capture initial conservation reference after first preset load
+        this.driftMonitor?.reset(this.physics, this.physics.tick());
     }
 
     private refreshBodies(): void {
@@ -691,7 +697,7 @@ class NBodyClient {
     }
 
     private updateSimulationSections(): void {
-        const simSection = document.getElementById('sim-params-section');
+        const simSection = document.getElementById('sim-monitor-section');
         const followSection = document.getElementById('follow-section');
         if (simSection) {
             simSection.style.display = this.showSimulationParams ? 'block' : 'none';
@@ -754,6 +760,9 @@ class NBodyClient {
 
         this.refreshBodies();
         this.timeController.resetAccumulator();
+
+        // Reset drift monitor reference snapshot for the new preset
+        this.driftMonitor.reset(this.physics, this.physics.tick());
 
         if (this.network?.isConnected()) {
             const snapshot = this.physics.getSnapshot();
@@ -1406,24 +1415,24 @@ class NBodyClient {
 
         // Update perf monitor AFTER all timing values are set
         this.updatePerfMonitor();
+
+        // Update conservation / drift monitor (reads from local WASM sim)
+        this.driftMonitor.update(this.physics, this.state.tick);
     };
 
     private updateUI(): void {
         document.getElementById('sim-time')!.textContent = this.formatTime(this.state.time);
-        document.getElementById('sim-tick')!.textContent = this.state.tick.toLocaleString();
-        document.getElementById('sim-energy')!.textContent = this.formatEnergy(this.state.energy);
         document.getElementById('sim-bodies')!.textContent = this.state.bodyCount.toString();
 
-        const totals = this.computeSystemTotals();
-        if (totals) {
-            document.getElementById('sim-mass')!.textContent = this.formatMass(totals.mass);
-            document.getElementById('sim-linear-momentum')!.textContent = this.formatMomentum(totals.linearMagnitude, 'kg·m/s');
-            document.getElementById('sim-angular-momentum')!.textContent = this.formatMomentum(totals.angularMagnitude, 'kg·m²/s');
+        // Compute total mass from cached bodies
+        if (this.cachedBodyMasses && this.cachedBodyMasses.length > 0) {
+            let mass = 0;
+            for (let i = 0; i < this.cachedBodyMasses.length; i++) {
+                mass += this.cachedBodyMasses[i];
+            }
+            document.getElementById('sim-mass')!.textContent = this.formatMass(mass);
         } else {
-            // No bodies or no velocity data - show zeros
             document.getElementById('sim-mass')!.textContent = '0 kg';
-            document.getElementById('sim-linear-momentum')!.textContent = '0 kg·m/s';
-            document.getElementById('sim-angular-momentum')!.textContent = '0 kg·m²/s';
         }
 
         const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
@@ -1462,77 +1471,6 @@ class NBodyClient {
         if (seconds < 86400) return (seconds / 3600).toFixed(2) + ' hr';
         if (seconds < 31536000) return (seconds / 86400).toFixed(2) + ' days';
         return (seconds / 31536000).toFixed(4) + ' years';
-    }
-
-    private formatEnergy(joules: number): string {
-        const abs = Math.abs(joules);
-        if (abs < 1e3) return joules.toFixed(2) + ' J';
-        if (abs < 1e6) return (joules / 1e3).toFixed(2) + ' kJ';
-        if (abs < 1e9) return (joules / 1e6).toFixed(2) + ' MJ';
-        if (abs < 1e12) return (joules / 1e9).toFixed(2) + ' GJ';
-        return joules.toExponential(3) + ' J';
-    }
-
-    private formatMomentum(value: number, unit: string): string {
-        if (!Number.isFinite(value)) return `0 ${unit}`;
-        const abs = Math.abs(value);
-        if (abs === 0) return `0 ${unit}`;
-        if (abs < 1e6) return `${value.toFixed(2)} ${unit}`;
-        return `${value.toExponential(3)} ${unit}`;
-    }
-
-    private computeSystemTotals(): { mass: number; linearMagnitude: number; angularMagnitude: number } | null {
-        // Use cached positions and velocities from state to avoid redundant WASM calls
-        const positions = this.state.positions;
-        const velocities = this.state.velocities;
-        
-        if (positions.length === 0 || velocities.length === 0) return null;
-        
-        const bodyCount = Math.floor(positions.length / 3);
-        if (velocities.length < bodyCount * 3) return null;
-
-        // Get body masses - use cached bodies to avoid expensive JSON parsing
-        // Only refresh when body count changes
-        if (!this.cachedBodyMasses || this.cachedBodyMasses.length !== bodyCount) {
-            const bodies = this.cachedBodies ?? this.physics.getBodies();
-            this.cachedBodyMasses = bodies.map(b => b.mass);
-        }
-
-        let mass = 0;
-        let px = 0;
-        let py = 0;
-        let pz = 0;
-        let lx = 0;
-        let ly = 0;
-        let lz = 0;
-
-        for (let i = 0; i < bodyCount; i++) {
-            const bodyMass = this.cachedBodyMasses[i];
-            const vx = velocities[i * 3];
-            const vy = velocities[i * 3 + 1];
-            const vz = velocities[i * 3 + 2];
-            const rx = positions[i * 3];
-            const ry = positions[i * 3 + 1];
-            const rz = positions[i * 3 + 2];
-
-            const pxi = bodyMass * vx;
-            const pyi = bodyMass * vy;
-            const pzi = bodyMass * vz;
-
-            px += pxi;
-            py += pyi;
-            pz += pzi;
-            mass += bodyMass;
-
-            lx += ry * pzi - rz * pyi;
-            ly += rz * pxi - rx * pzi;
-            lz += rx * pyi - ry * pxi;
-        }
-
-        const linearMagnitude = Math.sqrt(px * px + py * py + pz * pz);
-        const angularMagnitude = Math.sqrt(lx * lx + ly * ly + lz * lz);
-
-        return { mass, linearMagnitude, angularMagnitude };
     }
 
     private setLocalSimMode(mode: SimMode): void {

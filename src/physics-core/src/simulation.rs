@@ -5,7 +5,11 @@
 
 use crate::body::{Body, BodyId};
 use crate::constants::G;
-use crate::force::{compute_accelerations_direct, compute_total_energy};
+use crate::force::{
+    compute_accelerations_direct, compute_angular_momentum, compute_center_of_mass,
+    compute_kinetic_energy, compute_potential_energy, compute_total_energy,
+    compute_total_momentum,
+};
 use crate::integrator::{
     step_with_accel,
     AccelerationFn,
@@ -520,6 +524,32 @@ impl Simulation {
     /// Get total energy of the system
     pub fn total_energy(&self) -> f64 {
         compute_total_energy(&self.bodies, self.config.integrator.force_config.softening)
+    }
+
+    /// Get kinetic energy of the system
+    pub fn kinetic_energy(&self) -> f64 {
+        compute_kinetic_energy(&self.bodies)
+    }
+
+    /// Get potential energy of the system
+    pub fn potential_energy(&self) -> f64 {
+        compute_potential_energy(&self.bodies, self.config.integrator.force_config.softening)
+    }
+
+    /// Get total linear momentum as (px, py, pz)
+    pub fn total_momentum(&self) -> crate::vector::Vec3 {
+        compute_total_momentum(&self.bodies)
+    }
+
+    /// Get center of mass position
+    pub fn center_of_mass(&self) -> crate::vector::Vec3 {
+        compute_center_of_mass(&self.bodies)
+    }
+
+    /// Get total angular momentum about the center of mass
+    pub fn angular_momentum(&self) -> crate::vector::Vec3 {
+        let com = self.center_of_mass();
+        compute_angular_momentum(&self.bodies, com)
     }
 
     /// Create a snapshot of current state
