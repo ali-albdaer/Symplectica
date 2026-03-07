@@ -510,7 +510,7 @@ class NBodyClient {
         this.camera = new OrbitCamera(
             75,
             window.innerWidth / window.innerHeight,
-            1e3,     // 1 km near plane
+            1e2,     // 100 m near plane
             1e15     // ~1000 AU far plane
         );
         this.camera.setDistance(0.020 * AU); // Start at 0.020 AU distance
