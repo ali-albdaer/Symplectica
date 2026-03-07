@@ -1738,14 +1738,18 @@ pub fn create_star_cluster(seed: u64, star_count: usize) -> Simulation {
     // σᵥ² = (3π/64) × G × M / a
     let velocity_dispersion = ((3.0 * PI / 64.0) * G * total_mass / scale_radius).sqrt();
     
-    // Spectral type colors for variety (all roughly solar-type)
-    let star_colors = [
-        0xFFF4E8_u32, // G2V (Sun-like)
-        0xFFE4C4_u32, // G8V
-        0xFFFAF0_u32, // F8V
-        0xFFEBCD_u32, // G5V
-        0xFFE4B5_u32, // K0V
+    // OBAFGKM spectral type table: (weight, T_min, T_max, mass/M☉, radius/R☉, luminosity/L☉)
+    // Weights approximate a Salpeter-like IMF (more low-mass stars)
+    let spectral_types: [(f64, f64, f64, f64, f64, f64); 7] = [
+        (0.01, 30000.0, 50000.0, 20.0,  8.0, 100000.0), // O
+        (0.05, 10000.0, 30000.0,  5.0,  3.5,    500.0),  // B
+        (0.08,  7500.0, 10000.0,  2.0,  1.7,     10.0),  // A
+        (0.12,  6000.0,  7500.0,  1.3,  1.3,      3.0),  // F
+        (0.20,  5200.0,  6000.0,  1.0,  1.0,      1.0),  // G
+        (0.25,  3700.0,  5200.0,  0.7,  0.8,      0.3),  // K
+        (0.29,  2400.0,  3700.0,  0.3,  0.4,      0.04), // M
     ];
+    let total_weight: f64 = spectral_types.iter().map(|s| s.0).sum();
     
     for i in 0..star_count {
         // Sample position from Plummer sphere
@@ -1762,19 +1766,31 @@ pub fn create_star_cluster(seed: u64, star_count: usize) -> Simulation {
         let velocity = Vec3::new(vx, vy, vz);
         
         let name = format!("Star_{}", i + 1);
-        let color_idx = rng.next_bounded(star_colors.len() as u32) as usize;
         
-        let star_id = sim.add_star(&name, star_mass, R_SUN);
+        // Sample spectral type from weighted distribution
+        let mut roll = rng.next_f64() * total_weight;
+        let mut spec = &spectral_types[6]; // default to M
+        for s in &spectral_types {
+            roll -= s.0;
+            if roll <= 0.0 {
+                spec = s;
+                break;
+            }
+        }
+        let (_, t_min, t_max, mass_frac, radius_frac, lum_frac) = *spec;
+        
+        let this_mass = star_mass * mass_frac;
+        let this_radius = R_SUN * radius_frac;
+        let star_id = sim.add_star(&name, this_mass, this_radius);
         if let Some(star) = sim.get_body_mut(star_id) {
             star.position = position;
             star.velocity = velocity;
-            star.luminosity = L_SUN * (0.8 + rng.next_f64() * 0.4); // 0.8-1.2 L_SUN
-            star.effective_temperature = 5500.0 + rng.next_f64() * 1000.0; // 5500-6500 K
+            star.luminosity = L_SUN * lum_frac * (0.8 + rng.next_f64() * 0.4);
+            star.effective_temperature = t_min + rng.next_f64() * (t_max - t_min);
             star.rotation_rate = OMEGA_SUN * (0.5 + rng.next_f64()); // 0.5-1.5 × solar
             star.seed = seed.wrapping_add(i as u64);
             star.metallicity = sample_gaussian(&mut rng, 0.0, 0.3); // Solar ± 0.3 dex
             star.age = AGE_SUN * (0.1 + rng.next_f64() * 1.8); // 0.5-9 Gyr
-            star.color = hex_to_rgb(star_colors[color_idx]);
             star.softening_length = R_SUN * 100.0; // Larger softening for cluster dynamics
             star.compute_derived();
         }
