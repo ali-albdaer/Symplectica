@@ -18,6 +18,7 @@ export type PresetId =
     | 'integratorTest3'
     | 'asteroidBelt'
     | 'starCluster'
+    | 'stressTest'
     | 'worldBuilder';
 
 export type ForceMethod = 'direct' | 'barnes-hut';

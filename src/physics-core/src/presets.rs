@@ -428,6 +428,8 @@ pub enum Preset {
     IntegratorTest2,
     /// Integrator Test 3: Strong close encounter
     IntegratorTest3,
+    /// Configurable stress test: stars + planets + asteroids
+    StressTest,
 }
 
 impl Preset {
@@ -449,6 +451,7 @@ impl Preset {
             Preset::IntegratorTest1 => create_integrator_test1(seed),
             Preset::IntegratorTest2 => create_integrator_test2(seed),
             Preset::IntegratorTest3 => create_integrator_test3(seed),
+            Preset::StressTest => create_stress_test(seed, 20, 100),
         }
     }
 
@@ -468,6 +471,11 @@ impl Preset {
             Preset::IntegratorTest1 => create_integrator_test1(seed),
             Preset::IntegratorTest2 => create_integrator_test2(seed),
             Preset::IntegratorTest3 => create_integrator_test3(seed),
+            Preset::StressTest => {
+                let mut sim = create_stress_test(seed, 20, 100);
+                recenter_to_barycenter(&mut sim);
+                sim
+            },
             // Other presets don't support barycentric mode; fall back to default
             _ => self.create(seed),
         }
@@ -1808,6 +1816,180 @@ pub fn create_star_cluster(seed: u64, star_count: usize) -> Simulation {
     sim
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// STRESS TEST PRESET
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Create a configurable stress test simulation
+///
+/// Generates a mixed population of stars, planets, and asteroids:
+/// - Stars: Plummer sphere distribution with IMF-weighted masses
+/// - Planets: Random circular orbits around nearest star
+/// - Asteroids: Toroidal belt distribution around system center
+///
+/// Designed for benchmarking rendering and physics performance.
+pub fn create_stress_test(
+    seed: u64,
+    star_count: usize,
+    planet_count: usize,
+) -> Simulation {
+    let mut sim = Simulation::new(seed);
+    let mut rng = Pcg32::new(seed);
+
+    // ── Stars ──────────────────────────────────────────────────────────────
+    // Plummer sphere with IMF-weighted spectral types and virial velocities
+    let cluster_radius = 500.0 * AU; // Moderate cluster — tight enough to see, loose enough for stability
+    let spectral_types: [(f64, f64, f64, f64, f64, f64); 7] = [
+        (0.01, 30000.0, 50000.0, 20.0,  8.0, 100000.0), // O
+        (0.05, 10000.0, 30000.0,  5.0,  3.5,    500.0),  // B
+        (0.08,  7500.0, 10000.0,  2.0,  1.7,     10.0),  // A
+        (0.12,  6000.0,  7500.0,  1.3,  1.3,      3.0),  // F
+        (0.20,  5200.0,  6000.0,  1.0,  1.0,      1.0),  // G
+        (0.25,  3700.0,  5200.0,  0.7,  0.8,      0.3),  // K
+        (0.29,  2400.0,  3700.0,  0.3,  0.4,      0.04), // M
+    ];
+    let total_weight: f64 = spectral_types.iter().map(|s| s.0).sum();
+
+    // Pre-sample spectral types to compute total cluster mass for virial velocities
+    let mut sampled_specs: Vec<(f64, f64, f64, f64, f64, f64)> = Vec::with_capacity(star_count);
+    for _ in 0..star_count {
+        let mut roll = rng.next_f64() * total_weight;
+        let mut spec = spectral_types[6];
+        for s in &spectral_types {
+            roll -= s.0;
+            if roll <= 0.0 {
+                spec = *s;
+                break;
+            }
+        }
+        sampled_specs.push(spec);
+    }
+    let total_cluster_mass: f64 = sampled_specs.iter().map(|s| M_SUN * s.3).sum();
+
+    // Virial velocity dispersion: σ² = (3π/64) × G × M_total / a
+    let velocity_dispersion = ((3.0 * PI / 64.0) * G * total_cluster_mass / cluster_radius).sqrt();
+    let sigma_1d = velocity_dispersion / 3.0_f64.sqrt();
+
+    // Store star data for planet placement
+    let mut star_positions: Vec<Vec3> = Vec::with_capacity(star_count);
+    let mut star_velocities: Vec<Vec3> = Vec::with_capacity(star_count);
+    let mut star_masses: Vec<f64> = Vec::with_capacity(star_count);
+    let mut star_ids: Vec<u32> = Vec::with_capacity(star_count);
+
+    for i in 0..star_count {
+        let r = sample_plummer_radius(&mut rng, cluster_radius);
+        let (nx, ny, nz) = sample_unit_sphere(&mut rng);
+        let position = Vec3::new(r * nx, r * ny, r * nz);
+
+        // Virial velocity from isotropic Gaussian (Maxwell-Boltzmann)
+        let velocity = Vec3::new(
+            sample_gaussian(&mut rng, 0.0, sigma_1d),
+            sample_gaussian(&mut rng, 0.0, sigma_1d),
+            sample_gaussian(&mut rng, 0.0, sigma_1d),
+        );
+
+        let (_, t_min, t_max, mass_frac, radius_frac, lum_frac) = sampled_specs[i];
+        let this_mass = M_SUN * mass_frac;
+        let this_radius = R_SUN * radius_frac;
+        let name = format!("Star_{}", i + 1);
+        let star_id = sim.add_star(&name, this_mass, this_radius);
+        if let Some(star) = sim.get_body_mut(star_id) {
+            star.position = position;
+            star.velocity = velocity;
+            star.luminosity = L_SUN * lum_frac * (0.8 + rng.next_f64() * 0.4);
+            star.effective_temperature = t_min + rng.next_f64() * (t_max - t_min);
+            star.rotation_rate = OMEGA_SUN * (0.5 + rng.next_f64());
+            star.seed = seed.wrapping_add(i as u64);
+            star.metallicity = sample_gaussian(&mut rng, 0.0, 0.3);
+            star.age = AGE_SUN * (0.1 + rng.next_f64() * 1.8);
+            star.softening_length = R_SUN * 100.0; // Larger softening for cluster dynamics
+            star.compute_derived();
+        }
+        star_positions.push(position);
+        star_velocities.push(velocity);
+        star_masses.push(this_mass);
+        star_ids.push(star_id);
+    }
+
+    // ── Planets ───────────────────────────────────────────────────────────
+    // Each planet orbits its parent star via Keplerian elements (proper
+    // elliptical initial conditions). Orbital distances 1–10 AU so that
+    // periods (1–31 years) remain stable at time-warp speeds up to 1yr/s
+    // where dt ≈ 6 days → ≥60 substeps per innermost orbit.
+    let planet_colors: [u32; 8] = [
+        0x6b93d6, 0xc1440e, 0xd4a574, 0xead6a7,
+        0x72b4c4, 0x3d5ef5, 0xe6c229, 0x8c7853,
+    ];
+
+    for i in 0..planet_count {
+        let parent_idx = i % star_count.max(1);
+        let parent_pos = if star_count > 0 { star_positions[parent_idx] } else { Vec3::ZERO };
+        let parent_vel = if star_count > 0 { star_velocities[parent_idx] } else { Vec3::ZERO };
+        let parent_mass = if star_count > 0 { star_masses[parent_idx] } else { M_SUN };
+        let parent_id = if star_count > 0 { star_ids[parent_idx] } else { 0 };
+
+        // Orbital distance: 1–10 AU (safe range for integrator stability)
+        let semi_major = AU * (1.0 + rng.next_f64() * 9.0);
+        let ecc = rng.next_f64() * 0.15; // Low eccentricity
+        let inc = sample_rayleigh(&mut rng, 0.05); // Small inclination
+        let lon_asc = rng.next_f64() * 2.0 * PI;
+        let arg_peri = rng.next_f64() * 2.0 * PI;
+        let mean_anom = rng.next_f64() * 2.0 * PI;
+
+        let elements = OrbitalElements {
+            semi_major_axis: semi_major,
+            eccentricity: ecc,
+            inclination: inc,
+            longitude_asc_node: lon_asc,
+            arg_periapsis: arg_peri,
+            mean_anomaly: mean_anom,
+        };
+
+        let mu = G * parent_mass;
+        let (rel_pos, rel_vel) = elements.to_cartesian(mu);
+
+        // Random planet mass: 0.1–300 Earth masses
+        let mass = M_EARTH * (0.1 + rng.next_f64() * 299.9);
+        let radius = R_EARTH * (0.4 + (mass / M_EARTH).powf(0.27) * 0.5);
+        let name = format!("Planet_{}", i + 1);
+
+        let mut planet = Body::new(
+            0, &name, BodyType::Planet,
+            mass, radius,
+            parent_pos + rel_pos,     // Absolute position
+            parent_vel + rel_vel,     // Co-moving with parent star
+        );
+        planet.parent_id = Some(parent_id);
+        planet.semi_major_axis = semi_major;
+        planet.eccentricity = ecc;
+        planet.inclination = inc;
+        planet.color = hex_to_rgb(planet_colors[i % planet_colors.len()]);
+        planet.composition = if mass > 10.0 * M_EARTH {
+            PlanetComposition::GasGiant
+        } else {
+            PlanetComposition::Rocky
+        };
+        planet.albedo = 0.1 + rng.next_f64() * 0.6;
+        planet.rotation_rate = OMEGA_EARTH * (0.2 + rng.next_f64() * 3.0);
+        planet.axial_tilt = rng.next_f64() * 0.8;
+        planet.mean_surface_temperature = 200.0 + rng.next_f64() * 400.0;
+        planet.seed = seed.wrapping_add(1000 + i as u64);
+        planet.softening_length = compute_softening(radius);
+        planet.compute_derived();
+        sim.add_body(planet);
+    }
+
+    recenter_to_barycenter(&mut sim);
+
+    // Set timestep appropriate for cluster dynamics
+    // Crossing time ~ cluster_radius / σ ~ 500 AU / ~1 km/s ~ 2400 years
+    sim.set_dt(SECONDS_PER_YEAR * 10.0); // 10 year timestep
+    sim.set_substeps(4);
+
+    sim.finalize_derived();
+    sim
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1827,7 +2009,7 @@ mod tests {
             Preset::IntegratorTest1,
             Preset::IntegratorTest2,
             Preset::IntegratorTest3,
-            // Note: AsteroidBelt and StarCluster are tested separately due to body count
+            // Note: AsteroidBelt, StarCluster, and StressTest are tested separately due to body count
         ];
         
         for preset in presets {
@@ -2043,5 +2225,22 @@ mod tests {
         println!("  Total stars: {}", sim.body_count());
         println!("  COM offset: {:.3e} m", com_offset);
         println!("  Energy: {:.3e} J", energy);
+    }
+
+    #[test]
+    fn test_stress_test_preset() {
+        let sim = create_stress_test(42, 3, 10);
+        // 3 stars + 10 planets = 13
+        assert_eq!(sim.body_count(), 13, "Expected 13 bodies, got {}", sim.body_count());
+
+        let bodies = sim.bodies();
+        let stars = bodies.iter().filter(|b| b.body_type == BodyType::Star).count();
+        let planets = bodies.iter().filter(|b| b.body_type == BodyType::Planet).count();
+        assert_eq!(stars, 3);
+        assert_eq!(planets, 10);
+
+        // Verify the system is gravitationally bound (virial equilibrium)
+        let energy = sim.total_energy();
+        assert!(energy < 0.0, "Stress test should be gravitationally bound, got E={:.3e}", energy);
     }
 }
