@@ -54,9 +54,6 @@ pub const MAX_TOTAL_OBJECTS: usize = 500;
 /// Default integrator substeps per tick
 pub const DEFAULT_SUBSTEPS: u32 = 4;
 
-/// Floating origin recenter threshold in meters (10^7 m = 10,000 km)
-pub const FLOATING_ORIGIN_THRESHOLD: f64 = 1.0e7;
-
 /// Stefan-Boltzmann constant σ in W·m⁻²·K⁻⁴ (CODATA 2018)
 pub const STEFAN_BOLTZMANN: f64 = 5.670_374_419e-8;
 

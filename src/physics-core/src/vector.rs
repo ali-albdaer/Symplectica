@@ -70,6 +70,7 @@ impl Vec3 {
     #[inline]
     pub fn normalize(self) -> Self {
         let len = self.length();
+        debug_assert!(!len.is_nan(), "Vector::normalize called with NaN components");
         if len > 0.0 {
             self / len
         } else {
@@ -81,6 +82,7 @@ impl Vec3 {
     #[inline]
     pub fn normalize_with_length(self) -> (Self, f64) {
         let len = self.length();
+        debug_assert!(!len.is_nan(), "Vector::normalize_with_length called with NaN components");
         if len > 0.0 {
             (self / len, len)
         } else {
