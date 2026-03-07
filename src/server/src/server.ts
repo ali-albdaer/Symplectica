@@ -287,43 +287,7 @@ class SimulationServer {
             this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
         }
 
-        const dt = this.adminState.simMode === 'tick'
-            ? this.adminState.timeScale / CONFIG.tickRate
-            : this.adminState.dt;
-
-        if (this.adminState.simMode === 'tick' && this.adminState.dt !== dt) {
-            this.adminState = {
-                ...this.adminState,
-                dt,
-            };
-        }
-
-        this.simulation.setDt(dt);
-        this.simulation.setSubsteps(this.adminState.substeps);
-        if (this.adminState.forceMethod === 'barnes-hut') {
-            this.simulation.setTheta(this.adminState.theta);
-            this.simulation.useBarnesHut();
-        } else {
-            this.simulation.useDirectForce();
-        }
-        this.simulation.setCloseEncounterIntegrator(this.adminState.closeEncounterIntegrator);
-        this.simulation.setCloseEncounterThresholds(
-            this.adminState.closeEncounterHillFactor,
-            this.adminState.closeEncounterTidalRatio,
-            this.adminState.closeEncounterJerkNorm
-        );
-        this.simulation.setCloseEncounterLimits(
-            this.adminState.closeEncounterMaxSubsetSize,
-            this.adminState.closeEncounterMaxTrialSubsteps
-        );
-        this.simulation.setCloseEncounterRk45Tolerances(
-            this.adminState.closeEncounterRk45AbsTol,
-            this.adminState.closeEncounterRk45RelTol
-        );
-        this.simulation.setCloseEncounterGaussRadau(
-            this.adminState.closeEncounterGaussRadauMaxIters,
-            this.adminState.closeEncounterGaussRadauTol
-        );
+        this.applyAdminStateToSimulation();
 
         logger.info(`Bodies: ${this.simulation.bodyCount()}`);
         logger.info(`Initial energy: ${this.simulation.totalEnergy().toExponential(4)} J`);
@@ -449,49 +413,6 @@ class SimulationServer {
         } catch {
             return snapshot;
         }
-    }
-
-    private updateAdminStateFromSnapshot(snapshot: string): void {
-        try {
-            const parsed = JSON.parse(snapshot) as {
-                force_config?: { softening?: number; barnes_hut_theta?: number };
-                integrator_config?: {
-                    dt?: number;
-                    substeps?: number;
-                    close_encounter?: Record<string, unknown>;
-                };
-            };
-            if (!parsed || typeof parsed !== 'object') return;
-
-            const integrator = parsed.integrator_config;
-            if (integrator) {
-                if (typeof integrator.dt === 'number') this.adminState.dt = integrator.dt;
-                if (typeof integrator.substeps === 'number') this.adminState.substeps = integrator.substeps;
-
-                const close = integrator.close_encounter;
-                if (close) {
-                    const intName = String(close.integrator ?? 'None');
-                    if (intName === 'Rk45') this.adminState.closeEncounterIntegrator = 'rk45';
-                    else if (intName === 'GaussRadau5') this.adminState.closeEncounterIntegrator = 'gauss-radau';
-                    else this.adminState.closeEncounterIntegrator = 'none';
-
-                    if (typeof close.hill_factor === 'number') this.adminState.closeEncounterHillFactor = close.hill_factor;
-                    if (typeof close.tidal_ratio_threshold === 'number') this.adminState.closeEncounterTidalRatio = close.tidal_ratio_threshold;
-                    if (typeof close.jerk_norm_threshold === 'number') this.adminState.closeEncounterJerkNorm = close.jerk_norm_threshold;
-                    if (typeof close.max_subset_size === 'number') this.adminState.closeEncounterMaxSubsetSize = close.max_subset_size;
-                    if (typeof close.max_trial_substeps === 'number') this.adminState.closeEncounterMaxTrialSubsteps = close.max_trial_substeps;
-                    if (typeof close.rk45_abs_tol === 'number') this.adminState.closeEncounterRk45AbsTol = close.rk45_abs_tol;
-                    if (typeof close.rk45_rel_tol === 'number') this.adminState.closeEncounterRk45RelTol = close.rk45_rel_tol;
-                    if (typeof close.gauss_radau_max_iters === 'number') this.adminState.closeEncounterGaussRadauMaxIters = close.gauss_radau_max_iters;
-                    if (typeof close.gauss_radau_tol === 'number') this.adminState.closeEncounterGaussRadauTol = close.gauss_radau_tol;
-                }
-            }
-
-            const force = parsed.force_config;
-            if (force) {
-                if (typeof force.barnes_hut_theta === 'number') this.adminState.theta = force.barnes_hut_theta;
-            }
-        } catch { /* snapshot already loaded successfully, just skip state sync */ }
     }
 
     private handleMessage(client: Client, message: ClientMessage): void {
@@ -691,7 +612,7 @@ class SimulationServer {
                 const normalized = this.normalizeSnapshotForAdmin(payload.snapshot);
                 const ok = this.simulation.fromJson(normalized);
                 if (ok) {
-                    this.updateAdminStateFromSnapshot(normalized);
+                    this.applyAdminStateToSimulation();
                     this.broadcastSnapshot();
                     this.broadcastAdminState();
                     const name = payload.presetName || 'Custom Snapshot';
@@ -867,6 +788,43 @@ class SimulationServer {
                 client.ws.send(data);
             }
         }
+    }
+
+    private applyAdminStateToSimulation(): void {
+        const dt = this.adminState.simMode === 'tick'
+            ? this.adminState.timeScale / CONFIG.tickRate
+            : this.adminState.dt;
+
+        if (this.adminState.simMode === 'tick' && this.adminState.dt !== dt) {
+            this.adminState = { ...this.adminState, dt };
+        }
+
+        this.simulation.setDt(dt);
+        this.simulation.setSubsteps(this.adminState.substeps);
+        if (this.adminState.forceMethod === 'barnes-hut') {
+            this.simulation.setTheta(this.adminState.theta);
+            this.simulation.useBarnesHut();
+        } else {
+            this.simulation.useDirectForce();
+        }
+        this.simulation.setCloseEncounterIntegrator(this.adminState.closeEncounterIntegrator);
+        this.simulation.setCloseEncounterThresholds(
+            this.adminState.closeEncounterHillFactor,
+            this.adminState.closeEncounterTidalRatio,
+            this.adminState.closeEncounterJerkNorm
+        );
+        this.simulation.setCloseEncounterLimits(
+            this.adminState.closeEncounterMaxSubsetSize,
+            this.adminState.closeEncounterMaxTrialSubsteps
+        );
+        this.simulation.setCloseEncounterRk45Tolerances(
+            this.adminState.closeEncounterRk45AbsTol,
+            this.adminState.closeEncounterRk45RelTol
+        );
+        this.simulation.setCloseEncounterGaussRadau(
+            this.adminState.closeEncounterGaussRadauMaxIters,
+            this.adminState.closeEncounterGaussRadauTol
+        );
     }
 
     private broadcastAdminState(): void {
