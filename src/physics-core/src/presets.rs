@@ -404,6 +404,9 @@ pub enum Preset {
     /// Full Solar System II - Corrected J2000 orbital elements with inclinations
     /// Uses canonical JPL values with proper Kepler→Cartesian conversion
     FullSolarSystemII,
+    /// Full Solar System III (2026) — JPL HORIZONS ephemeris at 2026-01-01
+    /// 40 bodies: Sun, 8 planets, Pluto, 26 moons, 3 asteroids, 5 comets
+    FullSolarSystemIII,
     /// Playable scaled solar system (all planets + Moon)
     PlayableSolarSystem,
     /// Jupiter and its 4 Galilean moons
@@ -441,6 +444,7 @@ impl Preset {
             Preset::InnerSolarSystem => create_inner_solar_system(seed),
             Preset::FullSolarSystem => create_full_solar_system(seed),
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, false),
+            Preset::FullSolarSystemIII => create_full_solar_system_iii(seed, false),
             Preset::PlayableSolarSystem => create_playable_solar_system(seed),
             Preset::JupiterSystem => create_jupiter_system(seed),
             Preset::SaturnSystem => create_saturn_system(seed),
@@ -460,6 +464,7 @@ impl Preset {
     pub fn create_barycentric(&self, seed: u64) -> Simulation {
         match self {
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, true),
+            Preset::FullSolarSystemIII => create_full_solar_system_iii(seed, true),
             Preset::AsteroidBelt => {
                 let mut sim = create_asteroid_belt(seed, 5000);
                 recenter_to_barycenter(&mut sim);
@@ -1518,6 +1523,894 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
         recenter_to_barycenter(&mut sim);
     }
     
+    sim.finalize_derived();
+    sim
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FULL SOLAR SYSTEM III (2026) — JPL HORIZONS EPHEMERIS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Full Solar System III — 40 bodies with JPL HORIZONS ephemeris at 2026-01-01T00:00:00
+/// Heliocentric ecliptic J2000 state vectors, converted to SI (meters, m/s).
+/// Includes: Sun, 8 planets, Pluto, 26 moons, 3 asteroids (Ceres/Pallas/Vesta), 5 comets.
+pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation {
+    let mut sim = Simulation::new(seed);
+    let deg = PI / 180.0;
+
+    // ─── Sun ────────────────────────────────────────────────────────────
+    // Horizons #10 — at origin of heliocentric frame
+    let sun_id = sim.add_star("Sun", 1.98841e30, 6.957e8);
+    if let Some(sun) = sim.get_body_mut(sun_id) {
+        sun.luminosity = L_SUN;
+        sun.effective_temperature = 5772.0;
+        sun.rotation_rate = 2.8653290845717256e-6;
+        sun.mean_surface_temperature = 5772.0;
+        sun.seed = seed.wrapping_add(0);
+        sun.metallicity = METALLICITY_SUN;
+        sun.age = AGE_SUN;
+        sun.softening_length = compute_softening(6.957e8);
+        sun.compute_derived();
+    }
+
+    // ─── Mercury ────────────────────────────────────────────────────────
+    // Horizons #199 — epoch 2026-01-01
+    let mut mercury = Body::new(
+        0, "Mercury", BodyType::Planet,
+        3.302e23, 2.4394e6,
+        Vec3::new(-32193656.90676167e3, -61216587.9829846e3, -2049979.952579837e3),
+        Vec3::new(33.29912211950884e3, -20.32319326617692e3, -4.715026944319221e3),
+    );
+    mercury.rotation_rate = 1.24001e-6;
+    mercury.axial_tilt = 0.00059;
+    mercury.mean_surface_temperature = 440.0;
+    mercury.seed = seed.wrapping_add(1);
+    mercury.semi_major_axis = 57909051.27942418e3;
+    mercury.eccentricity = 0.2056426160956197;
+    mercury.inclination = 7.003422810415504 * deg;
+    mercury.longitude_asc_node = 48.29881667444637 * deg;
+    mercury.arg_periapsis = 29.19881272328852 * deg;
+    mercury.mean_anomaly = 157.6511583424542 * deg;
+    mercury.parent_id = Some(sun_id);
+    mercury.color = hex_to_rgb(0x8c7853);
+    mercury.composition = PlanetComposition::Rocky;
+    mercury.albedo = 0.088;
+    mercury.softening_length = compute_softening(2.4394e6);
+    mercury.compute_derived();
+    sim.add_body(mercury);
+
+    // ─── Venus ──────────────────────────────────────────────────────────
+    // Horizons #299
+    let mut venus = Body::new(
+        0, "Venus", BodyType::Planet,
+        4.8685e24, 6.05184e6,
+        Vec3::new(13295847.29627933e3, -107974115.5459946e3, -2250558.830319598e3),
+        Vec3::new(34.52275635351619e3, 4.156129935817114e3, -1.934854181927197e3),
+    );
+    venus.rotation_rate = -2.9924e-7;
+    venus.axial_tilt = 3.0943;
+    venus.mean_surface_temperature = 735.0;
+    venus.seed = seed.wrapping_add(2);
+    venus.semi_major_axis = 108209293.6140176e3;
+    venus.eccentricity = 0.006780942266658413;
+    venus.inclination = 3.394392156342094 * deg;
+    venus.longitude_asc_node = 76.60714242821713 * deg;
+    venus.arg_periapsis = 54.87317496286026 * deg;
+    venus.mean_anomaly = 145.1314515634737 * deg;
+    venus.parent_id = Some(sun_id);
+    venus.color = hex_to_rgb(0xe6c229);
+    venus.composition = PlanetComposition::Rocky;
+    venus.albedo = 0.77;
+    venus.atmosphere = Some(Atmosphere::venus_like());
+    venus.softening_length = compute_softening(6.05184e6);
+    venus.compute_derived();
+    sim.add_body(venus);
+
+    // ─── Earth ──────────────────────────────────────────────────────────
+    // Horizons #399
+    let mut earth = Body::new(
+        0, "Earth", BodyType::Planet,
+        5.97219e24, 6.37101e6,
+        Vec3::new(-26072138.44816194e3, 144774673.8210197e3, -8892.861905746162e3),
+        Vec3::new(-29.78893116564825e3, -5.396270536820538e3, 0.0004106639513727917e3),
+    );
+    earth.atmosphere = Some(Atmosphere::earth_like());
+    earth.rotation_rate = 7.292115e-5;
+    earth.axial_tilt = AXIAL_TILT_EARTH;
+    earth.mean_surface_temperature = T_SURFACE_EARTH;
+    earth.seed = seed.wrapping_add(3);
+    earth.semi_major_axis = 149477430.1325314e3;
+    earth.eccentricity = 0.01591429536350342;
+    earth.inclination = 0.003549055731418342 * deg;
+    earth.longitude_asc_node = 177.6179030721728 * deg;
+    earth.arg_periapsis = 286.3568704502947 * deg;
+    earth.mean_anomaly = 356.3524337712979 * deg;
+    earth.parent_id = Some(sun_id);
+    earth.color = hex_to_rgb(0x6b93d6);
+    earth.composition = PlanetComposition::Rocky;
+    earth.albedo = 0.306;
+    earth.softening_length = compute_softening(6.37101e6);
+    earth.compute_derived();
+    let earth_id = sim.add_body(earth);
+
+    // ─── Moon ───────────────────────────────────────────────────────────
+    // Horizons #301 — heliocentric state vector (already absolute)
+    let mut moon = Body::new(
+        0, "Moon", BodyType::Moon,
+        7.349e22, 1.73753e6,
+        Vec3::new(-25927812.72067001e3, 145104069.6519153e3, 22860.11443745345e3),
+        Vec3::new(-30.79324530332047e3, -4.975405328064174e3, 0.00599587524917955e3),
+    );
+    moon.rotation_rate = 2.6617e-6;
+    moon.axial_tilt = 0.02692;
+    moon.mean_surface_temperature = 250.0;
+    moon.seed = seed.wrapping_add(4);
+    moon.semi_major_axis = 160337924.3759978e3;
+    moon.eccentricity = 0.08236183062471594;
+    moon.inclination = 0.01403758402742693 * deg;
+    moon.longitude_asc_node = 60.85906168069921 * deg;
+    moon.arg_periapsis = 26.67216696617628 * deg;
+    moon.mean_anomaly = 10.65892596627429 * deg;
+    moon.parent_id = Some(earth_id);
+    moon.color = hex_to_rgb(0xb0b0b0);
+    moon.composition = PlanetComposition::Rocky;
+    moon.albedo = 0.12;
+    moon.softening_length = compute_softening(1.73753e6);
+    moon.compute_derived();
+    sim.add_body(moon);
+
+    // ─── Mars ───────────────────────────────────────────────────────────
+    // Horizons #499
+    let mut mars = Body::new(
+        0, "Mars", BodyType::Planet,
+        6.4171e23, 3.38992e6,
+        Vec3::new(50949994.46228143e3, -207492548.2420174e3, -5597537.454939082e3),
+        Vec3::new(24.44715235948102e3, 7.861165862885534e3, -0.4347434612671703e3),
+    );
+    mars.rotation_rate = 7.088218111185524e-5;
+    mars.axial_tilt = 0.4396;
+    mars.mean_surface_temperature = 210.0;
+    mars.seed = seed.wrapping_add(5);
+    mars.semi_major_axis = 227941421.6480371e3;
+    mars.eccentricity = 0.09348461380205672;
+    mars.inclination = 1.847490422989131 * deg;
+    mars.longitude_asc_node = 49.48317173608726 * deg;
+    mars.arg_periapsis = 286.6231771776422 * deg;
+    mars.mean_anomaly = 315.8219093418334 * deg;
+    mars.parent_id = Some(sun_id);
+    mars.color = hex_to_rgb(0xc1440e);
+    mars.composition = PlanetComposition::Rocky;
+    mars.albedo = 0.25;
+    mars.atmosphere = Some(Atmosphere::mars_like());
+    mars.softening_length = compute_softening(3.38992e6);
+    mars.compute_derived();
+    let mars_id = sim.add_body(mars);
+
+    // ─── Phobos ─────────────────────────────────────────────────────────
+    // Horizons #401 — mass from NASA fact sheet (GM=7.09e-4 km³/s²)
+    let mut phobos = Body::new(
+        0, "Phobos", BodyType::Moon,
+        1.0659e16, 1.31e4,
+        Vec3::new(50947366.23900896e3, -207501379.4311839e3, -5596900.585285708e3),
+        Vec3::new(26.27614488820742e3, 7.238706660368853e3, -1.422097641061121e3),
+    );
+    phobos.rotation_rate = 2.28e-4;
+    phobos.mean_surface_temperature = 233.0;
+    phobos.seed = seed.wrapping_add(6);
+    phobos.parent_id = Some(mars_id);
+    phobos.color = hex_to_rgb(0x6b5f4f);
+    phobos.composition = PlanetComposition::Rocky;
+    phobos.albedo = 0.071;
+    phobos.softening_length = compute_softening(1.31e4);
+    phobos.compute_derived();
+    sim.add_body(phobos);
+
+    // ─── Deimos ─────────────────────────────────────────────────────────
+    // Horizons #402 — mass from NASA fact sheet
+    let mut deimos = Body::new(
+        0, "Deimos", BodyType::Moon,
+        1.4762e15, 7.8e3,
+        Vec3::new(50960858.1512132e3, -207472045.051078e3, -5600953.046942502e3),
+        Vec3::new(23.38140382423259e3, 8.511628465950784e3, 0.08254899501365598e3),
+    );
+    deimos.rotation_rate = 5.82e-5;
+    deimos.mean_surface_temperature = 233.0;
+    deimos.seed = seed.wrapping_add(7);
+    deimos.parent_id = Some(mars_id);
+    deimos.color = hex_to_rgb(0x6b5f4f);
+    deimos.composition = PlanetComposition::Rocky;
+    deimos.albedo = 0.068;
+    deimos.softening_length = compute_softening(7.8e3);
+    deimos.compute_derived();
+    sim.add_body(deimos);
+
+    // ─── Jupiter ────────────────────────────────────────────────────────
+    // Horizons #599
+    let mut jupiter = Body::new(
+        0, "Jupiter", BodyType::Planet,
+        1.89819e27, 6.9911e7,
+        Vec3::new(-253419345.368912e3, 737350305.7947004e3, 2606925.500009716e3),
+        Vec3::new(-12.52004139508961e3, -3.640294521136214e3, 0.2951466824685909e3),
+    );
+    jupiter.rotation_rate = 1.7585e-4;
+    jupiter.axial_tilt = 0.0546;
+    jupiter.mean_surface_temperature = 165.0;
+    jupiter.seed = seed.wrapping_add(10);
+    jupiter.semi_major_axis = 778388856.4707986e3;
+    jupiter.eccentricity = 0.04815922780877058;
+    jupiter.inclination = 1.303188609732257 * deg;
+    jupiter.longitude_asc_node = 100.5154900059337 * deg;
+    jupiter.arg_periapsis = 273.711224859534 * deg;
+    jupiter.mean_anomaly = 89.22864130180537 * deg;
+    jupiter.parent_id = Some(sun_id);
+    jupiter.color = hex_to_rgb(0xd4a574);
+    jupiter.composition = PlanetComposition::GasGiant;
+    jupiter.albedo = 0.503;
+    jupiter.softening_length = compute_softening(6.9911e7);
+    jupiter.compute_derived();
+    let jupiter_id = sim.add_body(jupiter);
+
+    // ─── Io ─────────────────────────────────────────────────────────────
+    // Horizons #501 — GM=5959.9155 km³/s²
+    let mut io = Body::new(
+        0, "Io", BodyType::Moon,
+        8.9296e22, 1.82149e6,
+        Vec3::new(-253048162.4054362e3, 737149012.2283239e3, 2604956.343127787e3),
+        Vec3::new(-4.208017384166167e3, 11.53696126936628e3, 0.956643452611873e3),
+    );
+    io.rotation_rate = 4.11e-5;
+    io.mean_surface_temperature = 130.0;
+    io.seed = seed.wrapping_add(11);
+    io.parent_id = Some(jupiter_id);
+    io.color = hex_to_rgb(0xc2b250);
+    io.composition = PlanetComposition::Rocky;
+    io.albedo = 0.63;
+    io.softening_length = compute_softening(1.82149e6);
+    io.compute_derived();
+    sim.add_body(io);
+
+    // ─── Europa ─────────────────────────────────────────────────────────
+    // Horizons #502 — GM=3202.7121 km³/s²
+    let mut europa = Body::new(
+        0, "Europa", BodyType::Moon,
+        4.7986e22, 1.5608e6,
+        Vec3::new(-253336795.2240106e3, 736680778.5479159e3, 2587835.180404663e3),
+        Vec3::new(1.026104503088396e3, -1.874756906242933e3, 0.6349773826056384e3),
+    );
+    europa.rotation_rate = 2.048e-5;
+    europa.mean_surface_temperature = 102.0;
+    europa.seed = seed.wrapping_add(12);
+    europa.parent_id = Some(jupiter_id);
+    europa.color = hex_to_rgb(0xc8c0a8);
+    europa.composition = PlanetComposition::Rocky;
+    europa.albedo = 0.67;
+    europa.softening_length = compute_softening(1.5608e6);
+    europa.compute_derived();
+    sim.add_body(europa);
+
+    // ─── Ganymede ───────────────────────────────────────────────────────
+    // Horizons #503 — GM=9887.8328 km³/s²
+    let mut ganymede = Body::new(
+        0, "Ganymede", BodyType::Moon,
+        1.4815e23, 2.6312e6,
+        Vec3::new(-252407469.010232e3, 737006450.7486157e3, 2608449.50889349e3),
+        Vec3::new(-9.00783564280008e3, 6.667750073499915e3, 0.7397075799751662e3),
+    );
+    ganymede.rotation_rate = 1.016e-5;
+    ganymede.mean_surface_temperature = 110.0;
+    ganymede.seed = seed.wrapping_add(13);
+    ganymede.parent_id = Some(jupiter_id);
+    ganymede.color = hex_to_rgb(0x9a8a6a);
+    ganymede.composition = PlanetComposition::Rocky;
+    ganymede.albedo = 0.43;
+    ganymede.softening_length = compute_softening(2.6312e6);
+    ganymede.compute_derived();
+    sim.add_body(ganymede);
+
+    // ─── Callisto ───────────────────────────────────────────────────────
+    // Horizons #504 — GM=7179.2834 km³/s²
+    let mut callisto = Body::new(
+        0, "Callisto", BodyType::Moon,
+        1.0757e23, 2.4103e6,
+        Vec3::new(-253408954.3921413e3, 739229434.180588e3, 2665876.684725225e3),
+        Vec3::new(-20.73318361579015e3, -3.532172885335655e3, 0.187843729647549e3),
+    );
+    callisto.rotation_rate = 4.358e-6;
+    callisto.mean_surface_temperature = 134.0;
+    callisto.seed = seed.wrapping_add(14);
+    callisto.parent_id = Some(jupiter_id);
+    callisto.color = hex_to_rgb(0x5a4d3a);
+    callisto.composition = PlanetComposition::Rocky;
+    callisto.albedo = 0.22;
+    callisto.softening_length = compute_softening(2.4103e6);
+    callisto.compute_derived();
+    sim.add_body(callisto);
+
+    // ─── Saturn ─────────────────────────────────────────────────────────
+    // Horizons #699
+    let mut saturn = Body::new(
+        0, "Saturn", BodyType::Planet,
+        5.6834e26, 5.8232e7,
+        Vec3::new(1422278067.19984e3, 38557211.58159366e3, -57286362.61760134e3),
+        Vec3::new(-0.8022902327476618e3, 9.633913344037813e3, -0.1352982130832756e3),
+    );
+    saturn.rotation_rate = 1.63785e-4;
+    saturn.axial_tilt = 0.4665;
+    saturn.mean_surface_temperature = 134.0;
+    saturn.seed = seed.wrapping_add(20);
+    saturn.semi_major_axis = 1427745884.220034e3;
+    saturn.eccentricity = 0.05540366888330445;
+    saturn.inclination = 2.48665565615377 * deg;
+    saturn.longitude_asc_node = 113.5608662919897 * deg;
+    saturn.arg_periapsis = 338.4393086264126 * deg;
+    saturn.mean_anomaly = 275.9187884790698 * deg;
+    saturn.parent_id = Some(sun_id);
+    saturn.color = hex_to_rgb(0xead6a7);
+    saturn.composition = PlanetComposition::GasGiant;
+    saturn.albedo = 0.342;
+    saturn.softening_length = compute_softening(5.8232e7);
+    saturn.compute_derived();
+    let saturn_id = sim.add_body(saturn);
+
+    // ─── Mimas ──────────────────────────────────────────────────────────
+    // Horizons #601 — GM=2.503489 km³/s²
+    let mut mimas = Body::new(
+        0, "Mimas", BodyType::Moon,
+        3.7509e19, 1.988e5,
+        Vec3::new(1422134256.763391e3, 38664149.43022263e3, -57331424.57386944e3),
+        Vec3::new(-9.951772995864012e3, 0.3847832913716864e3, 5.977387219023425e3),
+    );
+    mimas.rotation_rate = 7.72e-5;
+    mimas.mean_surface_temperature = 64.0;
+    mimas.seed = seed.wrapping_add(21);
+    mimas.parent_id = Some(saturn_id);
+    mimas.color = hex_to_rgb(0xc8c8c8);
+    mimas.composition = PlanetComposition::Rocky;
+    mimas.albedo = 0.962;
+    mimas.softening_length = compute_softening(1.988e5);
+    mimas.compute_derived();
+    sim.add_body(mimas);
+
+    // ─── Enceladus ──────────────────────────────────────────────────────
+    // Horizons #602 — GM=7.210367 km³/s²
+    let mut enceladus = Body::new(
+        0, "Enceladus", BodyType::Moon,
+        1.0803e20, 2.523e5,
+        Vec3::new(1422042201.36275e3, 38545378.05526055e3, -57257288.4870629e3),
+        Vec3::new(0.5247221847633589e3, -1.551089888497419e3, 5.596865557104396e3),
+    );
+    enceladus.rotation_rate = 5.31e-5;
+    enceladus.mean_surface_temperature = 75.0;
+    enceladus.seed = seed.wrapping_add(22);
+    enceladus.parent_id = Some(saturn_id);
+    enceladus.color = hex_to_rgb(0xf0f0f0);
+    enceladus.composition = PlanetComposition::Rocky;
+    enceladus.albedo = 0.99;
+    enceladus.softening_length = compute_softening(2.523e5);
+    enceladus.compute_derived();
+    sim.add_body(enceladus);
+
+    // ─── Tethys ─────────────────────────────────────────────────────────
+    // Horizons #603 — GM=41.21 km³/s²
+    let mut tethys = Body::new(
+        0, "Tethys", BodyType::Moon,
+        6.1744e20, 5.363e5,
+        Vec3::new(1422114248.461821e3, 38780627.57833759e3, -57386689.11433573e3),
+        Vec3::new(-10.20298221498555e3, 4.295481160441287e3, 3.329682184654279e3),
+    );
+    tethys.rotation_rate = 3.85e-5;
+    tethys.mean_surface_temperature = 86.0;
+    tethys.seed = seed.wrapping_add(23);
+    tethys.parent_id = Some(saturn_id);
+    tethys.color = hex_to_rgb(0xd8d8d8);
+    tethys.composition = PlanetComposition::Rocky;
+    tethys.albedo = 0.80;
+    tethys.softening_length = compute_softening(5.363e5);
+    tethys.compute_derived();
+    sim.add_body(tethys);
+
+    // ─── Dione ──────────────────────────────────────────────────────────
+    // Horizons #604 — GM=73.116 km³/s²
+    let mut dione = Body::new(
+        0, "Dione", BodyType::Moon,
+        1.0955e21, 5.625e5,
+        Vec3::new(1422031948.887452e3, 38313212.74314193e3, -57134848.32052323e3),
+        Vec3::new(6.74439372546288e3, 3.540700481407788e3, 2.323905686523045e3),
+    );
+    dione.rotation_rate = 2.66e-5;
+    dione.mean_surface_temperature = 87.0;
+    dione.seed = seed.wrapping_add(24);
+    dione.parent_id = Some(saturn_id);
+    dione.color = hex_to_rgb(0xd0d0d0);
+    dione.composition = PlanetComposition::Rocky;
+    dione.albedo = 0.998;
+    dione.softening_length = compute_softening(5.625e5);
+    dione.compute_derived();
+    sim.add_body(dione);
+
+    // ─── Rhea ───────────────────────────────────────────────────────────
+    // Horizons #605 — GM=153.94 km³/s²
+    let mut rhea = Body::new(
+        0, "Rhea", BodyType::Moon,
+        2.3065e21, 7.645e5,
+        Vec3::new(1422010481.792402e3, 38166441.7383346e3, -57054752.32474688e3),
+        Vec3::new(6.476917318294454e3, 5.541627449500241e3, 1.353064103465281e3),
+    );
+    rhea.rotation_rate = 1.652e-5;
+    rhea.mean_surface_temperature = 76.0;
+    rhea.seed = seed.wrapping_add(25);
+    rhea.parent_id = Some(saturn_id);
+    rhea.color = hex_to_rgb(0xc0c0c0);
+    rhea.composition = PlanetComposition::Rocky;
+    rhea.albedo = 0.949;
+    rhea.softening_length = compute_softening(7.645e5);
+    rhea.compute_derived();
+    sim.add_body(rhea);
+
+    // ─── Titan ──────────────────────────────────────────────────────────
+    // Horizons #606 — GM=8978.14 km³/s², thick N₂/CH₄ atmosphere
+    let mut titan = Body::new(
+        0, "Titan", BodyType::Moon,
+        1.3452e23, 2.5755e6,
+        Vec3::new(1423389918.556709e3, 38153032.56924746e3, -57188578.59238257e3),
+        Vec3::new(1.120305624246614e3, 14.35438017172909e3, -2.760960541157103e3),
+    );
+    titan.rotation_rate = 4.561e-6;
+    titan.axial_tilt = 0.0052;
+    titan.mean_surface_temperature = 94.0;
+    titan.seed = seed.wrapping_add(26);
+    titan.parent_id = Some(saturn_id);
+    titan.color = hex_to_rgb(0xc8a040);
+    titan.composition = PlanetComposition::Rocky;
+    titan.albedo = 0.22;
+    // Titan: thick nitrogen atmosphere, 1.5× Earth surface pressure
+    titan.atmosphere = Some(Atmosphere {
+        scale_height: 21000.0,
+        rayleigh_coefficients: [2.0e-5, 5.0e-5, 8.5e-5],
+        mie_coefficient: 5.0e-4,
+        mie_direction: 0.76,
+        height: 600_000.0,
+        mie_color: [0.9, 0.7, 0.3],
+    });
+    titan.softening_length = compute_softening(2.5755e6);
+    titan.compute_derived();
+    sim.add_body(titan);
+
+    // ─── Iapetus ────────────────────────────────────────────────────────
+    // Horizons #608 — GM=120.52 km³/s²
+    let mut iapetus = Body::new(
+        0, "Iapetus", BodyType::Moon,
+        1.8057e21, 7.345e5,
+        Vec3::new(1420709057.046448e3, 41751346.03178877e3, -57706716.57236903e3),
+        Vec3::new(-3.688822513608554e3, 8.431453071930134e3, 0.7216475694914566e3),
+    );
+    iapetus.rotation_rate = 9.17e-7;
+    iapetus.mean_surface_temperature = 90.0;
+    iapetus.seed = seed.wrapping_add(27);
+    iapetus.parent_id = Some(saturn_id);
+    iapetus.color = hex_to_rgb(0x6b5a4a);
+    iapetus.composition = PlanetComposition::Rocky;
+    iapetus.albedo = 0.20;
+    iapetus.softening_length = compute_softening(7.345e5);
+    iapetus.compute_derived();
+    sim.add_body(iapetus);
+
+    // ─── Uranus ─────────────────────────────────────────────────────────
+    // Horizons #799
+    let mut uranus = Body::new(
+        0, "Uranus", BodyType::Planet,
+        8.6813e25, 2.5362e7,
+        Vec3::new(1478073476.913783e3, 2513246041.395467e3, -9831518.091484904e3),
+        Vec3::new(-5.932790537281171e3, 3.134649152126629e3, 0.08880768290436647e3),
+    );
+    uranus.rotation_rate = -1.01237e-4;
+    uranus.axial_tilt = 1.7064;
+    uranus.mean_surface_temperature = 76.0;
+    uranus.seed = seed.wrapping_add(30);
+    uranus.semi_major_axis = 2884827997.531245e3;
+    uranus.eccentricity = 0.04681618294428753;
+    uranus.inclination = 0.7747251262000414 * deg;
+    uranus.longitude_asc_node = 73.97944638615273 * deg;
+    uranus.arg_periapsis = 91.36357043520249 * deg;
+    uranus.mean_anomaly = 259.4053127263502 * deg;
+    uranus.parent_id = Some(sun_id);
+    uranus.color = hex_to_rgb(0x72b4c4);
+    uranus.composition = PlanetComposition::IceGiant;
+    uranus.albedo = 0.300;
+    uranus.softening_length = compute_softening(2.5362e7);
+    uranus.compute_derived();
+    let uranus_id = sim.add_body(uranus);
+
+    // ─── Miranda ────────────────────────────────────────────────────────
+    // Horizons #705 — GM=4.3 km³/s²
+    let mut miranda = Body::new(
+        0, "Miranda", BodyType::Moon,
+        6.4426e19, 2.40e5,
+        Vec3::new(1478186683.266191e3, 2513222317.937086e3, -9772397.13156879e3),
+        Vec3::new(-3.244095258519708e3, 1.347912130895228e3, -5.757145401858096e3),
+    );
+    miranda.rotation_rate = 5.01e-5;
+    miranda.mean_surface_temperature = 60.0;
+    miranda.seed = seed.wrapping_add(31);
+    miranda.parent_id = Some(uranus_id);
+    miranda.color = hex_to_rgb(0xa0a0a0);
+    miranda.composition = PlanetComposition::Rocky;
+    miranda.albedo = 0.32;
+    miranda.softening_length = compute_softening(2.40e5);
+    miranda.compute_derived();
+    sim.add_body(miranda);
+
+    // ─── Ariel ──────────────────────────────────────────────────────────
+    // Horizons #701 — GM=83.43 km³/s²
+    let mut ariel = Body::new(
+        0, "Ariel", BodyType::Moon,
+        1.2500e21, 5.811e5,
+        Vec3::new(1478247017.224427e3, 2513218437.002844e3, -9756912.972674847e3),
+        Vec3::new(-3.958215809508779e3, 2.006884233638803e3, -4.929726385208909e3),
+    );
+    ariel.rotation_rate = 2.87e-5;
+    ariel.mean_surface_temperature = 58.0;
+    ariel.seed = seed.wrapping_add(32);
+    ariel.parent_id = Some(uranus_id);
+    ariel.color = hex_to_rgb(0xc0c0c0);
+    ariel.composition = PlanetComposition::Rocky;
+    ariel.albedo = 0.53;
+    ariel.softening_length = compute_softening(5.811e5);
+    ariel.compute_derived();
+    sim.add_body(ariel);
+
+    // ─── Umbriel ────────────────────────────────────────────────────────
+    // Horizons #702 — GM=85.4 km³/s²
+    let mut umbriel = Body::new(
+        0, "Umbriel", BodyType::Moon,
+        1.2795e21, 5.847e5,
+        Vec3::new(1478020996.614599e3, 2513292863.609729e3, -9576045.21745038e3),
+        Vec3::new(-1.449193171903463e3, 2.30867803339213e3, 1.168563341651776e3),
+    );
+    umbriel.rotation_rate = 1.73e-5;
+    umbriel.mean_surface_temperature = 61.0;
+    umbriel.seed = seed.wrapping_add(33);
+    umbriel.parent_id = Some(uranus_id);
+    umbriel.color = hex_to_rgb(0x606060);
+    umbriel.composition = PlanetComposition::Rocky;
+    umbriel.albedo = 0.26;
+    umbriel.softening_length = compute_softening(5.847e5);
+    umbriel.compute_derived();
+    sim.add_body(umbriel);
+
+    // ─── Titania ────────────────────────────────────────────────────────
+    // Horizons #703 — GM=222.8 km³/s²
+    let mut titania = Body::new(
+        0, "Titania", BodyType::Moon,
+        3.3382e21, 7.889e5,
+        Vec3::new(1478435784.939839e3, 2513136567.626043e3, -10047155.14388299e3),
+        Vec3::new(-7.811325028798818e3, 3.109489400348165e3, -3.040436133563583e3),
+    );
+    titania.rotation_rate = 9.42e-6;
+    titania.mean_surface_temperature = 60.0;
+    titania.seed = seed.wrapping_add(34);
+    titania.parent_id = Some(uranus_id);
+    titania.color = hex_to_rgb(0x909090);
+    titania.composition = PlanetComposition::Rocky;
+    titania.albedo = 0.35;
+    titania.softening_length = compute_softening(7.889e5);
+    titania.compute_derived();
+    sim.add_body(titania);
+
+    // ─── Oberon ─────────────────────────────────────────────────────────
+    // Horizons #704 — GM=205.34 km³/s²
+    let mut oberon = Body::new(
+        0, "Oberon", BodyType::Moon,
+        3.0766e21, 7.614e5,
+        Vec3::new(1478363146.793264e3, 2513254768.633219e3, -9326066.379535913e3),
+        Vec3::new(-3.278451196615699e3, 2.341478491126701e3, -1.423347371695179e3),
+    );
+    oberon.rotation_rate = 6.97e-6;
+    oberon.mean_surface_temperature = 61.0;
+    oberon.seed = seed.wrapping_add(35);
+    oberon.parent_id = Some(uranus_id);
+    oberon.color = hex_to_rgb(0x707070);
+    oberon.composition = PlanetComposition::Rocky;
+    oberon.albedo = 0.31;
+    oberon.softening_length = compute_softening(7.614e5);
+    oberon.compute_derived();
+    sim.add_body(oberon);
+
+    // ─── Neptune ────────────────────────────────────────────────────────
+    // Horizons #899
+    let mut neptune = Body::new(
+        0, "Neptune", BodyType::Planet,
+        1.02409e26, 2.4624e7,
+        Vec3::new(4468805610.889497e3, 77632244.96534711e3, -104579004.7369847e3),
+        Vec3::new(-0.1418865028292812e3, 5.465647680419589e3, -0.1098251976786266e3),
+    );
+    neptune.rotation_rate = 1.08338e-4;
+    neptune.axial_tilt = 0.4943;
+    neptune.mean_surface_temperature = 72.0;
+    neptune.seed = seed.wrapping_add(40);
+    neptune.semi_major_axis = 4503937575.533338e3;
+    neptune.eccentricity = 0.01096408504193659;
+    neptune.inclination = 1.773857918729585 * deg;
+    neptune.longitude_asc_node = 131.9234181489527 * deg;
+    neptune.arg_periapsis = 277.2518326663131 * deg;
+    neptune.mean_anomaly = 312.7645852053252 * deg;
+    neptune.parent_id = Some(sun_id);
+    neptune.color = hex_to_rgb(0x3d5ef5);
+    neptune.composition = PlanetComposition::IceGiant;
+    neptune.albedo = 0.290;
+    neptune.softening_length = compute_softening(2.4624e7);
+    neptune.compute_derived();
+    let neptune_id = sim.add_body(neptune);
+
+    // ─── Triton ─────────────────────────────────────────────────────────
+    // Horizons #801 — GM=1428.495 km³/s², retrograde orbit
+    let mut triton = Body::new(
+        0, "Triton", BodyType::Moon,
+        2.1403e22, 1.3526e6,
+        Vec3::new(4468521081.135368e3, 77602227.99822089e3, -104369247.4342077e3),
+        Vec3::new(1.104116488429909e3, 9.0521646883296e3, 2.093651644994011e3),
+    );
+    triton.rotation_rate = -1.237e-5;
+    triton.mean_surface_temperature = 38.0;
+    triton.seed = seed.wrapping_add(41);
+    triton.parent_id = Some(neptune_id);
+    triton.color = hex_to_rgb(0xc8a0a0);
+    triton.composition = PlanetComposition::Rocky;
+    triton.albedo = 0.76;
+    triton.softening_length = compute_softening(1.3526e6);
+    triton.compute_derived();
+    sim.add_body(triton);
+
+    // ─── Nereid ─────────────────────────────────────────────────────────
+    // Horizons #802 — no GM; mass ~3.1e19 kg (estimated)
+    let mut nereid = Body::new(
+        0, "Nereid", BodyType::Moon,
+        3.1e19, 1.70e5,
+        Vec3::new(4466721998.629698e3, 77654770.52877851e3, -104697186.261003e3),
+        Vec3::new(1.05492366762975e3, 3.497657706565644e3, -0.1724898135491217e3),
+    );
+    nereid.mean_surface_temperature = 50.0;
+    nereid.seed = seed.wrapping_add(42);
+    nereid.parent_id = Some(neptune_id);
+    nereid.color = hex_to_rgb(0x808080);
+    nereid.composition = PlanetComposition::Rocky;
+    nereid.albedo = 0.155;
+    nereid.softening_length = compute_softening(1.70e5);
+    nereid.compute_derived();
+    sim.add_body(nereid);
+
+    // ─── Pluto (Dwarf Planet) ───────────────────────────────────────────
+    // Horizons #999
+    let mut pluto = Body::new(
+        0, "Pluto", BodyType::Planet,
+        1.307e22, 1.1883e6,
+        Vec3::new(2876454611.935341e3, -4435932980.402722e3, -357166891.4301288e3),
+        Vec3::new(4.712183799328487e3, 1.765843514620449e3, -1.541339492070124e3),
+    );
+    pluto.rotation_rate = -1.1386e-5;
+    pluto.axial_tilt = 2.1387;
+    pluto.mean_surface_temperature = 44.0;
+    pluto.seed = seed.wrapping_add(50);
+    pluto.semi_major_axis = 5926960866.430534e3;
+    pluto.eccentricity = 0.2474542943747517;
+    pluto.inclination = 17.02988887116384 * deg;
+    pluto.longitude_asc_node = 110.2194291724405 * deg;
+    pluto.arg_periapsis = 114.9681379392435 * deg;
+    pluto.mean_anomaly = 51.83516638073647 * deg;
+    pluto.parent_id = Some(sun_id);
+    pluto.color = hex_to_rgb(0xdbd3c9);
+    pluto.composition = PlanetComposition::Dwarf;
+    pluto.albedo = 0.49;
+    pluto.softening_length = compute_softening(1.1883e6);
+    pluto.compute_derived();
+    let pluto_id = sim.add_body(pluto);
+
+    // ─── Charon ─────────────────────────────────────────────────────────
+    // Horizons #901 — GM=106.1 km³/s²
+    let mut charon = Body::new(
+        0, "Charon", BodyType::Moon,
+        1.5897e21, 6.06e5,
+        Vec3::new(2876464774.708125e3, -4435932372.040207e3, -357183633.9245892e3),
+        Vec3::new(4.596001364099314e3, 1.591573427088925e3, -1.618235636917969e3),
+    );
+    charon.rotation_rate = -1.139e-5;
+    charon.mean_surface_temperature = 53.0;
+    charon.seed = seed.wrapping_add(51);
+    charon.parent_id = Some(pluto_id);
+    charon.color = hex_to_rgb(0xa0a0a0);
+    charon.composition = PlanetComposition::Dwarf;
+    charon.albedo = 0.35;
+    charon.softening_length = compute_softening(6.06e5);
+    charon.compute_derived();
+    sim.add_body(charon);
+
+    // ─── Ceres (Dwarf Planet) ───────────────────────────────────────────
+    // Horizons "Ceres;" — mass from Dawn mission: GM=62.6284 km³/s²
+    let mut ceres = Body::new(
+        0, "Ceres", BodyType::Asteroid,
+        9.393e20, 4.73e5,
+        Vec3::new(381172803.9516315e3, 192678035.3254012e3, -64122243.31556011e3),
+        Vec3::new(-8.426224419312673e3, 14.78866205551999e3, 2.020528345094608e3),
+    );
+    ceres.mean_surface_temperature = 168.0;
+    ceres.seed = seed.wrapping_add(60);
+    ceres.semi_major_axis = 413721487.1842388e3;
+    ceres.eccentricity = 0.07960223186188;
+    ceres.inclination = 10.58794645426135 * deg;
+    ceres.longitude_asc_node = 80.249108694232 * deg;
+    ceres.arg_periapsis = 73.30682825990756 * deg;
+    ceres.mean_anomaly = 240.3212260946607 * deg;
+    ceres.parent_id = Some(sun_id);
+    ceres.color = hex_to_rgb(0x8a8a7a);
+    ceres.composition = PlanetComposition::Dwarf;
+    ceres.albedo = 0.09;
+    ceres.softening_length = compute_softening(4.73e5);
+    ceres.compute_derived();
+    sim.add_body(ceres);
+
+    // ─── Pallas ─────────────────────────────────────────────────────────
+    // Horizons "Pallas;" — mass ~2.108e20 kg (estimated)
+    let mut pallas = Body::new(
+        0, "Pallas", BodyType::Asteroid,
+        2.108e20, 2.56e5,
+        Vec3::new(433537930.2825843e3, -211324380.8912392e3, 108960193.254541e3),
+        Vec3::new(5.285248956501269e3, 11.06926367069772e3, -8.12795020152019e3),
+    );
+    pallas.mean_surface_temperature = 164.0;
+    pallas.seed = seed.wrapping_add(61);
+    pallas.semi_major_axis = 414367434.3765528e3;
+    pallas.eccentricity = 0.2306536252077891;
+    pallas.inclination = 34.92925945224728 * deg;
+    pallas.longitude_asc_node = 172.8878106903665 * deg;
+    pallas.arg_periapsis = 310.9394914426276 * deg;
+    pallas.mean_anomaly = 220.2881595791486 * deg;
+    pallas.parent_id = Some(sun_id);
+    pallas.color = hex_to_rgb(0x909080);
+    pallas.composition = PlanetComposition::Dwarf;
+    pallas.albedo = 0.16;
+    pallas.softening_length = compute_softening(2.56e5);
+    pallas.compute_derived();
+    sim.add_body(pallas);
+
+    // ─── Vesta ──────────────────────────────────────────────────────────
+    // Horizons "Vesta;" — mass from Dawn mission: GM=17.28 km³/s²
+    let mut vesta = Body::new(
+        0, "Vesta", BodyType::Asteroid,
+        2.5908e20, 2.627e5,
+        Vec3::new(164667262.8555179e3, -285020315.7647729e3, -11589457.12623374e3),
+        Vec3::new(18.37499946379189e3, 9.286427386359417e3, -2.513236585470284e3),
+    );
+    vesta.mean_surface_temperature = 210.0;
+    vesta.seed = seed.wrapping_add(62);
+    vesta.semi_major_axis = 353282201.3859497e3;
+    vesta.eccentricity = 0.09017810677937681;
+    vesta.inclination = 7.144045850814265 * deg;
+    vesta.longitude_asc_node = 103.7022720857349 * deg;
+    vesta.arg_periapsis = 151.5286411503499 * deg;
+    vesta.mean_anomaly = 37.95145292974541 * deg;
+    vesta.parent_id = Some(sun_id);
+    vesta.color = hex_to_rgb(0xb0a890);
+    vesta.composition = PlanetComposition::Dwarf;
+    vesta.albedo = 0.42;
+    vesta.softening_length = compute_softening(2.627e5);
+    vesta.compute_derived();
+    sim.add_body(vesta);
+
+    // ─── 1P/Halley ──────────────────────────────────────────────────────
+    // Horizons "DES=1P;CAP" — nucleus ~11 km, mass ~2.2e14 kg
+    let mut halley = Body::new(
+        0, "1P/Halley", BodyType::Comet,
+        2.2e14, 5.5e3,
+        Vec3::new(-2917189260.832731e3, 4103229382.979976e3, -1479132076.090842e3),
+        Vec3::new(0.8832366191099449e3, 0.300525412476204e3, 0.1957770520897246e3),
+    );
+    halley.seed = seed.wrapping_add(70);
+    halley.semi_major_axis = 2671655325.504932e3;
+    halley.eccentricity = 0.9679618548754312;
+    halley.inclination = 162.1617653942714 * deg;
+    halley.longitude_asc_node = 59.49066226944706 * deg;
+    halley.arg_periapsis = 112.3892314916453 * deg;
+    halley.mean_anomaly = 190.1093625015996 * deg;
+    halley.parent_id = Some(sun_id);
+    halley.color = hex_to_rgb(0x505050);
+    halley.albedo = 0.04;
+    halley.softening_length = compute_softening(5.5e3);
+    halley.compute_derived();
+    sim.add_body(halley);
+
+    // ─── 2P/Encke ───────────────────────────────────────────────────────
+    // Horizons "DES=2P;CAP" — nucleus ~4.8 km, mass ~7e13 kg
+    let mut encke = Body::new(
+        0, "2P/Encke", BodyType::Comet,
+        7.0e13, 2.4e3,
+        Vec3::new(559664540.5575279e3, -92060418.24731372e3, 32596024.14056076e3),
+        Vec3::new(-4.3574121049484e3, 6.892325679666753e3, 0.8601878551229647e3),
+    );
+    encke.seed = seed.wrapping_add(71);
+    encke.semi_major_axis = 331809068.2956051e3;
+    encke.eccentricity = 0.8472319060114437;
+    encke.inclination = 11.34666622132782 * deg;
+    encke.longitude_asc_node = 334.0167568429482 * deg;
+    encke.arg_periapsis = 187.2807694345101 * deg;
+    encke.mean_anomaly = 239.0876786799605 * deg;
+    encke.parent_id = Some(sun_id);
+    encke.color = hex_to_rgb(0x484848);
+    encke.albedo = 0.05;
+    encke.softening_length = compute_softening(2.4e3);
+    encke.compute_derived();
+    sim.add_body(encke);
+
+    // ─── 67P/Churyumov-Gerasimenko ──────────────────────────────────────
+    // Horizons "DES=67P;CAP" — Rosetta target, mass 9.982e12 kg
+    let mut cg67p = Body::new(
+        0, "67P/C-G", BodyType::Comet,
+        9.982e12, 2.0e3,
+        Vec3::new(-221673785.044727e3, -768051446.6615202e3, -32968734.40386677e3),
+        Vec3::new(8.567957552286614e3, 1.333205084611423e3, -0.2702937321244637e3),
+    );
+    cg67p.seed = seed.wrapping_add(72);
+    cg67p.semi_major_axis = 517423212.7933555e3;
+    cg67p.eccentricity = 0.6496988109433209;
+    cg67p.inclination = 3.867254418089749 * deg;
+    cg67p.longitude_asc_node = 36.30454632096252 * deg;
+    cg67p.arg_periapsis = 22.22566744980207 * deg;
+    cg67p.mean_anomaly = 232.9237661694769 * deg;
+    cg67p.parent_id = Some(sun_id);
+    cg67p.color = hex_to_rgb(0x404040);
+    cg67p.albedo = 0.06;
+    cg67p.softening_length = compute_softening(2.0e3);
+    cg67p.compute_derived();
+    sim.add_body(cg67p);
+
+    // ─── C/1995 O1 (Hale-Bopp) ─────────────────────────────────────────
+    // Horizons "DES=C/1995 O1;CAP" — Great Comet, nucleus ~30 km
+    let mut hale_bopp = Body::new(
+        0, "Hale-Bopp", BodyType::Comet,
+        1.3e16, 3.0e4,
+        Vec3::new(650460388.6456269e3, -3264152766.125053e3, -6749038292.298038e3),
+        Vec3::new(0.6185915303296363e3, -3.06696975155981e3, -4.534169264860202e3),
+    );
+    hale_bopp.seed = seed.wrapping_add(73);
+    hale_bopp.semi_major_axis = 26950876213.25732e3;
+    hale_bopp.eccentricity = 0.9949126551461109;
+    hale_bopp.inclination = 89.76952938034762 * deg;
+    hale_bopp.longitude_asc_node = 281.7372689030623 * deg;
+    hale_bopp.arg_periapsis = 130.6503045023052 * deg;
+    hale_bopp.mean_anomaly = 4.281807099917236 * deg;
+    hale_bopp.parent_id = Some(sun_id);
+    hale_bopp.color = hex_to_rgb(0x585858);
+    hale_bopp.albedo = 0.04;
+    hale_bopp.softening_length = compute_softening(3.0e4);
+    hale_bopp.compute_derived();
+    sim.add_body(hale_bopp);
+
+    // ─── 109P/Swift-Tuttle ──────────────────────────────────────────────
+    // Horizons "DES=109P;CAP" — Perseid parent, nucleus ~26 km
+    let mut swift_tuttle = Body::new(
+        0, "109P/Swift-Tuttle", BodyType::Comet,
+        5.0e15, 1.3e4,
+        Vec3::new(-4935050362.134387e3, 2349412406.153687e3, -3279921364.912398e3),
+        Vec3::new(-2.235481933160598e3, 1.548617003034965e3, -0.6110576273988768e3),
+    );
+    swift_tuttle.seed = seed.wrapping_add(74);
+    swift_tuttle.semi_major_axis = 3918227229.670524e3;
+    swift_tuttle.eccentricity = 0.9631437947859451;
+    swift_tuttle.inclination = 112.9366346623207 * deg;
+    swift_tuttle.longitude_asc_node = 139.8317494517476 * deg;
+    swift_tuttle.arg_periapsis = 153.2438145838594 * deg;
+    swift_tuttle.mean_anomaly = 88.70750514362541 * deg;
+    swift_tuttle.parent_id = Some(sun_id);
+    swift_tuttle.color = hex_to_rgb(0x505050);
+    swift_tuttle.albedo = 0.04;
+    swift_tuttle.softening_length = compute_softening(1.3e4);
+    swift_tuttle.compute_derived();
+    sim.add_body(swift_tuttle);
+
+    // Shift to barycentric frame
+    if barycentric {
+        recenter_to_barycenter(&mut sim);
+    }
+
     sim.finalize_derived();
     sim
 }

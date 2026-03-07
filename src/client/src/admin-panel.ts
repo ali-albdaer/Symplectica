@@ -133,6 +133,7 @@ export class AdminPanel {
                             <option value="innerSolarSystem" ${APP_DEFAULTS.defaultPreset.id === 'innerSolarSystem' ? 'selected' : ''}>Inner Solar System</option>
                             <option value="fullSolarSystem" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystem' ? 'selected' : ''}>Full Solar System</option>
                             <option value="fullSolarSystemII" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemII' ? 'selected' : ''}>Full Solar System II (J2000)</option>
+                            <option value="fullSolarSystemIII" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemIII' ? 'selected' : ''}>Full Solar System III (2026)</option>
                             <option value="playableSolarSystem">Playable Solar System</option>
                             <option value="jupiterSystem">Jupiter System</option>
                             <option value="saturnSystem">Saturn System</option>
@@ -594,7 +595,7 @@ export class AdminPanel {
             
             // Show barycentric for Full Solar System II and World Builder
             if (barycentricField) {
-                barycentricField.style.display = (presetId === 'fullSolarSystemII' || presetId === 'worldBuilder') ? 'block' : 'none';
+                barycentricField.style.display = (presetId === 'fullSolarSystemII' || presetId === 'fullSolarSystemIII' || presetId === 'worldBuilder') ? 'block' : 'none';
             }
             
             // Show stress test fields

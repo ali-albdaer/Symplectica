@@ -419,6 +419,18 @@ pub fn create_full_solar_system_ii_barycentric(seed: u64) -> WasmSimulation {
     WasmSimulation { inner: presets::create_full_solar_system_ii(seed, true) }
 }
 
+/// Create Full Solar System III preset (2026 HORIZONS ephemeris, 40 bodies)
+#[wasm_bindgen(js_name = createFullSolarSystemIII)]
+pub fn create_full_solar_system_iii(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_full_solar_system_iii(seed, false) }
+}
+
+/// Create Full Solar System III in barycentric frame (center-of-mass at origin)
+#[wasm_bindgen(js_name = createFullSolarSystemIIIBarycentric)]
+pub fn create_full_solar_system_iii_barycentric(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_full_solar_system_iii(seed, true) }
+}
+
 /// Create Playable Solar System preset (scaled distances/masses/radii)
 #[wasm_bindgen(js_name = createPlayableSolarSystem)]
 pub fn create_playable_solar_system(seed: u64) -> WasmSimulation {
