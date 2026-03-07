@@ -79,7 +79,6 @@ class NBodyClient {
     private running = false;
     private localTickAccumulator = 0;
     private localSimMode: SimMode = 'tick';
-    private presetManagesTimestep = false;
 
     private lastServerState?: StatePayload;
     private lastServerPositions = new Float64Array(0);
@@ -161,16 +160,6 @@ class NBodyClient {
 
         this.applyLocalDefaults();
 
-        // Adjust camera for the default preset
-        if (APP_DEFAULTS.defaultPreset.id === 'stressTest') {
-            this.camera.setDistance(500 * AU);
-            this.followBodyIndex = -1; // Barycentric — follow origin, not a body
-        } else if (APP_DEFAULTS.defaultPreset.id === 'starCluster') {
-            this.camera.configureForScale('galactic');
-            this.camera.setInitialDistance(5 * 3.086e16);
-            this.followBodyIndex = -1; // Barycentric — follow origin, not a body
-        }
-
         this.updateLoadingStatus('Setting up controls...');
         this.initControls();
 
@@ -193,8 +182,8 @@ class NBodyClient {
             this.physics,
             this.timeController,
             this.network,
-            (presetId, name, barycentric, bodyCount, stressCounts) => {
-                this.loadPresetFromAdmin(presetId, name, barycentric, bodyCount, stressCounts);
+            (presetId, name, barycentric, bodyCount) => {
+                this.loadPresetFromAdmin(presetId, name, barycentric, bodyCount);
             },
             (mode) => {
                 this.setLocalSimMode(mode);
@@ -279,12 +268,8 @@ class NBodyClient {
     private applyLocalDefaults(): void {
         const defaults = APP_DEFAULTS.adminDefaults;
 
-        // Presets that set their own dt (starCluster, stressTest) should not
-        // be overridden by the default 1/60s frame-time dt.
-        if (!this.presetManagesTimestep) {
-            this.physics.setTimeStep(defaults.dt);
-            this.physics.setSubsteps(defaults.substeps);
-        }
+        this.physics.setTimeStep(defaults.dt);
+        this.physics.setSubsteps(defaults.substeps);
         if (defaults.forceMethod === 'barnes-hut') {
             this.physics.setTheta(defaults.theta);
             this.physics.useBarnesHut();
@@ -543,15 +528,13 @@ class NBodyClient {
         this.physics = new PhysicsClient();
         await this.physics.init();
 
-        // Use global default preset (fixed seed for deterministic results)
-        const defaultPresetId = APP_DEFAULTS.defaultPreset.id;
+        // Use global default preset
         this.physics.createPreset(
-            defaultPresetId,
-            BigInt(42),
+            APP_DEFAULTS.defaultPreset.id,
+            BigInt(Date.now()),
             APP_DEFAULTS.defaultPreset.barycentric,
             APP_DEFAULTS.defaultPreset.bodyCount ?? undefined
         );
-        this.presetManagesTimestep = defaultPresetId === 'stressTest' || defaultPresetId === 'starCluster';
 
         // TimeController manages simulation speed; physics dt is set by createPreset
 
@@ -718,7 +701,7 @@ class NBodyClient {
         }
     }
 
-    private loadPresetFromAdmin(presetId: string, name: string, barycentric: boolean = false, bodyCount?: number, stressCounts?: { stars: number; planets: number }): void {
+    private loadPresetFromAdmin(presetId: string, name: string, barycentric: boolean = false, bodyCount?: number): void {
         if (presetId === 'worldBuilder') {
             // World Builder: create empty simulation
             this.physics.createNew(BigInt(Date.now()));
@@ -747,9 +730,8 @@ class NBodyClient {
         } else {
             this.buildMode = false;
             this.buildPanel.setBuildMode(false);
-            this.physics.createPreset(presetId, BigInt(Date.now()), barycentric, bodyCount, stressCounts);
+            this.physics.createPreset(presetId, BigInt(Date.now()), barycentric, bodyCount);
         }
-        this.presetManagesTimestep = presetId === 'stressTest' || presetId === 'starCluster';
 
         // Configure camera scale based on preset type
         const PARSEC = 3.086e16;
@@ -758,35 +740,11 @@ class NBodyClient {
             this.camera.configureForScale('galactic');
             this.camera.setInitialDistance(5 * PARSEC);
             this.camera.setElevation(0.3);
-            this.followBodyIndex = -1; // Barycentric — follow origin, not a body
-        } else if (presetId === 'stressTest') {
-            // Stress test: cluster at ~500 AU, belt at 100-200 AU
-            this.camera.configureForScale('solar');
-            this.camera.setDistance(500 * AU);
-            this.camera.setElevation(0.5);
-            this.followBodyIndex = -1; // Barycentric — follow origin, not a body
-            // Default 1s/s is too slow for cluster dynamics — start at 1mo/s
-            this.timeController.setSpeedBySimRate(2592000);
         } else if (presetId !== 'worldBuilder') {
             // Solar system scale presets (worldBuilder already handled above)
             this.camera.configureForScale('solar');
             this.camera.setDistance(3 * AU);
             this.camera.setElevation(0.5);
-        }
-
-        // Enable all visuals if stress test checkbox is checked
-        if (presetId === 'stressTest') {
-            const enableVisualsCheckbox = document.getElementById('stress-enable-visuals') as HTMLInputElement | null;
-            if (enableVisualsCheckbox?.checked) {
-                this.currentVizOptions.showOrbitTrails = true;
-                this.currentVizOptions.showLabels = true;
-                this.currentVizOptions.showAxisLines = true;
-                this.currentVizOptions.showRefPlane = true;
-                this.currentVizOptions.showRefLine = true;
-                this.currentVizOptions.showRefPoint = true;
-                this.applyVisualizationToRenderer(this.currentVizOptions);
-                this.optionsPanel?.applyOptions(this.currentVizOptions);
-            }
         }
 
         this.refreshBodies();
@@ -947,8 +905,6 @@ class NBodyClient {
         const bodiesEl = document.getElementById('perf-bodies');
         const barEl = document.getElementById('perf-bar-fill');
 
-        const useServer = this.network?.isConnected() && this.lastServerState;
-
         // Format: "instant (avg)" for better readability
         if (frameEl) frameEl.textContent = `${this.frameTiming.total.toFixed(1)} (${this.frameTimingAvg.total.toFixed(1)}) ms`;
         if (physicsEl) physicsEl.textContent = `${this.frameTiming.physics.toFixed(1)} (${this.frameTimingAvg.physics.toFixed(1)}) ms`;
@@ -957,57 +913,13 @@ class NBodyClient {
         if (stepsEl) stepsEl.textContent = `${this.frameTiming.stepsThisFrame} (${this.frameTimingAvg.stepsThisFrame.toFixed(1)})`;
         if (bodiesEl) bodiesEl.textContent = this.state.bodyCount.toString();
 
-        // Update physics label to clarify server mode
-        const physicsLabel = physicsEl?.parentElement?.querySelector('.label');
-        if (physicsLabel) {
-            physicsLabel.textContent = useServer ? 'Physics (server)' : 'Physics';
-        }
-
-        // Three.js renderer stats
-        const info = this.renderer.info;
-        const drawCallsEl = document.getElementById('perf-draw-calls');
-        const trianglesEl = document.getElementById('perf-triangles');
-        const geometriesEl = document.getElementById('perf-geometries');
-        const texturesEl = document.getElementById('perf-textures');
-        if (drawCallsEl) drawCallsEl.textContent = info.render.calls.toString();
-        if (trianglesEl) trianglesEl.textContent = info.render.triangles.toLocaleString();
-        if (geometriesEl) geometriesEl.textContent = info.memory.geometries.toString();
-        if (texturesEl) texturesEl.textContent = info.memory.textures.toString();
-
-        // Trail stats
-        const trailsEl = document.getElementById('perf-trails');
-        if (trailsEl) {
-            const stats = this.bodyRenderer.getTrailStats();
-            trailsEl.textContent = `${stats.lineCount} / ${stats.totalVertices.toLocaleString()} verts`;
-        }
-
-        // Network latency
-        const latencyEl = document.getElementById('perf-latency');
-        if (latencyEl) {
-            if (useServer) {
-                latencyEl.textContent = `${this.network!.getLatency()}ms (avg ${this.network!.getAverageLatency()}ms)`;
-            } else {
-                latencyEl.textContent = '---';
-            }
-        }
-
-        // Heap usage (Chrome-only)
-        const heapEl = document.getElementById('perf-heap');
-        if (heapEl) {
-            const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
-            if (mem) {
-                const mb = (mem.usedJSHeapSize / (1024 * 1024)).toFixed(1);
-                heapEl.textContent = `${mb} MB`;
-            } else {
-                heapEl.textContent = 'N/A';
-            }
-        }
-
         // Show simulation status for debugging
         const statusEl = document.getElementById('perf-status');
         if (statusEl) {
             const isPaused = this.timeController.isPaused();
+            const useServer = this.network?.isConnected() && this.lastServerState;
             if (useServer) {
+                // Show server mode with pause indicator
                 statusEl.textContent = isPaused ? 'SERVER ⏸' : 'SERVER ▶';
                 statusEl.style.color = isPaused ? '#ff9800' : '#4fc3f7';
             } else if (isPaused) {

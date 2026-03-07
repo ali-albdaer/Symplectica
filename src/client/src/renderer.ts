@@ -1443,14 +1443,6 @@ export class BodyRenderer {
         }
     }
 
-    getTrailStats(): { lineCount: number; totalVertices: number } {
-        let totalVertices = 0;
-        for (const history of this.orbitHistory.values()) {
-            totalVertices += history.length;
-        }
-        return { lineCount: this.orbitLines.size, totalVertices };
-    }
-
     setGridOptions(showXY: boolean, showXZ: boolean, showYZ: boolean, spacing: number, size: number): void {
         this.gridXYVisible = showXY;
         this.gridXZVisible = showXZ;
