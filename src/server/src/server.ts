@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { CONFIG } from './config.js';
 import { APP_DEFAULTS } from './defaults.js';
-import { SPEED_LEVELS } from './constants.js';
+import { SPEED_LEVELS, getSpeedLabel } from './constants.js';
 import { logger } from './logger.js';
 
 // Physics WASM module types (will be loaded dynamically)
@@ -33,20 +33,6 @@ interface PhysicsModule {
     getEarthMass: () => number;
     circularVelocity: (mass: number, distance: number) => number;
     init: () => void;
-}
-
-function getSpeedLabel(sim: number): string {
-    // Find exact match
-    const exact = SPEED_LEVELS.find(l => Math.abs(l.sim - sim) < 0.001);
-    if (exact) return exact.label;
-
-    // Fallback format
-    if (sim < 60) return `${sim.toFixed(1)}s/s`;
-    if (sim < 3600) return `${(sim / 60).toFixed(1)}min/s`;
-    if (sim < 86400) return `${(sim / 3600).toFixed(1)}hr/s`;
-    if (sim < 604800) return `${(sim / 86400).toFixed(1)}day/s`;
-    if (sim < 31536000) return `${(sim / 604800).toFixed(1)}wk/s`;
-    return `${(sim / 31536000).toFixed(1)}yr/s`;
 }
 
 interface WasmSimulation {
@@ -654,6 +640,7 @@ class SimulationServer {
 
             default:
                 logger.warn(`Unknown message type: ${message.type}`);
+                this.sendChatToClient(client, { sender: 'System', text: 'Unknown command.' });
         }
     }
 

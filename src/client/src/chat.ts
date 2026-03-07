@@ -341,7 +341,7 @@ export class Chat {
 
     private sendMessage(): void {
         const text = this.input.value.trim();
-        if (!text) return;
+        if (!text || text.length > 200) return;
 
         // Handle local commands (not sent to server)
         if (text.startsWith('/')) {
