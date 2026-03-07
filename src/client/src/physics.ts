@@ -58,6 +58,7 @@ interface PhysicsModule {
     createBinaryPulsar: (seed: bigint) => WasmSimulation;
     createAsteroidBelt: (seed: bigint, asteroidCount: number) => WasmSimulation;
     createStarCluster: (seed: bigint, starCount: number) => WasmSimulation;
+    createStressTest: (seed: bigint, starCount: number, planetCount: number) => WasmSimulation;
     createIntegratorTest1: (seed: bigint) => WasmSimulation;
     createIntegratorTest2: (seed: bigint) => WasmSimulation;
     createIntegratorTest3: (seed: bigint) => WasmSimulation;
@@ -414,7 +415,7 @@ export class PhysicsClient {
     }
 
     /** Create a preset simulation */
-    createPreset(preset: string, seed: bigint, barycentric: boolean = false, bodyCount?: number): void {
+    createPreset(preset: string, seed: bigint, barycentric: boolean = false, bodyCount?: number, stressCounts?: { stars: number; planets: number }): void {
         if (!this.initialized || !this.module) throw new Error('Physics not initialized');
 
         let loadedPreset = preset;
@@ -494,15 +495,30 @@ export class PhysicsClient {
                 }
                 break;
             }
+            case 'stressTest': {
+                const sc = stressCounts ?? { stars: 20, planets: 100 };
+                if (typeof this.module.createStressTest === 'function') {
+                    this.simulation = this.module.createStressTest(seed, sc.stars, sc.planets);
+                } else {
+                    logger.warn('Stress Test preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
+                }
+                break;
+            }
             default:
                 this.simulation = this.module.createSunEarthMoon(seed);
         }
 
-        // Set default timestep/substeps from global defaults
-        this.simulation.setDt(APP_DEFAULTS.adminDefaults.dt);
-        this.simulation.setSubsteps(APP_DEFAULTS.adminDefaults.substeps);
+        // Presets that set their own dt/substeps (cluster-scale dynamics)
+        // should not be overridden by the default 1/60s frame-time dt.
+        const presetsWithOwnTimestep = new Set(['starCluster', 'stressTest']);
+        if (!presetsWithOwnTimestep.has(preset)) {
+            this.simulation.setDt(APP_DEFAULTS.adminDefaults.dt);
+            this.simulation.setSubsteps(APP_DEFAULTS.adminDefaults.substeps);
+        }
 
-            logger.info(`Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies, dt=${APP_DEFAULTS.adminDefaults.dt}s)`);
+            logger.info(`Loaded preset: ${loadedPreset} (${this.simulation.bodyCount()} bodies)`);
     }
 
     /** Add a custom body */

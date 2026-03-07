@@ -436,6 +436,13 @@ pub fn create_star_cluster(seed: u64, star_count: u32) -> WasmSimulation {
     WasmSimulation { inner: presets::create_star_cluster(seed, star_count as usize) }
 }
 
+/// Create Stress Test preset (configurable stars + planets)
+/// For benchmarking rendering and physics performance
+#[wasm_bindgen(js_name = createStressTest)]
+pub fn create_stress_test(seed: u64, star_count: u32, planet_count: u32) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_stress_test(seed, star_count as usize, planet_count as usize) }
+}
+
 /// Integrator Test 1: Two-body circular orbit
 #[wasm_bindgen(js_name = createIntegratorTest1)]
 pub fn create_integrator_test1(seed: u64) -> WasmSimulation {
