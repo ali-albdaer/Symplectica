@@ -11,8 +11,8 @@ use crate::constants::G;
 use crate::force::ForceConfig;
 use crate::vector::Vec3;
 
-/// Maximum octree depth to prevent infinite recursion
-const MAX_DEPTH: usize = 32;
+/// Default maximum octree depth to prevent infinite recursion
+const DEFAULT_MAX_DEPTH: usize = 32;
 
 /// A node in the octree
 #[derive(Debug)]
@@ -74,7 +74,7 @@ impl OctreeNode {
     }
 
     /// Insert a body into the octree
-    pub fn insert(&mut self, bodies: &[Body], body_idx: usize, depth: usize) {
+    pub fn insert(&mut self, bodies: &[Body], body_idx: usize, depth: usize, max_depth: usize) {
         let body = &bodies[body_idx];
         
         if !body.is_active || body.mass <= 0.0 {
@@ -89,7 +89,7 @@ impl OctreeNode {
         self.body_count += 1;
 
         // Prevent infinite recursion
-        if depth >= MAX_DEPTH {
+        if depth >= max_depth {
             return;
         }
 
@@ -103,7 +103,7 @@ impl OctreeNode {
                 let octant = self.octant_index(body.position);
                 self.ensure_child(octant);
                 if let Some(ref mut child) = self.children[octant] {
-                    child.insert(bodies, body_idx, depth + 1);
+                    child.insert(bodies, body_idx, depth + 1, max_depth);
                 }
             }
             Some(existing_idx) => {
@@ -114,14 +114,14 @@ impl OctreeNode {
                 let existing_octant = self.octant_index(bodies[existing_idx].position);
                 self.ensure_child(existing_octant);
                 if let Some(ref mut child) = self.children[existing_octant] {
-                    child.insert(bodies, existing_idx, depth + 1);
+                    child.insert(bodies, existing_idx, depth + 1, max_depth);
                 }
                 
                 // Insert the new body into a child
                 let new_octant = self.octant_index(body.position);
                 self.ensure_child(new_octant);
                 if let Some(ref mut child) = self.children[new_octant] {
-                    child.insert(bodies, body_idx, depth + 1);
+                    child.insert(bodies, body_idx, depth + 1, max_depth);
                 }
             }
         }
@@ -191,6 +191,8 @@ pub struct Octree {
     pub center: Vec3,
     /// Bounding box half-size
     pub half_size: f64,
+    /// Maximum tree depth
+    pub max_depth: usize,
 }
 
 impl Octree {
@@ -200,6 +202,7 @@ impl Octree {
             root: None,
             center: Vec3::ZERO,
             half_size: 1.0,
+            max_depth: DEFAULT_MAX_DEPTH,
         }
     }
 
@@ -227,7 +230,7 @@ impl Octree {
         for (idx, body) in bodies.iter().enumerate() {
             if body.is_active && body.contributes_gravity {
                 if let Some(ref mut root) = self.root {
-                    root.insert(bodies, idx, 0);
+                    root.insert(bodies, idx, 0, self.max_depth);
                 }
             }
         }
