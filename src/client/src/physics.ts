@@ -476,9 +476,9 @@ export class PhysicsClient {
                 if (typeof this.module.createAsteroidBelt === 'function') {
                     this.simulation = this.module.createAsteroidBelt(seed, asteroidCount);
                 } else {
-                    logger.warn('Asteroid Belt preset unavailable. Falling back to Full Solar System II.');
-                    this.simulation = this.module.createFullSolarSystemII(seed);
-                    loadedPreset = 'fullSolarSystemII';
+                    logger.warn('Asteroid Belt preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
                 }
                 break;
             }
