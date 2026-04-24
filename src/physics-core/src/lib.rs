@@ -400,12 +400,6 @@ pub fn create_inner_solar_system(seed: u64) -> WasmSimulation {
     WasmSimulation { inner: presets::create_inner_solar_system(seed) }
 }
 
-/// Create Full Solar System preset (all 8 planets + Pluto)
-#[wasm_bindgen(js_name = createFullSolarSystem)]
-pub fn create_full_solar_system(seed: u64) -> WasmSimulation {
-    WasmSimulation { inner: presets::create_full_solar_system(seed) }
-}
-
 /// Create Full Solar System II preset (J2000 corrected orbital elements)
 /// Uses canonical JPL values with proper inclinations and Kepler→Cartesian conversion
 #[wasm_bindgen(js_name = createFullSolarSystemII)]

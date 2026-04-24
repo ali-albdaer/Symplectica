@@ -225,9 +225,9 @@ impl OrbitalElements {
 pub mod j2000 {
     use super::*;
     
-    /// Mercury J2000 orbital elements (corrected)
+    /// Mercury J2000 orbital elements
     pub const MERCURY: OrbitalElements = OrbitalElements {
-        semi_major_axis: 5.7909227e10,       // 0.38709927 AU (corrected from audit)
+        semi_major_axis: 5.7909227e10,       // 0.38709927 AU
         eccentricity: 0.20563593,
         inclination: 0.12225804,             // 7.00487° in radians
         longitude_asc_node: 0.84354677,      // 48.33167° in radians
@@ -275,9 +275,9 @@ pub mod j2000 {
         mean_anomaly: 0.34854,               // ~20.0° at J2000
     };
     
-    /// Saturn J2000 orbital elements (corrected)
+    /// Saturn J2000 orbital elements
     pub const SATURN: OrbitalElements = OrbitalElements {
-        semi_major_axis: 1.4335290e12,       // 9.58201720 AU (corrected from audit)
+        semi_major_axis: 1.4335290e12,       // 9.58201720 AU
         eccentricity: 0.05386179,
         inclination: 0.04338282,             // 2.48524° in radians
         longitude_asc_node: 1.98376063,      // 113.66242° in radians
@@ -399,9 +399,7 @@ pub enum Preset {
     SunEarthMoon,
     /// Mercury, Venus, Earth, Mars
     InnerSolarSystem,
-    /// Full 8 planets + Pluto
-    FullSolarSystem,
-    /// Full Solar System II - Corrected J2000 orbital elements with inclinations
+    /// Full Solar System II - J2000 orbital elements with inclinations
     /// Uses canonical JPL values with proper Kepler→Cartesian conversion
     FullSolarSystemII,
     /// Full Solar System III (2026) — JPL HORIZONS ephemeris at 2026-01-01
@@ -442,7 +440,6 @@ impl Preset {
         match self {
             Preset::SunEarthMoon => create_sun_earth_moon(seed),
             Preset::InnerSolarSystem => create_inner_solar_system(seed),
-            Preset::FullSolarSystem => create_full_solar_system(seed),
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, false),
             Preset::FullSolarSystemIII => create_full_solar_system_iii(seed, false),
             Preset::PlayableSolarSystem => create_playable_solar_system(seed),
@@ -461,28 +458,32 @@ impl Preset {
     }
 
     /// Create a simulation from this preset with barycentric initialization
+    /// (center-of-mass at origin, zero total momentum)
     pub fn create_barycentric(&self, seed: u64) -> Simulation {
         match self {
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, true),
             Preset::FullSolarSystemIII => create_full_solar_system_iii(seed, true),
             Preset::AsteroidBelt => {
+                // AsteroidBelt delegates to FSSII(barycentric=true) internally,
+                // but we recenter again to include the asteroids
                 let mut sim = create_asteroid_belt(seed, 5000);
                 recenter_to_barycenter(&mut sim);
                 sim
             },
             Preset::StarCluster => {
-                // Star clusters are already centered
+                // Star clusters are already recentered internally
                 create_star_cluster(seed, 2000)
             },
             Preset::StressTest => {
-                // Stress test is already barycentric
+                // Stress test is already recentered internally
                 create_stress_test(seed, 30, 100, 0)
             },
-            Preset::IntegratorTest1 => create_integrator_test1(seed),
-            Preset::IntegratorTest2 => create_integrator_test2(seed),
-            Preset::IntegratorTest3 => create_integrator_test3(seed),
-            // Other presets don't support barycentric mode; fall back to default
-            _ => self.create(seed),
+            // All other presets: create normally then recenter to barycentric frame
+            _ => {
+                let mut sim = self.create(seed);
+                recenter_to_barycenter(&mut sim);
+                sim
+            }
         }
     }
 }
@@ -796,99 +797,6 @@ pub fn create_inner_solar_system(seed: u64) -> Simulation {
     sim
 }
 
-/// Full Solar System with all 8 planets
-pub fn create_full_solar_system(seed: u64) -> Simulation {
-    let mut sim = create_inner_solar_system(seed);
-    let sun_id = 0; // Sun is always id 0 in inner solar system
-    
-    // Jupiter
-    let jup_id = sim.add_planet("Jupiter", 1.8982e27, 6.9911e7, 7.7857e11, 13070.0);
-    if let Some(jup) = sim.get_body_mut(jup_id) {
-        jup.rotation_rate = 1.7585e-4;            // 9.925 hr sidereal
-        jup.axial_tilt = 0.0546;                  // 3.13°
-        jup.mean_surface_temperature = 165.0;     // 1-bar level ~165 K
-        jup.seed = seed.wrapping_add(10);
-        jup.semi_major_axis = 7.7857e11;
-        jup.eccentricity = 0.0489;
-        jup.inclination = 0.0228;                 // 1.31°
-        jup.parent_id = Some(sun_id);
-        jup.color = hex_to_rgb(0xd4a574);
-        jup.composition = PlanetComposition::GasGiant;
-        jup.albedo = 0.503;
-        jup.compute_derived();
-    }
-    
-    // Saturn
-    let sat_id = sim.add_planet("Saturn", 5.6834e26, 5.8232e7, 1.4335e12, 9680.0);
-    if let Some(sat) = sim.get_body_mut(sat_id) {
-        sat.rotation_rate = 1.6378e-4;            // 10.656 hr sidereal
-        sat.axial_tilt = 0.4665;                  // 26.73°
-        sat.mean_surface_temperature = 134.0;     // ~134 K
-        sat.seed = seed.wrapping_add(11);
-        sat.semi_major_axis = 1.4335e12;
-        sat.eccentricity = 0.0565;
-        sat.inclination = 0.0435;                 // 2.49°
-        sat.parent_id = Some(sun_id);
-        sat.color = hex_to_rgb(0xead6a7);
-        sat.composition = PlanetComposition::GasGiant;
-        sat.albedo = 0.342;
-        sat.compute_derived();
-    }
-    
-    // Uranus — extreme axial tilt (sideways)
-    let ura_id = sim.add_planet("Uranus", 8.6810e25, 2.5362e7, 2.8725e12, 6810.0);
-    if let Some(ura) = sim.get_body_mut(ura_id) {
-        ura.rotation_rate = -1.0124e-4;           // -17.24 hr retrograde
-        ura.axial_tilt = 1.7064;                  // 97.77° (sideways)
-        ura.mean_surface_temperature = 76.0;      // ~76 K
-        ura.seed = seed.wrapping_add(12);
-        ura.semi_major_axis = 2.8725e12;
-        ura.eccentricity = 0.0457;
-        ura.inclination = 0.01344;                // 0.77°
-        ura.parent_id = Some(sun_id);
-        ura.color = hex_to_rgb(0x72b4c4);
-        ura.composition = PlanetComposition::IceGiant;
-        ura.albedo = 0.300;
-        ura.compute_derived();
-    }
-    
-    // Neptune
-    let nep_id = sim.add_planet("Neptune", 1.02413e26, 2.4622e7, 4.4951e12, 5430.0);
-    if let Some(nep) = sim.get_body_mut(nep_id) {
-        nep.rotation_rate = 1.0834e-4;            // 16.11 hr sidereal
-        nep.axial_tilt = 0.4943;                  // 28.32°
-        nep.mean_surface_temperature = 72.0;      // ~72 K
-        nep.seed = seed.wrapping_add(13);
-        nep.semi_major_axis = 4.4951e12;
-        nep.eccentricity = 0.0113;
-        nep.inclination = 0.0309;                 // 1.77°
-        nep.parent_id = Some(sun_id);
-        nep.color = hex_to_rgb(0x3d5ef5);
-        nep.composition = PlanetComposition::IceGiant;
-        nep.albedo = 0.290;
-        nep.compute_derived();
-    }
-    
-    // Pluto (dwarf planet)
-    let plu_id = sim.add_planet("Pluto", 1.303e22, 1.1883e6, 5.9064e12, 4748.0);
-    if let Some(plu) = sim.get_body_mut(plu_id) {
-        plu.rotation_rate = -1.1386e-5;           // -6.387 day retrograde
-        plu.axial_tilt = 2.1387;                  // 122.53°
-        plu.mean_surface_temperature = 44.0;      // ~44 K
-        plu.seed = seed.wrapping_add(14);
-        plu.semi_major_axis = 5.9064e12;
-        plu.eccentricity = 0.2488;
-        plu.inclination = 0.2992;                 // 17.14°
-        plu.parent_id = Some(sun_id);
-        plu.color = hex_to_rgb(0xdbd3c9);
-        plu.composition = PlanetComposition::Dwarf;
-        plu.albedo = 0.49;
-        plu.compute_derived();
-    }
-    
-    sim.finalize_derived();
-    sim
-}
 
 /// Playable Solar System with scaled distances/masses/radii (all planets + Moon)
 pub fn create_playable_solar_system(seed: u64) -> Simulation {
@@ -930,6 +838,7 @@ pub fn create_playable_solar_system(seed: u64) -> Simulation {
     // Pluto (dwarf planet)
     sim.add_planet("Pluto", 1.303e22 * SCALE, 1.1883e6 * SCALE, 5.9064e12 * SCALE, 4748.0);
 
+    sim.finalize_derived();
     sim
 }
 
@@ -950,65 +859,88 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
     jupiter.seed = seed.wrapping_add(0);
     jupiter.composition = PlanetComposition::GasGiant;
     jupiter.albedo = 0.503;
+    jupiter.softening_length = compute_softening(6.9911e7);
+    jupiter.compute_derived();
     let jup_id = sim.add_body(jupiter);
     
     // Galilean moons (all tidally locked — rotation rate = orbital period)
-    let io_id = sim.add_planet("Io", 8.9319e22, 1.8216e6, 4.217e8, 17334.0);
-    if let Some(io) = sim.get_body_mut(io_id) {
-        io.rotation_rate = 4.1106e-5;             // 1.769 day synchronous
-        io.mean_surface_temperature = 130.0;      // ~130 K (volcanic hotspots much higher)
-        io.seed = seed.wrapping_add(1);
-        io.semi_major_axis = 4.217e8;
-        io.eccentricity = 0.0041;
-        io.parent_id = Some(jup_id);
-        io.color = hex_to_rgb(0xc8b84a);
-        io.composition = PlanetComposition::Rocky;
-        io.albedo = 0.63;
-        io.compute_derived();
-    }
+    let mut io = Body::new(
+        0, "Io", BodyType::Moon,
+        8.9319e22, 1.8216e6,
+        Vec3::new(4.217e8, 0.0, 0.0),
+        Vec3::new(0.0, 17334.0, 0.0),
+    );
+    io.rotation_rate = 4.1106e-5;             // 1.769 day synchronous
+    io.mean_surface_temperature = 130.0;      // ~130 K (volcanic hotspots much higher)
+    io.seed = seed.wrapping_add(1);
+    io.semi_major_axis = 4.217e8;
+    io.eccentricity = 0.0041;
+    io.parent_id = Some(jup_id);
+    io.color = hex_to_rgb(0xc8b84a);
+    io.composition = PlanetComposition::Rocky;
+    io.albedo = 0.63;
+    io.softening_length = compute_softening(1.8216e6);
+    io.compute_derived();
+    sim.add_body(io);
     
-    let eur_id = sim.add_planet("Europa", 4.7998e22, 1.5608e6, 6.709e8, 13740.0);
-    if let Some(eur) = sim.get_body_mut(eur_id) {
-        eur.rotation_rate = 2.0478e-5;            // 3.551 day synchronous
-        eur.mean_surface_temperature = 102.0;     // ~102 K
-        eur.seed = seed.wrapping_add(2);
-        eur.semi_major_axis = 6.709e8;
-        eur.eccentricity = 0.0094;
-        eur.parent_id = Some(jup_id);
-        eur.color = hex_to_rgb(0xb8a090);
-        eur.composition = PlanetComposition::Rocky;
-        eur.albedo = 0.67;
-        eur.compute_derived();
-    }
+    let mut europa = Body::new(
+        0, "Europa", BodyType::Moon,
+        4.7998e22, 1.5608e6,
+        Vec3::new(6.709e8, 0.0, 0.0),
+        Vec3::new(0.0, 13740.0, 0.0),
+    );
+    europa.rotation_rate = 2.0478e-5;            // 3.551 day synchronous
+    europa.mean_surface_temperature = 102.0;     // ~102 K
+    europa.seed = seed.wrapping_add(2);
+    europa.semi_major_axis = 6.709e8;
+    europa.eccentricity = 0.0094;
+    europa.parent_id = Some(jup_id);
+    europa.color = hex_to_rgb(0xb8a090);
+    europa.composition = PlanetComposition::Rocky;
+    europa.albedo = 0.67;
+    europa.softening_length = compute_softening(1.5608e6);
+    europa.compute_derived();
+    sim.add_body(europa);
     
-    let gan_id = sim.add_planet("Ganymede", 1.4819e23, 2.6341e6, 1.0704e9, 10880.0);
-    if let Some(gan) = sim.get_body_mut(gan_id) {
-        gan.rotation_rate = 1.0164e-5;            // 7.155 day synchronous
-        gan.mean_surface_temperature = 110.0;     // ~110 K
-        gan.seed = seed.wrapping_add(3);
-        gan.semi_major_axis = 1.0704e9;
-        gan.eccentricity = 0.0013;
-        gan.parent_id = Some(jup_id);
-        gan.color = hex_to_rgb(0x9a8a7a);
-        gan.composition = PlanetComposition::Rocky;
-        gan.albedo = 0.43;
-        gan.compute_derived();
-    }
+    let mut ganymede = Body::new(
+        0, "Ganymede", BodyType::Moon,
+        1.4819e23, 2.6341e6,
+        Vec3::new(1.0704e9, 0.0, 0.0),
+        Vec3::new(0.0, 10880.0, 0.0),
+    );
+    ganymede.rotation_rate = 1.0164e-5;            // 7.155 day synchronous
+    ganymede.mean_surface_temperature = 110.0;     // ~110 K
+    ganymede.seed = seed.wrapping_add(3);
+    ganymede.semi_major_axis = 1.0704e9;
+    ganymede.eccentricity = 0.0013;
+    ganymede.parent_id = Some(jup_id);
+    ganymede.color = hex_to_rgb(0x9a8a7a);
+    ganymede.composition = PlanetComposition::Rocky;
+    ganymede.albedo = 0.43;
+    ganymede.softening_length = compute_softening(2.6341e6);
+    ganymede.compute_derived();
+    sim.add_body(ganymede);
     
-    let cal_id = sim.add_planet("Callisto", 1.0759e23, 2.4103e6, 1.8827e9, 8204.0);
-    if let Some(cal) = sim.get_body_mut(cal_id) {
-        cal.rotation_rate = 4.3574e-6;            // 16.689 day synchronous
-        cal.mean_surface_temperature = 134.0;     // ~134 K
-        cal.seed = seed.wrapping_add(4);
-        cal.semi_major_axis = 1.8827e9;
-        cal.eccentricity = 0.0074;
-        cal.parent_id = Some(jup_id);
-        cal.color = hex_to_rgb(0x6a5a4a);
-        cal.composition = PlanetComposition::Rocky;
-        cal.albedo = 0.17;
-        cal.compute_derived();
-    }
+    let mut callisto = Body::new(
+        0, "Callisto", BodyType::Moon,
+        1.0759e23, 2.4103e6,
+        Vec3::new(1.8827e9, 0.0, 0.0),
+        Vec3::new(0.0, 8204.0, 0.0),
+    );
+    callisto.rotation_rate = 4.3574e-6;            // 16.689 day synchronous
+    callisto.mean_surface_temperature = 134.0;     // ~134 K
+    callisto.seed = seed.wrapping_add(4);
+    callisto.semi_major_axis = 1.8827e9;
+    callisto.eccentricity = 0.0074;
+    callisto.parent_id = Some(jup_id);
+    callisto.color = hex_to_rgb(0x6a5a4a);
+    callisto.composition = PlanetComposition::Rocky;
+    callisto.albedo = 0.17;
+    callisto.softening_length = compute_softening(2.4103e6);
+    callisto.compute_derived();
+    sim.add_body(callisto);
     
+    sim.finalize_derived();
     sim
 }
 
@@ -1029,30 +961,37 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
     saturn.seed = seed.wrapping_add(0);
     saturn.composition = PlanetComposition::GasGiant;
     saturn.albedo = 0.342;
+    saturn.softening_length = compute_softening(5.8232e7);
+    saturn.compute_derived();
     let sat_id = sim.add_body(saturn);
     
     // Titan — the only moon with a substantial atmosphere
-    let titan_id = sim.add_planet("Titan", 1.3452e23, 2.5747e6, 1.2218e9, 5570.0);
-    if let Some(titan) = sim.get_body_mut(titan_id) {
-        titan.rotation_rate = 4.5608e-6;          // 15.945 day synchronous
-        titan.mean_surface_temperature = 94.0;    // 94 K
-        titan.seed = seed.wrapping_add(1);
-        titan.semi_major_axis = 1.2218e9;
-        titan.eccentricity = 0.0288;
-        titan.parent_id = Some(sat_id);
-        titan.color = hex_to_rgb(0xc8a050);
-        titan.composition = PlanetComposition::Rocky;
-        titan.albedo = 0.22;
-        titan.atmosphere = Some(Atmosphere {
-            scale_height: 40_000.0,                   // ~40 km (thick N₂ atmosphere)
-            rayleigh_coefficients: [3.5e-6, 8.5e-6, 2.1e-5], // N₂ Rayleigh (blue-shifted)
-            mie_coefficient: 2.1e-5,                  // Dense tholin haze
-            mie_direction: 0.75,
-            height: 600_000.0,                        // ~600 km effective atmosphere
-            mie_color: [0.85, 0.55, 0.2],             // Tholin haze — deep orange-brown
-        });
-        titan.compute_derived();
-    }
+    let mut titan = Body::new(
+        0, "Titan", BodyType::Moon,
+        1.3452e23, 2.5747e6,
+        Vec3::new(1.2218e9, 0.0, 0.0),
+        Vec3::new(0.0, 5570.0, 0.0),
+    );
+    titan.rotation_rate = 4.5608e-6;          // 15.945 day synchronous
+    titan.mean_surface_temperature = 94.0;    // 94 K
+    titan.seed = seed.wrapping_add(1);
+    titan.semi_major_axis = 1.2218e9;
+    titan.eccentricity = 0.0288;
+    titan.parent_id = Some(sat_id);
+    titan.color = hex_to_rgb(0xc8a050);
+    titan.composition = PlanetComposition::Rocky;
+    titan.albedo = 0.22;
+    titan.softening_length = compute_softening(2.5747e6);
+    titan.atmosphere = Some(Atmosphere {
+        scale_height: 21_000.0,                       // ~21 km (canonical FSSIII)
+        rayleigh_coefficients: [2.0e-6, 5.0e-6, 1.2e-5],
+        mie_coefficient: 3.0e-5,                      // Dense tholin haze
+        mie_direction: 0.76,
+        height: 600_000.0,                            // ~600 km effective atmosphere
+        mie_color: [0.85, 0.55, 0.2],                 // Tholin haze — deep orange-brown
+    });
+    titan.compute_derived();
+    sim.add_body(titan);
     
     // Other major moons (sorted by orbital distance)
     let moons: &[(&str, f64, f64, f64, f64, u64, u32)] = &[
@@ -1065,65 +1004,97 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
         ("Iapetus",   1.8056e21, 7.346e5, 3.5613e9,  3260.0, 7, 0x908070),
     ];
     for &(name, mass, radius, dist, vel, seed_off, col) in moons {
-        let mid = sim.add_planet(name, mass, radius, dist, vel);
-        if let Some(m) = sim.get_body_mut(mid) {
-            m.seed = seed.wrapping_add(seed_off);
-            m.semi_major_axis = dist;
-            m.parent_id = Some(sat_id);
-            m.color = hex_to_rgb(col);
-            m.composition = PlanetComposition::Rocky;
-            m.albedo = 0.5; // generic icy moon albedo
-            m.compute_derived();
-        }
+        let mut moon = Body::new(
+            0, name, BodyType::Moon,
+            mass, radius,
+            Vec3::new(dist, 0.0, 0.0),
+            Vec3::new(0.0, vel, 0.0),
+        );
+        moon.seed = seed.wrapping_add(seed_off);
+        moon.semi_major_axis = dist;
+        moon.parent_id = Some(sat_id);
+        moon.color = hex_to_rgb(col);
+        moon.composition = PlanetComposition::Rocky;
+        moon.albedo = 0.5; // generic icy moon albedo
+        moon.softening_length = compute_softening(radius);
+        moon.compute_derived();
+        sim.add_body(moon);
     }
     
+    sim.finalize_derived();
     sim
 }
 
 /// Alpha Centauri binary star system
+/// Proper elliptical orbit: a=23.52 AU, e=0.5179, i=79.205°, P≈79.91 yr
 pub fn create_alpha_centauri(seed: u64) -> Simulation {
     let mut sim = Simulation::new(seed);
     
-    // Alpha Centauri A (G2V, slightly larger than Sun)
-    let m_a = 1.1 * M_SUN;
-    let m_b = 0.907 * M_SUN;
-    let semi_major = 23.4 * AU;
-    
+    // Stellar parameters
+    let m_a = 1.1055 * M_SUN;
+    let m_b = 0.9373 * M_SUN;
+    let r_a = 1.2234 * R_SUN;
+    let r_b = 0.8632 * R_SUN;
     let total_mass = m_a + m_b;
-    let v_orbital = (G * total_mass / semi_major).sqrt();
+    let mu = G * total_mass;
     
-    let r_a = semi_major * m_b / total_mass;
-    let r_b = semi_major * m_a / total_mass;
+    // Orbital elements (Pourbaix et al. 2016)
+    let elements = OrbitalElements {
+        semi_major_axis: 23.52 * AU,             // 23.52 AU
+        eccentricity: 0.5179,
+        inclination: 79.205 * PI / 180.0,        // 79.205°
+        longitude_asc_node: 204.85 * PI / 180.0, // 204.85°
+        arg_periapsis: 231.65 * PI / 180.0,      // 231.65°
+        mean_anomaly: 0.0,                        // Start at periapsis
+    };
+    
+    // Compute relative orbit state vector
+    let (rel_pos, rel_vel) = elements.to_cartesian(mu);
+    
+    // Distribute around center of mass
+    let frac_a = m_b / total_mass; // A orbits at frac_a × relative distance
+    let frac_b = m_a / total_mass;
     
     let mut star_a = Body::new(
         0, "Alpha Centauri A", BodyType::Star,
-        m_a, 1.2234 * R_SUN,
-        Vec3::new(-r_a, 0.0, 0.0),
-        Vec3::new(0.0, -v_orbital * m_b / total_mass, 0.0),
+        m_a, r_a,
+        rel_pos * (-frac_a),
+        rel_vel * (-frac_a),
     );
     star_a.color = hex_to_rgb(0xfff4e6);
     star_a.luminosity = 1.519 * L_SUN;
     star_a.effective_temperature = 5790.0;
+    star_a.rotation_rate = OMEGA_SUN * 0.9;
     star_a.seed = seed.wrapping_add(0);
-    star_a.metallicity = 0.20; // slightly metal-rich
-    star_a.age = 5.3e9 * 365.25 * 86400.0; // ~5.3 Gyr
+    star_a.metallicity = 0.20;
+    star_a.age = 5.3e9 * SECONDS_PER_YEAR;
+    star_a.semi_major_axis = elements.semi_major_axis * frac_a;
+    star_a.eccentricity = elements.eccentricity;
+    star_a.softening_length = compute_softening(r_a);
+    star_a.compute_derived();
     sim.add_body(star_a);
     
     // Alpha Centauri B (K1V, cooler orange)
     let mut star_b = Body::new(
         0, "Alpha Centauri B", BodyType::Star,
-        m_b, 0.8632 * R_SUN,
-        Vec3::new(r_b, 0.0, 0.0),
-        Vec3::new(0.0, v_orbital * m_a / total_mass, 0.0),
+        m_b, r_b,
+        rel_pos * frac_b,
+        rel_vel * frac_b,
     );
     star_b.color = hex_to_rgb(0xffd27f);
     star_b.luminosity = 0.5002 * L_SUN;
     star_b.effective_temperature = 5260.0;
+    star_b.rotation_rate = OMEGA_SUN * 0.7;
     star_b.seed = seed.wrapping_add(1);
     star_b.metallicity = 0.23;
-    star_b.age = 5.3e9 * 365.25 * 86400.0;
+    star_b.age = 5.3e9 * SECONDS_PER_YEAR;
+    star_b.semi_major_axis = elements.semi_major_axis * frac_b;
+    star_b.eccentricity = elements.eccentricity;
+    star_b.softening_length = compute_softening(r_b);
+    star_b.compute_derived();
     sim.add_body(star_b);
     
+    sim.finalize_derived();
     sim
 }
 
@@ -1145,7 +1116,7 @@ pub fn create_trappist1(seed: u64) -> Simulation {
     star.effective_temperature = 2566.0;
     star.seed = seed.wrapping_add(0);
     star.metallicity = 0.04; // near-solar
-    star.age = 7.6e9 * 365.25 * 86400.0; // ~7.6 Gyr
+    star.age = 7.6e9 * SECONDS_PER_YEAR; // ~7.6 Gyr
     let star_id = sim.add_body(star);
     
     // Orbital data: (name, period_days, a_AU, mass, radius, eq_temp_K, seed_offset, color)
@@ -1180,55 +1151,75 @@ pub fn create_trappist1(seed: u64) -> Simulation {
 }
 
 /// Binary pulsar system (PSR J0737-3039)
+/// Proper elliptical orbit: a≈8.8e8 m, e=0.0878, P≈2.45 hr
 pub fn create_binary_pulsar(seed: u64) -> Simulation {
     let mut sim = Simulation::new(seed);
     
     // Two neutron stars in tight orbit
-    let m_a = 1.338 * M_SUN;
-    let m_b = 1.249 * M_SUN;
-    let semi_major = 8.8e8; // ~0.9 million km separation
-    
+    let m_a = 1.3381 * M_SUN;
+    let m_b = 1.2489 * M_SUN;
+    let r_neutron = 1.0e4; // ~10 km radius
     let total_mass = m_a + m_b;
-    let v_orbital = (G * total_mass / semi_major).sqrt();
+    let mu = G * total_mass;
     
-    let r_a = semi_major * m_b / total_mass;
-    let r_b = semi_major * m_a / total_mass;
+    // Orbital elements (Kramer et al. 2021)
+    let elements = OrbitalElements {
+        semi_major_axis: 8.784e8,                // ~878,400 km
+        eccentricity: 0.0878,                    // Small but measurable
+        inclination: 0.0,                        // Edge-on relative to us, but arbitrary for sim
+        longitude_asc_node: 0.0,
+        arg_periapsis: 0.0,
+        mean_anomaly: 0.0,                       // Start at periapsis
+    };
     
-    // Neutron stars are tiny (~10 km radius)
-    let r_neutron = 1.0e4;
+    // Compute relative orbit state vector
+    let (rel_pos, rel_vel) = elements.to_cartesian(mu);
+    
+    // Distribute around center of mass
+    let frac_a = m_b / total_mass;
+    let frac_b = m_a / total_mass;
     
     let mut pulsar_a = Body::new(
         0, "PSR J0737-3039A", BodyType::Star,
         m_a, r_neutron,
-        Vec3::new(-r_a, 0.0, 0.0),
-        Vec3::new(0.0, -v_orbital * m_b / total_mass, 0.0),
+        rel_pos * (-frac_a),
+        rel_vel * (-frac_a),
     );
     pulsar_a.color = hex_to_rgb(0xaaaaff);
     pulsar_a.rotation_rate = 276.8;               // 44.07 Hz spin (millisecond pulsar)
     pulsar_a.seed = seed.wrapping_add(0);
-    pulsar_a.age = 2.1e8 * 365.25 * 86400.0; // ~210 Myr estimate
+    pulsar_a.age = 2.1e8 * SECONDS_PER_YEAR;
+    pulsar_a.semi_major_axis = elements.semi_major_axis * frac_a;
+    pulsar_a.eccentricity = elements.eccentricity;
+    pulsar_a.softening_length = compute_softening(r_neutron);
+    pulsar_a.compute_derived();
     sim.add_body(pulsar_a);
     
     let mut pulsar_b = Body::new(
         0, "PSR J0737-3039B", BodyType::Star,
         m_b, r_neutron,
-        Vec3::new(r_b, 0.0, 0.0),
-        Vec3::new(0.0, v_orbital * m_a / total_mass, 0.0),
+        rel_pos * frac_b,
+        rel_vel * frac_b,
     );
     pulsar_b.color = hex_to_rgb(0xffaaff);
     pulsar_b.rotation_rate = 1.76;                // 0.36 Hz spin
     pulsar_b.seed = seed.wrapping_add(1);
-    pulsar_b.age = 2.1e8 * 365.25 * 86400.0;
+    pulsar_b.age = 2.1e8 * SECONDS_PER_YEAR;
+    pulsar_b.semi_major_axis = elements.semi_major_axis * frac_b;
+    pulsar_b.eccentricity = elements.eccentricity;
+    pulsar_b.softening_length = compute_softening(r_neutron);
+    pulsar_b.compute_derived();
     sim.add_body(pulsar_b);
     
+    sim.finalize_derived();
     sim
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FULL SOLAR SYSTEM II: Corrected J2000 Preset
+// FULL SOLAR SYSTEM II: J2000 Preset
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Full Solar System II with corrected J2000 orbital elements
+/// Full Solar System II with J2000 orbital elements
 /// 
 /// Improvements over FullSolarSystem:
 /// - Uses canonical JPL J2000 orbital elements
@@ -1261,7 +1252,7 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
         sun.compute_derived();
     }
     
-    // ─── Mercury (CORRECTED) ────────────────────────────────────────────
+    // ─── Mercury ────────────────────────────────────────────────────────
     let (merc_pos, merc_vel) = j2000::MERCURY.to_cartesian(mu_sun);
     let mut mercury = Body::new(
         0, "Mercury", BodyType::Planet,
@@ -1418,7 +1409,7 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     jupiter.compute_derived();
     sim.add_body(jupiter);
     
-    // ─── Saturn (CORRECTED) ─────────────────────────────────────────────
+    // ─── Saturn ─────────────────────────────────────────────────────────
     let (sat_pos, sat_vel) = j2000::SATURN.to_cartesian(mu_sun);
     let mut saturn = Body::new(
         0, "Saturn", BodyType::Planet,
@@ -1540,7 +1531,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
 
     // ─── Sun ────────────────────────────────────────────────────────────
     // Horizons #10 — at origin of heliocentric frame
-    let sun_id = sim.add_star("Sun", 1.98841e30, 6.957e8);
+    let sun_id = sim.add_star("Sun", M_SUN, 6.957e8);
     if let Some(sun) = sim.get_body_mut(sun_id) {
         sun.luminosity = L_SUN;
         sun.effective_temperature = 5772.0;
@@ -2970,7 +2961,6 @@ mod tests {
         let presets = [
             Preset::SunEarthMoon,
             Preset::InnerSolarSystem,
-            Preset::FullSolarSystem,
             Preset::FullSolarSystemII,
             Preset::JupiterSystem,
             Preset::SaturnSystem,
@@ -3001,7 +2991,7 @@ mod tests {
         // Verify all 11 bodies present (Sun + 8 planets + Pluto + Moon)
         assert_eq!(bodies.len(), 11, "Expected 11 bodies");
         
-        // Verify Mercury uses corrected semi-major axis
+        // Verify Mercury semi-major axis
         let mercury = bodies.iter().find(|b| b.name == "Mercury").unwrap();
         // Semi-major axis should be within 0.05% of canonical 5.7909227e10 m
         let merc_a_error = ((mercury.semi_major_axis - 5.7909227e10).abs() / 5.7909227e10) * 100.0;
@@ -3009,7 +2999,7 @@ mod tests {
         // Mercury should have inclination set (7° = ~0.122 rad)
         assert!(mercury.inclination > 0.1, "Mercury inclination not set: {}", mercury.inclination);
         
-        // Verify Saturn uses corrected semi-major axis
+        // Verify Saturn semi-major axis
         let saturn = bodies.iter().find(|b| b.name == "Saturn").unwrap();
         let sat_a_error = ((saturn.semi_major_axis - 1.4335290e12).abs() / 1.4335290e12) * 100.0;
         assert!(sat_a_error < 0.05, "Saturn semi-major axis error: {:.4}%", sat_a_error);

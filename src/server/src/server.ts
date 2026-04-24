@@ -27,10 +27,17 @@ import {
 interface PhysicsModule {
     WasmSimulation: new (seed: bigint) => WasmSimulation;
     createSunEarthMoon: (seed: bigint) => WasmSimulation;
-    createFullSolarSystem: (seed: bigint) => WasmSimulation;
+    createInnerSolarSystem: (seed: bigint) => WasmSimulation;
     createFullSolarSystemII?: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIIBarycentric?: (seed: bigint) => WasmSimulation;
-    createPlayableSolarSystem: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemIII?: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemIIIBarycentric?: (seed: bigint) => WasmSimulation;
+    createPlayableSolarSystem?: (seed: bigint) => WasmSimulation;
+    createJupiterSystem?: (seed: bigint) => WasmSimulation;
+    createSaturnSystem?: (seed: bigint) => WasmSimulation;
+    createAlphaCentauri?: (seed: bigint) => WasmSimulation;
+    createTrappist1?: (seed: bigint) => WasmSimulation;
+    createBinaryPulsar?: (seed: bigint) => WasmSimulation;
     createIntegratorTest1?: (seed: bigint) => WasmSimulation;
     createIntegratorTest2?: (seed: bigint) => WasmSimulation;
     createIntegratorTest3?: (seed: bigint) => WasmSimulation;
@@ -220,18 +227,36 @@ class SimulationServer {
             } else if (typeof this.physics.createFullSolarSystemII === 'function') {
                 this.simulation = this.physics.createFullSolarSystemII(CONFIG.seed);
             } else {
-                this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
+                this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
             }
+        } else if (presetId === 'fullSolarSystemIII') {
+            if (barycentric && typeof this.physics.createFullSolarSystemIIIBarycentric === 'function') {
+                this.simulation = this.physics.createFullSolarSystemIIIBarycentric(CONFIG.seed);
+            } else if (typeof this.physics.createFullSolarSystemIII === 'function') {
+                this.simulation = this.physics.createFullSolarSystemIII(CONFIG.seed);
+            } else {
+                this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
+            }
+        } else if (presetId === 'innerSolarSystem' && typeof this.physics.createInnerSolarSystem === 'function') {
+            this.simulation = this.physics.createInnerSolarSystem(CONFIG.seed);
+        } else if (presetId === 'playableSolarSystem' && typeof this.physics.createPlayableSolarSystem === 'function') {
+            this.simulation = this.physics.createPlayableSolarSystem(CONFIG.seed);
+        } else if (presetId === 'jupiterSystem' && typeof this.physics.createJupiterSystem === 'function') {
+            this.simulation = this.physics.createJupiterSystem(CONFIG.seed);
+        } else if (presetId === 'saturnSystem' && typeof this.physics.createSaturnSystem === 'function') {
+            this.simulation = this.physics.createSaturnSystem(CONFIG.seed);
+        } else if (presetId === 'alphaCentauri' && typeof this.physics.createAlphaCentauri === 'function') {
+            this.simulation = this.physics.createAlphaCentauri(CONFIG.seed);
+        } else if (presetId === 'trappist1' && typeof this.physics.createTrappist1 === 'function') {
+            this.simulation = this.physics.createTrappist1(CONFIG.seed);
+        } else if (presetId === 'binaryPulsar' && typeof this.physics.createBinaryPulsar === 'function') {
+            this.simulation = this.physics.createBinaryPulsar(CONFIG.seed);
         } else if (presetId === 'integratorTest1' && typeof this.physics.createIntegratorTest1 === 'function') {
             this.simulation = this.physics.createIntegratorTest1(CONFIG.seed);
         } else if (presetId === 'integratorTest2' && typeof this.physics.createIntegratorTest2 === 'function') {
             this.simulation = this.physics.createIntegratorTest2(CONFIG.seed);
         } else if (presetId === 'integratorTest3' && typeof this.physics.createIntegratorTest3 === 'function') {
             this.simulation = this.physics.createIntegratorTest3(CONFIG.seed);
-        } else if (presetId === 'fullSolarSystem') {
-            this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
-        } else if (presetId === 'playableSolarSystem' && typeof this.physics.createPlayableSolarSystem === 'function') {
-            this.simulation = this.physics.createPlayableSolarSystem(CONFIG.seed);
         } else if (presetId === 'sunEarthMoon') {
             this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
         } else if (presetId === 'stressTest' && typeof this.physics.createStressTest === 'function') {
@@ -241,7 +266,12 @@ class SimulationServer {
         } else if (presetId === 'starCluster' && typeof this.physics.createStarCluster === 'function') {
             this.simulation = this.physics.createStarCluster(CONFIG.seed, 2000);
         } else {
-            this.simulation = this.physics.createFullSolarSystem(CONFIG.seed);
+            // Default fallback to Full Solar System II
+            if (typeof this.physics.createFullSolarSystemII === 'function') {
+                this.simulation = this.physics.createFullSolarSystemII(CONFIG.seed);
+            } else {
+                this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
+            }
         }
 
         this.applyAdminStateToSimulation();

@@ -5,7 +5,6 @@ import { dirname, resolve } from 'path';
 export type PresetId =
     | 'sunEarthMoon'
     | 'innerSolarSystem'
-    | 'fullSolarSystem'
     | 'fullSolarSystemII'
     | 'playableSolarSystem'
     | 'jupiterSystem'
@@ -19,7 +18,7 @@ export type PresetId =
     | 'asteroidBelt'
     | 'starCluster'
     | 'stressTest'
-    | 'worldBuilder';
+    | 'fullSolarSystemIII';
 
 export type ForceMethod = 'direct' | 'barnes-hut';
 export type SimMode = 'tick' | 'accumulator';

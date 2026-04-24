@@ -174,7 +174,7 @@ fn test_full_solar_system_audit() {
     // Create the Full Solar System preset
     let seed = 42u64;
     let mut sim = Simulation::new(seed);
-    let preset_sim = Preset::FullSolarSystem.create(seed);
+    let preset_sim = Preset::FullSolarSystemII.create(seed);
     
     println!("1. GLOBAL PHYSICS CONFIGURATION");
     println!("   - Gravitational constant G: {} m³/(kg·s²)", G);
@@ -340,7 +340,7 @@ fn test_full_solar_system_audit() {
     println!("10. DYNAMIC SIMULATION TEST (100 steps)");
     println!("    Running simulation for 100 steps to check conservation...");
     
-    let mut test_sim = Preset::FullSolarSystem.create(seed);
+    let mut test_sim = Preset::FullSolarSystemII.create(seed);
     let initial_energy = compute_total_energy(test_sim.bodies(), DEFAULT_SOFTENING);
     let initial_momentum = compute_total_momentum(test_sim.bodies());
     
