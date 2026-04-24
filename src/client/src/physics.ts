@@ -52,7 +52,6 @@ interface PhysicsModule {
     WasmSimulation: new (seed: bigint) => WasmSimulation;
     createSunEarthMoon: (seed: bigint) => WasmSimulation;
     createInnerSolarSystem: (seed: bigint) => WasmSimulation;
-    createFullSolarSystem: (seed: bigint) => WasmSimulation;
     createFullSolarSystemII: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIIBarycentric: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIII: (seed: bigint) => WasmSimulation;
@@ -460,18 +459,15 @@ export class PhysicsClient {
             case 'innerSolarSystem':
                 this.simulation = this.module.createInnerSolarSystem(seed);
                 break;
-            case 'fullSolarSystem':
-                this.simulation = this.module.createFullSolarSystem(seed);
-                break;
             case 'fullSolarSystemII':
                 if (barycentric && typeof this.module.createFullSolarSystemIIBarycentric === 'function') {
                     this.simulation = this.module.createFullSolarSystemIIBarycentric(seed);
                 } else if (typeof this.module.createFullSolarSystemII === 'function') {
                     this.simulation = this.module.createFullSolarSystemII(seed);
                 } else {
-                    logger.warn('Full Solar System II preset unavailable. Falling back to Full Solar System.');
-                    this.simulation = this.module.createFullSolarSystem(seed);
-                    loadedPreset = 'fullSolarSystem';
+                    logger.warn('Full Solar System II preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
                 }
                 break;
             case 'fullSolarSystemIII':
@@ -480,18 +476,18 @@ export class PhysicsClient {
                 } else if (typeof this.module.createFullSolarSystemIII === 'function') {
                     this.simulation = this.module.createFullSolarSystemIII(seed);
                 } else {
-                    logger.warn('Full Solar System III preset unavailable. Falling back to Full Solar System II.');
-                    this.simulation = this.module.createFullSolarSystemII(seed);
-                    loadedPreset = 'fullSolarSystemII';
+                    logger.warn('Full Solar System III preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
                 }
                 break;
             case 'playableSolarSystem':
                 if (typeof this.module.createPlayableSolarSystem === 'function') {
                     this.simulation = this.module.createPlayableSolarSystem(seed);
                 } else {
-                    logger.warn('Playable Solar System preset unavailable in WASM build. Falling back to Full Solar System.');
-                    this.simulation = this.module.createFullSolarSystem(seed);
-                    loadedPreset = 'fullSolarSystem';
+                    logger.warn('Playable Solar System preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
                 }
                 break;
             case 'jupiterSystem':

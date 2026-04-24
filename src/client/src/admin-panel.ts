@@ -131,7 +131,6 @@ export class AdminPanel {
                         <select id="admin-preset">
                             <option value="sunEarthMoon" ${APP_DEFAULTS.defaultPreset.id === 'sunEarthMoon' ? 'selected' : ''}>Sun-Earth-Moon</option>
                             <option value="innerSolarSystem" ${APP_DEFAULTS.defaultPreset.id === 'innerSolarSystem' ? 'selected' : ''}>Inner Solar System</option>
-                            <option value="fullSolarSystem" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystem' ? 'selected' : ''}>Full Solar System</option>
                             <option value="fullSolarSystemII" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemII' ? 'selected' : ''}>Full Solar System II (J2000)</option>
                             <option value="fullSolarSystemIII" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemIII' ? 'selected' : ''}>Full Solar System III (2026)</option>
                             <option value="playableSolarSystem">Playable Solar System</option>
@@ -146,7 +145,6 @@ export class AdminPanel {
                             <option value="asteroidBelt">Asteroid Belt (5000+ bodies)</option>
                             <option value="starCluster">Star Cluster (2000 stars)</option>
                             <option value="stressTest">Stress Test (Benchmark)</option>
-                            <option value="worldBuilder" ${APP_DEFAULTS.defaultPreset.id === 'worldBuilder' ? 'selected' : ''}>+ World Builder</option>
                         </select>
                     </div>
                     <div class="admin-field" id="barycentric-field">
@@ -593,9 +591,9 @@ export class AdminPanel {
             if (!presetSelect) return;
             const presetId = presetSelect.value;
             
-            // Show barycentric for Full Solar System II and World Builder
+            // Show barycentric for all presets (all support it via create_barycentric fallback)
             if (barycentricField) {
-                barycentricField.style.display = (presetId === 'fullSolarSystemII' || presetId === 'fullSolarSystemIII' || presetId === 'worldBuilder') ? 'block' : 'none';
+                barycentricField.style.display = 'block';
             }
             
             // Show stress test fields
