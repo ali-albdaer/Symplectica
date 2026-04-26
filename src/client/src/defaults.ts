@@ -76,6 +76,9 @@ export interface AppDefaults {
     cameraDefaults: {
         freeCamSpeedAuPerSec: number;
         freeCamSensitivity: number;
+        freeCamRotationDamping: number;
+        orbitalRotationDamping: number;
+        orbitalZoomDamping: number;
     };
 }
 

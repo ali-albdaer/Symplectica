@@ -43,6 +43,9 @@
   "visualPresetDefault": "Ultra",
   "cameraDefaults": {
     "freeCamSpeedAuPerSec": 0.01,
-    "freeCamSensitivity": 0.3
+    "freeCamSensitivity": 0.3,
+    "freeCamRotationDamping": 0.92,
+    "orbitalRotationDamping": 0.92,
+    "orbitalZoomDamping": 0.9
   }
 }

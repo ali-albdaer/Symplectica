@@ -39,12 +39,18 @@ export class OptionsPanel {
     private onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void;
     private onFreeCamSpeedChange?: (speed: number) => void;
     private onFreeCamSensitivityChange?: (sensitivity: number) => void;
+    private onFreeCamRotationDampingChange?: (damping: number) => void;
+    private onOrbitalRotationDampingChange?: (damping: number) => void;
+    private onOrbitalZoomDampingChange?: (damping: number) => void;
 
     // State
     private presetName: VisualizationPresetName;
     private presetRenderScale = 1;
     private freeCamSpeed = APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec;
     private freeCamSensitivity = APP_DEFAULTS.cameraDefaults.freeCamSensitivity;
+    private freeCamRotationDamping = APP_DEFAULTS.cameraDefaults.freeCamRotationDamping;
+    private orbitalRotationDamping = APP_DEFAULTS.cameraDefaults.orbitalRotationDamping;
+    private orbitalZoomDamping = APP_DEFAULTS.cameraDefaults.orbitalZoomDamping;
     private ignoreEvents = false;
 
     // UI Elements
@@ -94,6 +100,12 @@ export class OptionsPanel {
     private freeCamSpeedValue!: HTMLElement;
     private freeCamSensitivityInput!: HTMLInputElement;
     private freeCamSensitivityValue!: HTMLElement;
+    private freeCamRotationDampingInput!: HTMLInputElement;
+    private freeCamRotationDampingValue!: HTMLElement;
+    private orbitalRotationDampingInput!: HTMLInputElement;
+    private orbitalRotationDampingValue!: HTMLElement;
+    private orbitalZoomDampingInput!: HTMLInputElement;
+    private orbitalZoomDampingValue!: HTMLElement;
 
     constructor(
         onChange: (options: VisualizationOptions) => void,
@@ -101,6 +113,9 @@ export class OptionsPanel {
         onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void,
         onFreeCamSpeedChange?: (speed: number) => void,
         onFreeCamSensitivityChange?: (sensitivity: number) => void,
+        onFreeCamRotationDampingChange?: (damping: number) => void,
+        onOrbitalRotationDampingChange?: (damping: number) => void,
+        onOrbitalZoomDampingChange?: (damping: number) => void,
         initialPreset: VisualizationPresetName = APP_DEFAULTS.visualPresetDefault
     ) {
         this.onChange = onChange;
@@ -108,6 +123,9 @@ export class OptionsPanel {
         this.onPresetEdit = onPresetEdit;
         this.onFreeCamSpeedChange = onFreeCamSpeedChange;
         this.onFreeCamSensitivityChange = onFreeCamSensitivityChange;
+        this.onFreeCamRotationDampingChange = onFreeCamRotationDampingChange;
+        this.onOrbitalRotationDampingChange = onOrbitalRotationDampingChange;
+        this.onOrbitalZoomDampingChange = onOrbitalZoomDampingChange;
         this.presetName = initialPreset;
         this.options = { ...DEFAULTS };
         this.container = this.createUI();
@@ -241,7 +259,34 @@ export class OptionsPanel {
 
             <div class="opt-content" id="tab-camera" style="display: none;">
                 <section class="opt-section">
+                    <h3>Orbital Camera Settings</h3>
+                    <div class="opt-field">
+                        <label>Rotation Smoothing</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-orbital-rotation-damping" min="0.5" max="0.99" step="0.01" value="0.92">
+                            <span id="opt-orbital-rotation-damping-value">92%</span>
+                        </div>
+                    </div>
+
+                    <div class="opt-field">
+                        <label>Zoom Smoothing</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-orbital-zoom-damping" min="0.5" max="0.99" step="0.01" value="0.9">
+                            <span id="opt-orbital-zoom-damping-value">90%</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="opt-section">
                     <h3>Free Camera Settings</h3>
+                    <div class="opt-field">
+                        <label>Rotation Smoothing</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-freecam-rotation-damping" min="0.5" max="0.99" step="0.01" value="0.92">
+                            <span id="opt-freecam-rotation-damping-value">92%</span>
+                        </div>
+                    </div>
+
                     <div class="opt-field">
                         <label>Speed (AU/s)</label>
                         <div class="opt-slider-row">
@@ -476,6 +521,12 @@ export class OptionsPanel {
         this.freeCamSpeedValue = this.container.querySelector('#opt-freecam-speed-value')!;
         this.freeCamSensitivityInput = this.container.querySelector('#opt-freecam-sensitivity')!;
         this.freeCamSensitivityValue = this.container.querySelector('#opt-freecam-sensitivity-value')!;
+        this.freeCamRotationDampingInput = this.container.querySelector('#opt-freecam-rotation-damping')!;
+        this.freeCamRotationDampingValue = this.container.querySelector('#opt-freecam-rotation-damping-value')!;
+        this.orbitalRotationDampingInput = this.container.querySelector('#opt-orbital-rotation-damping')!;
+        this.orbitalRotationDampingValue = this.container.querySelector('#opt-orbital-rotation-damping-value')!;
+        this.orbitalZoomDampingInput = this.container.querySelector('#opt-orbital-zoom-damping')!;
+        this.orbitalZoomDampingValue = this.container.querySelector('#opt-orbital-zoom-damping-value')!;
     }
 
     private bindEvents(): void {
@@ -616,6 +667,27 @@ export class OptionsPanel {
             this.freeCamSensitivityValue.textContent = `${sensitivity.toFixed(1)}x`;
             this.onFreeCamSensitivityChange?.(sensitivity);
         });
+
+        this.freeCamRotationDampingInput.addEventListener('input', () => {
+            const damping = parseFloat(this.freeCamRotationDampingInput.value);
+            this.freeCamRotationDamping = damping;
+            this.freeCamRotationDampingValue.textContent = `${Math.round(damping * 100)}%`;
+            this.onFreeCamRotationDampingChange?.(damping);
+        });
+
+        this.orbitalRotationDampingInput.addEventListener('input', () => {
+            const damping = parseFloat(this.orbitalRotationDampingInput.value);
+            this.orbitalRotationDamping = damping;
+            this.orbitalRotationDampingValue.textContent = `${Math.round(damping * 100)}%`;
+            this.onOrbitalRotationDampingChange?.(damping);
+        });
+
+        this.orbitalZoomDampingInput.addEventListener('input', () => {
+            const damping = parseFloat(this.orbitalZoomDampingInput.value);
+            this.orbitalZoomDamping = damping;
+            this.orbitalZoomDampingValue.textContent = `${Math.round(damping * 100)}%`;
+            this.onOrbitalZoomDampingChange?.(damping);
+        });
     }
 
     private setupTabs(): void {
@@ -721,6 +793,12 @@ export class OptionsPanel {
         this.freeCamSpeedValue.textContent = `${this.freeCamSpeed.toFixed(3)} AU/s`;
         this.freeCamSensitivityInput.value = this.freeCamSensitivity.toString();
         this.freeCamSensitivityValue.textContent = `${this.freeCamSensitivity.toFixed(1)}x`;
+        this.freeCamRotationDampingInput.value = this.freeCamRotationDamping.toString();
+        this.freeCamRotationDampingValue.textContent = `${Math.round(this.freeCamRotationDamping * 100)}%`;
+        this.orbitalRotationDampingInput.value = this.orbitalRotationDamping.toString();
+        this.orbitalRotationDampingValue.textContent = `${Math.round(this.orbitalRotationDamping * 100)}%`;
+        this.orbitalZoomDampingInput.value = this.orbitalZoomDamping.toString();
+        this.orbitalZoomDampingValue.textContent = `${Math.round(this.orbitalZoomDamping * 100)}%`;
         this.ignoreEvents = false;
     }
 
@@ -774,5 +852,23 @@ export class OptionsPanel {
         this.freeCamSensitivity = sensitivity;
         this.freeCamSensitivityInput.value = sensitivity.toString();
         this.freeCamSensitivityValue.textContent = `${sensitivity.toFixed(1)}x`;
+    }
+
+    setFreeCamRotationDamping(damping: number): void {
+        this.freeCamRotationDamping = damping;
+        this.freeCamRotationDampingInput.value = damping.toString();
+        this.freeCamRotationDampingValue.textContent = `${Math.round(damping * 100)}%`;
+    }
+
+    setOrbitalRotationDamping(damping: number): void {
+        this.orbitalRotationDamping = damping;
+        this.orbitalRotationDampingInput.value = damping.toString();
+        this.orbitalRotationDampingValue.textContent = `${Math.round(damping * 100)}%`;
+    }
+
+    setOrbitalZoomDamping(damping: number): void {
+        this.orbitalZoomDamping = damping;
+        this.orbitalZoomDampingInput.value = damping.toString();
+        this.orbitalZoomDampingValue.textContent = `${Math.round(damping * 100)}%`;
     }
 }

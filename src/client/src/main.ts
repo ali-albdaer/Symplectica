@@ -124,9 +124,13 @@ class NBodyClient {
     // Free camera mode
     private freeCamera = false;
     private freeCamSpeedAuPerSec = APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec;
+    private freeCamRotationDamping = APP_DEFAULTS.cameraDefaults.freeCamRotationDamping;
+    private orbitalRotationDamping = APP_DEFAULTS.cameraDefaults.orbitalRotationDamping;
+    private orbitalZoomDamping = APP_DEFAULTS.cameraDefaults.orbitalZoomDamping;
     private freeCamCrosshair: HTMLElement | null = null;
     private raycaster = new THREE.Raycaster();
     private skyRenderer!: SkyRenderer;
+    private readonly initialFollowDistance = 0.020 * AU;
     private moveKeys: Record<string, boolean> = {
         KeyW: false,
         KeyA: false,
@@ -214,6 +218,18 @@ class NBodyClient {
             (sensitivity) => {
                 this.camera.setFreeLookSensitivity(sensitivity);
             },
+            (damping) => {
+                this.freeCamRotationDamping = damping;
+                this.camera.setFreeRotationDamping(damping);
+            },
+            (damping) => {
+                this.orbitalRotationDamping = damping;
+                this.camera.setOrbitalRotationDamping(damping);
+            },
+            (damping) => {
+                this.orbitalZoomDamping = damping;
+                this.camera.setOrbitalZoomDamping(damping);
+            },
             APP_DEFAULTS.visualPresetDefault
         );
         this.optionsPanel.setPresetRenderScale(
@@ -221,7 +237,13 @@ class NBodyClient {
         );
         this.optionsPanel.setFreeCamSpeed(APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec);
         this.optionsPanel.setFreeCamSensitivity(APP_DEFAULTS.cameraDefaults.freeCamSensitivity);
+        this.optionsPanel.setFreeCamRotationDamping(APP_DEFAULTS.cameraDefaults.freeCamRotationDamping);
+        this.optionsPanel.setOrbitalRotationDamping(APP_DEFAULTS.cameraDefaults.orbitalRotationDamping);
+        this.optionsPanel.setOrbitalZoomDamping(APP_DEFAULTS.cameraDefaults.orbitalZoomDamping);
         this.camera.setFreeLookSensitivity(APP_DEFAULTS.cameraDefaults.freeCamSensitivity);
+        this.camera.setFreeRotationDamping(APP_DEFAULTS.cameraDefaults.freeCamRotationDamping);
+        this.camera.setOrbitalRotationDamping(APP_DEFAULTS.cameraDefaults.orbitalRotationDamping);
+        this.camera.setOrbitalZoomDamping(APP_DEFAULTS.cameraDefaults.orbitalZoomDamping);
 
         // Initialize Touch Controls (disabled by default, enabled with /mobile command)
         this.touchControls = new TouchControls({
@@ -511,7 +533,7 @@ class NBodyClient {
             1e2,     // 100 m near plane
             1e15     // ~1000 AU far plane
         );
-        this.camera.setDistance(0.020 * AU); // Start at 0.020 AU distance
+        this.camera.setDistance(this.initialFollowDistance); // Start at 0.020 AU distance
         this.camera.setElevation(0.5); // Look down at system
 
         // Create body renderer
@@ -551,6 +573,7 @@ class NBodyClient {
 
         // Set initial follow target (first body if available, else origin)
         this.initializeFollowTarget();
+        this.applyInitialFollowCamera();
 
         // Capture initial conservation reference after first preset load
         this.driftMonitor?.reset(this.physics, this.physics.tick());
@@ -748,26 +771,23 @@ class NBodyClient {
         }
 
         // Configure camera scale based on preset type
-        const PARSEC = 3.086e16;
         if (presetId === 'starCluster') {
-            // Star cluster preset spans ~10 parsecs, start camera at 5 parsecs
             this.camera.configureForScale('galactic');
-            this.camera.setInitialDistance(5 * PARSEC);
-            this.camera.setElevation(0.3);
         } else if (presetId === 'stressTest') {
-            // Stress test: compact star cluster (~80 AU scale), start at 200 AU
             this.camera.configureForScale('solar');
-            this.camera.setDistance(200 * AU);
-            this.camera.setElevation(0.5);
         } else if (presetId !== 'worldBuilder') {
-            // Solar system scale presets (worldBuilder already handled above)
             this.camera.configureForScale('solar');
-            this.camera.setDistance(3 * AU);
+        }
+
+        if (presetId !== 'worldBuilder') {
             this.camera.setElevation(0.5);
         }
 
         this.refreshBodies();
         this.timeController.resetAccumulator();
+
+        this.initializeFollowTarget();
+        this.applyInitialFollowCamera();
 
         // Reset drift monitor reference snapshot for the new preset
         this.driftMonitor.reset(this.physics, this.physics.tick());
@@ -1023,6 +1043,37 @@ class NBodyClient {
         this.updateFollowUI();
     }
 
+    private getFollowBody(index: number): BodyInfo | null {
+        const bodies = this.cachedBodies ?? this.physics.getBodies();
+        return bodies[index] ?? null;
+    }
+
+    private applyInitialFollowCamera(): void {
+        if (this.followBodyIndex < 0) return;
+
+        const body = this.getFollowBody(this.followBodyIndex);
+        if (!body) return;
+
+        const target = this.getFollowTargetPosition(this.followBodyIndex);
+        this.camera.setTrackedBodyRadius(body.radius);
+        this.camera.setFocus(target.x, target.y, target.z);
+        this.camera.setDistance(this.initialFollowDistance);
+        this.lastFollowBodyIndex = this.followBodyIndex;
+    }
+
+    private focusFollowBody(index: number): void {
+        const body = this.getFollowBody(index);
+        if (!body) return;
+
+        const target = this.getFollowTargetPosition(index);
+        this.camera.setTrackedBodyRadius(body.radius);
+        this.camera.setFocus(target.x, target.y, target.z);
+        this.followBodyIndex = index;
+        this.lastFollowBodyIndex = index;
+        this.setFreeCamUI(false);
+        this.updateFollowUI();
+    }
+
     private followOrigin(): void {
         this.followBodyIndex = -1;
         this.updateFollowUI();
@@ -1032,22 +1083,16 @@ class NBodyClient {
         const bodyCount = this.physics.bodyCount();
         if (bodyCount === 0) return;
 
-        this.followBodyIndex++;
-        if (this.followBodyIndex >= bodyCount) {
-            this.followBodyIndex = 0; // Wrap to first body (skip origin)
-        }
-        this.updateFollowUI();
+        const nextIndex = (this.followBodyIndex + 1) % bodyCount;
+        this.focusFollowBody(nextIndex);
     }
 
     private followPreviousBody(): void {
         const bodyCount = this.physics.bodyCount();
         if (bodyCount === 0) return;
 
-        this.followBodyIndex--;
-        if (this.followBodyIndex < 0) {
-            this.followBodyIndex = bodyCount - 1; // Wrap to last body (skip origin)
-        }
-        this.updateFollowUI();
+        const previousIndex = (this.followBodyIndex - 1 + bodyCount) % bodyCount;
+        this.focusFollowBody(previousIndex);
     }
 
     private updateFollowUI(): void {

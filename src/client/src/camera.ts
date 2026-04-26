@@ -10,6 +10,11 @@
 
 import * as THREE from 'three';
 import { AU } from '../../shared/constants';
+import {
+    bodySafeOrbitDistance,
+    clampOrbitDistance,
+    unwrapAngle,
+} from './camera-math';
 
 export class OrbitCamera extends THREE.PerspectiveCamera {
     // Orbital parameters
@@ -55,14 +60,15 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private zoomVelocity = 0;
 
     // Limits
-    private readonly minRadius = 1e6;  // 1000 km
+    private minRadius = 1e6;  // 1000 km
     private maxRadius = 1e15; // ~1000 AU (can be increased for galactic scale)
     private readonly minElevation = -Math.PI / 2 + 0.01;
     private readonly maxElevation = Math.PI / 2 - 0.01;
 
     // Damping
-    private readonly rotationDamping = 0.92;
-    private readonly zoomDamping = 0.9;
+    private freeRotationDamping = 0.92;
+    private orbitalRotationDamping = 0.92;
+    private orbitalZoomDamping = 0.9;
 
     constructor(fov: number, aspect: number, near: number, far: number) {
         super(fov, aspect, near, far);
@@ -130,7 +136,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 // Rotate
                 const sensitivity = 0.005;
                 this.azimuthVelocity = -deltaX * sensitivity;
-                this.elevationVelocity = -deltaY * sensitivity;
+                this.elevationVelocity = deltaY * sensitivity;
 
                 this.azimuth += this.azimuthVelocity;
                 this.elevation += this.elevationVelocity;
@@ -184,7 +190,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
 
                 const sensitivity = 0.005;
                 this.azimuth -= deltaX * sensitivity;
-                this.elevation -= deltaY * sensitivity;
+                this.elevation += deltaY * sensitivity;
                 this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
 
                 this.lastMouseX = e.touches[0].clientX;
@@ -220,14 +226,15 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
 
             // Dampen
-            this.azimuthVelocity *= this.rotationDamping;
-            this.elevationVelocity *= this.rotationDamping;
+            const damping = this.freeMode ? this.freeRotationDamping : this.orbitalRotationDamping;
+            this.azimuthVelocity *= damping;
+            this.elevationVelocity *= damping;
         }
 
         // Apply zoom
         this.radius += this.zoomVelocity;
-        this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, this.radius));
-        this.zoomVelocity *= this.zoomDamping;
+        this.radius = clampOrbitDistance(this.radius, this.minRadius, this.maxRadius);
+        this.zoomVelocity *= this.orbitalZoomDamping;
 
         this.updatePosition();
     }
@@ -268,7 +275,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     }
 
     setDistance(distance: number): void {
-        this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, distance));
+        this.radius = clampOrbitDistance(distance, this.minRadius, this.maxRadius);
         this.updatePosition();
     }
 
@@ -294,8 +301,8 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     setOrbitFromOffset(offset: { x: number; y: number; z: number }): void {
         const r = Math.sqrt(offset.x * offset.x + offset.y * offset.y + offset.z * offset.z);
         if (!Number.isFinite(r) || r <= 0) return;
-        this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, r));
-        this.azimuth = Math.atan2(offset.x, offset.z);
+        this.radius = clampOrbitDistance(r, this.minRadius, this.maxRadius);
+        this.azimuth = unwrapAngle(this.azimuth, Math.atan2(offset.x, offset.z));
         const clampedY = Math.max(-1, Math.min(1, offset.y / this.radius));
         this.elevation = Math.asin(clampedY);
         this.azimuthVelocity = 0;
@@ -330,7 +337,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             if (seedForward) {
                 const dir = new THREE.Vector3(seedForward.x, seedForward.y, seedForward.z).normalize();
                 const clampedY = Math.max(-1, Math.min(1, dir.y));
-                this.azimuth = Math.atan2(dir.x, dir.z);
+                this.azimuth = unwrapAngle(this.azimuth, Math.atan2(dir.x, dir.z));
                 this.elevation = Math.asin(clampedY);
                 this.azimuthVelocity = 0;
                 this.elevationVelocity = 0;
@@ -360,6 +367,32 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     setElevation(angle: number): void {
         this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, angle));
         this.updatePosition();
+    }
+
+    setFreeRotationDamping(damping: number): void {
+        if (!Number.isFinite(damping)) return;
+        this.freeRotationDamping = Math.max(0, Math.min(0.999, damping));
+    }
+
+    setOrbitalRotationDamping(damping: number): void {
+        if (!Number.isFinite(damping)) return;
+        this.orbitalRotationDamping = Math.max(0, Math.min(0.999, damping));
+    }
+
+    setOrbitalZoomDamping(damping: number): void {
+        if (!Number.isFinite(damping)) return;
+        this.orbitalZoomDamping = Math.max(0, Math.min(0.999, damping));
+    }
+
+    setMinimumOrbitDistance(distance: number): void {
+        if (!Number.isFinite(distance) || distance <= 0) return;
+        this.minRadius = Math.min(distance, this.maxRadius);
+        this.radius = Math.max(this.radius, this.minRadius);
+        this.updatePosition();
+    }
+
+    setTrackedBodyRadius(radius: number): void {
+        this.setMinimumOrbitDistance(bodySafeOrbitDistance(radius));
     }
 
     /** Get world origin for floating origin rendering */
