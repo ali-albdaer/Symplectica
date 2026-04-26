@@ -8,7 +8,9 @@ import { APP_DEFAULTS } from './defaults';
 
 export interface VisualizationOptions {
     showOrbitTrails: boolean;
-    showLabels: boolean;
+    showStarLabels: boolean;
+    showPlanetLabels: boolean;
+    showMoonLabels: boolean;
     showAxisLines: boolean;
     showRefPlane: boolean;
     showRefLine: boolean;
@@ -47,7 +49,9 @@ export class OptionsPanel {
 
     // UI Elements
     private orbitsCheckbox!: HTMLInputElement;
-    private labelsCheckbox!: HTMLInputElement;
+    private starLabelsCheckbox!: HTMLInputElement;
+    private planetLabelsCheckbox!: HTMLInputElement;
+    private moonLabelsCheckbox!: HTMLInputElement;
     private gridXYCheckbox!: HTMLInputElement;
     private gridXZCheckbox!: HTMLInputElement;
     private gridYZCheckbox!: HTMLInputElement;
@@ -145,7 +149,7 @@ export class OptionsPanel {
                     <h3>Preset Tuning</h3>
                     <div class="opt-field">
                         <label>Render Scale</label>
-                        <input type="range" id="opt-render-scale" min="0.1" max="5" step="0.05" value="1">
+                        <input type="range" id="opt-render-scale" min="0.1" max="100" step="0.05" value="1">
                         <span id="opt-render-scale-value">1.00x</span>
                     </div>
                 </section>
@@ -158,10 +162,20 @@ export class OptionsPanel {
                             <input type="checkbox" id="opt-orbits">
                             <span>Trails</span>
                         </label>
-                        <label class="opt-toggle">
-                            <input type="checkbox" id="opt-labels">
-                            <span>Labels</span>
-                        </label>
+                        <div style="display: flex; gap: 8px;">
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-star-labels">
+                                <span>Star</span>
+                            </label>
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-planet-labels">
+                                <span>Planet</span>
+                            </label>
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-moon-labels">
+                                <span>Moon</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="opt-row">
@@ -437,7 +451,9 @@ export class OptionsPanel {
 
     private cacheElements(): void {
         this.orbitsCheckbox = this.container.querySelector('#opt-orbits')!;
-        this.labelsCheckbox = this.container.querySelector('#opt-labels')!;
+        this.starLabelsCheckbox = this.container.querySelector('#opt-star-labels')!;
+        this.planetLabelsCheckbox = this.container.querySelector('#opt-planet-labels')!;
+        this.moonLabelsCheckbox = this.container.querySelector('#opt-moon-labels')!;
         this.gridXYCheckbox = this.container.querySelector('#opt-grid-xy')!;
         this.gridXZCheckbox = this.container.querySelector('#opt-grid-xz')!;
         this.gridYZCheckbox = this.container.querySelector('#opt-grid-yz')!;
@@ -474,9 +490,21 @@ export class OptionsPanel {
             this.emitChange();
         });
 
-        this.labelsCheckbox.addEventListener('change', () => {
+        this.starLabelsCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
-            this.options.showLabels = this.labelsCheckbox.checked;
+            this.options.showStarLabels = this.starLabelsCheckbox.checked;
+            this.emitChange();
+        });
+
+        this.planetLabelsCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showPlanetLabels = this.planetLabelsCheckbox.checked;
+            this.emitChange();
+        });
+
+        this.moonLabelsCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showMoonLabels = this.moonLabelsCheckbox.checked;
             this.emitChange();
         });
 
@@ -666,7 +694,9 @@ export class OptionsPanel {
         this.ignoreEvents = true;
 
         this.orbitsCheckbox.checked = this.options.showOrbitTrails;
-        this.labelsCheckbox.checked = this.options.showLabels;
+        this.starLabelsCheckbox.checked = this.options.showStarLabels;
+        this.planetLabelsCheckbox.checked = this.options.showPlanetLabels;
+        this.moonLabelsCheckbox.checked = this.options.showMoonLabels;
         this.gridXYCheckbox.checked = this.options.showGridXY;
         this.gridXZCheckbox.checked = this.options.showGridXZ;
         this.gridYZCheckbox.checked = this.options.showGridYZ;

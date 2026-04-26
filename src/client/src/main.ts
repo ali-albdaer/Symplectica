@@ -95,7 +95,7 @@ class NBodyClient {
     private hintsVisible = true;
     private showSimulationParams = false;
     private showFollowingDetails = true;
-    private showPerfMonitor = true; // Performance monitor visible by default
+    private showPerfMonitor = false; // Performance monitor hidden by default
 
     // Performance timing (in milliseconds)
     private frameTiming = {
@@ -393,7 +393,9 @@ class NBodyClient {
 
     private applyVisualizationToRenderer(options: VisualizationOptions): void {
         this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
-        this.bodyRenderer.setShowLabels(options.showLabels);
+        this.bodyRenderer.setShowStarLabels(options.showStarLabels);
+        this.bodyRenderer.setShowPlanetLabels(options.showPlanetLabels);
+        this.bodyRenderer.setShowMoonLabels(options.showMoonLabels);
         this.bodyRenderer.setShowAxisLines(options.showAxisLines);
         this.bodyRenderer.setShowRefPlane(options.showRefPlane);
         this.bodyRenderer.setShowRefLine(options.showRefLine);
@@ -674,11 +676,17 @@ class NBodyClient {
 
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
-        // Include ALL UI elements including stats-overlay, perf-overlay, etc.
-        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #opt-panel, #perf-overlay');
+        // Toggle main UI elements
+        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #opt-panel');
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
+
+        // Handle perf-overlay separately based on its own state
+        const perfOverlay = document.getElementById('perf-overlay');
+        if (perfOverlay) {
+            perfOverlay.style.display = (this.uiHidden || !this.showPerfMonitor) ? 'none' : 'block';
+        }
 
         if (this.uiHidden) {
             this.buildPanel.hide();
@@ -886,7 +894,7 @@ class NBodyClient {
         this.showPerfMonitor = !this.showPerfMonitor;
         const overlay = document.getElementById('perf-overlay');
         if (overlay) {
-            overlay.style.display = this.showPerfMonitor ? 'block' : 'none';
+            overlay.style.display = (this.showPerfMonitor && !this.uiHidden) ? 'block' : 'none';
         }
     }
 
@@ -1384,7 +1392,7 @@ class NBodyClient {
         const cameraOrigin = this.resolveCameraOrigin(!this.freeCamera);
 
         // Update body positions with floating origin
-        this.bodyRenderer.update(this.state.positions, cameraOrigin);
+        this.bodyRenderer.update(this.state.positions, cameraOrigin, this.camera);
 
         // Update ghost preview position if in build mode (must track floating origin each frame)
         if (this.buildMode && this.buildPanel.isVisible()) {
