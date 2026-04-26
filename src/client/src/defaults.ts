@@ -74,6 +74,7 @@ export interface AppDefaults {
     optionsDefaults: OptionsDefaults;
     visualPresetDefault: VisualPresetName;
     cameraDefaults: {
+        cameraFov: number;
         freeCamSpeedAuPerSec: number;
         freeCamSensitivity: number;
         freeCamRotationDamping: number;

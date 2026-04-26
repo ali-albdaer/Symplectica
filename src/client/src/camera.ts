@@ -216,6 +216,11 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         });
     }
 
+    setFov(fov: number): void {
+        this.fov = fov;
+        this.updateProjectionMatrix();
+    }
+
     setFreeLookSensitivity(multiplier: number): void {
         if (!Number.isFinite(multiplier) || multiplier <= 0) return;
         this.freeLookSensitivity = multiplier;

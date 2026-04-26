@@ -235,6 +235,9 @@ class NBodyClient {
                 this.orbitalZoomDamping = damping;
                 this.camera.setOrbitalZoomDamping(damping);
             },
+            (fov) => {
+                this.camera.setFov(fov);
+            },
             APP_DEFAULTS.visualPresetDefault
         );
         this.optionsPanel.setPresetRenderScale(
@@ -533,7 +536,7 @@ class NBodyClient {
 
         // Create camera - start further out and elevated
         this.camera = new OrbitCamera(
-            75,
+            APP_DEFAULTS.cameraDefaults.cameraFov,
             window.innerWidth / window.innerHeight,
             1e2,     // 100 m near plane
             1e15     // ~1000 AU far plane

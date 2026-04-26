@@ -42,10 +42,12 @@ export class OptionsPanel {
     private onFreeCamRotationDampingChange?: (damping: number) => void;
     private onOrbitalRotationDampingChange?: (damping: number) => void;
     private onOrbitalZoomDampingChange?: (damping: number) => void;
+    private onFovChange?: (fov: number) => void;
 
     // State
     private presetName: VisualizationPresetName;
     private presetRenderScale = 1;
+    private cameraFov = APP_DEFAULTS.cameraDefaults.cameraFov;
     private freeCamSpeed = APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec;
     private freeCamSensitivity = APP_DEFAULTS.cameraDefaults.freeCamSensitivity;
     private freeCamRotationDamping = APP_DEFAULTS.cameraDefaults.freeCamRotationDamping;
@@ -106,6 +108,8 @@ export class OptionsPanel {
     private orbitalRotationDampingValue!: HTMLElement;
     private orbitalZoomDampingInput!: HTMLInputElement;
     private orbitalZoomDampingValue!: HTMLElement;
+    private fovInput!: HTMLInputElement;
+    private fovValue!: HTMLElement;
 
     constructor(
         onChange: (options: VisualizationOptions) => void,
@@ -116,6 +120,7 @@ export class OptionsPanel {
         onFreeCamRotationDampingChange?: (damping: number) => void,
         onOrbitalRotationDampingChange?: (damping: number) => void,
         onOrbitalZoomDampingChange?: (damping: number) => void,
+        onFovChange?: (fov: number) => void,
         initialPreset: VisualizationPresetName = APP_DEFAULTS.visualPresetDefault
     ) {
         this.onChange = onChange;
@@ -126,6 +131,7 @@ export class OptionsPanel {
         this.onFreeCamRotationDampingChange = onFreeCamRotationDampingChange;
         this.onOrbitalRotationDampingChange = onOrbitalRotationDampingChange;
         this.onOrbitalZoomDampingChange = onOrbitalZoomDampingChange;
+        this.onFovChange = onFovChange;
         this.presetName = initialPreset;
         this.options = { ...DEFAULTS };
         this.container = this.createUI();
@@ -258,6 +264,17 @@ export class OptionsPanel {
             </div>
 
             <div class="opt-content" id="tab-camera" style="display: none;">
+                <section class="opt-section">
+                    <h3>Global Camera Settings</h3>
+                    <div class="opt-field">
+                        <label>Field of View</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-camera-fov" min="10" max="120" step="1" value="75">
+                            <span id="opt-camera-fov-value">75°</span>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="opt-section">
                     <h3>Orbital Camera Settings</h3>
                     <div class="opt-field">
@@ -527,6 +544,8 @@ export class OptionsPanel {
         this.orbitalRotationDampingValue = this.container.querySelector('#opt-orbital-rotation-damping-value')!;
         this.orbitalZoomDampingInput = this.container.querySelector('#opt-orbital-zoom-damping')!;
         this.orbitalZoomDampingValue = this.container.querySelector('#opt-orbital-zoom-damping-value')!;
+        this.fovInput = this.container.querySelector('#opt-camera-fov')!;
+        this.fovValue = this.container.querySelector('#opt-camera-fov-value')!;
     }
 
     private bindEvents(): void {
@@ -688,6 +707,13 @@ export class OptionsPanel {
             this.orbitalZoomDampingValue.textContent = `${Math.round(damping * 100)}%`;
             this.onOrbitalZoomDampingChange?.(damping);
         });
+
+        this.fovInput.addEventListener('input', () => {
+            const fov = parseFloat(this.fovInput.value);
+            this.cameraFov = fov;
+            this.fovValue.textContent = `${fov}°`;
+            this.onFovChange?.(fov);
+        });
     }
 
     private setupTabs(): void {
@@ -799,6 +825,10 @@ export class OptionsPanel {
         this.orbitalRotationDampingValue.textContent = `${Math.round(this.orbitalRotationDamping * 100)}%`;
         this.orbitalZoomDampingInput.value = this.orbitalZoomDamping.toString();
         this.orbitalZoomDampingValue.textContent = `${Math.round(this.orbitalZoomDamping * 100)}%`;
+        
+        this.fovInput.value = this.cameraFov.toString();
+        this.fovValue.textContent = `${this.cameraFov}°`;
+        
         this.ignoreEvents = false;
     }
 
