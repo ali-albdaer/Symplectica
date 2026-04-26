@@ -31,7 +31,7 @@ fn test_full_solar_system_iii_body_names() {
         "Dione", "Rhea", "Titan", "Iapetus", "Uranus", "Miranda",
         "Ariel", "Umbriel", "Titania", "Oberon", "Neptune", "Triton",
         "Nereid", "Pluto", "Charon", "Ceres", "Pallas", "Vesta",
-        "1P/Halley", "2P/Encke", "67P/C-G", "Hale-Bopp",
+        "1P/Halley", "2P/Encke", "67P/Churyumov-Gerasimenko", "C/1995 O1 (Hale-Bopp)",
         "109P/Swift-Tuttle",
     ];
     for name in &expected {
@@ -165,7 +165,7 @@ fn test_comet_body_types() {
     let sim = create_full_solar_system_iii(42, false);
     let bodies = sim.bodies();
 
-    let comets = ["1P/Halley", "2P/Encke", "67P/C-G", "Hale-Bopp", "109P/Swift-Tuttle"];
+    let comets = ["1P/Halley", "2P/Encke", "67P/Churyumov-Gerasimenko", "C/1995 O1 (Hale-Bopp)", "109P/Swift-Tuttle"];
     for name in &comets {
         let body = bodies.iter().find(|b| b.name == *name)
             .unwrap_or_else(|| panic!("Missing comet: {}", name));

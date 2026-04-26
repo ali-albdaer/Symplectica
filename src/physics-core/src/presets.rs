@@ -1611,7 +1611,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
 
     // ─── Sun ────────────────────────────────────────────────────────────
     // Horizons #10 — at origin of heliocentric frame
-    let sun_id = sim.add_star("Sun", M_SUN, 6.957e8);
+    let sun_id = sim.add_star("Sun", 1.988409871326422e+30, 6.957e8);
     if let Some(sun) = sim.get_body_mut(sun_id) {
         sun.luminosity = L_SUN;
         sun.effective_temperature = 5772.0;
@@ -1628,20 +1628,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #199 — epoch 2026-01-01
     let mut mercury = Body::new(
         0, "Mercury", BodyType::Planet,
-        3.302e23, 2.4394e6,
-        Vec3::new(-32193656.90676167e3, -61216587.9829846e3, -2049979.952579837e3),
-        Vec3::new(33.29912211950884e3, -20.32319326617692e3, -4.715026944319221e3),
+        3.3010006367708975e+23, 2439400.0,
+        Vec3::new(-32193656906.76167, -61216587982.9846, -2049979952.5798378),
+        Vec3::new(33299.122119508844, -20323.193266176917, -4715.026944319222),
     );
     mercury.rotation_rate = 1.24001e-6;
     mercury.axial_tilt = 0.00059;
     mercury.mean_surface_temperature = 440.0;
     mercury.seed = seed.wrapping_add(1);
-    mercury.semi_major_axis = 57909051.27942418e3;
-    mercury.eccentricity = 0.2056426160956197;
-    mercury.inclination = 7.003422810415504 * deg;
-    mercury.longitude_asc_node = 48.29881667444637 * deg;
-    mercury.arg_periapsis = 29.19881272328852 * deg;
-    mercury.mean_anomaly = 157.6511583424542 * deg;
+    mercury.semi_major_axis = 59212300557.43999;
+    mercury.eccentricity = 0.1957390377099447;
+    mercury.inclination = 6.995740318986847 * deg;
+    mercury.longitude_asc_node = 48.593424228867 * deg;
+    mercury.arg_periapsis = 29.74575733028552 * deg;
+    mercury.mean_anomaly = 156.8214628414177 * deg;
     mercury.parent_id = Some(sun_id);
     mercury.color = hex_to_rgb(0x8c7853);
     mercury.composition = PlanetComposition::Rocky;
@@ -1654,20 +1654,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #299
     let mut venus = Body::new(
         0, "Venus", BodyType::Planet,
-        4.8685e24, 6.05184e6,
-        Vec3::new(13295847.29627933e3, -107974115.5459946e3, -2250558.830319598e3),
-        Vec3::new(34.52275635351619e3, 4.156129935817114e3, -1.934854181927197e3),
+        4.867305814842006e+24, 6051840.0,
+        Vec3::new(13295847296.279331, -107974115545.99457, -2250558830.319599),
+        Vec3::new(34522.7563535162, 4156.129935817115, -1934.8541819271966),
     );
     venus.rotation_rate = -2.9924e-7;
     venus.axial_tilt = 3.0943;
     venus.mean_surface_temperature = 735.0;
     venus.seed = seed.wrapping_add(2);
-    venus.semi_major_axis = 108209293.6140176e3;
-    venus.eccentricity = 0.006780942266658413;
-    venus.inclination = 3.394392156342094 * deg;
-    venus.longitude_asc_node = 76.60714242821713 * deg;
-    venus.arg_periapsis = 54.87317496286026 * deg;
-    venus.mean_anomaly = 145.1314515634737 * deg;
+    venus.semi_major_axis = 109667353851.7825;
+    venus.eccentricity = 0.00144460469378842;
+    venus.inclination = 3.392827761961026 * deg;
+    venus.longitude_asc_node = 76.64061238860523 * deg;
+    venus.arg_periapsis = 256.4097670347575 * deg;
+    venus.mean_anomaly = 303.8486165108158 * deg;
     venus.parent_id = Some(sun_id);
     venus.color = hex_to_rgb(0xe6c229);
     venus.composition = PlanetComposition::Rocky;
@@ -1681,21 +1681,21 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #399
     let mut earth = Body::new(
         0, "Earth", BodyType::Planet,
-        5.97219e24, 6.37101e6,
-        Vec3::new(-26072138.44816194e3, 144774673.8210197e3, -8892.861905746162e3),
-        Vec3::new(-29.78893116564825e3, -5.396270536820538e3, 0.0004106639513727917e3),
+        5.972168398723462e+24, 6371010.0,
+        Vec3::new(-26072138448.161938, 144774673821.01974, -8892861.90574651),
+        Vec3::new(-29788.931165648246, -5396.270536820537, 0.4106639513727202),
     );
     earth.atmosphere = Some(Atmosphere::earth_like());
     earth.rotation_rate = 7.292115e-5;
     earth.axial_tilt = AXIAL_TILT_EARTH;
     earth.mean_surface_temperature = T_SURFACE_EARTH;
     earth.seed = seed.wrapping_add(3);
-    earth.semi_major_axis = 149477430.1325314e3;
-    earth.eccentricity = 0.01591429536350342;
-    earth.inclination = 0.003549055731418342 * deg;
-    earth.longitude_asc_node = 177.6179030721728 * deg;
-    earth.arg_periapsis = 286.3568704502947 * deg;
-    earth.mean_anomaly = 356.3524337712979 * deg;
+    earth.semi_major_axis = 147650674422.1825;
+    earth.eccentricity = 0.009166999548581222;
+    earth.inclination = 0.004242269325986349 * deg;
+    earth.longitude_asc_node = 14.76083602234425 * deg;
+    earth.arg_periapsis = 66.43751678619198 * deg;
+    earth.mean_anomaly = 18.90069218754828 * deg;
     earth.parent_id = Some(sun_id);
     earth.color = hex_to_rgb(0x6b93d6);
     earth.composition = PlanetComposition::Rocky;
@@ -1708,20 +1708,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #301 — heliocentric state vector (already absolute)
     let mut moon = Body::new(
         0, "Moon", BodyType::Moon,
-        7.349e22, 1.73753e6,
-        Vec3::new(-25927812.72067001e3, 145104069.6519153e3, 22860.11443745345e3),
-        Vec3::new(-30.79324530332047e3, -4.975405328064174e3, 0.00599587524917955e3),
+        7.345789170399893e+22, 1.73753e6,
+        Vec3::new(-25927812720.670017, 145104069651.91534, 22860114.43744565),
+        Vec3::new(-30793.245303320462, -4975.405328064174, 5.99587524917948),
     );
     moon.rotation_rate = 2.6617e-6;
     moon.axial_tilt = 0.02692;
     moon.mean_surface_temperature = 250.0;
     moon.seed = seed.wrapping_add(4);
-    moon.semi_major_axis = 160337924.3759978e3;
-    moon.eccentricity = 0.08236183062471594;
-    moon.inclination = 0.01403758402742693 * deg;
-    moon.longitude_asc_node = 60.85906168069921 * deg;
-    moon.arg_periapsis = 26.67216696617628 * deg;
-    moon.mean_anomaly = 10.65892596627429 * deg;
+    moon.semi_major_axis = 158221976583.3624;
+    moon.eccentricity = 0.07586278949852443;
+    moon.inclination = 0.01952857082753733 * deg;
+    moon.longitude_asc_node = 42.00460263999287 * deg;
+    moon.arg_periapsis = 41.38501390659234 * deg;
+    moon.mean_anomaly = 14.56870417917833 * deg;
     moon.parent_id = Some(earth_id);
     moon.color = hex_to_rgb(0xb0b0b0);
     moon.composition = PlanetComposition::Rocky;
@@ -1734,20 +1734,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #499
     let mut mars = Body::new(
         0, "Mars", BodyType::Planet,
-        6.4171e23, 3.38992e6,
-        Vec3::new(50949994.46228143e3, -207492548.2420174e3, -5597537.454939082e3),
-        Vec3::new(24.44715235948102e3, 7.861165862885534e3, -0.4347434612671703e3),
+        6.41690898850816e+23, 3389920.0,
+        Vec3::new(50949994462.28143, -207492548242.01736, -5597537454.939068),
+        Vec3::new(24447.152359481024, 7861.165862885534, -434.7434612671703),
     );
     mars.rotation_rate = 7.088218111185524e-5;
     mars.axial_tilt = 0.4396;
     mars.mean_surface_temperature = 210.0;
     mars.seed = seed.wrapping_add(5);
-    mars.semi_major_axis = 227941421.6480371e3;
-    mars.eccentricity = 0.09348461380205672;
-    mars.inclination = 1.847490422989131 * deg;
-    mars.longitude_asc_node = 49.48317173608726 * deg;
-    mars.arg_periapsis = 286.6231771776422 * deg;
-    mars.mean_anomaly = 315.8219093418334 * deg;
+    mars.semi_major_axis = 229419926126.27258;
+    mars.eccentricity = 0.09761065338892279;
+    mars.inclination = 1.841533419384498 * deg;
+    mars.longitude_asc_node = 49.59249963415456 * deg;
+    mars.arg_periapsis = 286.3100390578677 * deg;
+    mars.mean_anomaly = 316.1919958872677 * deg;
     mars.parent_id = Some(sun_id);
     mars.color = hex_to_rgb(0xc1440e);
     mars.composition = PlanetComposition::Rocky;
@@ -1761,9 +1761,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #401 — mass from NASA fact sheet (GM=7.09e-4 km³/s²)
     let mut phobos = Body::new(
         0, "Phobos", BodyType::Moon,
-        1.0659e16, 1.31e4,
-        Vec3::new(50947366.23900896e3, -207501379.4311839e3, -5596900.585285708e3),
-        Vec3::new(26.27614488820742e3, 7.238706660368853e3, -1.422097641061121e3),
+        1.0659e16, 13100.0,
+        Vec3::new(50947366239.00896, -207501379431.18384, -5596900585.285694),
+        Vec3::new(26276.144888207426, 7238.706660368854, -1422.0976410611206),
     );
     phobos.rotation_rate = 2.28e-4;
     phobos.mean_surface_temperature = 233.0;
@@ -1780,9 +1780,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #402 — mass from NASA fact sheet
     let mut deimos = Body::new(
         0, "Deimos", BodyType::Moon,
-        1.4762e15, 7.8e3,
-        Vec3::new(50960858.1512132e3, -207472045.051078e3, -5600953.046942502e3),
-        Vec3::new(23.38140382423259e3, 8.511628465950784e3, 0.08254899501365598e3),
+        1.4762e15, 7800.0,
+        Vec3::new(50960858151.2132, -207472045051.07797, -5600953046.942488),
+        Vec3::new(23381.403824232595, 8511.628465950784, 82.54899501365614),
     );
     deimos.rotation_rate = 5.82e-5;
     deimos.mean_surface_temperature = 233.0;
@@ -1799,20 +1799,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #599
     let mut jupiter = Body::new(
         0, "Jupiter", BodyType::Planet,
-        1.89819e27, 6.9911e7,
-        Vec3::new(-253419345.368912e3, 737350305.7947004e3, 2606925.500009716e3),
-        Vec3::new(-12.52004139508961e3, -3.640294521136214e3, 0.2951466824685909e3),
+        1.8981246258034552e+27, 66854000.0,
+        Vec3::new(-253419345368.912, 737350305794.7006, 2606925500.009656),
+        Vec3::new(-12520.041395089607, -3640.294521136214, 295.1466824685907),
     );
     jupiter.rotation_rate = 1.7585e-4;
     jupiter.axial_tilt = 0.0546;
     jupiter.mean_surface_temperature = 165.0;
     jupiter.seed = seed.wrapping_add(10);
-    jupiter.semi_major_axis = 778388856.4707986e3;
-    jupiter.eccentricity = 0.04815922780877058;
-    jupiter.inclination = 1.303188609732257 * deg;
-    jupiter.longitude_asc_node = 100.5154900059337 * deg;
-    jupiter.arg_periapsis = 273.711224859534 * deg;
-    jupiter.mean_anomaly = 89.22864130180537 * deg;
+    jupiter.semi_major_axis = 777615551082.3237;
+    jupiter.eccentricity = 0.0488238339890161;
+    jupiter.inclination = 1.303423734788113 * deg;
+    jupiter.longitude_asc_node = 100.4974267386808 * deg;
+    jupiter.arg_periapsis = 273.5571974333627 * deg;
+    jupiter.mean_anomaly = 89.37724066060315 * deg;
     jupiter.parent_id = Some(sun_id);
     jupiter.color = hex_to_rgb(0xd4a574);
     jupiter.composition = PlanetComposition::GasGiant;
@@ -1825,9 +1825,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #501 — GM=5959.9155 km³/s²
     let mut io = Body::new(
         0, "Io", BodyType::Moon,
-        8.9296e22, 1.82149e6,
-        Vec3::new(-253048162.4054362e3, 737149012.2283239e3, 2604956.343127787e3),
-        Vec3::new(-4.208017384166167e3, 11.53696126936628e3, 0.956643452611873e3),
+        8.929648802121572e+22, 1821490.0,
+        Vec3::new(-253048162405.43616, 737149012228.3239, 2604956343.127757),
+        Vec3::new(-4208.017384166167, 11536.961269366273, 956.6434526118736),
     );
     io.rotation_rate = 4.11e-5;
     io.mean_surface_temperature = 130.0;
@@ -1844,9 +1844,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #502 — GM=3202.7121 km³/s²
     let mut europa = Body::new(
         0, "Europa", BodyType::Moon,
-        4.7986e22, 1.5608e6,
-        Vec3::new(-253336795.2240106e3, 736680778.5479159e3, 2587835.180404663e3),
-        Vec3::new(1.026104503088396e3, -1.874756906242933e3, 0.6349773826056384e3),
+        4.7985737830184444e+22, 1560800.0,
+        Vec3::new(-253336795224.01056, 736680778547.9159, 2587835180.404633),
+        Vec3::new(1026.1045030883959, -1874.756906242933, 634.9773826056384),
     );
     europa.rotation_rate = 2.048e-5;
     europa.mean_surface_temperature = 102.0;
@@ -1863,9 +1863,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #503 — GM=9887.8328 km³/s²
     let mut ganymede = Body::new(
         0, "Ganymede", BodyType::Moon,
-        1.4815e23, 2.6312e6,
-        Vec3::new(-252407469.010232e3, 737006450.7486157e3, 2608449.50889349e3),
-        Vec3::new(-9.00783564280008e3, 6.667750073499915e3, 0.7397075799751662e3),
+        1.481478626972117e+23, 2631200.0,
+        Vec3::new(-252407469010.23196, 737006450748.6157, 2608449508.89343),
+        Vec3::new(-9007.83564280008, 6667.750073499915, 739.7075799751664),
     );
     ganymede.rotation_rate = 1.016e-5;
     ganymede.mean_surface_temperature = 110.0;
@@ -1882,9 +1882,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #504 — GM=7179.2834 km³/s²
     let mut callisto = Body::new(
         0, "Callisto", BodyType::Moon,
-        1.0757e23, 2.4103e6,
-        Vec3::new(-253408954.3921413e3, 739229434.180588e3, 2665876.684725225e3),
-        Vec3::new(-20.73318361579015e3, -3.532172885335655e3, 0.187843729647549e3),
+        1.075660878294353e+23, 2410300.0,
+        Vec3::new(-253408954392.14127, 739229434180.5881, 2665876684.725195),
+        Vec3::new(-20733.183615790145, -3532.172885335655, 187.84372964754917),
     );
     callisto.rotation_rate = 4.358e-6;
     callisto.mean_surface_temperature = 134.0;
@@ -1901,20 +1901,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #699
     let mut saturn = Body::new(
         0, "Saturn", BodyType::Planet,
-        5.6834e26, 5.8232e7,
-        Vec3::new(1422278067.19984e3, 38557211.58159366e3, -57286362.61760134e3),
-        Vec3::new(-0.8022902327476618e3, 9.633913344037813e3, -0.1352982130832756e3),
+        5.683173701212113e+26, 54364000.0,
+        Vec3::new(1422278067199.8396, 38557211581.593666, -57286362617.60134),
+        Vec3::new(-802.2902327476618, 9633.913344037814, -135.29821308327544),
     );
     saturn.rotation_rate = 1.63785e-4;
     saturn.axial_tilt = 0.4665;
     saturn.mean_surface_temperature = 134.0;
     saturn.seed = seed.wrapping_add(20);
-    saturn.semi_major_axis = 1427745884.220034e3;
-    saturn.eccentricity = 0.05540366888330445;
-    saturn.inclination = 2.48665565615377 * deg;
-    saturn.longitude_asc_node = 113.5608662919897 * deg;
-    saturn.arg_periapsis = 338.4393086264126 * deg;
-    saturn.mean_anomaly = 275.9187884790698 * deg;
+    saturn.semi_major_axis = 1426282424721.493;
+    saturn.eccentricity = 0.05466572968317326;
+    saturn.inclination = 2.486560591194277 * deg;
+    saturn.longitude_asc_node = 113.5234423447392 * deg;
+    saturn.arg_periapsis = 339.0844496578067 * deg;
+    saturn.mean_anomaly = 275.1957082168172 * deg;
     saturn.parent_id = Some(sun_id);
     saturn.color = hex_to_rgb(0xead6a7);
     saturn.composition = PlanetComposition::GasGiant;
@@ -1927,9 +1927,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #601 — GM=2.503489 km³/s²
     let mut mimas = Body::new(
         0, "Mimas", BodyType::Moon,
-        3.7509e19, 1.988e5,
-        Vec3::new(1422134256.763391e3, 38664149.43022263e3, -57331424.57386944e3),
-        Vec3::new(-9.951772995864012e3, 0.3847832913716864e3, 5.977387219023425e3),
+        3.750938675216877e+19, 198800.0,
+        Vec3::new(1422134256763.3904, 38664149430.222626, -57331424573.86942),
+        Vec3::new(-9951.772995864012, 384.7832913716863, 5977.387219023425),
     );
     mimas.rotation_rate = 7.72e-5;
     mimas.mean_surface_temperature = 64.0;
@@ -1946,9 +1946,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #602 — GM=7.210367 km³/s²
     let mut enceladus = Body::new(
         0, "Enceladus", BodyType::Moon,
-        1.0803e20, 2.523e5,
-        Vec3::new(1422042201.36275e3, 38545378.05526055e3, -57257288.4870629e3),
-        Vec3::new(0.5247221847633589e3, -1.551089888497419e3, 5.596865557104396e3),
+        1.0803180857917686e+20, 252300.0,
+        Vec3::new(1422042201362.7507, 38545378055.26055, -57257288487.062904),
+        Vec3::new(524.7221847633589, -1551.089888497419, 5596.8655571043955),
     );
     enceladus.rotation_rate = 5.31e-5;
     enceladus.mean_surface_temperature = 75.0;
@@ -1965,9 +1965,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #603 — GM=41.21 km³/s²
     let mut tethys = Body::new(
         0, "Tethys", BodyType::Moon,
-        6.1744e20, 5.363e5,
-        Vec3::new(1422114248.461821e3, 38780627.57833759e3, -57386689.11433573e3),
-        Vec3::new(-10.20298221498555e3, 4.295481160441287e3, 3.329682184654279e3),
+        6.174430277332455e+20, 536300.0,
+        Vec3::new(1422114248461.8206, 38780627578.33761, -57386689114.33573),
+        Vec3::new(-10202.982214985555, 4295.481160441287, 3329.6821846542794),
     );
     tethys.rotation_rate = 3.85e-5;
     tethys.mean_surface_temperature = 86.0;
@@ -1984,9 +1984,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #604 — GM=73.116 km³/s²
     let mut dione = Body::new(
         0, "Dione", BodyType::Moon,
-        1.0955e21, 5.625e5,
-        Vec3::new(1422031948.887452e3, 38313212.74314193e3, -57134848.32052323e3),
-        Vec3::new(6.74439372546288e3, 3.540700481407788e3, 2.323905686523045e3),
+        1.0954856689090991e+21, 562500.0,
+        Vec3::new(1422031948887.4526, 38313212743.14192, -57134848320.52324),
+        Vec3::new(6744.393725462879, 3540.700481407787, 2323.905686523044),
     );
     dione.rotation_rate = 2.66e-5;
     dione.mean_surface_temperature = 87.0;
@@ -2003,9 +2003,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #605 — GM=153.94 km³/s²
     let mut rhea = Body::new(
         0, "Rhea", BodyType::Moon,
-        2.3065e21, 7.645e5,
-        Vec3::new(1422010481.792402e3, 38166441.7383346e3, -57054752.32474688e3),
-        Vec3::new(6.476917318294454e3, 5.541627449500241e3, 1.353064103465281e3),
+        2.3064591043255476e+21, 764500.0,
+        Vec3::new(1422010481792.4014, 38166441738.334595, -57054752324.74689),
+        Vec3::new(6476.917318294454, 5541.627449500242, 1353.0641034652804),
     );
     rhea.rotation_rate = 1.652e-5;
     rhea.mean_surface_temperature = 76.0;
@@ -2022,9 +2022,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #606 — GM=8978.14 km³/s², thick N₂/CH₄ atmosphere
     let mut titan = Body::new(
         0, "Titan", BodyType::Moon,
-        1.3452e23, 2.5755e6,
-        Vec3::new(1423389918.556709e3, 38153032.56924746e3, -57188578.59238257e3),
-        Vec3::new(1.120305624246614e3, 14.35438017172909e3, -2.760960541157103e3),
+        1.3451807680206165e+23, 2575500.0,
+        Vec3::new(1423389918556.7085, 38153032569.24747, -57188578592.38257),
+        Vec3::new(1120.305624246614, 14354.380171729084, -2760.960541157103),
     );
     titan.rotation_rate = 4.561e-6;
     titan.axial_tilt = 0.0052;
@@ -2051,9 +2051,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #608 — GM=120.52 km³/s²
     let mut iapetus = Body::new(
         0, "Iapetus", BodyType::Moon,
-        1.8057e21, 7.345e5,
-        Vec3::new(1420709057.046448e3, 41751346.03178877e3, -57706716.57236903e3),
-        Vec3::new(-3.688822513608554e3, 8.431453071930134e3, 0.7216475694914566e3),
+        1.8057324363603674e+21, 734500.0,
+        Vec3::new(1420709057046.4487, 41751346031.78877, -57706716572.36903),
+        Vec3::new(-3688.8225136085543, 8431.453071930135, 721.6475694914568),
     );
     iapetus.rotation_rate = 9.17e-7;
     iapetus.mean_surface_temperature = 90.0;
@@ -2070,20 +2070,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #799
     let mut uranus = Body::new(
         0, "Uranus", BodyType::Planet,
-        8.6813e25, 2.5362e7,
-        Vec3::new(1478073476.913783e3, 2513246041.395467e3, -9831518.091484904e3),
-        Vec3::new(-5.932790537281171e3, 3.134649152126629e3, 0.08880768290436647e3),
+        8.680986186266726e+25, 24973000.0,
+        Vec3::new(1478073476913.7825, 2513246041395.4673, -9831518091.484814),
+        Vec3::new(-5932.790537281172, 3134.649152126628, 88.8076829043664),
     );
     uranus.rotation_rate = -1.01237e-4;
     uranus.axial_tilt = 1.7064;
     uranus.mean_surface_temperature = 76.0;
     uranus.seed = seed.wrapping_add(30);
-    uranus.semi_major_axis = 2884827997.531245e3;
-    uranus.eccentricity = 0.04681618294428753;
-    uranus.inclination = 0.7747251262000414 * deg;
-    uranus.longitude_asc_node = 73.97944638615273 * deg;
-    uranus.arg_periapsis = 91.36357043520249 * deg;
-    uranus.mean_anomaly = 259.4053127263502 * deg;
+    uranus.semi_major_axis = 2870646874755.253;
+    uranus.eccentricity = 0.04724370911732833;
+    uranus.inclination = 0.774035806823098 * deg;
+    uranus.longitude_asc_node = 73.96730874539558 * deg;
+    uranus.arg_periapsis = 97.08319609588438 * deg;
+    uranus.mean_anomaly = 253.5885560232958 * deg;
     uranus.parent_id = Some(sun_id);
     uranus.color = hex_to_rgb(0x72b4c4);
     uranus.composition = PlanetComposition::IceGiant;
@@ -2096,9 +2096,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #705 — GM=4.3 km³/s²
     let mut miranda = Body::new(
         0, "Miranda", BodyType::Moon,
-        6.4426e19, 2.40e5,
-        Vec3::new(1478186683.266191e3, 2513222317.937086e3, -9772397.13156879e3),
-        Vec3::new(-3.244095258519708e3, 1.347912130895228e3, -5.757145401858096e3),
+        6.442623196440077e+19, 240000.0,
+        Vec3::new(1478186683266.1907, 2513222317937.086, -9772397131.568699),
+        Vec3::new(-3244.0952585197083, 1347.9121308952272, -5757.145401858095),
     );
     miranda.rotation_rate = 5.01e-5;
     miranda.mean_surface_temperature = 60.0;
@@ -2115,9 +2115,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #701 — GM=83.43 km³/s²
     let mut ariel = Body::new(
         0, "Ariel", BodyType::Moon,
-        1.2500e21, 5.811e5,
-        Vec3::new(1478247017.224427e3, 2513218437.002844e3, -9756912.972674847e3),
-        Vec3::new(-3.958215809508779e3, 2.006884233638803e3, -4.929726385208909e3),
+        1.2500187285558038e+21, 581100.0,
+        Vec3::new(1478247017224.4268, 2513218437002.844, -9756912972.674757),
+        Vec3::new(-3958.215809508779, 2006.8842336388032, -4929.726385208909),
     );
     ariel.rotation_rate = 2.87e-5;
     ariel.mean_surface_temperature = 58.0;
@@ -2134,9 +2134,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #702 — GM=85.4 km³/s²
     let mut umbriel = Body::new(
         0, "Umbriel", BodyType::Moon,
-        1.2795e21, 5.847e5,
-        Vec3::new(1478020996.614599e3, 2513292863.609729e3, -9576045.21745038e3),
-        Vec3::new(-1.449193171903463e3, 2.30867803339213e3, 1.168563341651776e3),
+        1.279534932502285e+21, 584700.0,
+        Vec3::new(1478020996614.5986, 2513292863609.7295, -9576045217.45029),
+        Vec3::new(-1449.193171903463, 2308.678033392129, 1168.5633416517765),
     );
     umbriel.rotation_rate = 1.73e-5;
     umbriel.mean_surface_temperature = 61.0;
@@ -2153,9 +2153,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #703 — GM=222.8 km³/s²
     let mut titania = Body::new(
         0, "Titania", BodyType::Moon,
-        3.3382e21, 7.889e5,
-        Vec3::new(1478435784.939839e3, 2513136567.626043e3, -10047155.14388299e3),
-        Vec3::new(-7.811325028798818e3, 3.109489400348165e3, -3.040436133563583e3),
+        3.338177786434533e+21, 788900.0,
+        Vec3::new(1478435784939.8396, 2513136567626.0435, -10047155143.882902),
+        Vec3::new(-7811.325028798818, 3109.489400348165, -3040.4361335635836),
     );
     titania.rotation_rate = 9.42e-6;
     titania.mean_surface_temperature = 60.0;
@@ -2172,9 +2172,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #704 — GM=205.34 km³/s²
     let mut oberon = Body::new(
         0, "Oberon", BodyType::Moon,
-        3.0766e21, 7.614e5,
-        Vec3::new(1478363146.793264e3, 2513254768.633219e3, -9326066.379535913e3),
-        Vec3::new(-3.278451196615699e3, 2.341478491126701e3, -1.423347371695179e3),
+        3.0765773189697797e+21, 761400.0,
+        Vec3::new(1478363146793.2646, 2513254768633.219, -9326066379.535824),
+        Vec3::new(-3278.4511966156992, 2341.4784911267006, -1423.3473716951794),
     );
     oberon.rotation_rate = 6.97e-6;
     oberon.mean_surface_temperature = 61.0;
@@ -2191,20 +2191,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #899
     let mut neptune = Body::new(
         0, "Neptune", BodyType::Planet,
-        1.02409e26, 2.4624e7,
-        Vec3::new(4468805610.889497e3, 77632244.96534711e3, -104579004.7369847e3),
-        Vec3::new(-0.1418865028292812e3, 5.465647680419589e3, -0.1098251976786266e3),
+        1.024092409690904e+26, 24624000.0,
+        Vec3::new(4468805610889.497, 77632244965.34709, -104579004736.9847),
+        Vec3::new(-141.8865028292812, 5465.647680419589, -109.82519767862651),
     );
     neptune.rotation_rate = 1.08338e-4;
     neptune.axial_tilt = 0.4943;
     neptune.mean_surface_temperature = 72.0;
     neptune.seed = seed.wrapping_add(40);
-    neptune.semi_major_axis = 4503937575.533338e3;
-    neptune.eccentricity = 0.01096408504193659;
-    neptune.inclination = 1.773857918729585 * deg;
-    neptune.longitude_asc_node = 131.9234181489527 * deg;
-    neptune.arg_periapsis = 277.2518326663131 * deg;
-    neptune.mean_anomaly = 312.7645852053252 * deg;
+    neptune.semi_major_axis = 4497806205857.0625;
+    neptune.eccentricity = 0.008592301304124647;
+    neptune.inclination = 1.773542114139843 * deg;
+    neptune.longitude_asc_node = 131.9065895380446 * deg;
+    neptune.arg_periapsis = 273.9127519499114 * deg;
+    neptune.mean_anomaly = 315.8698602184478 * deg;
     neptune.parent_id = Some(sun_id);
     neptune.color = hex_to_rgb(0x3d5ef5);
     neptune.composition = PlanetComposition::IceGiant;
@@ -2217,9 +2217,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #801 — GM=1428.495 km³/s², retrograde orbit
     let mut triton = Body::new(
         0, "Triton", BodyType::Moon,
-        2.1403e22, 1.3526e6,
-        Vec3::new(4468521081.135368e3, 77602227.99822089e3, -104369247.4342077e3),
-        Vec3::new(1.104116488429909e3, 9.0521646883296e3, 2.093651644994011e3),
+        2.1402918658136437e+22, 1352600.0,
+        Vec3::new(4468521081135.368, 77602227998.22089, -104369247434.20769),
+        Vec3::new(1104.116488429909, 9052.164688329602, 2093.6516449940113),
     );
     triton.rotation_rate = -1.237e-5;
     triton.mean_surface_temperature = 38.0;
@@ -2236,9 +2236,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #802 — no GM; mass ~3.1e19 kg (estimated)
     let mut nereid = Body::new(
         0, "Nereid", BodyType::Moon,
-        3.1e19, 1.70e5,
-        Vec3::new(4466721998.629698e3, 77654770.52877851e3, -104697186.261003e3),
-        Vec3::new(1.05492366762975e3, 3.497657706565644e3, -0.1724898135491217e3),
+        3.1e19, 170000.0,
+        Vec3::new(4466721998629.697, 77654770528.77852, -104697186261.00308),
+        Vec3::new(1054.9236676297498, 3497.6577065656443, -172.4898135491216),
     );
     nereid.mean_surface_temperature = 50.0;
     nereid.seed = seed.wrapping_add(42);
@@ -2254,20 +2254,20 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #999
     let mut pluto = Body::new(
         0, "Pluto", BodyType::Planet,
-        1.307e22, 1.1883e6,
-        Vec3::new(2876454611.935341e3, -4435932980.402722e3, -357166891.4301288e3),
-        Vec3::new(4.712183799328487e3, 1.765843514620449e3, -1.541339492070124e3),
+        1.3069999999999998e+22, 1188300.0,
+        Vec3::new(2876454611935.3413, -4435932980402.723, -357166891430.12866),
+        Vec3::new(4712.183799328487, 1765.843514620449, -1541.3394920701237),
     );
     pluto.rotation_rate = -1.1386e-5;
     pluto.axial_tilt = 2.1387;
     pluto.mean_surface_temperature = 44.0;
     pluto.seed = seed.wrapping_add(50);
-    pluto.semi_major_axis = 5926960866.430534e3;
-    pluto.eccentricity = 0.2474542943747517;
-    pluto.inclination = 17.02988887116384 * deg;
-    pluto.longitude_asc_node = 110.2194291724405 * deg;
-    pluto.arg_periapsis = 114.9681379392435 * deg;
-    pluto.mean_anomaly = 51.83516638073647 * deg;
+    pluto.semi_major_axis = 5949805524558.921;
+    pluto.eccentricity = 0.249374434785719;
+    pluto.inclination = 16.9949501178648 * deg;
+    pluto.longitude_asc_node = 110.1839145902636 * deg;
+    pluto.arg_periapsis = 115.5804042048147 * deg;
+    pluto.mean_anomaly = 51.1590531539379 * deg;
     pluto.parent_id = Some(sun_id);
     pluto.color = hex_to_rgb(0xdbd3c9);
     pluto.composition = PlanetComposition::Dwarf;
@@ -2280,9 +2280,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #901 — GM=106.1 km³/s²
     let mut charon = Body::new(
         0, "Charon", BodyType::Moon,
-        1.5897e21, 6.06e5,
-        Vec3::new(2876464774.708125e3, -4435932372.040207e3, -357183633.9245892e3),
-        Vec3::new(4.596001364099314e3, 1.591573427088925e3, -1.618235636917969e3),
+        1.5896798166099818e+21, 6.06e5,
+        Vec3::new(2876464774708.1245, -4435932372040.207, -357183633924.58905),
+        Vec3::new(4596.001364099315, 1591.573427088925, -1618.2356369179686),
     );
     charon.rotation_rate = -1.139e-5;
     charon.mean_surface_temperature = 53.0;
@@ -2300,17 +2300,17 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     let mut ceres = Body::new(
         0, "Ceres", BodyType::Asteroid,
         9.393e20, 4.73e5,
-        Vec3::new(381172803.9516315e3, 192678035.3254012e3, -64122243.31556011e3),
-        Vec3::new(-8.426224419312673e3, 14.78866205551999e3, 2.020528345094608e3),
+        Vec3::new(381172803951.6316, 192678035325.40125, -64122243315.560104),
+        Vec3::new(-8426.224419312673, 14788.662055519993, 2020.5283450946074),
     );
     ceres.mean_surface_temperature = 168.0;
     ceres.seed = seed.wrapping_add(60);
-    ceres.semi_major_axis = 413721487.1842388e3;
-    ceres.eccentricity = 0.07960223186188;
-    ceres.inclination = 10.58794645426135 * deg;
-    ceres.longitude_asc_node = 80.249108694232 * deg;
-    ceres.arg_periapsis = 73.30682825990756 * deg;
-    ceres.mean_anomaly = 240.3212260946607 * deg;
+    ceres.semi_major_axis = 411538004554.0657;
+    ceres.eccentricity = 0.08216880877958072;
+    ceres.inclination = 10.59578890670587 * deg;
+    ceres.longitude_asc_node = 80.23712527448001 * deg;
+    ceres.arg_periapsis = 75.1642705049938 * deg;
+    ceres.mean_anomaly = 238.4666019918075 * deg;
     ceres.parent_id = Some(sun_id);
     ceres.color = hex_to_rgb(0x8a8a7a);
     ceres.composition = PlanetComposition::Dwarf;
@@ -2324,17 +2324,17 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     let mut pallas = Body::new(
         0, "Pallas", BodyType::Asteroid,
         2.108e20, 2.56e5,
-        Vec3::new(433537930.2825843e3, -211324380.8912392e3, 108960193.254541e3),
-        Vec3::new(5.285248956501269e3, 11.06926367069772e3, -8.12795020152019e3),
+        Vec3::new(433537930289.0228, -211324380873.61078, 108960193246.82422),
+        Vec3::new(5285.248955952197, 11069.263670969503, -8127.950201700926),
     );
     pallas.mean_surface_temperature = 164.0;
     pallas.seed = seed.wrapping_add(61);
-    pallas.semi_major_axis = 414367434.3765528e3;
-    pallas.eccentricity = 0.2306536252077891;
-    pallas.inclination = 34.92925945224728 * deg;
-    pallas.longitude_asc_node = 172.8878106903665 * deg;
-    pallas.arg_periapsis = 310.9394914426276 * deg;
-    pallas.mean_anomaly = 220.2881595791486 * deg;
+    pallas.semi_major_axis = 414115006264.7682;
+    pallas.eccentricity = 0.2316257482873376;
+    pallas.inclination = 34.91115445003978 * deg;
+    pallas.longitude_asc_node = 172.7942418556915 * deg;
+    pallas.arg_periapsis = 310.8776891229305 * deg;
+    pallas.mean_anomaly = 220.4222294580799 * deg;
     pallas.parent_id = Some(sun_id);
     pallas.color = hex_to_rgb(0x909080);
     pallas.composition = PlanetComposition::Dwarf;
@@ -2348,17 +2348,17 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     let mut vesta = Body::new(
         0, "Vesta", BodyType::Asteroid,
         2.5908e20, 2.627e5,
-        Vec3::new(164667262.8555179e3, -285020315.7647729e3, -11589457.12623374e3),
-        Vec3::new(18.37499946379189e3, 9.286427386359417e3, -2.513236585470284e3),
+        Vec3::new(164667262855.5179, -285020315764.7729, -11589457126.233732),
+        Vec3::new(18374.999463791897, 9286.427386359417, -2513.2365854702834),
     );
     vesta.mean_surface_temperature = 210.0;
     vesta.seed = seed.wrapping_add(62);
-    vesta.semi_major_axis = 353282201.3859497e3;
-    vesta.eccentricity = 0.09017810677937681;
-    vesta.inclination = 7.144045850814265 * deg;
-    vesta.longitude_asc_node = 103.7022720857349 * deg;
-    vesta.arg_periapsis = 151.5286411503499 * deg;
-    vesta.mean_anomaly = 37.95145292974541 * deg;
+    vesta.semi_major_axis = 354297814125.40295;
+    vesta.eccentricity = 0.08973505414628136;
+    vesta.inclination = 7.143023825590094 * deg;
+    vesta.longitude_asc_node = 103.6121198235115 * deg;
+    vesta.arg_periapsis = 153.2059357997306 * deg;
+    vesta.mean_anomaly = 36.47698154656908 * deg;
     vesta.parent_id = Some(sun_id);
     vesta.color = hex_to_rgb(0xb0a890);
     vesta.composition = PlanetComposition::Dwarf;
@@ -2372,16 +2372,16 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     let mut halley = Body::new(
         0, "1P/Halley", BodyType::Comet,
         2.2e14, 5.5e3,
-        Vec3::new(-2917189260.832731e3, 4103229382.979976e3, -1479132076.090842e3),
-        Vec3::new(0.8832366191099449e3, 0.300525412476204e3, 0.1957770520897246e3),
+        Vec3::new(-2917189260832.731, 4103229382979.975, -1479132076090.842),
+        Vec3::new(883.2366191099449, 300.52541247620394, 195.77705208972458),
     );
     halley.seed = seed.wrapping_add(70);
-    halley.semi_major_axis = 2671655325.504932e3;
-    halley.eccentricity = 0.9679618548754312;
-    halley.inclination = 162.1617653942714 * deg;
-    halley.longitude_asc_node = 59.49066226944706 * deg;
-    halley.arg_periapsis = 112.3892314916453 * deg;
-    halley.mean_anomaly = 190.1093625015996 * deg;
+    halley.semi_major_axis = 2672576131202.004;
+    halley.eccentricity = 0.967302714162277;
+    halley.inclination = 162.2458132943639 * deg;
+    halley.longitude_asc_node = 58.83507143810274 * deg;
+    halley.arg_periapsis = 111.7345218123615 * deg;
+    halley.mean_anomaly = 190.323016379983 * deg;
     halley.parent_id = Some(sun_id);
     halley.color = hex_to_rgb(0x505050);
     halley.albedo = 0.04;
@@ -2394,16 +2394,16 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     let mut encke = Body::new(
         0, "2P/Encke", BodyType::Comet,
         7.0e13, 2.4e3,
-        Vec3::new(559664540.5575279e3, -92060418.24731372e3, 32596024.14056076e3),
-        Vec3::new(-4.3574121049484e3, 6.892325679666753e3, 0.8601878551229647e3),
+        Vec3::new(559664540557.528, -92060418247.3137, 32596024140.560757),
+        Vec3::new(-4357.4121049484, 6892.325679666754, 860.1878551229648),
     );
     encke.seed = seed.wrapping_add(71);
-    encke.semi_major_axis = 331809068.2956051e3;
-    encke.eccentricity = 0.8472319060114437;
-    encke.inclination = 11.34666622132782 * deg;
-    encke.longitude_asc_node = 334.0167568429482 * deg;
-    encke.arg_periapsis = 187.2807694345101 * deg;
-    encke.mean_anomaly = 239.0876786799605 * deg;
+    encke.semi_major_axis = 331432607855.5415;
+    encke.eccentricity = 0.8477770617760961;
+    encke.inclination = 11.35782636520889 * deg;
+    encke.longitude_asc_node = 333.9240130727996 * deg;
+    encke.arg_periapsis = 187.3233167871771 * deg;
+    encke.mean_anomaly = 238.9905948279631 * deg;
     encke.parent_id = Some(sun_id);
     encke.color = hex_to_rgb(0x484848);
     encke.albedo = 0.05;
@@ -2414,18 +2414,18 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // ─── 67P/Churyumov-Gerasimenko ──────────────────────────────────────
     // Horizons "DES=67P;CAP" — Rosetta target, mass 9.982e12 kg
     let mut cg67p = Body::new(
-        0, "67P/C-G", BodyType::Comet,
+        0, "67P/Churyumov-Gerasimenko", BodyType::Comet,
         9.982e12, 2.0e3,
-        Vec3::new(-221673785.044727e3, -768051446.6615202e3, -32968734.40386677e3),
-        Vec3::new(8.567957552286614e3, 1.333205084611423e3, -0.2702937321244637e3),
+        Vec3::new(-221673785044.72696, -768051446661.5203, -32968734403.866802),
+        Vec3::new(8567.957552286614, 1333.205084611422, -270.29373212446376),
     );
     cg67p.seed = seed.wrapping_add(72);
-    cg67p.semi_major_axis = 517423212.7933555e3;
-    cg67p.eccentricity = 0.6496988109433209;
-    cg67p.inclination = 3.867254418089749 * deg;
-    cg67p.longitude_asc_node = 36.30454632096252 * deg;
-    cg67p.arg_periapsis = 22.22566744980207 * deg;
-    cg67p.mean_anomaly = 232.9237661694769 * deg;
+    cg67p.semi_major_axis = 518422354253.69696;
+    cg67p.eccentricity = 0.6489001989676814;
+    cg67p.inclination = 3.862608688566866 * deg;
+    cg67p.longitude_asc_node = 36.31347113311906 * deg;
+    cg67p.arg_periapsis = 22.13769776184141 * deg;
+    cg67p.mean_anomaly = 233.0329630545787 * deg;
     cg67p.parent_id = Some(sun_id);
     cg67p.color = hex_to_rgb(0x404040);
     cg67p.albedo = 0.06;
@@ -2436,18 +2436,18 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // ─── C/1995 O1 (Hale-Bopp) ─────────────────────────────────────────
     // Horizons "DES=C/1995 O1;CAP" — Great Comet, nucleus ~30 km
     let mut hale_bopp = Body::new(
-        0, "Hale-Bopp", BodyType::Comet,
+        0, "C/1995 O1 (Hale-Bopp)", BodyType::Comet,
         1.3e16, 3.0e4,
-        Vec3::new(650460388.6456269e3, -3264152766.125053e3, -6749038292.298038e3),
-        Vec3::new(0.6185915303296363e3, -3.06696975155981e3, -4.534169264860202e3),
+        Vec3::new(650460388645.627, -3264152766125.0527, -6749038292298.037),
+        Vec3::new(618.5915303296364, -3066.96975155981, -4534.169264860202),
     );
     hale_bopp.seed = seed.wrapping_add(73);
-    hale_bopp.semi_major_axis = 26950876213.25732e3;
-    hale_bopp.eccentricity = 0.9949126551461109;
-    hale_bopp.inclination = 89.76952938034762 * deg;
-    hale_bopp.longitude_asc_node = 281.7372689030623 * deg;
-    hale_bopp.arg_periapsis = 130.6503045023052 * deg;
-    hale_bopp.mean_anomaly = 4.281807099917236 * deg;
+    hale_bopp.semi_major_axis = 26822857887030.707;
+    hale_bopp.eccentricity = 0.9948750221775609;
+    hale_bopp.inclination = 89.36481974476078 * deg;
+    hale_bopp.longitude_asc_node = 282.5472614590468 * deg;
+    hale_bopp.arg_periapsis = 130.662145362621 * deg;
+    hale_bopp.mean_anomaly = 4.31405196719594 * deg;
     hale_bopp.parent_id = Some(sun_id);
     hale_bopp.color = hex_to_rgb(0x585858);
     hale_bopp.albedo = 0.04;
@@ -2460,16 +2460,16 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     let mut swift_tuttle = Body::new(
         0, "109P/Swift-Tuttle", BodyType::Comet,
         5.0e15, 1.3e4,
-        Vec3::new(-4935050362.134387e3, 2349412406.153687e3, -3279921364.912398e3),
-        Vec3::new(-2.235481933160598e3, 1.548617003034965e3, -0.6110576273988768e3),
+        Vec3::new(-4935050362134.387, 2349412406153.687, -3279921364912.3984),
+        Vec3::new(-2235.4819331605972, 1548.6170030349651, -611.0576273988768),
     );
     swift_tuttle.seed = seed.wrapping_add(74);
-    swift_tuttle.semi_major_axis = 3918227229.670524e3;
-    swift_tuttle.eccentricity = 0.9631437947859451;
-    swift_tuttle.inclination = 112.9366346623207 * deg;
-    swift_tuttle.longitude_asc_node = 139.8317494517476 * deg;
-    swift_tuttle.arg_periapsis = 153.2438145838594 * deg;
-    swift_tuttle.mean_anomaly = 88.70750514362541 * deg;
+    swift_tuttle.semi_major_axis = 3910810703533.1787;
+    swift_tuttle.eccentricity = 0.9633187058287521;
+    swift_tuttle.inclination = 113.3388731739547 * deg;
+    swift_tuttle.longitude_asc_node = 139.546578613716 * deg;
+    swift_tuttle.arg_periapsis = 153.0722754997699 * deg;
+    swift_tuttle.mean_anomaly = 89.08093528130695 * deg;
     swift_tuttle.parent_id = Some(sun_id);
     swift_tuttle.color = hex_to_rgb(0x505050);
     swift_tuttle.albedo = 0.04;
