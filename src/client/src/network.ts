@@ -32,6 +32,7 @@ export class NetworkClient {
     private pingStart = 0;
     private latency = 0;
     private latencyHistory: number[] = [];
+    private pingIntervalId: any = null;
 
     // Server state
     private serverTick = 0;
@@ -64,11 +65,21 @@ export class NetworkClient {
                 logger.info('Connected to server');
                 this.reconnecting = false;
                 this.reconnectAttempts = 0;
+                
+                // Start sending pings every 2 seconds
+                if (this.pingIntervalId !== null) clearInterval(this.pingIntervalId);
+                this.pingIntervalId = setInterval(() => this.ping(), 2000);
+                
                 resolve();
             };
 
             this.ws.onclose = () => {
                 logger.info('Disconnected from server');
+                if (this.pingIntervalId !== null) {
+                    clearInterval(this.pingIntervalId);
+                    this.pingIntervalId = null;
+                }
+                this.latency = 0;
                 this.handleDisconnect();
             };
 
