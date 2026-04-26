@@ -26,9 +26,7 @@
   },
   "optionsDefaults": {
     "showOrbitTrails": false,
-    "showStarLabels": false,
-    "showPlanetLabels": false,
-    "showMoonLabels": false,
+    "showLabels": false,
     "showAxisLines": false,
     "showRefPlane": false,
     "showRefLine": false,
