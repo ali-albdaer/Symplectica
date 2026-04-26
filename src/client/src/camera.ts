@@ -13,6 +13,7 @@ import { AU } from '../../shared/constants';
 import {
     bodySafeOrbitDistance,
     clampOrbitDistance,
+    smoothingAlphaFromDamping,
     unwrapAngle,
 } from './camera-math';
 
@@ -57,7 +58,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     // Momentum
     private azimuthVelocity = 0;
     private elevationVelocity = 0;
-    private zoomVelocity = 0;
+    private zoomTargetRadius = this.radius;
 
     // Limits
     private minRadius = 1e6;  // 1000 km
@@ -162,7 +163,8 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
 
             // Exponential zoom
             const zoomFactor = 1 + Math.sign(e.deltaY) * 0.1;
-            this.zoomVelocity = (zoomFactor - 1) * this.radius * 0.5;
+            this.zoomTargetRadius *= zoomFactor;
+            this.zoomTargetRadius = clampOrbitDistance(this.zoomTargetRadius, this.minRadius, this.maxRadius);
         }, { passive: false });
 
         // Prevent context menu
@@ -201,8 +203,8 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
                 const zoomFactor = touchStartDist / dist;
-                this.radius *= zoomFactor;
-                this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, this.radius));
+                this.zoomTargetRadius *= zoomFactor;
+                this.zoomTargetRadius = clampOrbitDistance(this.zoomTargetRadius, this.minRadius, this.maxRadius);
 
                 touchStartDist = dist;
             }
@@ -231,10 +233,11 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             this.elevationVelocity *= damping;
         }
 
-        // Apply zoom
-        this.radius += this.zoomVelocity;
+        // Apply zoom by converging to a target distance so smoothing controls duration.
+        this.zoomTargetRadius = clampOrbitDistance(this.zoomTargetRadius, this.minRadius, this.maxRadius);
+        const zoomAlpha = smoothingAlphaFromDamping(this.orbitalZoomDamping, delta);
+        this.radius += (this.zoomTargetRadius - this.radius) * zoomAlpha;
         this.radius = clampOrbitDistance(this.radius, this.minRadius, this.maxRadius);
-        this.zoomVelocity *= this.orbitalZoomDamping;
 
         this.updatePosition();
     }
@@ -276,6 +279,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
 
     setDistance(distance: number): void {
         this.radius = clampOrbitDistance(distance, this.minRadius, this.maxRadius);
+        this.zoomTargetRadius = this.radius;
         this.updatePosition();
     }
 
@@ -307,7 +311,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         this.elevation = Math.asin(clampedY);
         this.azimuthVelocity = 0;
         this.elevationVelocity = 0;
-        this.zoomVelocity = 0;
+        this.zoomTargetRadius = this.radius;
         this.updatePosition();
     }
 
@@ -388,6 +392,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         if (!Number.isFinite(distance) || distance <= 0) return;
         this.minRadius = Math.min(distance, this.maxRadius);
         this.radius = Math.max(this.radius, this.minRadius);
+        this.zoomTargetRadius = Math.max(this.zoomTargetRadius, this.minRadius);
         this.updatePosition();
     }
 
@@ -436,6 +441,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         const savedMax = this.maxRadius;
         this.maxRadius = Math.max(this.maxRadius, distance);
         this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, distance));
+        this.zoomTargetRadius = this.radius;
         this.maxRadius = savedMax;
         this.updatePosition();
     }

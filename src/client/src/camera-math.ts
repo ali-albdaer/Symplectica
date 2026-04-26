@@ -22,3 +22,9 @@ export function clampOrbitDistance(distance: number, minDistance: number, maxDis
     if (!Number.isFinite(distance)) return minDistance;
     return Math.max(minDistance, Math.min(maxDistance, distance));
 }
+
+export function smoothingAlphaFromDamping(damping: number, deltaSeconds: number): number {
+    if (!Number.isFinite(damping) || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return 1;
+    const clampedDamping = Math.max(0, Math.min(0.9999, damping));
+    return 1 - Math.pow(clampedDamping, deltaSeconds * 60);
+}

@@ -760,6 +760,7 @@ class NBodyClient {
             this.camera.setDistance(0.5 * AU);
             this.camera.setElevation(0.5);
             this.followBodyIndex = -1;
+            this.lastFollowBodyIndex = -1;
         } else if (presetId === 'sunEarthMoon') {
             this.buildMode = false;
             this.buildPanel.setBuildMode(false);
@@ -781,6 +782,8 @@ class NBodyClient {
 
         if (presetId !== 'worldBuilder') {
             this.camera.setElevation(0.5);
+            this.followBodyIndex = 0;
+            this.lastFollowBodyIndex = 0;
         }
 
         this.refreshBodies();
@@ -822,8 +825,12 @@ class NBodyClient {
                 y: cameraWorld.y - target.y,
                 z: cameraWorld.z - target.z,
             };
+            const body = this.getFollowBody(this.lastFollowBodyIndex);
             this.camera.setFreeMode(false);
             // Update camera focus to the target position before setting orbit
+            if (body) {
+                this.camera.setTrackedBodyRadius(body.radius);
+            }
             this.camera.setFocus(target.x, target.y, target.z);
             this.camera.setOrbitFromOffset(offset);
             this.followBodyIndex = this.lastFollowBodyIndex;
@@ -882,10 +889,14 @@ class NBodyClient {
             y: cameraWorld.y - target.y,
             z: cameraWorld.z - target.z,
         };
+        const body = this.getFollowBody(index);
 
         this.freeCamera = false;
         this.camera.setFreeMode(false);
         // Update camera focus to the target position before setting orbit
+        if (body) {
+            this.camera.setTrackedBodyRadius(body.radius);
+        }
         this.camera.setFocus(target.x, target.y, target.z);
         this.camera.setOrbitFromOffset(offset);
         this.followBodyIndex = index;
@@ -1076,6 +1087,7 @@ class NBodyClient {
 
     private followOrigin(): void {
         this.followBodyIndex = -1;
+        this.camera.setMinimumOrbitDistance(1);
         this.updateFollowUI();
     }
 
