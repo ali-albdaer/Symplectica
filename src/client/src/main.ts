@@ -631,6 +631,12 @@ class NBodyClient {
                 return;
             }
 
+            // Ignore OS shortcut chords (e.g. Win+Shift+S)
+            if (this.hasOsShortcutModifier(e)) {
+                this.clearMoveKeys();
+                return;
+            }
+
             // Movement keys for free and orbital camera
             if (this.setMoveKey(e.code, true)) {
                 e.preventDefault();
@@ -677,9 +683,19 @@ class NBodyClient {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
                 return;
             }
+
+            if (this.hasOsShortcutModifier(e)) {
+                this.clearMoveKeys();
+                return;
+            }
+
             if (this.setMoveKey(e.code, false)) {
                 e.preventDefault();
             }
+        });
+
+        window.addEventListener('blur', () => {
+            this.clearMoveKeys();
         });
 
         // Clicking on the canvas blurs any focused UI element
@@ -914,6 +930,16 @@ class NBodyClient {
             return true;
         }
         return false;
+    }
+
+    private clearMoveKeys(): void {
+        for (const code in this.moveKeys) {
+            this.moveKeys[code] = false;
+        }
+    }
+
+    private hasOsShortcutModifier(e: KeyboardEvent): boolean {
+        return e.metaKey || e.getModifierState('OS');
     }
 
     private toggleHints(): void {
