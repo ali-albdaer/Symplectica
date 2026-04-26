@@ -977,6 +977,8 @@ void main() {
 export class BodyRenderer {
     private scene: THREE.Scene;
     private bodies: Map<number, BodyMesh> = new Map();
+    private camera: THREE.Camera | null = null;
+    private labelContainer: HTMLElement;
 
     // Grid
     private gridGroup: THREE.Group | null = null;
@@ -1019,6 +1021,21 @@ export class BodyRenderer {
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
+        this.labelContainer = document.createElement('div');
+        this.labelContainer.id = 'body-label-container';
+        this.labelContainer.style.position = 'absolute';
+        this.labelContainer.style.top = '0';
+        this.labelContainer.style.left = '0';
+        this.labelContainer.style.width = '100%';
+        this.labelContainer.style.height = '100%';
+        this.labelContainer.style.pointerEvents = 'none';
+        this.labelContainer.style.overflow = 'hidden';
+        this.labelContainer.style.zIndex = '10';
+        document.getElementById('canvas-container')?.appendChild(this.labelContainer);
+    }
+
+    setCamera(camera: THREE.Camera): void {
+        this.camera = camera;
     }
 
     setRenderScale(scale: number): void {
@@ -1115,11 +1132,9 @@ export class BodyRenderer {
             this.scene.add(line);
         }
 
-        // Create text label sprite
-        const label = this.createLabelSprite(body.name);
-        label.visible = this.showLabels;
+        // Add body label HTML
+        const label = this.createLabelHTML(body.name, body.type);
         this.bodyLabels.set(body.id, label);
-        this.scene.add(label);
 
         // Create rotation axis arrow overlay
         const tilt = body.axialTilt ?? 0;
@@ -1217,63 +1232,23 @@ export class BodyRenderer {
         }
     }
 
-    private createLabelSprite(text: string): THREE.Sprite {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d')!;
-        canvas.width = 512;
-        canvas.height = 128;
-
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Measure text first
-        ctx.font = 'bold 36px "Segoe UI", system-ui, sans-serif';
-        const textMetrics = ctx.measureText(text);
-        const textWidth = textMetrics.width;
-
-        // Draw pill-shaped background
-        const padding = 24;
-        const bgWidth = textWidth + padding * 2;
-        const bgHeight = 56;
-        const x = (canvas.width - bgWidth) / 2;
-        const y = (canvas.height - bgHeight) / 2;
-        const radius = bgHeight / 2;
-
-        ctx.beginPath();
-        ctx.roundRect(x, y, bgWidth, bgHeight, radius);
-        ctx.fillStyle = 'rgba(10, 20, 40, 0.85)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(100, 180, 255, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Draw text with subtle shadow
-        ctx.font = 'bold 36px "Segoe UI", system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // Shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillText(text, canvas.width / 2 + 1, canvas.height / 2 + 1);
-
-        // Main text
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-
-        const material = new THREE.SpriteMaterial({
-            map: texture,
-            transparent: true,
-            depthTest: false,
-            sizeAttenuation: true,
-        });
-        const sprite = new THREE.Sprite(material);
-        // Store default scale to be adjusted per body later
-        sprite.scale.set(AU * 0.12, AU * 0.03, 1);
-        return sprite;
+    private createLabelHTML(text: string, type: string): { el: HTMLElement, type: string } {
+        const el = document.createElement('div');
+        el.className = 'body-label';
+        el.textContent = text;
+        
+        el.style.position = 'absolute';
+        el.style.color = '#ffffff';
+        el.style.fontFamily = 'system-ui, sans-serif';
+        el.style.fontSize = '12px';
+        el.style.fontWeight = '500';
+        el.style.textShadow = '0px 1px 3px rgba(0,0,0,0.8)';
+        el.style.transform = 'translate(-50%, -100%)';
+        el.style.whiteSpace = 'nowrap';
+        el.style.display = 'none';
+        
+        this.labelContainer.appendChild(el);
+        return { el, type };
     }
 
     removeBody(id: number): void {
@@ -1296,9 +1271,7 @@ export class BodyRenderer {
 
         const label = this.bodyLabels.get(id);
         if (label) {
-            this.scene.remove(label);
-            (label.material as THREE.SpriteMaterial).map?.dispose();
-            label.material.dispose();
+            this.labelContainer.removeChild(label.el);
             this.bodyLabels.delete(id);
         }
     }
@@ -1327,16 +1300,38 @@ export class BodyRenderer {
 
                 mesh.group.position.set(localX, localY, localZ);
 
-                // Update label position (offset above body)
+                // Update label position (HTML overlay)
                 const label = this.bodyLabels.get(id);
-                if (label) {
-                    // Scale label based on body visual radius for better proportions
-                    const bodyMesh = this.bodies.get(id);
-                    const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
-                    const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
-                    const labelScale = Math.max(bodyVisRadius * 0.5, AU * 0.01);
-                    label.scale.set(labelScale, labelScale * 0.25, 1);
-                    label.position.set(localX, localY + labelOffset, localZ);
+                if (label && this.camera) {
+                    const isVisible = (label.type === 'star' && this.showStarLabels) || 
+                                      (label.type === 'planet' && this.showPlanetLabels) || 
+                                      (label.type === 'moon' && this.showMoonLabels) ||
+                                      (label.type === 'player') ||
+                                      (label.type === 'comet' || label.type === 'asteroid');
+                    
+                    const actuallyVisible = isVisible && 
+                        (label.type === 'star' || label.type === 'planet' || label.type === 'moon');
+
+                    if (!actuallyVisible) {
+                        label.el.style.display = 'none';
+                    } else {
+                        const bodyVisRadius = mesh ? scaleRadius(mesh.realRadius * this.renderScale) : AU * 0.01;
+                        const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
+                        
+                        // Project 3D position to 2D screen coordinates
+                        const worldPos = new THREE.Vector3(localX, localY + labelOffset, localZ);
+                        worldPos.project(this.camera);
+                        
+                        // Check if behind camera
+                        if (worldPos.z > 1.0) {
+                            label.el.style.display = 'none';
+                        } else {
+                            label.el.style.display = 'block';
+                            const x = (worldPos.x * 0.5 + 0.5) * window.innerWidth;
+                            const y = (worldPos.y * -0.5 + 0.5) * window.innerHeight;
+                            label.el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
+                        }
+                    }
                 }
 
                 // Update orbit trail
@@ -1383,8 +1378,10 @@ export class BodyRenderer {
 
     // Visualization options
     private showOrbitTrails = true;
-    private showLabels = false;
-    private bodyLabels: Map<number, THREE.Sprite> = new Map();
+    private showStarLabels = false;
+    private showPlanetLabels = false;
+    private showMoonLabels = false;
+    private bodyLabels: Map<number, { el: HTMLElement, type: string }> = new Map();
 
     setShowAxisLines(show: boolean): void {
         this.showAxisLinesFlag = show;
@@ -1421,11 +1418,10 @@ export class BodyRenderer {
         }
     }
 
-    setShowLabels(show: boolean): void {
-        this.showLabels = show;
-        for (const label of this.bodyLabels.values()) {
-            label.visible = show;
-        }
+    setLabelOptions(showStar: boolean, showPlanet: boolean, showMoon: boolean): void {
+        this.showStarLabels = showStar;
+        this.showPlanetLabels = showPlanet;
+        this.showMoonLabels = showMoon;
     }
 
     setMaxTrailPoints(points: number): void {
