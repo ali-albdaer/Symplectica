@@ -95,7 +95,7 @@ class NBodyClient {
     private hintsVisible = true;
     private showSimulationParams = false;
     private showFollowingDetails = true;
-    private showPerfMonitor = true; // Performance monitor visible by default
+    private showPerfMonitor = false; // Performance monitor hidden by default
 
     // Performance timing (in milliseconds)
     private frameTiming = {
@@ -393,7 +393,7 @@ class NBodyClient {
 
     private applyVisualizationToRenderer(options: VisualizationOptions): void {
         this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
-        this.bodyRenderer.setShowLabels(options.showLabels);
+        this.bodyRenderer.setLabelOptions(options.showStarLabels, options.showPlanetLabels, options.showMoonLabels);
         this.bodyRenderer.setShowAxisLines(options.showAxisLines);
         this.bodyRenderer.setShowRefPlane(options.showRefPlane);
         this.bodyRenderer.setShowRefLine(options.showRefLine);
@@ -514,6 +514,7 @@ class NBodyClient {
 
         // Create body renderer
         this.bodyRenderer = new BodyRenderer(this.scene);
+        this.bodyRenderer.setCamera(this.camera);
 
         // Add seeded starfield
         this.skyRenderer = new SkyRenderer(this.scene, { seed: 42 });
@@ -558,6 +559,7 @@ class NBodyClient {
         // Clear existing bodies from renderer
         this.bodyRenderer.dispose();
         this.bodyRenderer = new BodyRenderer(this.scene);
+        this.bodyRenderer.setCamera(this.camera);
         this.applyPresetToRenderer();
 
         // Invalidate caches
@@ -670,15 +672,27 @@ class NBodyClient {
 
         this.updateSimulationSections();
         this.updateTimeScaleUI();
+
+        // Ensure performance monitor is explicitly hidden on startup
+        const perfOverlay = document.getElementById('perf-overlay');
+        if (perfOverlay) {
+            perfOverlay.style.display = this.showPerfMonitor ? 'block' : 'none';
+        }
     }
 
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
-        // Include ALL UI elements including stats-overlay, perf-overlay, etc.
-        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #opt-panel, #perf-overlay');
+        // Include ALL UI elements except perf-overlay
+        const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #opt-panel');
         uiElements.forEach(el => {
             (el as HTMLElement).style.display = this.uiHidden ? 'none' : '';
         });
+
+        // Handle perf-overlay separately based on its own state
+        const perfOverlay = document.getElementById('perf-overlay');
+        if (perfOverlay) {
+            perfOverlay.style.display = (this.uiHidden || !this.showPerfMonitor) ? 'none' : 'block';
+        }
 
         if (this.uiHidden) {
             this.buildPanel.hide();
