@@ -22,6 +22,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private radius = 3 * AU;
     private azimuth = 0;
     private elevation = Math.PI / 6;
+    private roll = 0;
 
     // Focus point (world coordinates, high precision)
     private focusX = 0;
@@ -249,11 +250,15 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         const dirZ = Math.cos(this.elevation) * Math.cos(this.azimuth);
 
         if (this.freeMode) {
+            const forward = new THREE.Vector3(dirX, dirY, dirZ).normalize();
+            const up = new THREE.Vector3(0, 1, 0).applyAxisAngle(forward, this.roll);
+
             // Free mode: camera uses explicit world position and a fixed render origin
             const renderX = this.freeX - this.freeOriginX;
             const renderY = this.freeY - this.freeOriginY;
             const renderZ = this.freeZ - this.freeOriginZ;
             this.position.set(renderX, renderY, renderZ);
+            this.up.copy(up);
             this.lookAt(renderX + dirX, renderY + dirY, renderZ + dirZ);
 
             // Floating origin is the chosen render origin
@@ -268,7 +273,11 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         const y = this.radius * Math.sin(this.elevation);
         const z = this.radius * Math.cos(this.elevation) * Math.cos(this.azimuth);
 
+        const forward = new THREE.Vector3(-x, -y, -z).normalize();
+        const up = new THREE.Vector3(0, 1, 0).applyAxisAngle(forward, this.roll);
+
         this.position.set(x, y, z);
+        this.up.copy(up);
         this.lookAt(0, 0, 0);
 
         // Update origin for floating origin system
@@ -371,6 +380,25 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     setElevation(angle: number): void {
         this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, angle));
         this.updatePosition();
+    }
+
+    nudgeOrbit(deltaAzimuth: number, deltaElevation: number): void {
+        if (this.freeMode) return;
+        if (!Number.isFinite(deltaAzimuth) || !Number.isFinite(deltaElevation)) return;
+        this.azimuth += deltaAzimuth;
+        this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation + deltaElevation));
+    }
+
+    nudgeRoll(deltaRoll: number): void {
+        if (!Number.isFinite(deltaRoll)) return;
+        this.roll += deltaRoll;
+    }
+
+    nudgeOrbitZoom(multiplier: number): void {
+        if (this.freeMode) return;
+        if (!Number.isFinite(multiplier) || multiplier <= 0) return;
+        this.zoomTargetRadius *= multiplier;
+        this.zoomTargetRadius = clampOrbitDistance(this.zoomTargetRadius, this.minRadius, this.maxRadius);
     }
 
     setFreeRotationDamping(damping: number): void {

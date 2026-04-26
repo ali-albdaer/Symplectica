@@ -131,11 +131,16 @@ class NBodyClient {
     private raycaster = new THREE.Raycaster();
     private skyRenderer!: SkyRenderer;
     private readonly initialFollowDistance = 0.020 * AU;
+    private readonly orbitalKeyRotateSpeedRadPerSec = 0.6;
+    private readonly orbitalKeyRollSpeedRadPerSec = 0.8;
+    private readonly orbitalKeyZoomRatePerSec = 2.4;
     private moveKeys: Record<string, boolean> = {
         KeyW: false,
         KeyA: false,
         KeyS: false,
         KeyD: false,
+        KeyQ: false,
+        KeyE: false,
         Space: false,
         ShiftLeft: false,
         ShiftRight: false,
@@ -626,12 +631,10 @@ class NBodyClient {
                 return;
             }
 
-            // Movement keys for free camera
+            // Movement keys for free and orbital camera
             if (this.setMoveKey(e.code, true)) {
-                if (this.freeCamera) {
-                    e.preventDefault();
-                    return;
-                }
+                e.preventDefault();
+                return;
             }
 
             switch (e.key) {
@@ -1408,6 +1411,38 @@ class NBodyClient {
         if (!this.freeCamera) {
             const target = this.getFollowTargetPosition(this.followBodyIndex);
             this.camera.setFocus(target.x, target.y, target.z);
+        }
+
+        // Keyboard fine-adjustments for orbital camera.
+        if (!this.freeCamera) {
+            let deltaAzimuth = 0;
+            let deltaElevation = 0;
+            let deltaRoll = 0;
+            const step = this.orbitalKeyRotateSpeedRadPerSec * delta;
+            const rollStep = this.orbitalKeyRollSpeedRadPerSec * delta;
+
+            if (this.moveKeys.KeyA) deltaAzimuth -= step;
+            if (this.moveKeys.KeyD) deltaAzimuth += step;
+            if (this.moveKeys.KeyW) deltaElevation += step;
+            if (this.moveKeys.KeyS) deltaElevation -= step;
+            if (this.moveKeys.KeyQ) deltaRoll += rollStep;
+            if (this.moveKeys.KeyE) deltaRoll -= rollStep;
+
+            if (deltaAzimuth !== 0 || deltaElevation !== 0) {
+                this.camera.nudgeOrbit(deltaAzimuth, deltaElevation);
+            }
+            if (deltaRoll !== 0) {
+                this.camera.nudgeRoll(deltaRoll);
+            }
+
+            if (this.moveKeys.Space) {
+                const zoomIn = Math.exp(-this.orbitalKeyZoomRatePerSec * delta);
+                this.camera.nudgeOrbitZoom(zoomIn);
+            }
+            if (this.moveKeys.ShiftLeft || this.moveKeys.ShiftRight) {
+                const zoomOut = Math.exp(this.orbitalKeyZoomRatePerSec * delta);
+                this.camera.nudgeOrbitZoom(zoomOut);
+            }
         }
 
         // Update camera
