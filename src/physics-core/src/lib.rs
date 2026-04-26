@@ -425,6 +425,18 @@ pub fn create_full_solar_system_iii_barycentric(seed: u64) -> WasmSimulation {
     WasmSimulation { inner: presets::create_full_solar_system_iii(seed, true) }
 }
 
+/// Create Full Solar System IV preset (2026 strict SSB vectors, 40 bodies)
+#[wasm_bindgen(js_name = createFullSolarSystemIV)]
+pub fn create_full_solar_system_iv(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_full_solar_system_iv(seed, false) }
+}
+
+/// Create Full Solar System IV in barycentric SSB frame
+#[wasm_bindgen(js_name = createFullSolarSystemIVBarycentric)]
+pub fn create_full_solar_system_iv_barycentric(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_full_solar_system_iv(seed, true) }
+}
+
 /// Create Playable Solar System preset (scaled distances/masses/radii)
 #[wasm_bindgen(js_name = createPlayableSolarSystem)]
 pub fn create_playable_solar_system(seed: u64) -> WasmSimulation {

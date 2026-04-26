@@ -6,6 +6,7 @@ export type PresetId =
     | 'fullSolarSystem'
     | 'fullSolarSystemII'
     | 'fullSolarSystemIII'
+    | 'fullSolarSystemIV'
     | 'playableSolarSystem'
     | 'jupiterSystem'
     | 'saturnSystem'

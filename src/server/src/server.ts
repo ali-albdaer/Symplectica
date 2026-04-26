@@ -32,6 +32,8 @@ interface PhysicsModule {
     createFullSolarSystemIIBarycentric?: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIII?: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIIIBarycentric?: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemIV?: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemIVBarycentric?: (seed: bigint) => WasmSimulation;
     createPlayableSolarSystem?: (seed: bigint) => WasmSimulation;
     createJupiterSystem?: (seed: bigint) => WasmSimulation;
     createSaturnSystem?: (seed: bigint) => WasmSimulation;
@@ -234,6 +236,14 @@ class SimulationServer {
                 this.simulation = this.physics.createFullSolarSystemIIIBarycentric(CONFIG.seed);
             } else if (typeof this.physics.createFullSolarSystemIII === 'function') {
                 this.simulation = this.physics.createFullSolarSystemIII(CONFIG.seed);
+            } else {
+                this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
+            }
+        } else if (presetId === 'fullSolarSystemIV') {
+            if (barycentric && typeof this.physics.createFullSolarSystemIVBarycentric === 'function') {
+                this.simulation = this.physics.createFullSolarSystemIVBarycentric(CONFIG.seed);
+            } else if (typeof this.physics.createFullSolarSystemIV === 'function') {
+                this.simulation = this.physics.createFullSolarSystemIV(CONFIG.seed);
             } else {
                 this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
             }

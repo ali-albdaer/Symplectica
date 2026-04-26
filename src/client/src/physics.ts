@@ -56,6 +56,8 @@ interface PhysicsModule {
     createFullSolarSystemIIBarycentric: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIII: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIIIBarycentric: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemIV: (seed: bigint) => WasmSimulation;
+    createFullSolarSystemIVBarycentric: (seed: bigint) => WasmSimulation;
     createPlayableSolarSystem: (seed: bigint) => WasmSimulation;
     createJupiterSystem: (seed: bigint) => WasmSimulation;
     createSaturnSystem: (seed: bigint) => WasmSimulation;
@@ -477,6 +479,17 @@ export class PhysicsClient {
                     this.simulation = this.module.createFullSolarSystemIII(seed);
                 } else {
                     logger.warn('Full Solar System III preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
+                }
+                break;
+            case 'fullSolarSystemIV':
+                if (barycentric && typeof this.module.createFullSolarSystemIVBarycentric === 'function') {
+                    this.simulation = this.module.createFullSolarSystemIVBarycentric(seed);
+                } else if (typeof this.module.createFullSolarSystemIV === 'function') {
+                    this.simulation = this.module.createFullSolarSystemIV(seed);
+                } else {
+                    logger.warn('Full Solar System IV preset unavailable. Falling back to Sun-Earth-Moon.');
                     this.simulation = this.module.createSunEarthMoon(seed);
                     loadedPreset = 'sunEarthMoon';
                 }

@@ -18,7 +18,8 @@ export type PresetId =
     | 'asteroidBelt'
     | 'starCluster'
     | 'stressTest'
-    | 'fullSolarSystemIII';
+    | 'fullSolarSystemIII'
+    | 'fullSolarSystemIV';
 
 export type ForceMethod = 'direct' | 'barnes-hut';
 export type SimMode = 'tick' | 'accumulator';

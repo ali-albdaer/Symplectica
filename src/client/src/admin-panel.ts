@@ -133,6 +133,7 @@ export class AdminPanel {
                             <option value="innerSolarSystem" ${APP_DEFAULTS.defaultPreset.id === 'innerSolarSystem' ? 'selected' : ''}>Inner Solar System</option>
                             <option value="fullSolarSystemII" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemII' ? 'selected' : ''}>Full Solar System II (J2000)</option>
                             <option value="fullSolarSystemIII" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemIII' ? 'selected' : ''}>Full Solar System III (2026)</option>
+                            <option value="fullSolarSystemIV" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemIV' ? 'selected' : ''}>Full Solar System IV (2026, SSB)</option>
                             <option value="playableSolarSystem">Playable Solar System</option>
                             <option value="jupiterSystem">Jupiter System</option>
                             <option value="saturnSystem">Saturn System</option>

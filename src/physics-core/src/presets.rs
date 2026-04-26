@@ -392,6 +392,81 @@ fn recenter_to_barycenter(sim: &mut Simulation) {
     }
 }
 
+/// Translate all body states by a constant position/velocity offset.
+/// Useful for switching between heliocentric and barycentric frames.
+fn translate_simulation_frame(sim: &mut Simulation, position_offset: Vec3, velocity_offset: Vec3) {
+    let body_count = sim.bodies().len();
+    for i in 0..body_count {
+        if let Some(body) = sim.get_body_mut(i as u32) {
+            body.position = body.position + position_offset;
+            body.velocity = body.velocity + velocity_offset;
+        }
+    }
+}
+
+/// Rebuild a simulation with bodies ordered by heliocentric distance.
+/// The Sun is always first; all other bodies are sorted by instantaneous
+/// distance from the Sun at epoch.
+fn reorder_by_heliocentric_distance(sim: &Simulation, seed: u64) -> Simulation {
+    let bodies = sim.bodies();
+    if bodies.is_empty() {
+        return Simulation::new(seed);
+    }
+
+    let sun_position = bodies
+        .iter()
+        .find(|b| b.name == "Sun")
+        .map(|b| b.position)
+        .unwrap_or(Vec3::ZERO);
+
+    let mut sortable: Vec<(Body, f64, u32, Option<u32>)> = bodies
+        .iter()
+        .cloned()
+        .map(|body| {
+            let old_id = body.id;
+            let old_parent = body.parent_id;
+            let distance = if body.name == "Sun" {
+                -1.0
+            } else {
+                (body.position - sun_position).length()
+            };
+            (body, distance, old_id, old_parent)
+        })
+        .collect();
+
+    sortable.sort_by(|a, b| {
+        a.1
+            .partial_cmp(&b.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.name.cmp(&b.0.name))
+    });
+
+    let mut rebuilt = Simulation::new(seed);
+    let mut id_map: std::collections::HashMap<u32, u32> =
+        std::collections::HashMap::with_capacity(sortable.len());
+    let mut parent_links: Vec<(u32, Option<u32>)> = Vec::with_capacity(sortable.len());
+
+    for (mut body, _, old_id, old_parent) in sortable {
+        body.parent_id = None;
+        let new_id = rebuilt.add_body(body);
+        id_map.insert(old_id, new_id);
+        parent_links.push((new_id, old_parent));
+    }
+
+    for (new_id, old_parent) in parent_links {
+        if let Some(parent_old_id) = old_parent {
+            if let Some(&parent_new_id) = id_map.get(&parent_old_id) {
+                if let Some(body) = rebuilt.get_body_mut(new_id) {
+                    body.parent_id = Some(parent_new_id);
+                }
+            }
+        }
+    }
+
+    rebuilt.finalize_derived();
+    rebuilt
+}
+
 /// Available preset configurations
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Preset {
@@ -405,6 +480,9 @@ pub enum Preset {
     /// Full Solar System III (2026) — JPL HORIZONS ephemeris at 2026-01-01
     /// 40 bodies: Sun, 8 planets, Pluto, 26 moons, 3 asteroids, 5 comets
     FullSolarSystemIII,
+    /// Full Solar System IV (2026) — strict HORIZONS SSB vectors at 2026-01-01
+    /// 40 bodies ordered by heliocentric distance; barycentric by default
+    FullSolarSystemIV,
     /// Playable scaled solar system (all planets + Moon)
     PlayableSolarSystem,
     /// Jupiter and its 4 Galilean moons
@@ -442,6 +520,7 @@ impl Preset {
             Preset::InnerSolarSystem => create_inner_solar_system(seed),
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, false),
             Preset::FullSolarSystemIII => create_full_solar_system_iii(seed, false),
+            Preset::FullSolarSystemIV => create_full_solar_system_iv(seed, true),
             Preset::PlayableSolarSystem => create_playable_solar_system(seed),
             Preset::JupiterSystem => create_jupiter_system(seed),
             Preset::SaturnSystem => create_saturn_system(seed),
@@ -463,6 +542,7 @@ impl Preset {
         match self {
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, true),
             Preset::FullSolarSystemIII => create_full_solar_system_iii(seed, true),
+            Preset::FullSolarSystemIV => create_full_solar_system_iv(seed, true),
             Preset::AsteroidBelt => {
                 // AsteroidBelt delegates to FSSII(barycentric=true) internally,
                 // but we recenter again to include the asteroids
@@ -2406,6 +2486,40 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     sim
 }
 
+/// Full Solar System IV — strict JPL HORIZONS SSB vectors at 2026-01-01T00:00:00.
+///
+/// Implementation strategy:
+/// - Start from Full Solar System III to preserve all curated physical properties
+///   (mass/radius placeholders, albedo, composition, atmospheres, etc.).
+/// - Apply a fixed heliocentric→SSB translation (from direct HORIZONS SSB fetch).
+/// - Rebuild body order by heliocentric distance (Sun first), so body-cycling
+///   order is deterministic and distance-sorted.
+pub fn create_full_solar_system_iv(seed: u64, barycentric: bool) -> Simulation {
+    // Full Solar System III contains the curated 40-body roster and properties.
+    let mut sim = create_full_solar_system_iii(seed, false);
+
+    // Sun state in SSB frame from direct HORIZONS query:
+    // center=500@0, epoch=2026-01-01T00:00:00, ecliptic J2000, km/s converted to SI.
+    const SUN_SSB_POS_2026: Vec3 = Vec3::new(
+        -458_863_967.403_542_1,
+        -827_774_246.990_133_5,
+        19_699_675.024_181_95,
+    );
+    const SUN_SSB_VEL_2026: Vec3 = Vec3::new(
+        12.425_057_943_606_11,
+        0.307_876_248_436_915_1,
+        -0.235_280_331_488_380_7,
+    );
+
+    if barycentric {
+        // Convert absolute states from heliocentric origin to strict SSB frame.
+        translate_simulation_frame(&mut sim, SUN_SSB_POS_2026, SUN_SSB_VEL_2026);
+    }
+
+    // Always expose IV in heliocentric-distance order for predictable cycling.
+    reorder_by_heliocentric_distance(&sim, seed)
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ASTEROID BELT PRESET
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2962,6 +3076,8 @@ mod tests {
             Preset::SunEarthMoon,
             Preset::InnerSolarSystem,
             Preset::FullSolarSystemII,
+            Preset::FullSolarSystemIII,
+            Preset::FullSolarSystemIV,
             Preset::JupiterSystem,
             Preset::SaturnSystem,
             Preset::AlphaCentauri,
