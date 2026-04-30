@@ -129,6 +129,7 @@ export class AdminPanel {
                     <div class="admin-field">
                         <label>Load Preset</label>
                         <select id="admin-preset">
+                            <option value="worldBuilder" ${APP_DEFAULTS.defaultPreset.id === 'worldBuilder' ? 'selected' : ''}>World Builder</option>
                             <option value="sunEarthMoon" ${APP_DEFAULTS.defaultPreset.id === 'sunEarthMoon' ? 'selected' : ''}>Sun-Earth-Moon</option>
                             <option value="innerSolarSystem" ${APP_DEFAULTS.defaultPreset.id === 'innerSolarSystem' ? 'selected' : ''}>Inner Solar System</option>
                             <option value="fullSolarSystemII" ${APP_DEFAULTS.defaultPreset.id === 'fullSolarSystemII' ? 'selected' : ''}>Full Solar System II (J2000)</option>
