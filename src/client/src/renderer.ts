@@ -1634,12 +1634,54 @@ export class BodyRenderer {
     }
 }
 
+// ── Star glow sphere shader ────────────────────────────────────────
+// 3D glow sphere rendered from BackSide with radial falloff.
+// Replaces billboard sprites to avoid perspective-distortion at screen edges.
+
+const STAR_GLOW_VERTEX = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_vertex>
+varying vec3 vNormal;
+varying vec3 vViewDir;
+void main() {
+    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    vNormal = normalize(normalMatrix * normal);
+    vViewDir = normalize(-mvPos.xyz);
+    gl_Position = projectionMatrix * mvPos;
+    #include <logdepthbuf_vertex>
+}
+`;
+
+const STAR_GLOW_FRAGMENT = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 u_glowColor;
+uniform float u_glowIntensity;
+varying vec3 vNormal;
+varying vec3 vViewDir;
+void main() {
+    // FrontSide: camera sees the near hemisphere.
+    // dot(N, V) ~ 1 at center (face-on), ~ 0 at silhouette edges.
+    float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
+
+    // Fresnel rim: bright at edges, transparent at center.
+    // The star mesh (inside) renders normally; the glow adds a halo at the limb.
+    float rim = pow(1.0 - mu, 3.0);          // tight bright rim
+    float soft = pow(1.0 - mu, 1.5) * 0.25;  // wider, dimmer halo
+    float alpha = (rim + soft) * u_glowIntensity;
+
+    gl_FragColor = vec4(u_glowColor * (0.8 + 0.2 * rim), alpha);
+    #include <logdepthbuf_fragment>
+}
+`;
+
 class BodyMesh {
     group: THREE.Group;
     private mesh: THREE.Mesh;
     private geometry: THREE.SphereGeometry;
     private material: THREE.Material;
     private atmosphereMesh: THREE.Mesh | null = null;
+    private glowMesh: THREE.Mesh | null = null;
     private starMaterial: THREE.ShaderMaterial | null = null;
     private granulationTexture: THREE.Texture | null = null;
     private flareSystem: StarFlareSystem | null = null;
@@ -1874,11 +1916,10 @@ class BodyMesh {
             }
         }
 
-        // Also scale glow sprites for stars
-        for (const child of this.group.children) {
-            if (child instanceof THREE.Sprite) {
-                child.scale.set(radius * 8, radius * 8, 1);
-            }
+        // Scale glow sphere for stars
+        if (this.glowMesh) {
+            const glowR = radius * 4;
+            this.glowMesh.scale.setScalar(glowR);
         }
     }
 
@@ -1890,45 +1931,26 @@ class BodyMesh {
 
     private addStarGlow(color: number, luminosity: number): void {
         // Glow intensity scales with luminosity (log, clamped)
-        const glowOpacity = Math.min(1.0, 0.3 + 0.15 * Math.log10(Math.max(luminosity, 0.01)));
+        const glowIntensity = Math.min(1.0, 0.3 + 0.15 * Math.log10(Math.max(luminosity, 0.01)));
 
-        const spriteMaterial = new THREE.SpriteMaterial({
-            map: this.createGlowTexture(),
-            color: color,
+        const c = new THREE.Color(color);
+        const glowGeo = new THREE.SphereGeometry(1, 32, 16);
+        const glowMat = new THREE.ShaderMaterial({
+            vertexShader: STAR_GLOW_VERTEX,
+            fragmentShader: STAR_GLOW_FRAGMENT,
+            uniforms: {
+                u_glowColor: { value: new THREE.Vector3(c.r, c.g, c.b) },
+                u_glowIntensity: { value: glowIntensity },
+            },
             transparent: true,
-            opacity: glowOpacity,
-            blending: THREE.AdditiveBlending,
+            side: THREE.FrontSide,
             depthWrite: false,
+            blending: THREE.AdditiveBlending,
         });
 
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(1, 1, 1); // Will be scaled by setScale
-        this.group.add(sprite);
-    }
-
-    private createGlowTexture(): THREE.Texture {
-        const size = 256;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-
-        const ctx = canvas.getContext('2d')!;
-        const gradient = ctx.createRadialGradient(
-            size / 2, size / 2, 0,
-            size / 2, size / 2, size / 2
-        );
-
-        // Neutral white gradient — colour is applied via SpriteMaterial.color
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.15, 'rgba(255, 255, 255, 0.85)');
-        gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.3)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, size, size);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
+        this.glowMesh = new THREE.Mesh(glowGeo, glowMat);
+        // Scale will be set in setScale — glow is larger than body
+        this.group.add(this.glowMesh);
     }
 
     dispose(): void {
@@ -1939,6 +1961,10 @@ class BodyMesh {
         if (this.atmosphereMesh) {
             this.atmosphereMesh.geometry.dispose();
             (this.atmosphereMesh.material as THREE.Material).dispose();
+        }
+        if (this.glowMesh) {
+            this.glowMesh.geometry.dispose();
+            (this.glowMesh.material as THREE.Material).dispose();
         }
     }
 

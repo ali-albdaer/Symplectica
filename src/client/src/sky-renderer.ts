@@ -7,7 +7,9 @@
  * 
  * Features:
  * - Seeded starfield with IMF-weighted star color distribution
- * - Configurable density, size, and opacity
+ * - Power-law brightness distribution (few bright, many dim)
+ * - Fixed-pixel-size rendering (no sizeAttenuation) to prevent flicker
+ * - Configurable density and seed
  * - Future: nebula overlays, Milky Way band
  */
 
@@ -30,13 +32,61 @@ function splitmix32(seed: number): () => number {
     };
 }
 
+// ── Starfield shaders ──
+// Fixed-pixel-size points with per-vertex color and brightness.
+// Uses gl_PointCoord for circular anti-aliased point rendering.
+
+const STARFIELD_VERTEX = /* glsl */ `
+attribute float a_brightness;
+varying vec3 vColor;
+varying float vBrightness;
+uniform float u_pixelRatio;
+uniform float u_baseSize;
+
+void main() {
+    vColor = color;
+    vBrightness = a_brightness;
+
+    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mvPos;
+
+    // Fixed pixel size — does not attenuate with distance.
+    // Bright stars get larger points; dim stars get smaller.
+    // a_brightness is in [0, 1] where 1 = brightest.
+    float size = u_baseSize * u_pixelRatio * (0.6 + 2.4 * a_brightness);
+    gl_PointSize = max(size, 0.8 * u_pixelRatio);
+}
+`;
+
+const STARFIELD_FRAGMENT = /* glsl */ `
+varying vec3 vColor;
+varying float vBrightness;
+
+void main() {
+    // Circular point with soft anti-aliased edge
+    vec2 center = gl_PointCoord - 0.5;
+    float dist = length(center) * 2.0;
+
+    // Smooth circular falloff — core is bright, edge fades
+    float alpha = 1.0 - smoothstep(0.0, 1.0, dist);
+
+    // Brightness modulates both alpha and color intensity
+    // Dim stars appear more neutral; bright stars show vivid color
+    float intensity = 0.3 + 0.7 * vBrightness;
+    vec3 col = vColor * intensity;
+
+    // Overall alpha based on brightness and circular shape
+    float finalAlpha = alpha * (0.25 + 0.75 * vBrightness);
+
+    gl_FragColor = vec4(col, finalAlpha);
+}
+`;
+
 export interface SkyRendererOptions {
-    /** Number of background stars (default: 10000) */
+    /** Number of background stars (default: 3000) */
     starCount?: number;
-    /** Visual size of star points in meters (default: 1e12) */
+    /** Base pixel size of star points (default: 1.8) */
     starSize?: number;
-    /** Opacity of the starfield (default: 0.8) */
-    opacity?: number;
     /** Seed for deterministic generation (default: 42) */
     seed?: number;
     /** Distance of the sky sphere in meters (default: 5e14 = ~3300 AU) */
@@ -44,9 +94,8 @@ export interface SkyRendererOptions {
 }
 
 const DEFAULT_OPTIONS: Required<SkyRendererOptions> = {
-    starCount: 10000,
-    starSize: 1.0e12,
-    opacity: 0.8,
+    starCount: 3600,
+    starSize: 1.8,
     seed: 42,
     skyRadius: 5e14,
 };
@@ -85,13 +134,13 @@ export class SkyRenderer {
     generate(): void {
         this.dispose();
 
-        const { starCount, starSize, opacity, seed, skyRadius } = this.options;
+        const { starCount, starSize, seed, skyRadius } = this.options;
         const count = Math.max(100, Math.round(starCount));
         const rng = splitmix32(seed);
 
         const positions = new Float32Array(count * 3);
         const colors = new Float32Array(count * 3);
-        const sizes = new Float32Array(count);
+        const brightness = new Float32Array(count);
 
         for (let i = 0; i < count; i++) {
             // Uniform distribution on sphere surface
@@ -105,31 +154,46 @@ export class SkyRenderer {
             // IMF-weighted blackbody color
             const tempK = sampleStarTemperature(rng());
             const [r, g, b] = blackbodyToRGBNorm(tempK);
-            colors[i * 3] = r;
-            colors[i * 3 + 1] = g;
-            colors[i * 3 + 2] = b;
 
-            // Apparent size: IMF-weighted magnitude variation
-            // Brighter (hotter) stars appear larger
-            const brightnessFactor = tempK > 6000 ? 1.5 : tempK > 4000 ? 1.0 : 0.6;
-            sizes[i] = (rng() * 1.5 + 0.5) * brightnessFactor;
+            // Power-law brightness distribution:
+            // Most stars are dim (apparent mag 5-6), few are bright (mag 1-2).
+            // Using cube of uniform gives a realistic long tail.
+            const rawBright = rng();
+            const bright = rawBright * rawBright * rawBright; // cube → heavy dim tail
+
+            // Modulate color by brightness:
+            // Dim stars appear more neutral (desaturated), bright stars are vivid
+            const saturation = 0.3 + 0.7 * bright;
+            const gray = (r + g + b) / 3.0;
+            colors[i * 3] = gray + (r - gray) * saturation;
+            colors[i * 3 + 1] = gray + (g - gray) * saturation;
+            colors[i * 3 + 2] = gray + (b - gray) * saturation;
+
+            brightness[i] = bright;
         }
 
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        geometry.setAttribute('a_brightness', new THREE.BufferAttribute(brightness, 1));
 
-        const material = new THREE.PointsMaterial({
-            size: starSize,
-            sizeAttenuation: true,
+        const material = new THREE.ShaderMaterial({
+            vertexShader: STARFIELD_VERTEX,
+            fragmentShader: STARFIELD_FRAGMENT,
+            uniforms: {
+                u_pixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+                u_baseSize: { value: starSize },
+            },
             vertexColors: true,
             transparent: true,
-            opacity,
+            depthTest: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
         });
 
         this.starfield = new THREE.Points(geometry, material);
         this.starfield.name = 'starfield';
+        this.starfield.frustumCulled = false;
         this.scene.add(this.starfield);
     }
 

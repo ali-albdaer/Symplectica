@@ -456,17 +456,9 @@ class NBodyClient {
         this.bodyRenderer.setSphereSegments(64 * segmentScale, 32 * segmentScale);
 
         const starParams = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'starRenderer') as {
-            starCount?: number;
-            starSize?: number;
-            starOpacity?: number;
             granulationEnabled?: boolean;
             flareQuality?: 'Off' | 'Low' | 'High' | 'Ultra';
         };
-        this.skyRenderer.setOptions({
-            starCount: starParams.starCount,
-            starSize: starParams.starSize,
-            opacity: starParams.starOpacity,
-        });
         this.bodyRenderer.setStarRenderOptions({
             granulationEnabled: typeof starParams.granulationEnabled === 'boolean'
                 ? starParams.granulationEnabled
