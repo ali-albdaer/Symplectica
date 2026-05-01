@@ -174,7 +174,6 @@ export class AdminPanel {
                             <label>Asteroids</label>
                             <input type="number" id="stress-asteroids" min="0" max="10000" step="1" value="0">
                         </div>
-                        <div class="admin-hint">Deterministic layout — same bodies every run</div>
                     </div>
                     <button class="admin-btn" id="admin-load-preset">Load Preset</button>
                 </section>
