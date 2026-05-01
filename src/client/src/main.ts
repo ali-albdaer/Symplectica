@@ -16,7 +16,7 @@ import { StatePayload } from '../../shared/protocol';
 import { PhysicsClient, BodyInfo } from './physics';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
-import { OptionsPanel, VisualizationOptions, VisualizationPresetName } from './options-panel';
+import { OptionsPanel, VisualizationOptions, VisualizationPresetName, ExperimentalOptions } from './options-panel';
 import { TimeController } from './time-controller';
 import { getWebSocketUrl } from './config';
 import { VisualPresetRegistry, VisualPresetsFile } from './visual-preset-registry';
@@ -238,7 +238,13 @@ class NBodyClient {
             (fov) => {
                 this.camera.setFov(fov);
             },
-            APP_DEFAULTS.visualPresetDefault
+            APP_DEFAULTS.visualPresetDefault,
+            (experimental: ExperimentalOptions) => {
+                this.bodyRenderer.setFlareBrightness(
+                    experimental.flaresVisible ? experimental.flareBrightness : 0
+                );
+                this.bodyRenderer.setFlareFrequencyMode(experimental.flareFrequencyMode);
+            }
         );
         this.optionsPanel.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale

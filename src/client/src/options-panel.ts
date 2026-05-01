@@ -23,6 +23,13 @@ export interface VisualizationOptions {
     orbitTrailLength: number;
 }
 
+export interface ExperimentalOptions {
+    flareFrequencyMode: 'fixed' | 'scaled';
+    flareBrightness: number;
+    flaresVisible: boolean;
+    fixedFlareRate: number; // flares per 100s sim time, 0.5–10
+}
+
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
 
 import { AU } from '../../shared/constants';
@@ -43,6 +50,7 @@ export class OptionsPanel {
     private onOrbitalRotationDampingChange?: (damping: number) => void;
     private onOrbitalZoomDampingChange?: (damping: number) => void;
     private onFovChange?: (fov: number) => void;
+    private onExperimentalChange?: (options: ExperimentalOptions) => void;
 
     // State
     private presetName: VisualizationPresetName;
@@ -54,6 +62,12 @@ export class OptionsPanel {
     private orbitalRotationDamping = APP_DEFAULTS.cameraDefaults.orbitalRotationDamping;
     private orbitalZoomDamping = APP_DEFAULTS.cameraDefaults.orbitalZoomDamping;
     private ignoreEvents = false;
+    private experimentalOptions: ExperimentalOptions = {
+        flareFrequencyMode: 'scaled',
+        flareBrightness: 1.0,
+        flaresVisible: true,
+        fixedFlareRate: 2.0,
+    };
 
     // UI Elements
     private orbitsCheckbox!: HTMLInputElement;
@@ -77,6 +91,13 @@ export class OptionsPanel {
     private refPlaneCheckbox!: HTMLInputElement;
     private refLineCheckbox!: HTMLInputElement;
     private refPointCheckbox!: HTMLInputElement;
+    private flareFrequencySelect!: HTMLSelectElement;
+    private flareBrightnessInput!: HTMLInputElement;
+    private flareBrightnessValue!: HTMLElement;
+    private flaresVisibleCheckbox!: HTMLInputElement;
+    private fixedFlareRateInput!: HTMLInputElement;
+    private fixedFlareRateValue!: HTMLElement;
+    private fixedFlareRateField!: HTMLElement;
 
     // Grid Spacing Helpers (Logarithmic)
     private sliderToSpacing(t: number): number {
@@ -121,7 +142,8 @@ export class OptionsPanel {
         onOrbitalRotationDampingChange?: (damping: number) => void,
         onOrbitalZoomDampingChange?: (damping: number) => void,
         onFovChange?: (fov: number) => void,
-        initialPreset: VisualizationPresetName = APP_DEFAULTS.visualPresetDefault
+        initialPreset: VisualizationPresetName = APP_DEFAULTS.visualPresetDefault,
+        onExperimentalChange?: (options: ExperimentalOptions) => void,
     ) {
         this.onChange = onChange;
         this.onPresetChange = onPresetChange;
@@ -132,6 +154,7 @@ export class OptionsPanel {
         this.onOrbitalRotationDampingChange = onOrbitalRotationDampingChange;
         this.onOrbitalZoomDampingChange = onOrbitalZoomDampingChange;
         this.onFovChange = onFovChange;
+        this.onExperimentalChange = onExperimentalChange;
         this.presetName = initialPreset;
         this.options = { ...DEFAULTS };
         this.container = this.createUI();
@@ -154,6 +177,7 @@ export class OptionsPanel {
             <div class="opt-tabs">
                 <button class="opt-tab active" data-tab="graphics">Graphics</button>
                 <button class="opt-tab" data-tab="camera">Camera</button>
+                <button class="opt-tab" data-tab="experimental">Experimental</button>
             </div>
 
             <div class="opt-content active" id="tab-graphics">
@@ -317,6 +341,39 @@ export class OptionsPanel {
                         <div class="opt-slider-row">
                             <input type="range" id="opt-freecam-sensitivity" min="0.1" max="2" step="0.1" value="0.3">
                             <span id="opt-freecam-sensitivity-value">0.3x</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="opt-content" id="tab-experimental" style="display: none;">
+                <section class="opt-section">
+                    <h3>Solar Flares</h3>
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-flares-visible" checked>
+                            <span>Visible</span>
+                        </label>
+                    </div>
+                    <div class="opt-field">
+                        <label>Frequency Mode</label>
+                        <select id="opt-flare-frequency">
+                            <option value="scaled">Scale with Time</option>
+                            <option value="fixed">Fixed Rate</option>
+                        </select>
+                    </div>
+                    <div class="opt-field" id="opt-fixed-rate-field" style="display: none;">
+                        <label>Fixed Rate (per 100s)</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-fixed-flare-rate" min="0.2" max="10" step="0.1" value="2">
+                            <span id="opt-fixed-flare-rate-value">2.0</span>
+                        </div>
+                    </div>
+                    <div class="opt-field">
+                        <label>Brightness</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-flare-brightness" min="0" max="3" step="0.05" value="1">
+                            <span id="opt-flare-brightness-value">1.00x</span>
                         </div>
                     </div>
                 </section>
@@ -546,6 +603,13 @@ export class OptionsPanel {
         this.orbitalZoomDampingValue = this.container.querySelector('#opt-orbital-zoom-damping-value')!;
         this.fovInput = this.container.querySelector('#opt-camera-fov')!;
         this.fovValue = this.container.querySelector('#opt-camera-fov-value')!;
+        this.flareFrequencySelect = this.container.querySelector('#opt-flare-frequency')!;
+        this.flareBrightnessInput = this.container.querySelector('#opt-flare-brightness')!;
+        this.flareBrightnessValue = this.container.querySelector('#opt-flare-brightness-value')!;
+        this.flaresVisibleCheckbox = this.container.querySelector('#opt-flares-visible')!;
+        this.fixedFlareRateInput = this.container.querySelector('#opt-fixed-flare-rate')!;
+        this.fixedFlareRateValue = this.container.querySelector('#opt-fixed-flare-rate-value')!;
+        this.fixedFlareRateField = this.container.querySelector('#opt-fixed-rate-field')!;
     }
 
     private bindEvents(): void {
@@ -714,6 +778,37 @@ export class OptionsPanel {
             this.fovValue.textContent = `${fov}°`;
             this.onFovChange?.(fov);
         });
+
+        // Experimental events
+        this.flaresVisibleCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.experimentalOptions.flaresVisible = this.flaresVisibleCheckbox.checked;
+            this.emitExperimentalChange();
+        });
+
+        this.flareFrequencySelect.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.experimentalOptions.flareFrequencyMode = this.flareFrequencySelect.value as 'fixed' | 'scaled';
+            // Show/hide fixed rate slider based on mode
+            this.fixedFlareRateField.style.display = this.experimentalOptions.flareFrequencyMode === 'fixed' ? '' : 'none';
+            this.emitExperimentalChange();
+        });
+
+        this.flareBrightnessInput.addEventListener('input', () => {
+            if (this.ignoreEvents) return;
+            const brightness = parseFloat(this.flareBrightnessInput.value);
+            this.experimentalOptions.flareBrightness = brightness;
+            this.flareBrightnessValue.textContent = `${brightness.toFixed(2)}x`;
+            this.emitExperimentalChange();
+        });
+
+        this.fixedFlareRateInput.addEventListener('input', () => {
+            if (this.ignoreEvents) return;
+            const rate = parseFloat(this.fixedFlareRateInput.value);
+            this.experimentalOptions.fixedFlareRate = rate;
+            this.fixedFlareRateValue.textContent = `${rate.toFixed(1)}`;
+            this.emitExperimentalChange();
+        });
     }
 
     private setupTabs(): void {
@@ -788,6 +883,10 @@ export class OptionsPanel {
         this.onChange({ ...this.options });
     }
 
+    private emitExperimentalChange(): void {
+        this.onExperimentalChange?.({ ...this.experimentalOptions });
+    }
+
     private syncUIFromOptions(): void {
         this.ignoreEvents = true;
 
@@ -828,6 +927,14 @@ export class OptionsPanel {
         
         this.fovInput.value = this.cameraFov.toString();
         this.fovValue.textContent = `${this.cameraFov}°`;
+
+        this.flaresVisibleCheckbox.checked = this.experimentalOptions.flaresVisible;
+        this.flareFrequencySelect.value = this.experimentalOptions.flareFrequencyMode;
+        this.flareBrightnessInput.value = this.experimentalOptions.flareBrightness.toString();
+        this.flareBrightnessValue.textContent = `${this.experimentalOptions.flareBrightness.toFixed(2)}x`;
+        this.fixedFlareRateInput.value = this.experimentalOptions.fixedFlareRate.toString();
+        this.fixedFlareRateValue.textContent = `${this.experimentalOptions.fixedFlareRate.toFixed(1)}`;
+        this.fixedFlareRateField.style.display = this.experimentalOptions.flareFrequencyMode === 'fixed' ? '' : 'none';
         
         this.ignoreEvents = false;
     }

@@ -378,6 +378,8 @@ class StarFlareSystem {
     private flareQuality: FlareQuality;
     private flareRate: number;
     private seed: number;
+    private frequencyMode: 'fixed' | 'scaled' = 'scaled';
+    private brightness = 1.0;
 
     private events: FlareEvent[] = [];
     private nextEventId = 1;
@@ -479,11 +481,16 @@ void main() {
     float y = position.y;
     float arcLen = a_shape.x;
     float arcHeight = a_shape.y * (0.35 + 0.95 * life);
-    float thickness = a_shape.z * (0.55 + 0.7 * life);
+    float baseThickness = a_shape.z * (0.55 + 0.7 * life);
+    // Taper: thick at base, thin at apex
+    float taper = 1.0 - pow(abs(x), 1.5);
+    float thickness = baseThickness * (0.3 + 0.7 * taper);
     float curve = max(0.0, 1.0 - 4.0 * x * x);
+    // Slight helical twist along arc length
+    float twist = sin(x * 3.14159 * 2.0 + a_phase * 6.28) * 0.03 * arcHeight;
 
     vec3 center = n * (1.015 + 0.01 * life);
-    vec3 p = center + tR * (x * arcLen) + bR * (y * thickness) + n * (curve * arcHeight);
+    vec3 p = center + tR * (x * arcLen) + bR * (y * thickness + twist) + n * (curve * arcHeight);
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
@@ -509,6 +516,7 @@ uniform float u_time;
 uniform vec3 u_coreColor;
 uniform vec3 u_glowColor;
 uniform float u_animStrength;
+uniform float u_brightness;
 
 void main() {
     float edge = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
@@ -521,7 +529,7 @@ void main() {
     vec3 col = mix(u_glowColor, u_coreColor, core);
     float front = smoothstep(-0.18, 0.06, vFacing);
     float alpha = edge * vLife * (0.25 * outer + 0.85 * core) * front;
-    gl_FragColor = vec4(col * intensity, alpha);
+    gl_FragColor = vec4(col * intensity * u_brightness, alpha * u_brightness);
 }
 `,
             uniforms: {
@@ -529,6 +537,7 @@ void main() {
                 u_coreColor: { value: coreColor },
                 u_glowColor: { value: glowColor },
                 u_animStrength: { value: 0.75 },
+                u_brightness: { value: 1.0 },
             },
             transparent: true,
             blending: THREE.AdditiveBlending,
@@ -618,6 +627,7 @@ uniform float u_time;
 uniform vec3 u_coreColor;
 uniform vec3 u_glowColor;
 uniform float u_animStrength;
+uniform float u_brightness;
 
 void main() {
     vec2 p = vUv - 0.5;
@@ -630,7 +640,7 @@ void main() {
     vec3 col = mix(u_glowColor, u_coreColor, core);
     float front = smoothstep(-0.18, 0.06, vFacing);
     float alpha = vLife * (0.4 * halo + 0.8 * core) * (1.0 - smoothstep(0.85, 1.0, r)) * front;
-    gl_FragColor = vec4(col * intensity, alpha);
+    gl_FragColor = vec4(col * intensity * u_brightness, alpha * u_brightness);
 }
 `,
             uniforms: {
@@ -638,6 +648,7 @@ void main() {
                 u_coreColor: { value: coreColor },
                 u_glowColor: { value: glowColor },
                 u_animStrength: { value: 0.75 },
+                u_brightness: { value: 1.0 },
             },
             transparent: true,
             blending: THREE.AdditiveBlending,
@@ -765,6 +776,27 @@ void main() {
         }
     }
 
+    /** Flare frequency mode: 'fixed' = constant visual rate, 'scaled' = scales with sim time */
+    setFrequencyMode(mode: 'fixed' | 'scaled'): void {
+        this.frequencyMode = mode;
+    }
+
+    getFrequencyMode(): 'fixed' | 'scaled' {
+        return this.frequencyMode;
+    }
+
+    /** Brightness multiplier for flares (0 = hidden, 1 = default, 2 = bright) */
+    setBrightness(brightness: number): void {
+        this.brightness = Math.max(0, Math.min(3, brightness));
+        const b = this.brightness;
+        this.arcMaterial.uniforms.u_brightness.value = b;
+        this.glowMaterial.uniforms.u_brightness.value = b;
+    }
+
+    getBrightness(): number {
+        return this.brightness;
+    }
+
     setFlareRate(rate: number): void {
         this.flareRate = Math.max(0, rate);
     }
@@ -815,8 +847,13 @@ void main() {
             : this.flareQuality === 'High'
                 ? 1 / 150
                 : 1 / 95;
-        // TEMP TEST TUNING: 10x flare frequency for quick visual validation
-        return Math.min(0.8, (baseline + this.flareRate * 90.0) * 10.0);
+        // Physics flareRate is ~1e-5 /s for the Sun.
+        // Scale so the Sun produces ~1 visual flare per 60-120s of sim time.
+        // In 'fixed' mode, ignore physics rate and use only baseline.
+        const physicsContribution = this.frequencyMode === 'fixed'
+            ? 0
+            : this.flareRate * 5000.0;
+        return Math.min(0.5, baseline + physicsContribution);
     }
 
     private spawnEvent(startTime: number): void {
@@ -1072,6 +1109,18 @@ export class BodyRenderer {
             mesh.setGranulationEnabled(nextGranulationEnabled);
             mesh.setStarspotsEnabled(nextStarspotsEnabled);
             mesh.setFlareQuality(nextFlareQuality);
+        }
+    }
+
+    setFlareFrequencyMode(mode: 'fixed' | 'scaled'): void {
+        for (const mesh of this.bodies.values()) {
+            mesh.setFlareFrequencyMode(mode);
+        }
+    }
+
+    setFlareBrightness(brightness: number): void {
+        for (const mesh of this.bodies.values()) {
+            mesh.setFlareBrightness(brightness);
         }
     }
 
@@ -1634,54 +1683,12 @@ export class BodyRenderer {
     }
 }
 
-// ── Star glow sphere shader ────────────────────────────────────────
-// 3D glow sphere rendered from BackSide with radial falloff.
-// Replaces billboard sprites to avoid perspective-distortion at screen edges.
-
-const STAR_GLOW_VERTEX = /* glsl */ `
-#include <common>
-#include <logdepthbuf_pars_vertex>
-varying vec3 vNormal;
-varying vec3 vViewDir;
-void main() {
-    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-    vNormal = normalize(normalMatrix * normal);
-    vViewDir = normalize(-mvPos.xyz);
-    gl_Position = projectionMatrix * mvPos;
-    #include <logdepthbuf_vertex>
-}
-`;
-
-const STAR_GLOW_FRAGMENT = /* glsl */ `
-#include <common>
-#include <logdepthbuf_pars_fragment>
-uniform vec3 u_glowColor;
-uniform float u_glowIntensity;
-varying vec3 vNormal;
-varying vec3 vViewDir;
-void main() {
-    // FrontSide: camera sees the near hemisphere.
-    // dot(N, V) ~ 1 at center (face-on), ~ 0 at silhouette edges.
-    float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
-
-    // Fresnel rim: bright at edges, transparent at center.
-    // The star mesh (inside) renders normally; the glow adds a halo at the limb.
-    float rim = pow(1.0 - mu, 3.0);          // tight bright rim
-    float soft = pow(1.0 - mu, 1.5) * 0.25;  // wider, dimmer halo
-    float alpha = (rim + soft) * u_glowIntensity;
-
-    gl_FragColor = vec4(u_glowColor * (0.8 + 0.2 * rim), alpha);
-    #include <logdepthbuf_fragment>
-}
-`;
-
 class BodyMesh {
     group: THREE.Group;
     private mesh: THREE.Mesh;
     private geometry: THREE.SphereGeometry;
     private material: THREE.Material;
     private atmosphereMesh: THREE.Mesh | null = null;
-    private glowMesh: THREE.Mesh | null = null;
     private starMaterial: THREE.ShaderMaterial | null = null;
     private granulationTexture: THREE.Texture | null = null;
     private flareSystem: StarFlareSystem | null = null;
@@ -1897,6 +1904,14 @@ class BodyMesh {
         this.flareSystem?.setQuality(quality);
     }
 
+    setFlareFrequencyMode(mode: 'fixed' | 'scaled'): void {
+        this.flareSystem?.setFrequencyMode(mode);
+    }
+
+    setFlareBrightness(brightness: number): void {
+        this.flareSystem?.setBrightness(brightness);
+    }
+
     setScale(radius: number): void {
         // F2: Apply oblateness — compress along local Y (pole axis)
         if (this.oblateness > 0.001) {
@@ -1916,10 +1931,11 @@ class BodyMesh {
             }
         }
 
-        // Scale glow sphere for stars
-        if (this.glowMesh) {
-            const glowR = radius * 4;
-            this.glowMesh.scale.setScalar(glowR);
+        // Also scale glow sprites for stars
+        for (const child of this.group.children) {
+            if (child instanceof THREE.Sprite) {
+                child.scale.set(radius * 8, radius * 8, 1);
+            }
         }
     }
 
@@ -1931,26 +1947,45 @@ class BodyMesh {
 
     private addStarGlow(color: number, luminosity: number): void {
         // Glow intensity scales with luminosity (log, clamped)
-        const glowIntensity = Math.min(1.0, 0.3 + 0.15 * Math.log10(Math.max(luminosity, 0.01)));
+        const glowOpacity = Math.min(1.0, 0.3 + 0.15 * Math.log10(Math.max(luminosity, 0.01)));
 
-        const c = new THREE.Color(color);
-        const glowGeo = new THREE.SphereGeometry(1, 32, 16);
-        const glowMat = new THREE.ShaderMaterial({
-            vertexShader: STAR_GLOW_VERTEX,
-            fragmentShader: STAR_GLOW_FRAGMENT,
-            uniforms: {
-                u_glowColor: { value: new THREE.Vector3(c.r, c.g, c.b) },
-                u_glowIntensity: { value: glowIntensity },
-            },
+        const spriteMaterial = new THREE.SpriteMaterial({
+            map: this.createGlowTexture(),
+            color: color,
             transparent: true,
-            side: THREE.FrontSide,
-            depthWrite: false,
+            opacity: glowOpacity,
             blending: THREE.AdditiveBlending,
+            depthWrite: false,
         });
 
-        this.glowMesh = new THREE.Mesh(glowGeo, glowMat);
-        // Scale will be set in setScale — glow is larger than body
-        this.group.add(this.glowMesh);
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(1, 1, 1); // Will be scaled by setScale
+        this.group.add(sprite);
+    }
+
+    private createGlowTexture(): THREE.Texture {
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx = canvas.getContext('2d')!;
+        const gradient = ctx.createRadialGradient(
+            size / 2, size / 2, 0,
+            size / 2, size / 2, size / 2
+        );
+
+        // Neutral white gradient — colour is applied via SpriteMaterial.color
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.15, 'rgba(255, 255, 255, 0.85)');
+        gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.3)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        return texture;
     }
 
     dispose(): void {
@@ -1961,10 +1996,6 @@ class BodyMesh {
         if (this.atmosphereMesh) {
             this.atmosphereMesh.geometry.dispose();
             (this.atmosphereMesh.material as THREE.Material).dispose();
-        }
-        if (this.glowMesh) {
-            this.glowMesh.geometry.dispose();
-            (this.glowMesh.material as THREE.Material).dispose();
         }
     }
 
