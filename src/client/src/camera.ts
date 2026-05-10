@@ -55,6 +55,8 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private lastMouseX = 0;
     private lastMouseY = 0;
     private isRightDrag = false;
+    private lastDragMoveTime = 0;
+    private readonly dragMomentumCutoffMs = 120;
 
     // Momentum
     private azimuthVelocity = 0;
@@ -102,6 +104,9 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             this.isRightDrag = e.button === 2;
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
+            this.lastDragMoveTime = performance.now();
+            this.azimuthVelocity = 0;
+            this.elevationVelocity = 0;
             e.preventDefault();
         });
 
@@ -147,6 +152,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
             }
 
+            this.lastDragMoveTime = performance.now();
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
         });
@@ -188,6 +194,9 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 this.isDragging = true;
                 this.lastMouseX = e.touches[0].clientX;
                 this.lastMouseY = e.touches[0].clientY;
+                this.lastDragMoveTime = performance.now();
+                this.azimuthVelocity = 0;
+                this.elevationVelocity = 0;
             } else if (e.touches.length === 2) {
                 const dx = e.touches[1].clientX - e.touches[0].clientX;
                 const dy = e.touches[1].clientY - e.touches[0].clientY;
@@ -205,6 +214,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 this.elevation += deltaY * sensitivity;
                 this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
 
+                this.lastDragMoveTime = performance.now();
                 this.lastMouseX = e.touches[0].clientX;
                 this.lastMouseY = e.touches[0].clientY;
             } else if (e.touches.length === 2) {
@@ -237,7 +247,13 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
 
     update(delta: number): void {
         // Apply momentum
-        if (!this.isDragging) {
+        if (this.isDragging) {
+            const idleMs = performance.now() - this.lastDragMoveTime;
+            if (idleMs > this.dragMomentumCutoffMs) {
+                this.azimuthVelocity = 0;
+                this.elevationVelocity = 0;
+            }
+        } else {
             this.azimuth += this.azimuthVelocity * delta * 60;
             this.elevation += this.elevationVelocity * delta * 60;
             this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
