@@ -323,8 +323,8 @@ export class OptionsPanel {
                     <div class="opt-field">
                         <label>Rotation Smoothing</label>
                         <div class="opt-slider-row">
-                            <input type="range" id="opt-freecam-rotation-damping" min="0.5" max="0.99" step="0.01" value="0.92">
-                            <span id="opt-freecam-rotation-damping-value">92%</span>
+                            <input type="range" id="opt-freecam-rotation-damping" min="0" max="0.99" step="0.01" value="0">
+                            <span id="opt-freecam-rotation-damping-value">0%</span>
                         </div>
                     </div>
 

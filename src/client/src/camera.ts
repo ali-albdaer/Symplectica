@@ -113,12 +113,16 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         canvas.addEventListener('mousemove', (e: MouseEvent) => {
             if (this.freeMode && this.pointerLocked) {
                 const sensitivity = 0.002 * this.freeLookSensitivity;
-                this.azimuthVelocity = -e.movementX * sensitivity;
-                this.elevationVelocity = -e.movementY * sensitivity;
-
-                this.azimuth += this.azimuthVelocity;
-                this.elevation += this.elevationVelocity;
-                this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
+                if (this.freeRotationDamping <= 0) {
+                    this.azimuth += -e.movementX * sensitivity;
+                    this.elevation += -e.movementY * sensitivity;
+                    this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
+                    this.azimuthVelocity = 0;
+                    this.elevationVelocity = 0;
+                } else {
+                    this.azimuthVelocity += -e.movementX * sensitivity;
+                    this.elevationVelocity += -e.movementY * sensitivity;
+                }
                 return;
             }
 
@@ -247,7 +251,19 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
 
     update(delta: number): void {
         // Apply momentum
-        if (this.isDragging) {
+        if (this.freeMode) {
+            if (this.freeRotationDamping <= 0) {
+                this.azimuthVelocity = 0;
+                this.elevationVelocity = 0;
+            } else {
+                this.azimuth += this.azimuthVelocity * delta * 60;
+                this.elevation += this.elevationVelocity * delta * 60;
+                this.elevation = Math.max(this.minElevation, Math.min(this.maxElevation, this.elevation));
+
+                this.azimuthVelocity *= this.freeRotationDamping;
+                this.elevationVelocity *= this.freeRotationDamping;
+            }
+        } else if (this.isDragging) {
             const idleMs = performance.now() - this.lastDragMoveTime;
             if (idleMs > this.dragMomentumCutoffMs) {
                 this.azimuthVelocity = 0;
