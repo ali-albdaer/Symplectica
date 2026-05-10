@@ -47,6 +47,10 @@ export class OptionsPanel {
     private onFreeCamSpeedChange?: (speed: number) => void;
     private onFreeCamSensitivityChange?: (sensitivity: number) => void;
     private onFreeCamRotationDampingChange?: (damping: number) => void;
+    private onSurfaceSpeedChange?: (speed: number) => void;
+    private onSurfaceSensitivityChange?: (sensitivity: number) => void;
+    private onSurfaceRotationDampingChange?: (damping: number) => void;
+    private onSurfaceEyeHeightChange?: (height: number) => void;
     private onOrbitalRotationDampingChange?: (damping: number) => void;
     private onOrbitalZoomDampingChange?: (damping: number) => void;
     private onFovChange?: (fov: number) => void;
@@ -59,6 +63,10 @@ export class OptionsPanel {
     private freeCamSpeed = APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec;
     private freeCamSensitivity = APP_DEFAULTS.cameraDefaults.freeCamSensitivity;
     private freeCamRotationDamping = APP_DEFAULTS.cameraDefaults.freeCamRotationDamping;
+    private surfaceSpeed = APP_DEFAULTS.cameraDefaults.surfaceSpeedMps;
+    private surfaceSensitivity = APP_DEFAULTS.cameraDefaults.surfaceSensitivity;
+    private surfaceRotationDamping = APP_DEFAULTS.cameraDefaults.surfaceRotationDamping;
+    private surfaceEyeHeight = APP_DEFAULTS.cameraDefaults.surfaceEyeHeightM;
     private orbitalRotationDamping = APP_DEFAULTS.cameraDefaults.orbitalRotationDamping;
     private orbitalZoomDamping = APP_DEFAULTS.cameraDefaults.orbitalZoomDamping;
     private ignoreEvents = false;
@@ -125,6 +133,14 @@ export class OptionsPanel {
     private freeCamSensitivityValue!: HTMLElement;
     private freeCamRotationDampingInput!: HTMLInputElement;
     private freeCamRotationDampingValue!: HTMLElement;
+    private surfaceSpeedInput!: HTMLInputElement;
+    private surfaceSpeedValue!: HTMLElement;
+    private surfaceSensitivityInput!: HTMLInputElement;
+    private surfaceSensitivityValue!: HTMLElement;
+    private surfaceRotationDampingInput!: HTMLInputElement;
+    private surfaceRotationDampingValue!: HTMLElement;
+    private surfaceEyeHeightInput!: HTMLInputElement;
+    private surfaceEyeHeightValue!: HTMLElement;
     private orbitalRotationDampingInput!: HTMLInputElement;
     private orbitalRotationDampingValue!: HTMLElement;
     private orbitalZoomDampingInput!: HTMLInputElement;
@@ -139,6 +155,10 @@ export class OptionsPanel {
         onFreeCamSpeedChange?: (speed: number) => void,
         onFreeCamSensitivityChange?: (sensitivity: number) => void,
         onFreeCamRotationDampingChange?: (damping: number) => void,
+        onSurfaceSpeedChange?: (speed: number) => void,
+        onSurfaceSensitivityChange?: (sensitivity: number) => void,
+        onSurfaceRotationDampingChange?: (damping: number) => void,
+        onSurfaceEyeHeightChange?: (height: number) => void,
         onOrbitalRotationDampingChange?: (damping: number) => void,
         onOrbitalZoomDampingChange?: (damping: number) => void,
         onFovChange?: (fov: number) => void,
@@ -151,6 +171,10 @@ export class OptionsPanel {
         this.onFreeCamSpeedChange = onFreeCamSpeedChange;
         this.onFreeCamSensitivityChange = onFreeCamSensitivityChange;
         this.onFreeCamRotationDampingChange = onFreeCamRotationDampingChange;
+        this.onSurfaceSpeedChange = onSurfaceSpeedChange;
+        this.onSurfaceSensitivityChange = onSurfaceSensitivityChange;
+        this.onSurfaceRotationDampingChange = onSurfaceRotationDampingChange;
+        this.onSurfaceEyeHeightChange = onSurfaceEyeHeightChange;
         this.onOrbitalRotationDampingChange = onOrbitalRotationDampingChange;
         this.onOrbitalZoomDampingChange = onOrbitalZoomDampingChange;
         this.onFovChange = onFovChange;
@@ -341,6 +365,41 @@ export class OptionsPanel {
                         <div class="opt-slider-row">
                             <input type="range" id="opt-freecam-sensitivity" min="0.1" max="2" step="0.1" value="0.3">
                             <span id="opt-freecam-sensitivity-value">0.3x</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="opt-section">
+                    <h3>Surface Camera Settings</h3>
+                    <div class="opt-field">
+                        <label>Rotation Smoothing</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-surface-rotation-damping" min="0" max="0.99" step="0.01" value="0">
+                            <span id="opt-surface-rotation-damping-value">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="opt-field">
+                        <label>Speed (m/s)</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-surface-speed" min="0" max="50" step="0.5" value="5">
+                            <span id="opt-surface-speed-value">5.0 m/s</span>
+                        </div>
+                    </div>
+
+                    <div class="opt-field">
+                        <label>Sensitivity</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-surface-sensitivity" min="0.1" max="2" step="0.1" value="0.3">
+                            <span id="opt-surface-sensitivity-value">0.3x</span>
+                        </div>
+                    </div>
+
+                    <div class="opt-field">
+                        <label>Eye Height (m)</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-surface-eye-height" min="0.5" max="5" step="0.1" value="1.7">
+                            <span id="opt-surface-eye-height-value">1.7 m</span>
                         </div>
                     </div>
                 </section>
@@ -597,6 +656,14 @@ export class OptionsPanel {
         this.freeCamSensitivityValue = this.container.querySelector('#opt-freecam-sensitivity-value')!;
         this.freeCamRotationDampingInput = this.container.querySelector('#opt-freecam-rotation-damping')!;
         this.freeCamRotationDampingValue = this.container.querySelector('#opt-freecam-rotation-damping-value')!;
+        this.surfaceSpeedInput = this.container.querySelector('#opt-surface-speed')!;
+        this.surfaceSpeedValue = this.container.querySelector('#opt-surface-speed-value')!;
+        this.surfaceSensitivityInput = this.container.querySelector('#opt-surface-sensitivity')!;
+        this.surfaceSensitivityValue = this.container.querySelector('#opt-surface-sensitivity-value')!;
+        this.surfaceRotationDampingInput = this.container.querySelector('#opt-surface-rotation-damping')!;
+        this.surfaceRotationDampingValue = this.container.querySelector('#opt-surface-rotation-damping-value')!;
+        this.surfaceEyeHeightInput = this.container.querySelector('#opt-surface-eye-height')!;
+        this.surfaceEyeHeightValue = this.container.querySelector('#opt-surface-eye-height-value')!;
         this.orbitalRotationDampingInput = this.container.querySelector('#opt-orbital-rotation-damping')!;
         this.orbitalRotationDampingValue = this.container.querySelector('#opt-orbital-rotation-damping-value')!;
         this.orbitalZoomDampingInput = this.container.querySelector('#opt-orbital-zoom-damping')!;
@@ -756,6 +823,34 @@ export class OptionsPanel {
             this.freeCamRotationDamping = damping;
             this.freeCamRotationDampingValue.textContent = `${Math.round(damping * 100)}%`;
             this.onFreeCamRotationDampingChange?.(damping);
+        });
+
+        this.surfaceSpeedInput.addEventListener('input', () => {
+            const speed = parseFloat(this.surfaceSpeedInput.value);
+            this.surfaceSpeed = speed;
+            this.surfaceSpeedValue.textContent = `${speed.toFixed(1)} m/s`;
+            this.onSurfaceSpeedChange?.(speed);
+        });
+
+        this.surfaceSensitivityInput.addEventListener('input', () => {
+            const sensitivity = parseFloat(this.surfaceSensitivityInput.value);
+            this.surfaceSensitivity = sensitivity;
+            this.surfaceSensitivityValue.textContent = `${sensitivity.toFixed(1)}x`;
+            this.onSurfaceSensitivityChange?.(sensitivity);
+        });
+
+        this.surfaceRotationDampingInput.addEventListener('input', () => {
+            const damping = parseFloat(this.surfaceRotationDampingInput.value);
+            this.surfaceRotationDamping = damping;
+            this.surfaceRotationDampingValue.textContent = `${Math.round(damping * 100)}%`;
+            this.onSurfaceRotationDampingChange?.(damping);
+        });
+
+        this.surfaceEyeHeightInput.addEventListener('input', () => {
+            const height = parseFloat(this.surfaceEyeHeightInput.value);
+            this.surfaceEyeHeight = height;
+            this.surfaceEyeHeightValue.textContent = `${height.toFixed(1)} m`;
+            this.onSurfaceEyeHeightChange?.(height);
         });
 
         this.orbitalRotationDampingInput.addEventListener('input', () => {
@@ -920,6 +1015,14 @@ export class OptionsPanel {
         this.freeCamSensitivityValue.textContent = `${this.freeCamSensitivity.toFixed(1)}x`;
         this.freeCamRotationDampingInput.value = this.freeCamRotationDamping.toString();
         this.freeCamRotationDampingValue.textContent = `${Math.round(this.freeCamRotationDamping * 100)}%`;
+        this.surfaceSpeedInput.value = this.surfaceSpeed.toString();
+        this.surfaceSpeedValue.textContent = `${this.surfaceSpeed.toFixed(1)} m/s`;
+        this.surfaceSensitivityInput.value = this.surfaceSensitivity.toString();
+        this.surfaceSensitivityValue.textContent = `${this.surfaceSensitivity.toFixed(1)}x`;
+        this.surfaceRotationDampingInput.value = this.surfaceRotationDamping.toString();
+        this.surfaceRotationDampingValue.textContent = `${Math.round(this.surfaceRotationDamping * 100)}%`;
+        this.surfaceEyeHeightInput.value = this.surfaceEyeHeight.toString();
+        this.surfaceEyeHeightValue.textContent = `${this.surfaceEyeHeight.toFixed(1)} m`;
         this.orbitalRotationDampingInput.value = this.orbitalRotationDamping.toString();
         this.orbitalRotationDampingValue.textContent = `${Math.round(this.orbitalRotationDamping * 100)}%`;
         this.orbitalZoomDampingInput.value = this.orbitalZoomDamping.toString();
@@ -995,6 +1098,30 @@ export class OptionsPanel {
         this.freeCamRotationDamping = damping;
         this.freeCamRotationDampingInput.value = damping.toString();
         this.freeCamRotationDampingValue.textContent = `${Math.round(damping * 100)}%`;
+    }
+
+    setSurfaceSpeed(speed: number): void {
+        this.surfaceSpeed = speed;
+        this.surfaceSpeedInput.value = speed.toString();
+        this.surfaceSpeedValue.textContent = `${speed.toFixed(1)} m/s`;
+    }
+
+    setSurfaceSensitivity(sensitivity: number): void {
+        this.surfaceSensitivity = sensitivity;
+        this.surfaceSensitivityInput.value = sensitivity.toString();
+        this.surfaceSensitivityValue.textContent = `${sensitivity.toFixed(1)}x`;
+    }
+
+    setSurfaceRotationDamping(damping: number): void {
+        this.surfaceRotationDamping = damping;
+        this.surfaceRotationDampingInput.value = damping.toString();
+        this.surfaceRotationDampingValue.textContent = `${Math.round(damping * 100)}%`;
+    }
+
+    setSurfaceEyeHeight(height: number): void {
+        this.surfaceEyeHeight = height;
+        this.surfaceEyeHeightInput.value = height.toString();
+        this.surfaceEyeHeightValue.textContent = `${height.toFixed(1)} m`;
     }
 
     setOrbitalRotationDamping(damping: number): void {

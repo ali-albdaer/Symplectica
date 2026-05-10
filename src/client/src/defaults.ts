@@ -78,6 +78,10 @@ export interface AppDefaults {
         freeCamSpeedAuPerSec: number;
         freeCamSensitivity: number;
         freeCamRotationDamping: number;
+        surfaceSpeedMps: number;
+        surfaceSensitivity: number;
+        surfaceRotationDamping: number;
+        surfaceEyeHeightM: number;
         orbitalRotationDamping: number;
         orbitalZoomDamping: number;
     };

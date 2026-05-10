@@ -127,6 +127,12 @@ class NBodyClient {
     private freeCamRotationDamping = APP_DEFAULTS.cameraDefaults.freeCamRotationDamping;
     private orbitalRotationDamping = APP_DEFAULTS.cameraDefaults.orbitalRotationDamping;
     private orbitalZoomDamping = APP_DEFAULTS.cameraDefaults.orbitalZoomDamping;
+    private surfaceCamera = false;
+    private surfaceBodyIndex = -1;
+    private surfaceSpeedMps = APP_DEFAULTS.cameraDefaults.surfaceSpeedMps;
+    private surfaceSensitivity = APP_DEFAULTS.cameraDefaults.surfaceSensitivity;
+    private surfaceRotationDamping = APP_DEFAULTS.cameraDefaults.surfaceRotationDamping;
+    private surfaceEyeHeightM = APP_DEFAULTS.cameraDefaults.surfaceEyeHeightM;
     private freeCamCrosshair: HTMLElement | null = null;
     private raycaster = new THREE.Raycaster();
     private skyRenderer!: SkyRenderer;
@@ -227,6 +233,21 @@ class NBodyClient {
                 this.freeCamRotationDamping = damping;
                 this.camera.setFreeRotationDamping(damping);
             },
+            (speed) => {
+                this.surfaceSpeedMps = speed;
+            },
+            (sensitivity) => {
+                this.surfaceSensitivity = sensitivity;
+                this.camera.setSurfaceLookSensitivity(sensitivity);
+            },
+            (damping) => {
+                this.surfaceRotationDamping = damping;
+                this.camera.setSurfaceRotationDamping(damping);
+            },
+            (height) => {
+                this.surfaceEyeHeightM = height;
+                this.camera.setSurfaceEyeHeight(height);
+            },
             (damping) => {
                 this.orbitalRotationDamping = damping;
                 this.camera.setOrbitalRotationDamping(damping);
@@ -252,10 +273,17 @@ class NBodyClient {
         this.optionsPanel.setFreeCamSpeed(APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec);
         this.optionsPanel.setFreeCamSensitivity(APP_DEFAULTS.cameraDefaults.freeCamSensitivity);
         this.optionsPanel.setFreeCamRotationDamping(APP_DEFAULTS.cameraDefaults.freeCamRotationDamping);
+        this.optionsPanel.setSurfaceSpeed(APP_DEFAULTS.cameraDefaults.surfaceSpeedMps);
+        this.optionsPanel.setSurfaceSensitivity(APP_DEFAULTS.cameraDefaults.surfaceSensitivity);
+        this.optionsPanel.setSurfaceRotationDamping(APP_DEFAULTS.cameraDefaults.surfaceRotationDamping);
+        this.optionsPanel.setSurfaceEyeHeight(APP_DEFAULTS.cameraDefaults.surfaceEyeHeightM);
         this.optionsPanel.setOrbitalRotationDamping(APP_DEFAULTS.cameraDefaults.orbitalRotationDamping);
         this.optionsPanel.setOrbitalZoomDamping(APP_DEFAULTS.cameraDefaults.orbitalZoomDamping);
         this.camera.setFreeLookSensitivity(APP_DEFAULTS.cameraDefaults.freeCamSensitivity);
         this.camera.setFreeRotationDamping(APP_DEFAULTS.cameraDefaults.freeCamRotationDamping);
+        this.camera.setSurfaceLookSensitivity(APP_DEFAULTS.cameraDefaults.surfaceSensitivity);
+        this.camera.setSurfaceRotationDamping(APP_DEFAULTS.cameraDefaults.surfaceRotationDamping);
+        this.camera.setSurfaceEyeHeight(APP_DEFAULTS.cameraDefaults.surfaceEyeHeightM);
         this.camera.setOrbitalRotationDamping(APP_DEFAULTS.cameraDefaults.orbitalRotationDamping);
         this.camera.setOrbitalZoomDamping(APP_DEFAULTS.cameraDefaults.orbitalZoomDamping);
 
@@ -658,6 +686,10 @@ class NBodyClient {
                 case 'C':
                     this.toggleFreeCamera();
                     break;
+                case 'v':
+                case 'V':
+                    this.toggleSurfaceCamera();
+                    break;
                 case 'n':
                 case 'N':
                     this.followNextBody();
@@ -824,6 +856,11 @@ class NBodyClient {
     private toggleFreeCamera(): void {
         this.freeCamera = !this.freeCamera;
         if (this.freeCamera) {
+            if (this.surfaceCamera) {
+                this.surfaceCamera = false;
+                this.surfaceBodyIndex = -1;
+                this.camera.setSurfaceMode(false);
+            }
             this.lastFollowBodyIndex = this.followBodyIndex;
             this.followBodyIndex = -1;
             const origin = this.resolveCameraOrigin(true);
@@ -856,6 +893,60 @@ class NBodyClient {
             this.followBodyIndex = this.lastFollowBodyIndex;
             this.setFreeCamUI(false);
         }
+        this.updateFollowUI();
+    }
+
+    private toggleSurfaceCamera(): void {
+        if (this.surfaceCamera) {
+            const cameraWorld = this.camera.getCameraWorldPosition();
+            const target = this.getFollowTargetPosition(this.surfaceBodyIndex);
+            const offset = {
+                x: cameraWorld.x - target.x,
+                y: cameraWorld.y - target.y,
+                z: cameraWorld.z - target.z,
+            };
+            const body = this.getFollowBody(this.surfaceBodyIndex);
+
+            this.surfaceCamera = false;
+            this.surfaceBodyIndex = -1;
+            this.camera.setSurfaceMode(false);
+            if (body) {
+                this.camera.setTrackedBodyRadius(body.radius);
+            }
+            this.camera.setFocus(target.x, target.y, target.z);
+            this.camera.setOrbitFromOffset(offset);
+            this.updateFollowUI();
+            return;
+        }
+
+        const index = this.followBodyIndex >= 0 ? this.followBodyIndex : this.lastFollowBodyIndex;
+        const body = this.getFollowBody(index);
+        if (!body) return;
+
+        const target = this.getFollowTargetPosition(index);
+        const cameraWorld = this.camera.getCameraWorldPosition();
+        const forward = new THREE.Vector3();
+        this.camera.getWorldDirection(forward);
+
+        this.freeCamera = false;
+        this.camera.setFreeMode(false);
+        this.camera.setSurfaceMode(true, {
+            center: target,
+            radius: body.radius,
+            rotationRate: body.rotationRate,
+            axialTilt: body.axialTilt,
+            eyeHeight: this.surfaceEyeHeightM,
+            seedWorld: cameraWorld,
+            seedForward: { x: forward.x, y: forward.y, z: forward.z },
+        });
+        this.camera.setSurfaceLookSensitivity(this.surfaceSensitivity);
+        this.camera.setSurfaceRotationDamping(this.surfaceRotationDamping);
+
+        this.surfaceCamera = true;
+        this.surfaceBodyIndex = index;
+        this.followBodyIndex = index;
+        this.lastFollowBodyIndex = index;
+        this.setFreeCamUI(false);
         this.updateFollowUI();
     }
 
@@ -1435,13 +1526,13 @@ class NBodyClient {
         this.frameTiming.stepsThisFrame = stepsThisFrame;
 
         // Update camera focus to follow target (for orbit mode)
-        if (!this.freeCamera) {
+        if (!this.freeCamera && !this.surfaceCamera) {
             const target = this.getFollowTargetPosition(this.followBodyIndex);
             this.camera.setFocus(target.x, target.y, target.z);
         }
 
         // Keyboard fine-adjustments for orbital camera.
-        if (!this.freeCamera) {
+        if (!this.freeCamera && !this.surfaceCamera) {
             let deltaAzimuth = 0;
             let deltaElevation = 0;
             let deltaRoll = 0;
@@ -1473,6 +1564,18 @@ class NBodyClient {
         }
 
         // Update camera
+        if (this.surfaceCamera) {
+            const body = this.getFollowBody(this.surfaceBodyIndex);
+            if (body) {
+                const target = this.getFollowTargetPosition(this.surfaceBodyIndex);
+                this.camera.setSurfaceTarget({
+                    center: target,
+                    radius: body.radius,
+                    rotationRate: body.rotationRate,
+                    axialTilt: body.axialTilt,
+                });
+            }
+        }
         this.camera.update(delta);
 
         // Free camera movement (WASD + Space/Shift)
@@ -1505,10 +1608,17 @@ class NBodyClient {
                 move.normalize().multiplyScalar(step);
                 this.camera.moveFree(move.x, move.y, move.z);
             }
+        } else if (this.surfaceCamera) {
+            const forwardInput = (this.moveKeys.KeyW ? 1 : 0) + (this.moveKeys.KeyS ? -1 : 0);
+            const rightInput = (this.moveKeys.KeyD ? 1 : 0) + (this.moveKeys.KeyA ? -1 : 0);
+            const upInput = (this.moveKeys.Space ? 1 : 0) + ((this.moveKeys.ShiftLeft || this.moveKeys.ShiftRight) ? -1 : 0);
+            if (forwardInput || rightInput || upInput) {
+                this.camera.moveSurface(forwardInput, rightInput, upInput, delta, this.surfaceSpeedMps);
+            }
         }
 
         // Calculate camera origin based on followed body
-        const cameraOrigin = this.resolveCameraOrigin(!this.freeCamera);
+        const cameraOrigin = this.resolveCameraOrigin(!this.freeCamera && !this.surfaceCamera);
 
         // Update body positions with floating origin
         this.bodyRenderer.update(this.state.positions, cameraOrigin, this.camera);

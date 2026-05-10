@@ -46,6 +46,10 @@
     "freeCamSpeedAuPerSec": 0.01,
     "freeCamSensitivity": 0.3,
     "freeCamRotationDamping": 0.55,
+    "surfaceSpeedMps": 5,
+    "surfaceSensitivity": 0.3,
+    "surfaceRotationDamping": 0,
+    "surfaceEyeHeightM": 1.7,
     "orbitalRotationDamping": 0.92,
     "orbitalZoomDamping": 0.9
   }

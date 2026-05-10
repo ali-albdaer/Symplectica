@@ -38,6 +38,26 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private freeOriginY = 0;
     private freeOriginZ = 0;
 
+    // Surface camera mode (body-local)
+    private surfaceMode = false;
+    private surfaceX = 0;
+    private surfaceY = 0;
+    private surfaceZ = 0;
+    private surfaceCenterX = 0;
+    private surfaceCenterY = 0;
+    private surfaceCenterZ = 0;
+    private surfaceBodyRadius = 1;
+    private surfaceEyeHeight = 1.7;
+    private surfaceYaw = 0;
+    private surfacePitch = 0;
+    private surfaceYawVelocity = 0;
+    private surfacePitchVelocity = 0;
+    private surfaceRotationAxis = new THREE.Vector3(0, 1, 0);
+    private surfaceRotationRate = 0;
+    private surfaceLookSensitivity = 0.3;
+    private surfaceRotationDamping = 0;
+    private readonly surfacePitchLimit = Math.PI / 2 - 0.01;
+
     // Pointer lock
     private canvas?: HTMLElement;
     private pointerLocked = false;
@@ -94,7 +114,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         });
 
         canvas.addEventListener('mousedown', (e: MouseEvent) => {
-            if (this.freeMode && !this.pointerLocked) {
+            if ((this.freeMode || this.surfaceMode) && !this.pointerLocked) {
                 this.canvas?.requestPointerLock();
                 e.preventDefault();
                 return;
@@ -122,6 +142,21 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 } else {
                     this.azimuthVelocity += -e.movementX * sensitivity;
                     this.elevationVelocity += -e.movementY * sensitivity;
+                }
+                return;
+            }
+
+            if (this.surfaceMode && this.pointerLocked) {
+                const sensitivity = 0.002 * this.surfaceLookSensitivity;
+                if (this.surfaceRotationDamping <= 0) {
+                    this.surfaceYaw += -e.movementX * sensitivity;
+                    this.surfacePitch += -e.movementY * sensitivity;
+                    this.surfacePitch = Math.max(-this.surfacePitchLimit, Math.min(this.surfacePitchLimit, this.surfacePitch));
+                    this.surfaceYawVelocity = 0;
+                    this.surfacePitchVelocity = 0;
+                } else {
+                    this.surfaceYawVelocity += -e.movementX * sensitivity;
+                    this.surfacePitchVelocity += -e.movementY * sensitivity;
                 }
                 return;
             }
@@ -250,6 +285,33 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     }
 
     update(delta: number): void {
+        if (this.surfaceMode) {
+            const rotation = this.surfaceRotationRate * delta;
+            if (rotation !== 0) {
+                const offset = new THREE.Vector3(
+                    this.surfaceX - this.surfaceCenterX,
+                    this.surfaceY - this.surfaceCenterY,
+                    this.surfaceZ - this.surfaceCenterZ
+                );
+                offset.applyAxisAngle(this.surfaceRotationAxis, rotation);
+                this.surfaceX = this.surfaceCenterX + offset.x;
+                this.surfaceY = this.surfaceCenterY + offset.y;
+                this.surfaceZ = this.surfaceCenterZ + offset.z;
+            }
+
+            if (this.surfaceRotationDamping > 0) {
+                this.surfaceYaw += this.surfaceYawVelocity * delta * 60;
+                this.surfacePitch += this.surfacePitchVelocity * delta * 60;
+                this.surfacePitch = Math.max(-this.surfacePitchLimit, Math.min(this.surfacePitchLimit, this.surfacePitch));
+
+                this.surfaceYawVelocity *= this.surfaceRotationDamping;
+                this.surfacePitchVelocity *= this.surfaceRotationDamping;
+            }
+
+            this.updatePosition();
+            return;
+        }
+
         // Apply momentum
         if (this.freeMode) {
             if (this.freeRotationDamping <= 0) {
@@ -290,6 +352,22 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     }
 
     private updatePosition(): void {
+        if (this.surfaceMode) {
+            const frame = this.getSurfaceFrame();
+
+            const renderX = 0;
+            const renderY = 0;
+            const renderZ = 0;
+            this.position.set(renderX, renderY, renderZ);
+            this.up.copy(frame.up);
+            this.lookAt(renderX + frame.forward.x, renderY + frame.forward.y, renderZ + frame.forward.z);
+
+            this.originX = this.surfaceX;
+            this.originY = this.surfaceY;
+            this.originZ = this.surfaceZ;
+            return;
+        }
+
         // Direction the camera is facing
         const dirX = Math.cos(this.elevation) * Math.sin(this.azimuth);
         const dirY = Math.sin(this.elevation);
@@ -346,6 +424,9 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         if (this.freeMode) {
             return { x: this.freeX, y: this.freeY, z: this.freeZ };
         }
+        if (this.surfaceMode) {
+            return { x: this.surfaceX, y: this.surfaceY, z: this.surfaceZ };
+        }
         // In orbit mode, origin is the camera world position.
         return { x: this.originX, y: this.originY, z: this.originZ };
     }
@@ -376,6 +457,9 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         seedForward?: { x: number; y: number; z: number },
         seedOrigin?: { x: number; y: number; z: number }
     ): void {
+        if (enabled) {
+            this.surfaceMode = false;
+        }
         this.freeMode = enabled;
         if (enabled) {
             // Seed free position from provided world coordinates
@@ -409,6 +493,253 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             }
         }
         this.updatePosition();
+    }
+
+    setSurfaceMode(
+        enabled: boolean,
+        options?: {
+            center: { x: number; y: number; z: number };
+            radius: number;
+            rotationRate: number;
+            axialTilt: number;
+            eyeHeight?: number;
+            seedWorld?: { x: number; y: number; z: number };
+            seedForward?: { x: number; y: number; z: number };
+        }
+    ): void {
+        this.surfaceMode = enabled;
+        if (!enabled) {
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
+            }
+            this.updatePosition();
+            return;
+        }
+
+        if (options) {
+            this.surfaceCenterX = options.center.x;
+            this.surfaceCenterY = options.center.y;
+            this.surfaceCenterZ = options.center.z;
+            this.surfaceBodyRadius = Number.isFinite(options.radius) ? options.radius : this.surfaceBodyRadius;
+            this.surfaceRotationRate = Number.isFinite(options.rotationRate) ? options.rotationRate : 0;
+            this.surfaceRotationAxis = this.getRotationAxis(options.axialTilt);
+            if (typeof options.eyeHeight === 'number') {
+                this.surfaceEyeHeight = Math.max(0.1, options.eyeHeight);
+            }
+
+            const seedWorld = options.seedWorld;
+            const seedForward = options.seedForward;
+            const up = this.getSurfaceUp(seedWorld);
+            const minDist = this.surfaceBodyRadius + this.surfaceEyeHeight;
+            this.surfaceX = this.surfaceCenterX + up.x * minDist;
+            this.surfaceY = this.surfaceCenterY + up.y * minDist;
+            this.surfaceZ = this.surfaceCenterZ + up.z * minDist;
+
+            if (seedForward) {
+                this.applySurfaceSeedForward(seedForward, up);
+            }
+        }
+
+        this.freeMode = false;
+        this.isDragging = false;
+        this.surfaceYawVelocity = 0;
+        this.surfacePitchVelocity = 0;
+        this.updatePosition();
+    }
+
+    isSurfaceMode(): boolean {
+        return this.surfaceMode;
+    }
+
+    setSurfaceTarget(params: { center: { x: number; y: number; z: number }; radius: number; rotationRate: number; axialTilt: number }): void {
+        const dx = params.center.x - this.surfaceCenterX;
+        const dy = params.center.y - this.surfaceCenterY;
+        const dz = params.center.z - this.surfaceCenterZ;
+        this.surfaceX += dx;
+        this.surfaceY += dy;
+        this.surfaceZ += dz;
+        this.surfaceCenterX = params.center.x;
+        this.surfaceCenterY = params.center.y;
+        this.surfaceCenterZ = params.center.z;
+        this.surfaceBodyRadius = Number.isFinite(params.radius) ? params.radius : this.surfaceBodyRadius;
+        this.surfaceRotationRate = Number.isFinite(params.rotationRate) ? params.rotationRate : 0;
+        this.surfaceRotationAxis = this.getRotationAxis(params.axialTilt);
+
+        const minDist = this.surfaceBodyRadius + this.surfaceEyeHeight;
+        const offset = new THREE.Vector3(
+            this.surfaceX - this.surfaceCenterX,
+            this.surfaceY - this.surfaceCenterY,
+            this.surfaceZ - this.surfaceCenterZ
+        );
+        if (offset.lengthSq() < 1e-6) {
+            offset.set(0, 1, 0);
+        }
+        if (offset.length() < minDist) {
+            offset.normalize().multiplyScalar(minDist);
+            this.surfaceX = this.surfaceCenterX + offset.x;
+            this.surfaceY = this.surfaceCenterY + offset.y;
+            this.surfaceZ = this.surfaceCenterZ + offset.z;
+        }
+    }
+
+    setSurfaceLookSensitivity(multiplier: number): void {
+        if (!Number.isFinite(multiplier) || multiplier <= 0) return;
+        this.surfaceLookSensitivity = multiplier;
+    }
+
+    setSurfaceRotationDamping(damping: number): void {
+        if (!Number.isFinite(damping)) return;
+        this.surfaceRotationDamping = Math.max(0, Math.min(0.999, damping));
+    }
+
+    setSurfaceEyeHeight(heightMeters: number): void {
+        if (!Number.isFinite(heightMeters) || heightMeters <= 0) return;
+        this.surfaceEyeHeight = heightMeters;
+        if (this.surfaceMode) {
+            const minDist = this.surfaceBodyRadius + this.surfaceEyeHeight;
+            const offset = new THREE.Vector3(
+                this.surfaceX - this.surfaceCenterX,
+                this.surfaceY - this.surfaceCenterY,
+                this.surfaceZ - this.surfaceCenterZ
+            );
+            if (offset.lengthSq() < 1e-6) {
+                offset.set(0, 1, 0);
+            }
+            offset.normalize().multiplyScalar(minDist);
+            this.surfaceX = this.surfaceCenterX + offset.x;
+            this.surfaceY = this.surfaceCenterY + offset.y;
+            this.surfaceZ = this.surfaceCenterZ + offset.z;
+        }
+    }
+
+    moveSurface(forwardInput: number, rightInput: number, upInput: number, delta: number, speedMps: number): void {
+        if (!this.surfaceMode) return;
+        if (!Number.isFinite(speedMps) || speedMps <= 0) return;
+
+        const frame = this.getSurfaceFrame();
+        const move = new THREE.Vector3();
+        if (forwardInput !== 0) move.addScaledVector(frame.forwardTangent, forwardInput);
+        if (rightInput !== 0) move.addScaledVector(frame.right, rightInput);
+        if (upInput !== 0) move.addScaledVector(frame.up, upInput);
+
+        if (move.lengthSq() > 0) {
+            move.normalize().multiplyScalar(speedMps * delta);
+            this.surfaceX += move.x;
+            this.surfaceY += move.y;
+            this.surfaceZ += move.z;
+        }
+
+        const minDist = this.surfaceBodyRadius + this.surfaceEyeHeight;
+        const offset = new THREE.Vector3(
+            this.surfaceX - this.surfaceCenterX,
+            this.surfaceY - this.surfaceCenterY,
+            this.surfaceZ - this.surfaceCenterZ
+        );
+        const dist = offset.length();
+        if (dist < minDist) {
+            offset.normalize().multiplyScalar(minDist);
+            this.surfaceX = this.surfaceCenterX + offset.x;
+            this.surfaceY = this.surfaceCenterY + offset.y;
+            this.surfaceZ = this.surfaceCenterZ + offset.z;
+        }
+    }
+
+    private getRotationAxis(axialTilt: number): THREE.Vector3 {
+        if (!Number.isFinite(axialTilt)) return new THREE.Vector3(0, 1, 0);
+        const axis = new THREE.Vector3(-Math.sin(axialTilt), Math.cos(axialTilt), 0);
+        if (axis.lengthSq() < 1e-6) {
+            return new THREE.Vector3(0, 1, 0);
+        }
+        return axis.normalize();
+    }
+
+    private getSurfaceUp(seedWorld?: { x: number; y: number; z: number }): THREE.Vector3 {
+        if (seedWorld) {
+            const up = new THREE.Vector3(
+                seedWorld.x - this.surfaceCenterX,
+                seedWorld.y - this.surfaceCenterY,
+                seedWorld.z - this.surfaceCenterZ
+            );
+            if (up.lengthSq() > 1e-6) {
+                return up.normalize();
+            }
+        }
+        return new THREE.Vector3(0, 1, 0);
+    }
+
+    private applySurfaceSeedForward(seedForward: { x: number; y: number; z: number }, up: THREE.Vector3): void {
+        const forward = new THREE.Vector3(seedForward.x, seedForward.y, seedForward.z).normalize();
+        const upDot = forward.dot(up);
+        const pitch = Math.asin(Math.max(-1, Math.min(1, upDot)));
+        const tangent = forward.clone().sub(up.clone().multiplyScalar(upDot));
+
+        if (tangent.lengthSq() < 1e-6) {
+            this.surfacePitch = Math.max(-this.surfacePitchLimit, Math.min(this.surfacePitchLimit, pitch));
+            return;
+        }
+
+        const frame = this.getSurfaceFrameFromUp(up);
+        const east = frame.east;
+        const north = frame.north;
+        const tanNorm = tangent.normalize();
+        this.surfaceYaw = Math.atan2(tanNorm.dot(east), tanNorm.dot(north));
+        this.surfacePitch = Math.max(-this.surfacePitchLimit, Math.min(this.surfacePitchLimit, pitch));
+    }
+
+    private getSurfaceFrameFromUp(up: THREE.Vector3): { up: THREE.Vector3; east: THREE.Vector3; north: THREE.Vector3 } {
+        const east = new THREE.Vector3().crossVectors(this.surfaceRotationAxis, up);
+        if (east.lengthSq() < 1e-6) {
+            east.set(1, 0, 0).cross(up);
+            if (east.lengthSq() < 1e-6) {
+                east.set(0, 0, 1).cross(up);
+            }
+        }
+        east.normalize();
+        const north = new THREE.Vector3().crossVectors(up, east).normalize();
+        return { up, east, north };
+    }
+
+    private getSurfaceFrame(): {
+        up: THREE.Vector3;
+        east: THREE.Vector3;
+        north: THREE.Vector3;
+        forward: THREE.Vector3;
+        forwardTangent: THREE.Vector3;
+        right: THREE.Vector3;
+    } {
+        const up = new THREE.Vector3(
+            this.surfaceX - this.surfaceCenterX,
+            this.surfaceY - this.surfaceCenterY,
+            this.surfaceZ - this.surfaceCenterZ
+        );
+        if (up.lengthSq() < 1e-6) {
+            up.set(0, 1, 0);
+        } else {
+            up.normalize();
+        }
+
+        const basis = this.getSurfaceFrameFromUp(up);
+        const yawCos = Math.cos(this.surfaceYaw);
+        const yawSin = Math.sin(this.surfaceYaw);
+        const forwardTangent = new THREE.Vector3()
+            .addScaledVector(basis.north, yawCos)
+            .addScaledVector(basis.east, yawSin)
+            .normalize();
+
+        const right = new THREE.Vector3().crossVectors(forwardTangent, basis.up).normalize();
+        const forward = new THREE.Vector3()
+            .addScaledVector(forwardTangent, Math.cos(this.surfacePitch))
+            .addScaledVector(basis.up, Math.sin(this.surfacePitch))
+            .normalize();
+
+        return {
+            up: basis.up,
+            east: basis.east,
+            north: basis.north,
+            forward,
+            forwardTangent,
+            right,
+        };
     }
 
     isFreeMode(): boolean {
