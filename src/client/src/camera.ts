@@ -162,8 +162,17 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
         canvas.addEventListener('wheel', (e: WheelEvent) => {
             e.preventDefault();
 
-            // Exponential zoom
-            const zoomFactor = 1 + Math.sign(e.deltaY) * 0.1;
+            // Smooth exponential zoom based on delta magnitude
+            const LINE_HEIGHT = 16;
+            const PAGE_HEIGHT = window.innerHeight || 800;
+            let delta = e.deltaY;
+            if (e.deltaMode === 1) delta *= LINE_HEIGHT;
+            if (e.deltaMode === 2) delta *= PAGE_HEIGHT;
+
+            const zoomSpeed = 0.0015;
+            let zoomFactor = Math.exp(delta * zoomSpeed);
+            zoomFactor = Math.max(0.5, Math.min(2.0, zoomFactor));
+
             this.zoomTargetRadius *= zoomFactor;
             this.zoomTargetRadius = clampOrbitDistance(this.zoomTargetRadius, this.minRadius, this.maxRadius);
         }, { passive: false });
