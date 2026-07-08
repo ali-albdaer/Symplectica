@@ -128,6 +128,7 @@ class NBodyClient {
     private orbitalRotationDamping = APP_DEFAULTS.cameraDefaults.orbitalRotationDamping;
     private orbitalZoomDamping = APP_DEFAULTS.cameraDefaults.orbitalZoomDamping;
     private surfaceCamera = false;
+    private preSurfaceOffset: { x: number, y: number, z: number } | null = null;
     private surfaceBodyIndex = -1;
     private surfaceSpeedMps = APP_DEFAULTS.cameraDefaults.surfaceSpeedMps;
     private surfaceSensitivity = APP_DEFAULTS.cameraDefaults.surfaceSensitivity;
@@ -901,11 +902,15 @@ class NBodyClient {
             const bodyIndex = this.surfaceBodyIndex;
             const cameraWorld = this.camera.getCameraWorldPosition();
             const target = this.getFollowTargetPosition(bodyIndex);
-            const offset = {
-                x: cameraWorld.x - target.x,
-                y: cameraWorld.y - target.y,
-                z: cameraWorld.z - target.z,
-            };
+            
+            let offset = this.preSurfaceOffset;
+            if (!offset) {
+                offset = {
+                    x: cameraWorld.x - target.x,
+                    y: cameraWorld.y - target.y,
+                    z: cameraWorld.z - target.z,
+                };
+            }
             const body = this.getFollowBody(bodyIndex);
 
             this.surfaceCamera = false;
@@ -928,6 +933,13 @@ class NBodyClient {
 
         const target = this.getFollowTargetPosition(index);
         const cameraWorld = this.camera.getCameraWorldPosition();
+        
+        this.preSurfaceOffset = {
+            x: cameraWorld.x - target.x,
+            y: cameraWorld.y - target.y,
+            z: cameraWorld.z - target.z,
+        };
+
         const forward = new THREE.Vector3();
         this.camera.getWorldDirection(forward);
 
