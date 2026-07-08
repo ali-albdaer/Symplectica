@@ -149,13 +149,13 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
             if (this.surfaceMode && this.pointerLocked) {
                 const sensitivity = 0.002 * this.surfaceLookSensitivity;
                 if (this.surfaceRotationDamping <= 0) {
-                    this.surfaceYaw += -e.movementX * sensitivity;
+                    this.surfaceYaw += e.movementX * sensitivity;
                     this.surfacePitch += -e.movementY * sensitivity;
                     this.surfacePitch = Math.max(-this.surfacePitchLimit, Math.min(this.surfacePitchLimit, this.surfacePitch));
                     this.surfaceYawVelocity = 0;
                     this.surfacePitchVelocity = 0;
                 } else {
-                    this.surfaceYawVelocity += -e.movementX * sensitivity;
+                    this.surfaceYawVelocity += e.movementX * sensitivity;
                     this.surfacePitchVelocity += -e.movementY * sensitivity;
                 }
                 return;
