@@ -898,17 +898,20 @@ class NBodyClient {
 
     private toggleSurfaceCamera(): void {
         if (this.surfaceCamera) {
+            const bodyIndex = this.surfaceBodyIndex;
             const cameraWorld = this.camera.getCameraWorldPosition();
-            const target = this.getFollowTargetPosition(this.surfaceBodyIndex);
+            const target = this.getFollowTargetPosition(bodyIndex);
             const offset = {
                 x: cameraWorld.x - target.x,
                 y: cameraWorld.y - target.y,
                 z: cameraWorld.z - target.z,
             };
-            const body = this.getFollowBody(this.surfaceBodyIndex);
+            const body = this.getFollowBody(bodyIndex);
 
             this.surfaceCamera = false;
             this.surfaceBodyIndex = -1;
+            this.followBodyIndex = bodyIndex;
+            this.lastFollowBodyIndex = bodyIndex;
             this.camera.setSurfaceMode(false);
             if (body) {
                 this.camera.setTrackedBodyRadius(body.radius);

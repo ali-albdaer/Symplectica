@@ -13,6 +13,7 @@ use physics_core::force::{compute_total_energy, compute_total_momentum};
 use std::f64::consts::PI;
 
 /// Canonical solar system data for validation
+#[allow(dead_code)]
 struct CanonicalData {
     name: &'static str,
     semi_major_axis_m: f64,
@@ -149,10 +150,10 @@ fn compute_orbital_elements(pos: Vec3, vel: Vec3, m_central: f64) -> (f64, f64, 
         };
         
         // Eccentric anomaly: E = 2 arctan(tan(ν/2) / sqrt((1+e)/(1-e)))
-        let E = 2.0 * ((true_anomaly_signed / 2.0).tan() / ((1.0 + e) / (1.0 - e)).sqrt()).atan();
+        let ecc_anomaly = 2.0 * ((true_anomaly_signed / 2.0).tan() / ((1.0 + e) / (1.0 - e)).sqrt()).atan();
         
         // Mean anomaly: M = E - e sin(E)
-        E - e * E.sin()
+        ecc_anomaly - e * ecc_anomaly.sin()
     } else {
         0.0
     };
