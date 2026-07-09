@@ -28,6 +28,7 @@ import { BuildPanel, BuildBodyParams, BuildableBodyType, BodyListEntry } from '.
 import { DriftMonitor } from './drift-monitor';
 import { APP_DEFAULTS } from './defaults';
 import { logger } from './logger';
+import { MediaCapture } from './recorder';
 
 import { AU, G, M_SUN, L_SUN } from '../../shared/constants';
 const LOCAL_TICK_RATE = APP_DEFAULTS.adminDefaults.tickRate;
@@ -58,6 +59,7 @@ class NBodyClient {
     private optionsPanel!: OptionsPanel;
     private touchControls!: TouchControls;
     private buildPanel!: BuildPanel;
+    private mediaCapture!: MediaCapture;
     private buildMode = false; // True when in world builder mode
     private driftMonitor!: DriftMonitor;
 
@@ -598,6 +600,8 @@ class NBodyClient {
         container.appendChild(this.renderer.domElement);
         this.freeCamCrosshair = document.getElementById('freecam-crosshair');
 
+        this.mediaCapture = new MediaCapture(this.renderer.domElement);
+
         // Create camera - start further out and elevated
         this.camera = new OrbitCamera(
             APP_DEFAULTS.cameraDefaults.cameraFov,
@@ -746,6 +750,12 @@ class NBodyClient {
                     break;
                 case '3':
                     this.togglePerfMonitor();
+                    break;
+                case '8': // Screenshot
+                    this.mediaCapture.takeScreenshot(this.renderer, this.scene, this.camera);
+                    break;
+                case '9': // Toggle Recording
+                    this.mediaCapture.toggleRecording();
                     break;
             }
         });
