@@ -266,6 +266,7 @@ class NBodyClient {
                     experimental.flaresVisible ? experimental.flareBrightness : 0
                 );
                 this.bodyRenderer.setFlareFrequencyMode(experimental.flareFrequencyMode);
+                this.bodyRenderer.setRingQuality(experimental.ringQuality);
             }
         );
         this.optionsPanel.setPresetRenderScale(

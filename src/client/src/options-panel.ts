@@ -28,6 +28,7 @@ export interface ExperimentalOptions {
     flareBrightness: number;
     flaresVisible: boolean;
     fixedFlareRate: number; // flares per 100s sim time, 0.5–10
+    ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways';
 }
 
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
@@ -75,6 +76,7 @@ export class OptionsPanel {
         flareBrightness: 1.0,
         flaresVisible: true,
         fixedFlareRate: 2.0,
+        ringQuality: 'Performance',
     };
 
     // UI Elements
@@ -106,6 +108,7 @@ export class OptionsPanel {
     private fixedFlareRateInput!: HTMLInputElement;
     private fixedFlareRateValue!: HTMLElement;
     private fixedFlareRateField!: HTMLElement;
+    private ringQualitySelect!: HTMLSelectElement;
 
     // Grid Spacing Helpers (Logarithmic)
     private sliderToSpacing(t: number): number {
@@ -436,6 +439,17 @@ export class OptionsPanel {
                         </div>
                     </div>
                 </section>
+                <section class="opt-section">
+                    <h3>Planetary Rings</h3>
+                    <div class="opt-field">
+                        <label>Render Quality</label>
+                        <select id="opt-ring-quality">
+                            <option value="Performance">Performance (Default)</option>
+                            <option value="HighQualityClose">High Quality (Close Range)</option>
+                            <option value="HighQualityAlways">High Quality (Always)</option>
+                        </select>
+                    </div>
+                </section>
             </div>
         `;
 
@@ -677,6 +691,7 @@ export class OptionsPanel {
         this.fixedFlareRateInput = this.container.querySelector('#opt-fixed-flare-rate')!;
         this.fixedFlareRateValue = this.container.querySelector('#opt-fixed-flare-rate-value')!;
         this.fixedFlareRateField = this.container.querySelector('#opt-fixed-rate-field')!;
+        this.ringQualitySelect = this.container.querySelector('#opt-ring-quality')!;
     }
 
     private bindEvents(): void {
@@ -904,6 +919,12 @@ export class OptionsPanel {
             this.fixedFlareRateValue.textContent = `${rate.toFixed(1)}`;
             this.emitExperimentalChange();
         });
+
+        this.ringQualitySelect.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.experimentalOptions.ringQuality = this.ringQualitySelect.value as 'Performance' | 'HighQualityClose' | 'HighQualityAlways';
+            this.emitExperimentalChange();
+        });
     }
 
     private setupTabs(): void {
@@ -1038,6 +1059,7 @@ export class OptionsPanel {
         this.fixedFlareRateInput.value = this.experimentalOptions.fixedFlareRate.toString();
         this.fixedFlareRateValue.textContent = `${this.experimentalOptions.fixedFlareRate.toFixed(1)}`;
         this.fixedFlareRateField.style.display = this.experimentalOptions.flareFrequencyMode === 'fixed' ? '' : 'none';
+        this.ringQualitySelect.value = this.experimentalOptions.ringQuality;
         
         this.ignoreEvents = false;
     }

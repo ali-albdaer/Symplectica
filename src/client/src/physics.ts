@@ -110,6 +110,12 @@ export interface BodyInfo {
         height: number;
         mieColor: [number, number, number];
     };
+    rings?: {
+        innerRadiusMult: number;
+        outerRadiusMult: number;
+        texturePreset: string;
+        baseOpacity: number;
+    };
     semiMajorAxis: number;
     eccentricity: number;
     meanSurfaceTemperature: number;
@@ -369,6 +375,12 @@ export class PhysicsClient {
                     height: number;
                     mie_color?: [number, number, number];
                 };
+                rings?: {
+                    inner_radius_mult: number;
+                    outer_radius_mult: number;
+                    texture_preset: string;
+                    base_opacity: number;
+                };
                 semi_major_axis?: number;
                 eccentricity?: number;
                 mean_surface_temperature?: number;
@@ -405,6 +417,12 @@ export class PhysicsClient {
                     mieDirection: b.atmosphere.mie_direction,
                     height: b.atmosphere.height,
                     mieColor: b.atmosphere.mie_color ?? [1, 1, 1],
+                } : undefined,
+                rings: b.rings ? {
+                    innerRadiusMult: b.rings.inner_radius_mult,
+                    outerRadiusMult: b.rings.outer_radius_mult,
+                    texturePreset: b.rings.texture_preset,
+                    baseOpacity: b.rings.base_opacity,
                 } : undefined,
                 semiMajorAxis: b.semi_major_axis ?? 0,
                 eccentricity: b.eccentricity ?? 0,

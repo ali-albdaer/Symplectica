@@ -144,6 +144,19 @@ impl Atmosphere {
     }
 }
 
+/// Parameters for parametric planetary rings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RingParameters {
+    /// Inner radius as a multiplier of the body's radius
+    pub inner_radius_mult: f64,
+    /// Outer radius as a multiplier of the body's radius
+    pub outer_radius_mult: f64,
+    /// Texture preset identifier (e.g., "saturn", "jupiter", "uranus", "neptune")
+    pub texture_preset: String,
+    /// Overall opacity multiplier (0.0 to 1.0)
+    pub base_opacity: f32,
+}
+
 /// A celestial body in the simulation.
 /// 
 /// All physical quantities are in SI units for consistency and accuracy.
@@ -321,6 +334,10 @@ pub struct Body {
     /// Optional atmosphere parameters
     pub atmosphere: Option<Atmosphere>,
     
+    /// Optional planetary rings
+    #[serde(default)]
+    pub rings: Option<RingParameters>,
+    
     /// Albedo (reflectivity, 0-1)
     pub albedo: f64,
     
@@ -395,6 +412,7 @@ impl Body {
             arg_periapsis: 0.0,
             mean_anomaly: 0.0,
             atmosphere: None,
+            rings: None,
             albedo: 0.3,
             color: [1.0, 1.0, 1.0],
             is_active: true,
@@ -601,6 +619,7 @@ impl Default for Body {
             arg_periapsis: 0.0,
             mean_anomaly: 0.0,
             atmosphere: None,
+            rings: None,
             albedo: 0.3,
             color: [1.0, 1.0, 1.0],
             is_active: true,

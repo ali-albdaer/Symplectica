@@ -3,7 +3,7 @@
 //! Pre-configured solar system simulations with accurate orbital data.
 //! All values in SI units (meters, kilograms, seconds).
 
-use crate::body::{Atmosphere, Body, BodyType, PlanetComposition};
+use crate::body::{Atmosphere, Body, BodyType, PlanetComposition, RingParameters};
 use crate::simulation::Simulation;
 use crate::vector::Vec3;
 use crate::constants::*;
@@ -638,6 +638,12 @@ pub fn create_integrator_test2(seed: u64) -> Simulation {
     jupiter.semi_major_axis = 5.2044 * AU;
     jupiter.eccentricity = 0.0;
     jupiter.color = hex_to_rgb(0xd4a574);
+    jupiter.rings = Some(RingParameters {
+        inner_radius_mult: 1.29,
+        outer_radius_mult: 3.1,
+        texture_preset: "jupiter".to_string(),
+        base_opacity: 0.1,
+    });
     jupiter.composition = PlanetComposition::GasGiant;
     jupiter.albedo = 0.503;
     jupiter.softening_length = compute_softening(6.9911e7);
@@ -657,6 +663,12 @@ pub fn create_integrator_test2(seed: u64) -> Simulation {
     saturn.semi_major_axis = 9.5826 * AU;
     saturn.eccentricity = 0.0;
     saturn.color = hex_to_rgb(0xead6a7);
+    saturn.rings = Some(RingParameters {
+        inner_radius_mult: 1.11,
+        outer_radius_mult: 2.27,
+        texture_preset: "saturn".to_string(),
+        base_opacity: 0.9,
+    });
     saturn.composition = PlanetComposition::GasGiant;
     saturn.albedo = 0.47;
     saturn.softening_length = compute_softening(5.8232e7);
@@ -933,6 +945,12 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
         Vec3::ZERO, Vec3::ZERO,
     );
     jupiter.color = hex_to_rgb(0xd4a574);
+    jupiter.rings = Some(RingParameters {
+        inner_radius_mult: 1.29,
+        outer_radius_mult: 3.1,
+        texture_preset: "jupiter".to_string(),
+        base_opacity: 0.1,
+    });
     jupiter.rotation_rate = 1.7585e-4;
     jupiter.axial_tilt = 0.0546;
     jupiter.mean_surface_temperature = 165.0;
@@ -1035,6 +1053,12 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
         Vec3::ZERO, Vec3::ZERO,
     );
     saturn.color = hex_to_rgb(0xead6a7);
+    saturn.rings = Some(RingParameters {
+        inner_radius_mult: 1.11,
+        outer_radius_mult: 2.27,
+        texture_preset: "saturn".to_string(),
+        base_opacity: 0.9,
+    });
     saturn.rotation_rate = 1.6378e-4;
     saturn.axial_tilt = 0.4665;
     saturn.mean_surface_temperature = 134.0;
@@ -1483,6 +1507,12 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     jupiter.mean_anomaly = j2000::JUPITER.mean_anomaly;
     jupiter.parent_id = Some(sun_id);
     jupiter.color = hex_to_rgb(0xd4a574);
+    jupiter.rings = Some(RingParameters {
+        inner_radius_mult: 1.29,
+        outer_radius_mult: 3.1,
+        texture_preset: "jupiter".to_string(),
+        base_opacity: 0.1,
+    });
     jupiter.composition = PlanetComposition::GasGiant;
     jupiter.albedo = 0.503;
     jupiter.softening_length = compute_softening(6.9911e7);
@@ -1508,6 +1538,12 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     saturn.mean_anomaly = j2000::SATURN.mean_anomaly;
     saturn.parent_id = Some(sun_id);
     saturn.color = hex_to_rgb(0xead6a7);
+    saturn.rings = Some(RingParameters {
+        inner_radius_mult: 1.11,
+        outer_radius_mult: 2.27,
+        texture_preset: "saturn".to_string(),
+        base_opacity: 0.9,
+    });
     saturn.composition = PlanetComposition::GasGiant;
     saturn.albedo = 0.342;
     saturn.softening_length = compute_softening(5.8232e7);
@@ -1533,6 +1569,12 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     uranus.mean_anomaly = j2000::URANUS.mean_anomaly;
     uranus.parent_id = Some(sun_id);
     uranus.color = hex_to_rgb(0x72b4c4);
+    uranus.rings = Some(RingParameters {
+        inner_radius_mult: 1.64,
+        outer_radius_mult: 2.0,
+        texture_preset: "uranus".to_string(),
+        base_opacity: 0.3,
+    });
     uranus.composition = PlanetComposition::IceGiant;
     uranus.albedo = 0.300;
     uranus.softening_length = compute_softening(2.5362e7);
@@ -1558,6 +1600,12 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     neptune.mean_anomaly = j2000::NEPTUNE.mean_anomaly;
     neptune.parent_id = Some(sun_id);
     neptune.color = hex_to_rgb(0x3d5ef5);
+    neptune.rings = Some(RingParameters {
+        inner_radius_mult: 1.69,
+        outer_radius_mult: 2.54,
+        texture_preset: "neptune".to_string(),
+        base_opacity: 0.15,
+    });
     neptune.composition = PlanetComposition::IceGiant;
     neptune.albedo = 0.290;
     neptune.softening_length = compute_softening(2.4622e7);
@@ -1815,6 +1863,12 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     jupiter.mean_anomaly = 89.37724066060315 * deg;
     jupiter.parent_id = Some(sun_id);
     jupiter.color = hex_to_rgb(0xd4a574);
+    jupiter.rings = Some(RingParameters {
+        inner_radius_mult: 1.29,
+        outer_radius_mult: 3.1,
+        texture_preset: "jupiter".to_string(),
+        base_opacity: 0.1,
+    });
     jupiter.composition = PlanetComposition::GasGiant;
     jupiter.albedo = 0.503;
     jupiter.softening_length = compute_softening(6.9911e7);
@@ -1917,6 +1971,12 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     saturn.mean_anomaly = 275.1957082168172 * deg;
     saturn.parent_id = Some(sun_id);
     saturn.color = hex_to_rgb(0xead6a7);
+    saturn.rings = Some(RingParameters {
+        inner_radius_mult: 1.11,
+        outer_radius_mult: 2.27,
+        texture_preset: "saturn".to_string(),
+        base_opacity: 0.9,
+    });
     saturn.composition = PlanetComposition::GasGiant;
     saturn.albedo = 0.342;
     saturn.softening_length = compute_softening(5.8232e7);
@@ -2086,6 +2146,12 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     uranus.mean_anomaly = 253.5885560232958 * deg;
     uranus.parent_id = Some(sun_id);
     uranus.color = hex_to_rgb(0x72b4c4);
+    uranus.rings = Some(RingParameters {
+        inner_radius_mult: 1.64,
+        outer_radius_mult: 2.0,
+        texture_preset: "uranus".to_string(),
+        base_opacity: 0.3,
+    });
     uranus.composition = PlanetComposition::IceGiant;
     uranus.albedo = 0.300;
     uranus.softening_length = compute_softening(2.5362e7);
@@ -2207,6 +2273,12 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     neptune.mean_anomaly = 315.8698602184478 * deg;
     neptune.parent_id = Some(sun_id);
     neptune.color = hex_to_rgb(0x3d5ef5);
+    neptune.rings = Some(RingParameters {
+        inner_radius_mult: 1.69,
+        outer_radius_mult: 2.54,
+        texture_preset: "neptune".to_string(),
+        base_opacity: 0.15,
+    });
     neptune.composition = PlanetComposition::IceGiant;
     neptune.albedo = 0.290;
     neptune.softening_length = compute_softening(2.4624e7);

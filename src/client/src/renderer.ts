@@ -166,6 +166,89 @@ void main() {
 }
 `;
 
+// ── Planetary Ring Shader ───────────────────────────────────────────────
+// Implements view-angle transparency, Henyey-Greenstein scattering,
+// and ray-sphere intersection for planet shadowing.
+
+const RING_VERTEX = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_vertex>
+varying vec3 vWorldNormal;
+varying vec3 vViewDir;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+void main() {
+    vUv = uv;
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPos = worldPosition.xyz;
+    vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+    vViewDir = normalize(cameraPosition - worldPosition.xyz);
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+    #include <logdepthbuf_vertex>
+}
+`;
+
+const RING_FRAGMENT = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform sampler2D u_ringMap;
+uniform vec3 u_sunPos;
+uniform vec3 u_planetCenter;
+uniform float u_planetRadius;
+uniform float u_g; // Henyey-Greenstein scattering parameter
+
+varying vec3 vWorldNormal;
+varying vec3 vViewDir;
+varying vec3 vWorldPos;
+varying vec2 vUv;
+
+// Henyey-Greenstein phase function for forward/back scattering
+float henyeyGreenstein(float cosTheta, float g) {
+    float g2 = g * g;
+    return (1.0 - g2) / (4.0 * 3.14159 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
+}
+
+void main() {
+    // Look up ring color/opacity from 1D radial map
+    vec4 ring = texture2D(u_ringMap, vec2(0.5, vUv.y));
+    if (ring.a < 0.01) discard;
+
+    vec3 normal = normalize(vWorldNormal);
+    vec3 viewDir = normalize(vViewDir);
+    vec3 lightDir = normalize(u_sunPos - vWorldPos);
+
+    // 1. View-Angle Transparency: edge-on = more transparent
+    float viewAngle = abs(dot(normal, viewDir));
+    float viewFade = smoothstep(0.0, 0.12, viewAngle);
+
+    // 2. Planet Shadow (Ray-Sphere intersection)
+    // Ray from ring fragment towards the sun
+    vec3 oc = vWorldPos - u_planetCenter;
+    float b = dot(oc, lightDir);
+    float c = dot(oc, oc) - u_planetRadius * u_planetRadius;
+    float disc = b * b - c;
+    // If disc > 0 and b < 0, the ray hits the planet
+    float inShadow = (disc > 0.0 && b < 0.0) ? 0.05 : 1.0;
+
+    // 3. Lighting: Diffuse + Scattering
+    // Rings are double-sided, so abs(dot(N, L)) for diffuse
+    float NdotL = abs(dot(normal, lightDir));
+    float diffuse = max(NdotL, 0.05);
+
+    // Scattering (Opposition Surge / Forward scatter)
+    float cosTheta = dot(viewDir, lightDir);
+    float scattering = henyeyGreenstein(cosTheta, u_g);
+    
+    // Scale scattering to look visually pleasing, mix with diffuse
+    float lighting = mix(diffuse, scattering * 5.0, 0.4);
+
+    vec3 finalColor = ring.rgb * lighting * inShadow;
+    
+    gl_FragColor = vec4(finalColor, ring.a * viewFade);
+    #include <logdepthbuf_fragment>
+}
+`;
+
 // Body data from physics simulation
 interface BodyData {
     id: number;
@@ -199,6 +282,13 @@ interface BodyData {
         height: number;
         mieColor: [number, number, number];
     };
+
+    rings?: {
+        innerRadiusMult: number;
+        outerRadiusMult: number;
+        texturePreset: string;
+        baseOpacity: number;
+    };
     semiMajorAxis?: number;
     eccentricity?: number;
     meanSurfaceTemperature?: number;
@@ -213,6 +303,93 @@ interface StarRenderOptions {
 }
 
 // Body scaling for visualization
+function createRingTexture(preset: string): THREE.Texture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d')!;
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 1024);
+
+    if (preset === 'saturn') {
+        // C Ring (0.12 - 0.30)
+        gradient.addColorStop(0.00, 'rgba(0,0,0,0.0)');
+        gradient.addColorStop(0.12, 'rgba(184,168,138,0.05)');
+        gradient.addColorStop(0.30, 'rgba(195,178,148,0.35)');
+        // B Ring (0.30 - 0.70)
+        gradient.addColorStop(0.31, 'rgba(230,215,190,0.85)');
+        gradient.addColorStop(0.50, 'rgba(230,215,190,0.95)');
+        gradient.addColorStop(0.68, 'rgba(225,210,185,0.8)');
+        gradient.addColorStop(0.70, 'rgba(0,0,0,0.0)'); // Cassini start
+        // Cassini Division (0.70 - 0.77)
+        gradient.addColorStop(0.73, 'rgba(180,165,140,0.05)'); // faint material inside division
+        gradient.addColorStop(0.77, 'rgba(0,0,0,0.0)'); // Cassini end
+        // A Ring (0.77 - 0.96)
+        gradient.addColorStop(0.78, 'rgba(215,200,165,0.7)');
+        gradient.addColorStop(0.88, 'rgba(215,200,165,0.6)');
+        gradient.addColorStop(0.90, 'rgba(0,0,0,0.0)'); // Encke Gap
+        gradient.addColorStop(0.92, 'rgba(0,0,0,0.0)');
+        gradient.addColorStop(0.93, 'rgba(210,195,160,0.5)');
+        gradient.addColorStop(0.96, 'rgba(205,190,155,0.4)');
+        gradient.addColorStop(0.97, 'rgba(0,0,0,0.0)');
+        // F Ring (~0.99)
+        gradient.addColorStop(0.98, 'rgba(200,184,150,0.3)');
+        gradient.addColorStop(0.99, 'rgba(200,184,150,0.1)');
+        gradient.addColorStop(1.00, 'rgba(0,0,0,0.0)');
+    } else if (preset === 'uranus') {
+        // Dark charcoal narrow bands
+        gradient.addColorStop(0.00, 'rgba(0,0,0,0.0)');
+        // 6 ring (~0.05)
+        gradient.addColorStop(0.04, 'rgba(60,65,75,0.0)');
+        gradient.addColorStop(0.05, 'rgba(60,65,75,0.15)');
+        gradient.addColorStop(0.06, 'rgba(60,65,75,0.0)');
+        // alpha, beta, etc
+        gradient.addColorStop(0.34, 'rgba(0,0,0,0.0)');
+        gradient.addColorStop(0.35, 'rgba(74,79,82,0.15)');
+        gradient.addColorStop(0.36, 'rgba(0,0,0,0.0)');
+        
+        gradient.addColorStop(0.59, 'rgba(0,0,0,0.0)');
+        gradient.addColorStop(0.60, 'rgba(60,65,75,0.2)');
+        gradient.addColorStop(0.61, 'rgba(0,0,0,0.0)');
+        // epsilon ring (outer, brightest)
+        gradient.addColorStop(0.98, 'rgba(0,0,0,0.0)');
+        gradient.addColorStop(0.99, 'rgba(80,85,88,0.35)');
+        gradient.addColorStop(1.00, 'rgba(0,0,0,0.0)');
+    } else if (preset === 'neptune') {
+        // Faint reddish arcs
+        gradient.addColorStop(0.00, 'rgba(0,0,0,0.0)');
+        // Galle
+        gradient.addColorStop(0.05, 'rgba(69,53,53,0.05)');
+        gradient.addColorStop(0.15, 'rgba(0,0,0,0.0)');
+        // Le Verrier
+        gradient.addColorStop(0.53, 'rgba(82,64,64,0.08)');
+        gradient.addColorStop(0.55, 'rgba(0,0,0,0.0)');
+        // Adams (outer)
+        gradient.addColorStop(0.98, 'rgba(0,0,0,0.0)');
+        gradient.addColorStop(0.99, 'rgba(90,69,69,0.12)');
+        gradient.addColorStop(1.00, 'rgba(0,0,0,0.0)');
+    } else if (preset === 'jupiter') {
+        // Faint dusty gossamer
+        gradient.addColorStop(0.0, 'rgba(0,0,0,0.0)');
+        gradient.addColorStop(0.1, 'rgba(160,130,100,0.08)');
+        gradient.addColorStop(0.9, 'rgba(160,130,100,0.02)');
+        gradient.addColorStop(1.0, 'rgba(0,0,0,0.0)');
+    } else {
+        gradient.addColorStop(0.0, 'rgba(255,255,255,0.0)');
+        gradient.addColorStop(0.5, 'rgba(255,255,255,0.8)');
+        gradient.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    }
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1, 1024);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.format = THREE.RGBAFormat;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+}
 // Real world: Sun radius = 6.96e8m, Earth = 6.37e6m, Moon = 1.74e6m
 // Moon-Earth distance = 3.84e8m, Earth-Sun distance = 1.496e11m (1 AU)
 
@@ -1031,6 +1208,7 @@ export class BodyRenderer {
         starspotsEnabled: false,
         flareQuality: 'Low',
     };
+    private ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways' = 'Performance';
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
@@ -1116,6 +1294,10 @@ export class BodyRenderer {
         for (const mesh of this.bodies.values()) {
             mesh.setFlareFrequencyMode(mode);
         }
+    }
+
+    setRingQuality(quality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways'): void {
+        this.ringQuality = quality;
     }
 
     setFlareBrightness(brightness: number): void {
@@ -1322,6 +1504,21 @@ export class BodyRenderer {
             this.gridGroup.position.set(-origin.x, -origin.y, -origin.z);
         }
 
+        // Find primary light source (first star) for ring lighting
+        let sunPos = new THREE.Vector3(0, 0, 0);
+        let idx = 0;
+        for (const [id, mesh] of this.bodies) {
+            if (mesh.type === 'star' && idx * 3 + 2 < positions.length) {
+                sunPos.set(
+                    positions[idx * 3] - origin.x,
+                    positions[idx * 3 + 1] - origin.y,
+                    positions[idx * 3 + 2] - origin.z
+                );
+                break;
+            }
+            idx++;
+        }
+
         let i = 0;
         for (const [id, mesh] of this.bodies) {
             if (i * 3 + 2 < positions.length) {
@@ -1335,6 +1532,11 @@ export class BodyRenderer {
                 const localZ = worldZ - origin.z;
 
                 mesh.group.position.set(localX, localY, localZ);
+
+                // Update ring quality dynamically based on distance
+                const distanceToCamera = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
+                mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
+                mesh.updateRingLighting(sunPos, mesh.group.position, this.renderScale);
 
                 // Update label position (offset above body)
                 const label = this.bodyLabels.get(id);
@@ -1692,6 +1894,8 @@ class BodyMesh {
     private starMaterial: THREE.ShaderMaterial | null = null;
     private granulationTexture: THREE.Texture | null = null;
     private flareSystem: StarFlareSystem | null = null;
+    private ringMesh: THREE.Mesh | null = null;
+    private ringData: { innerMult: number, outerMult: number } | null = null;
 
     // Expose for dynamic rescaling
     readonly realRadius: number;
@@ -1796,6 +2000,50 @@ class BodyMesh {
         // F3: Atmosphere shell for bodies with atmosphere data
         if (body.atmosphere && body.atmosphere.height > 0) {
             this.addAtmosphereShell(body, segmentsWidth, segmentsHeight);
+        }
+
+        // F5: Planetary Rings
+        if (body.rings) {
+            this.ringData = {
+                innerMult: body.rings.innerRadiusMult,
+                outerMult: body.rings.outerRadiusMult
+            };
+            const ringGeom = new THREE.RingGeometry(
+                initialRadius * body.rings.innerRadiusMult,
+                initialRadius * body.rings.outerRadiusMult,
+                128, 1
+            );
+            // Fix UVs so v maps from 0 to 1 based on radius
+            const pos = ringGeom.attributes.position;
+            const uvs = ringGeom.attributes.uv;
+            for (let i = 0; i < pos.count; i++) {
+                const vec = new THREE.Vector3().fromBufferAttribute(pos, i);
+                const r = vec.length();
+                const v = (r - initialRadius * body.rings.innerRadiusMult) / (initialRadius * (body.rings.outerRadiusMult - body.rings.innerRadiusMult));
+                uvs.setY(i, v);
+            }
+            
+            const ringTex = createRingTexture(body.rings.texturePreset);
+            const ringMat = new THREE.MeshBasicMaterial({
+                map: ringTex,
+                color: 0xffffff,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: body.rings.baseOpacity,
+                depthWrite: false, // Prevents z-fighting artifacts
+            });
+            this.ringMesh = new THREE.Mesh(ringGeom, ringMat);
+            this.ringMesh.renderOrder = 2; // Render after the planet
+            this.ringMesh.userData.preset = body.rings.texturePreset;
+
+            // Rings align with the equator. RingGeometry normal is +Z.
+            // We want to align the normal with the spin axis.
+            const tilt = body.axialTilt ?? 0;
+            const axisDir = new THREE.Vector3(-Math.sin(tilt), Math.cos(tilt), 0).normalize();
+            const upZ = new THREE.Vector3(0, 0, 1);
+            this.ringMesh.quaternion.setFromUnitVectors(upZ, axisDir);
+            
+            this.group.add(this.ringMesh);
         }
     }
 
@@ -1931,6 +2179,11 @@ class BodyMesh {
             }
         }
 
+        // Scale ring mesh
+        if (this.ringMesh) {
+            this.ringMesh.scale.setScalar(radius);
+        }
+
         // Also scale glow sprites for stars
         for (const child of this.group.children) {
             if (child instanceof THREE.Sprite) {
@@ -1986,6 +2239,76 @@ class BodyMesh {
 
         const texture = new THREE.CanvasTexture(canvas);
         return texture;
+    }
+
+    updateRingQuality(globalQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways', distanceToCamera: number, renderScale: number): void {
+        if (!this.ringMesh) return;
+        
+        let useHighQuality = false;
+        if (globalQuality === 'HighQualityAlways') {
+            useHighQuality = true;
+        } else if (globalQuality === 'HighQualityClose') {
+            const visualRadius = this.realRadius * renderScale;
+            const threshold = visualRadius * 100;
+            useHighQuality = distanceToCamera < threshold;
+        }
+
+        const isCurrentlyHighQuality = this.ringMesh.material instanceof THREE.ShaderMaterial;
+
+        if (useHighQuality !== isCurrentlyHighQuality) {
+            const oldMat = this.ringMesh.material as THREE.Material;
+            let map = 'map' in oldMat ? (oldMat as any).map : null;
+            let opacity = 'opacity' in oldMat ? (oldMat as any).opacity : null;
+            if (oldMat instanceof THREE.ShaderMaterial && oldMat.uniforms.u_ringMap) {
+                map = oldMat.uniforms.u_ringMap.value;
+                opacity = oldMat.userData.baseOpacity;
+            }
+
+            if (useHighQuality) {
+                // Determine scattering g parameter based on preset
+                let g = 0.3; // Default for dusty/dark rings (Uranus, Neptune, Jupiter)
+                const isSaturn = map && map.image && map.image.height === 1024; // Simple check or pass it from body.
+                // We don't have the preset name here easily, but we can just use 0.65 as a generic forward scattering
+                // if it's Saturn, otherwise 0.3. Let's just use 0.5 as a compromise or we can store it in userData.
+                g = this.ringMesh.userData.preset === 'saturn' ? 0.7 : 0.3;
+                
+                const shaderMat = new THREE.ShaderMaterial({
+                    vertexShader: RING_VERTEX,
+                    fragmentShader: RING_FRAGMENT,
+                    uniforms: {
+                        u_ringMap: { value: map },
+                        u_sunPos: { value: new THREE.Vector3(0, 0, 0) },
+                        u_planetCenter: { value: new THREE.Vector3(0, 0, 0) },
+                        u_planetRadius: { value: 1.0 }, // Updated dynamically
+                        u_g: { value: g }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                });
+                shaderMat.userData.baseOpacity = opacity; // Store to restore later if needed
+                
+                this.ringMesh.material = shaderMat;
+            } else {
+                this.ringMesh.material = new THREE.MeshBasicMaterial({
+                    map: map,
+                    color: 0xffffff,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: opacity || 1,
+                    depthWrite: false,
+                });
+            }
+            oldMat.dispose();
+        }
+    }
+
+    updateRingLighting(sunPos: THREE.Vector3, planetPos: THREE.Vector3, renderScale: number): void {
+        if (!this.ringMesh || !(this.ringMesh.material instanceof THREE.ShaderMaterial)) return;
+        const mat = this.ringMesh.material as THREE.ShaderMaterial;
+        mat.uniforms.u_sunPos.value.copy(sunPos);
+        mat.uniforms.u_planetCenter.value.copy(planetPos);
+        mat.uniforms.u_planetRadius.value = scaleRadius(this.realRadius * renderScale);
     }
 
     dispose(): void {
