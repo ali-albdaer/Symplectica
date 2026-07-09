@@ -1570,8 +1570,8 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     uranus.parent_id = Some(sun_id);
     uranus.color = hex_to_rgb(0x72b4c4);
     uranus.rings = Some(RingParameters {
-        inner_radius_mult: 1.64,
-        outer_radius_mult: 2.0,
+        inner_radius_mult: 1.56,
+        outer_radius_mult: 3.90,
         texture_preset: "uranus".to_string(),
         base_opacity: 0.3,
     });
@@ -1601,8 +1601,8 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     neptune.parent_id = Some(sun_id);
     neptune.color = hex_to_rgb(0x3d5ef5);
     neptune.rings = Some(RingParameters {
-        inner_radius_mult: 1.69,
-        outer_radius_mult: 2.54,
+        inner_radius_mult: 1.70,
+        outer_radius_mult: 2.60,
         texture_preset: "neptune".to_string(),
         base_opacity: 0.15,
     });
@@ -2147,8 +2147,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     uranus.parent_id = Some(sun_id);
     uranus.color = hex_to_rgb(0x72b4c4);
     uranus.rings = Some(RingParameters {
-        inner_radius_mult: 1.64,
-        outer_radius_mult: 2.0,
+        inner_radius_mult: 1.56,
+        outer_radius_mult: 3.90,
         texture_preset: "uranus".to_string(),
         base_opacity: 0.3,
     });
@@ -2274,8 +2274,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     neptune.parent_id = Some(sun_id);
     neptune.color = hex_to_rgb(0x3d5ef5);
     neptune.rings = Some(RingParameters {
-        inner_radius_mult: 1.69,
-        outer_radius_mult: 2.54,
+        inner_radius_mult: 1.70,
+        outer_radius_mult: 2.60,
         texture_preset: "neptune".to_string(),
         base_opacity: 0.15,
     });

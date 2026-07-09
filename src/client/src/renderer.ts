@@ -366,33 +366,79 @@ export function getDefaultRingProfile(preset: string): RingProfile {
             { pos: 1.000, color: '#000000', alpha: 0.00 },
         ];
     } else if (preset === 'uranus') {
-        scatteringG = 0.3;
+        scatteringG = 0.5;
         stops = [
-            { pos: 0.00, color: '#000000', alpha: 0.0 },
-            { pos: 0.04, color: '#3c414b', alpha: 0.0 },
-            { pos: 0.05, color: '#3c414b', alpha: 0.45 },
-            { pos: 0.06, color: '#3c414b', alpha: 0.0 },
-            { pos: 0.34, color: '#000000', alpha: 0.0 },
-            { pos: 0.35, color: '#4a4f52', alpha: 0.45 },
-            { pos: 0.36, color: '#000000', alpha: 0.0 },
-            { pos: 0.59, color: '#000000', alpha: 0.0 },
-            { pos: 0.60, color: '#3c414b', alpha: 0.6 },
-            { pos: 0.61, color: '#000000', alpha: 0.0 },
-            { pos: 0.98, color: '#000000', alpha: 0.0 },
-            { pos: 0.99, color: '#505558', alpha: 0.9 },
-            { pos: 1.00, color: '#000000', alpha: 0.0 },
+            // Zeta
+            { pos: 0.000, color: '#333333', alpha: 0.05 },
+            { pos: 0.035, color: '#333333', alpha: 0.05 },
+            { pos: 0.036, color: '#000000', alpha: 0.00 },
+            // 6
+            { pos: 0.038, color: '#555555', alpha: 0.80 },
+            { pos: 0.039, color: '#000000', alpha: 0.00 },
+            // 5
+            { pos: 0.045, color: '#555555', alpha: 0.80 },
+            { pos: 0.046, color: '#000000', alpha: 0.00 },
+            // 4
+            { pos: 0.051, color: '#555555', alpha: 0.80 },
+            { pos: 0.052, color: '#000000', alpha: 0.00 },
+            // Alpha
+            { pos: 0.087, color: '#555555', alpha: 0.80 },
+            { pos: 0.088, color: '#000000', alpha: 0.00 },
+            // Beta
+            { pos: 0.103, color: '#555555', alpha: 0.80 },
+            { pos: 0.104, color: '#000000', alpha: 0.00 },
+            // Eta
+            { pos: 0.128, color: '#555555', alpha: 0.80 },
+            { pos: 0.129, color: '#000000', alpha: 0.00 },
+            // Gamma
+            { pos: 0.136, color: '#555555', alpha: 0.80 },
+            { pos: 0.137, color: '#000000', alpha: 0.00 },
+            // Delta
+            { pos: 0.147, color: '#555555', alpha: 0.80 },
+            { pos: 0.148, color: '#000000', alpha: 0.00 },
+            // Lambda
+            { pos: 0.176, color: '#555555', alpha: 0.30 },
+            { pos: 0.177, color: '#000000', alpha: 0.00 },
+            // Epsilon
+            { pos: 0.194, color: '#000000', alpha: 0.00 },
+            { pos: 0.195, color: '#888888', alpha: 1.00 },
+            { pos: 0.197, color: '#000000', alpha: 0.00 },
+            // Nu
+            { pos: 0.460, color: '#000000', alpha: 0.00 },
+            { pos: 0.468, color: '#774444', alpha: 0.15 },
+            { pos: 0.475, color: '#774444', alpha: 0.15 },
+            { pos: 0.480, color: '#000000', alpha: 0.00 },
+            // Mu
+            { pos: 0.960, color: '#000000', alpha: 0.00 },
+            { pos: 0.979, color: '#446699', alpha: 0.15 },
+            { pos: 0.990, color: '#446699', alpha: 0.15 },
+            { pos: 1.000, color: '#000000', alpha: 0.00 },
         ];
     } else if (preset === 'neptune') {
-        scatteringG = 0.3;
+        scatteringG = 0.5;
         stops = [
-            { pos: 0.00, color: '#000000', alpha: 0.0 },
-            { pos: 0.05, color: '#453535', alpha: 0.2 },
-            { pos: 0.15, color: '#000000', alpha: 0.0 },
-            { pos: 0.53, color: '#524040', alpha: 0.3 },
-            { pos: 0.55, color: '#000000', alpha: 0.0 },
-            { pos: 0.98, color: '#000000', alpha: 0.0 },
-            { pos: 0.99, color: '#5a4545', alpha: 0.45 },
-            { pos: 1.00, color: '#000000', alpha: 0.0 },
+            // Galle (broad, faint)
+            { pos: 0.000, color: '#000000', alpha: 0.00 },
+            { pos: 0.007, color: '#5a606a', alpha: 0.20 },
+            { pos: 0.050, color: '#5a606a', alpha: 0.20 },
+            { pos: 0.097, color: '#000000', alpha: 0.00 },
+            // Le Verrier (narrow)
+            { pos: 0.510, color: '#000000', alpha: 0.00 },
+            { pos: 0.512, color: '#5a606a', alpha: 0.80 },
+            { pos: 0.514, color: '#000000', alpha: 0.00 },
+            // Lassell (broad sheet)
+            { pos: 0.600, color: '#000000', alpha: 0.00 },
+            { pos: 0.602, color: '#5a606a', alpha: 0.20 },
+            // Arago (enhancement)
+            { pos: 0.690, color: '#5a606a', alpha: 0.20 },
+            { pos: 0.692, color: '#5a606a', alpha: 0.40 },
+            { pos: 0.694, color: '#5a606a', alpha: 0.20 },
+            { pos: 0.782, color: '#000000', alpha: 0.00 },
+            // Adams (narrow, dense arcs)
+            { pos: 0.949, color: '#000000', alpha: 0.00 },
+            { pos: 0.951, color: '#6a707a', alpha: 0.90 },
+            { pos: 0.953, color: '#000000', alpha: 0.00 },
+            { pos: 1.000, color: '#000000', alpha: 0.00 },
         ];
     } else if (preset === 'jupiter') {
         scatteringG = 0.5;
@@ -1964,7 +2010,7 @@ class BodyMesh {
     private starMaterial: THREE.ShaderMaterial | null = null;
     private granulationTexture: THREE.Texture | null = null;
     private flareSystem: StarFlareSystem | null = null;
-    private ringMesh: THREE.Mesh | null = null;
+    public ringMesh: THREE.Mesh | null = null;
     private ringData: { innerMult: number, outerMult: number } | null = null;
 
     // Expose for dynamic rescaling
