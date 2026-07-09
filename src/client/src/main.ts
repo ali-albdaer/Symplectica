@@ -267,6 +267,42 @@ class NBodyClient {
                 );
                 this.bodyRenderer.setFlareFrequencyMode(experimental.flareFrequencyMode);
                 this.bodyRenderer.setRingQuality(experimental.ringQuality);
+            },
+            () => { // onRingGeneratorLoadRequest
+                if (this.followBodyIndex !== null && this.followBodyIndex >= 0) {
+                    const body = this.getFollowBody(this.followBodyIndex);
+                    if (body) {
+                        const profile = this.bodyRenderer.getBodyRingProfile(body.id);
+                        if (profile) {
+                            this.optionsPanel.setRingGeneratorProfile(profile);
+                        } else {
+                            console.warn("Followed body does not have rings.");
+                        }
+                    }
+                }
+            },
+            (profile) => { // onRingGeneratorApply
+                if (this.followBodyIndex !== null && this.followBodyIndex >= 0) {
+                    const body = this.getFollowBody(this.followBodyIndex);
+                    if (body) {
+                        this.bodyRenderer.updateBodyRingProfile(body.id, profile);
+                    }
+                }
+            },
+            (profile) => { // onRingGeneratorExport
+                let out = `{\n  scatteringG: ${profile.scatteringG},\n  baseOpacity: ${profile.baseOpacity},\n  stops: [\n`;
+                for (const s of profile.stops) {
+                    out += `    { pos: ${s.pos.toFixed(2)}, color: '${s.color}', alpha: ${s.alpha.toFixed(2)} },\n`;
+                }
+                out += `  ]\n}`;
+                
+                // Copy to clipboard
+                navigator.clipboard.writeText(out).then(() => {
+                    console.log("Ring profile copied to clipboard:\n" + out);
+                }).catch(err => {
+                    console.error("Failed to copy:", err);
+                    console.log("Ring profile:\n" + out);
+                });
             }
         );
         this.optionsPanel.setPresetRenderScale(

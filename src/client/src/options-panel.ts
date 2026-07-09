@@ -5,6 +5,7 @@
  */
 
 import { APP_DEFAULTS } from './defaults';
+import { RingProfile, RingStop } from './renderer';
 
 export interface VisualizationOptions {
     showOrbitTrails: boolean;
@@ -24,11 +25,16 @@ export interface VisualizationOptions {
 }
 
 export interface ExperimentalOptions {
-    flareFrequencyMode: 'fixed' | 'scaled';
-    flareBrightness: number;
     flaresVisible: boolean;
-    fixedFlareRate: number; // flares per 100s sim time, 0.5–10
+    flareFrequencyMode: 'fixed' | 'scaled';
+    fixedFlareRate: number;
+    flareBrightness: number;
     ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways';
+    
+    // Ring Generator Events (these don't store state, they just fire actions)
+    onRingGeneratorLoadRequest?: () => void;
+    onRingGeneratorApply?: (profile: RingProfile) => void;
+    onRingGeneratorExport?: (profile: RingProfile) => void;
 }
 
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
@@ -56,6 +62,12 @@ export class OptionsPanel {
     private onOrbitalZoomDampingChange?: (damping: number) => void;
     private onFovChange?: (fov: number) => void;
     private onExperimentalChange?: (options: ExperimentalOptions) => void;
+    private onRingGeneratorLoadRequest?: () => void;
+    private onRingGeneratorApply?: (profile: RingProfile) => void;
+    private onRingGeneratorExport?: (profile: RingProfile) => void;
+
+    // Ring Generator internal state
+    private currentRingProfile: RingProfile = { stops: [], baseOpacity: 1.0, scatteringG: 0.3 };
 
     // State
     private presetName: VisualizationPresetName;
@@ -167,6 +179,9 @@ export class OptionsPanel {
         onFovChange?: (fov: number) => void,
         initialPreset: VisualizationPresetName = APP_DEFAULTS.visualPresetDefault,
         onExperimentalChange?: (options: ExperimentalOptions) => void,
+        onRingGeneratorLoadRequest?: () => void,
+        onRingGeneratorApply?: (profile: RingProfile) => void,
+        onRingGeneratorExport?: (profile: RingProfile) => void,
     ) {
         this.onChange = onChange;
         this.onPresetChange = onPresetChange;
@@ -182,6 +197,9 @@ export class OptionsPanel {
         this.onOrbitalZoomDampingChange = onOrbitalZoomDampingChange;
         this.onFovChange = onFovChange;
         this.onExperimentalChange = onExperimentalChange;
+        this.onRingGeneratorLoadRequest = onRingGeneratorLoadRequest;
+        this.onRingGeneratorApply = onRingGeneratorApply;
+        this.onRingGeneratorExport = onRingGeneratorExport;
         this.presetName = initialPreset;
         this.options = { ...DEFAULTS };
         this.container = this.createUI();
@@ -450,6 +468,39 @@ export class OptionsPanel {
                         </select>
                     </div>
                 </section>
+                <section class="opt-section">
+                    <h3>Ring Generator (Followed Body)</h3>
+                    <div class="opt-row">
+                        <button id="opt-ring-gen-load" class="opt-btn">Load Current Body</button>
+                    </div>
+                    <div class="opt-field">
+                        <label>Base Opacity</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-ring-gen-opacity" min="0" max="2" step="0.05" value="1.0">
+                            <span id="opt-ring-gen-opacity-val">1.0</span>
+                        </div>
+                    </div>
+                    <div class="opt-field">
+                        <label>Scattering (g)</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-ring-gen-g" min="-0.99" max="0.99" step="0.01" value="0.3">
+                            <span id="opt-ring-gen-g-val">0.3</span>
+                        </div>
+                    </div>
+                    <div class="opt-field" style="margin-top:10px;">
+                        <label style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>Gradient Stops</span>
+                            <button id="opt-ring-gen-add-stop" class="opt-btn" style="padding:2px 6px; font-size:12px;">+ Add Stop</button>
+                        </label>
+                        <div id="opt-ring-gen-stops" style="display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto;border:1px solid #444;padding:5px;background:#222;">
+                            <!-- Stops injected here -->
+                        </div>
+                    </div>
+                    <div class="opt-row" style="margin-top:10px;gap:5px;">
+                        <button id="opt-ring-gen-apply" class="opt-btn" style="flex:1;">Apply (Preview)</button>
+                        <button id="opt-ring-gen-export" class="opt-btn" style="flex:1;">Export Code</button>
+                    </div>
+                </section>
             </div>
         `;
 
@@ -636,6 +687,16 @@ export class OptionsPanel {
                 opacity: 0.4;
                 pointer-events: none;
             }
+            .opt-btn {
+                background: #4fc3f7;
+                color: #000;
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: bold;
+            }
+            .opt-btn:hover { background: #81d4fa; }
         `;
         document.head.appendChild(style);
         return container;
@@ -925,7 +986,144 @@ export class OptionsPanel {
             this.experimentalOptions.ringQuality = this.ringQualitySelect.value as 'Performance' | 'HighQualityClose' | 'HighQualityAlways';
             this.emitExperimentalChange();
         });
+
+        this.setupRingGeneratorEvents();
     }
+
+    private syncRingGeneratorProfileFromUI(): void {
+        const rgOpacityInput = this.container.querySelector('#opt-ring-gen-opacity') as HTMLInputElement;
+        const rgGInput = this.container.querySelector('#opt-ring-gen-g') as HTMLInputElement;
+        
+        this.currentRingProfile.baseOpacity = parseFloat(rgOpacityInput.value);
+        this.currentRingProfile.scatteringG = parseFloat(rgGInput.value);
+        
+        // Stops are synced continuously in their own inputs
+        this.currentRingProfile.stops.sort((a, b) => a.pos - b.pos);
+    }
+
+    private renderRingGeneratorStops(): void {
+        const stopsContainer = this.container.querySelector('#opt-ring-gen-stops') as HTMLDivElement;
+        if (!stopsContainer) return;
+        stopsContainer.innerHTML = '';
+        
+        this.currentRingProfile.stops.forEach((stop, index) => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '5px';
+            row.style.background = '#333';
+            row.style.padding = '2px';
+            row.style.borderRadius = '3px';
+
+            const posInput = document.createElement('input');
+            posInput.type = 'number';
+            posInput.min = '0';
+            posInput.max = '1';
+            posInput.step = '0.01';
+            posInput.value = stop.pos.toString();
+            posInput.style.width = '50px';
+            posInput.addEventListener('change', () => { stop.pos = parseFloat(posInput.value) || 0; });
+
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = stop.color.length === 7 ? stop.color : '#ffffff';
+            colorInput.style.width = '30px';
+            colorInput.style.padding = '0';
+            colorInput.style.border = 'none';
+            colorInput.addEventListener('input', () => { stop.color = colorInput.value; });
+
+            const alphaInput = document.createElement('input');
+            alphaInput.type = 'range';
+            alphaInput.min = '0';
+            alphaInput.max = '1';
+            alphaInput.step = '0.01';
+            alphaInput.value = stop.alpha.toString();
+            alphaInput.style.flex = '1';
+            alphaInput.style.width = '50px';
+            alphaInput.addEventListener('input', () => { stop.alpha = parseFloat(alphaInput.value); });
+
+            const delBtn = document.createElement('button');
+            delBtn.textContent = 'x';
+            delBtn.className = 'opt-btn';
+            delBtn.style.padding = '1px 5px';
+            delBtn.addEventListener('click', () => {
+                this.currentRingProfile.stops.splice(index, 1);
+                this.renderRingGeneratorStops();
+            });
+
+            row.appendChild(posInput);
+            row.appendChild(colorInput);
+            row.appendChild(alphaInput);
+            row.appendChild(delBtn);
+            stopsContainer.appendChild(row);
+        });
+    }
+
+    private setupRingGeneratorEvents(): void {
+        const rgLoadBtn = this.container.querySelector('#opt-ring-gen-load') as HTMLButtonElement;
+        const rgApplyBtn = this.container.querySelector('#opt-ring-gen-apply') as HTMLButtonElement;
+        const rgExportBtn = this.container.querySelector('#opt-ring-gen-export') as HTMLButtonElement;
+        const rgAddStopBtn = this.container.querySelector('#opt-ring-gen-add-stop') as HTMLButtonElement;
+        const rgOpacityInput = this.container.querySelector('#opt-ring-gen-opacity') as HTMLInputElement;
+        const rgOpacityVal = this.container.querySelector('#opt-ring-gen-opacity-val') as HTMLSpanElement;
+        const rgGInput = this.container.querySelector('#opt-ring-gen-g') as HTMLInputElement;
+        const rgGVal = this.container.querySelector('#opt-ring-gen-g-val') as HTMLSpanElement;
+
+        rgLoadBtn?.addEventListener('click', () => {
+            if (this.onRingGeneratorLoadRequest) this.onRingGeneratorLoadRequest();
+        });
+
+        rgApplyBtn?.addEventListener('click', () => {
+            this.syncRingGeneratorProfileFromUI();
+            if (this.onRingGeneratorApply) this.onRingGeneratorApply(this.currentRingProfile);
+        });
+
+        rgExportBtn?.addEventListener('click', () => {
+            this.syncRingGeneratorProfileFromUI();
+            if (this.onRingGeneratorExport) this.onRingGeneratorExport(this.currentRingProfile);
+        });
+
+        rgAddStopBtn?.addEventListener('click', () => {
+            this.currentRingProfile.stops.push({ pos: 0.5, color: '#ffffff', alpha: 1.0 });
+            this.currentRingProfile.stops.sort((a, b) => a.pos - b.pos);
+            this.renderRingGeneratorStops();
+        });
+
+        rgOpacityInput?.addEventListener('input', () => {
+            rgOpacityVal.textContent = parseFloat(rgOpacityInput.value).toFixed(2);
+        });
+
+        rgGInput?.addEventListener('input', () => {
+            rgGVal.textContent = parseFloat(rgGInput.value).toFixed(2);
+        });
+    }
+
+    // Call this from main.ts when load request is fulfilled
+    setRingGeneratorProfile(profile: RingProfile): void {
+        // Deep copy
+        this.currentRingProfile = {
+            baseOpacity: profile.baseOpacity,
+            scatteringG: profile.scatteringG,
+            stops: profile.stops.map(s => ({ ...s }))
+        };
+
+        const rgOpacityInput = this.container.querySelector('#opt-ring-gen-opacity') as HTMLInputElement;
+        const rgOpacityVal = this.container.querySelector('#opt-ring-gen-opacity-val') as HTMLSpanElement;
+        const rgGInput = this.container.querySelector('#opt-ring-gen-g') as HTMLInputElement;
+        const rgGVal = this.container.querySelector('#opt-ring-gen-g-val') as HTMLSpanElement;
+
+        if (rgOpacityInput) {
+            rgOpacityInput.value = this.currentRingProfile.baseOpacity.toString();
+            rgOpacityVal.textContent = this.currentRingProfile.baseOpacity.toFixed(2);
+        }
+        if (rgGInput) {
+            rgGInput.value = this.currentRingProfile.scatteringG.toString();
+            rgGVal.textContent = this.currentRingProfile.scatteringG.toFixed(2);
+        }
+
+        this.renderRingGeneratorStops();
+    }
+
 
     private setupTabs(): void {
         const tabs = this.container.querySelectorAll('.opt-tab');

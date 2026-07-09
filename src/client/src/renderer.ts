@@ -302,8 +302,96 @@ interface StarRenderOptions {
     flareQuality: FlareQuality;
 }
 
+export interface RingStop {
+    pos: number;
+    color: string; // e.g. 'rgba(255,255,255,0.5)' or hex '#ffffff' + alpha
+    alpha: number;
+}
+
+export interface RingProfile {
+    stops: RingStop[];
+    scatteringG: number;
+    baseOpacity: number;
+}
+
+export function getDefaultRingProfile(preset: string): RingProfile {
+    let stops: RingStop[] = [];
+    let scatteringG = 0.3;
+    let baseOpacity = 1.0;
+
+    if (preset === 'saturn') {
+        scatteringG = 0.7;
+        stops = [
+            { pos: 0.00, color: '#000000', alpha: 0.0 },
+            { pos: 0.12, color: '#b8a88a', alpha: 0.05 },
+            { pos: 0.30, color: '#c3b294', alpha: 0.35 },
+            { pos: 0.31, color: '#e6d7be', alpha: 0.85 },
+            { pos: 0.50, color: '#e6d7be', alpha: 0.95 },
+            { pos: 0.68, color: '#e1d2b9', alpha: 0.8 },
+            { pos: 0.70, color: '#000000', alpha: 0.0 },
+            { pos: 0.73, color: '#b4a58c', alpha: 0.05 },
+            { pos: 0.77, color: '#000000', alpha: 0.0 },
+            { pos: 0.78, color: '#d7c8a5', alpha: 0.7 },
+            { pos: 0.88, color: '#d7c8a5', alpha: 0.6 },
+            { pos: 0.90, color: '#000000', alpha: 0.0 },
+            { pos: 0.92, color: '#000000', alpha: 0.0 },
+            { pos: 0.93, color: '#d2c3a0', alpha: 0.5 },
+            { pos: 0.96, color: '#cdbe9b', alpha: 0.4 },
+            { pos: 0.97, color: '#000000', alpha: 0.0 },
+            { pos: 0.98, color: '#c8b896', alpha: 0.3 },
+            { pos: 0.99, color: '#c8b896', alpha: 0.1 },
+            { pos: 1.00, color: '#000000', alpha: 0.0 },
+        ];
+    } else if (preset === 'uranus') {
+        scatteringG = 0.3;
+        stops = [
+            { pos: 0.00, color: '#000000', alpha: 0.0 },
+            { pos: 0.04, color: '#3c414b', alpha: 0.0 },
+            { pos: 0.05, color: '#3c414b', alpha: 0.45 },
+            { pos: 0.06, color: '#3c414b', alpha: 0.0 },
+            { pos: 0.34, color: '#000000', alpha: 0.0 },
+            { pos: 0.35, color: '#4a4f52', alpha: 0.45 },
+            { pos: 0.36, color: '#000000', alpha: 0.0 },
+            { pos: 0.59, color: '#000000', alpha: 0.0 },
+            { pos: 0.60, color: '#3c414b', alpha: 0.6 },
+            { pos: 0.61, color: '#000000', alpha: 0.0 },
+            { pos: 0.98, color: '#000000', alpha: 0.0 },
+            { pos: 0.99, color: '#505558', alpha: 0.9 },
+            { pos: 1.00, color: '#000000', alpha: 0.0 },
+        ];
+    } else if (preset === 'neptune') {
+        scatteringG = 0.3;
+        stops = [
+            { pos: 0.00, color: '#000000', alpha: 0.0 },
+            { pos: 0.05, color: '#453535', alpha: 0.2 },
+            { pos: 0.15, color: '#000000', alpha: 0.0 },
+            { pos: 0.53, color: '#524040', alpha: 0.3 },
+            { pos: 0.55, color: '#000000', alpha: 0.0 },
+            { pos: 0.98, color: '#000000', alpha: 0.0 },
+            { pos: 0.99, color: '#5a4545', alpha: 0.45 },
+            { pos: 1.00, color: '#000000', alpha: 0.0 },
+        ];
+    } else if (preset === 'jupiter') {
+        scatteringG = 0.5;
+        stops = [
+            { pos: 0.00, color: '#000000', alpha: 0.0 },
+            { pos: 0.10, color: '#a08264', alpha: 0.08 },
+            { pos: 0.90, color: '#a08264', alpha: 0.02 },
+            { pos: 1.00, color: '#000000', alpha: 0.0 },
+        ];
+    } else {
+        stops = [
+            { pos: 0.00, color: '#ffffff', alpha: 0.0 },
+            { pos: 0.50, color: '#ffffff', alpha: 0.8 },
+            { pos: 1.00, color: '#ffffff', alpha: 0.0 },
+        ];
+    }
+
+    return { stops, scatteringG, baseOpacity };
+}
+
 // Body scaling for visualization
-function createRingTexture(preset: string): THREE.Texture {
+function createRingTexture(profile: RingProfile): THREE.Texture {
     const canvas = document.createElement('canvas');
     canvas.width = 1;
     canvas.height = 1024;
@@ -311,73 +399,16 @@ function createRingTexture(preset: string): THREE.Texture {
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 1024);
 
-    if (preset === 'saturn') {
-        // C Ring (0.12 - 0.30)
-        gradient.addColorStop(0.00, 'rgba(0,0,0,0.0)');
-        gradient.addColorStop(0.12, 'rgba(184,168,138,0.05)');
-        gradient.addColorStop(0.30, 'rgba(195,178,148,0.35)');
-        // B Ring (0.30 - 0.70)
-        gradient.addColorStop(0.31, 'rgba(230,215,190,0.85)');
-        gradient.addColorStop(0.50, 'rgba(230,215,190,0.95)');
-        gradient.addColorStop(0.68, 'rgba(225,210,185,0.8)');
-        gradient.addColorStop(0.70, 'rgba(0,0,0,0.0)'); // Cassini start
-        // Cassini Division (0.70 - 0.77)
-        gradient.addColorStop(0.73, 'rgba(180,165,140,0.05)'); // faint material inside division
-        gradient.addColorStop(0.77, 'rgba(0,0,0,0.0)'); // Cassini end
-        // A Ring (0.77 - 0.96)
-        gradient.addColorStop(0.78, 'rgba(215,200,165,0.7)');
-        gradient.addColorStop(0.88, 'rgba(215,200,165,0.6)');
-        gradient.addColorStop(0.90, 'rgba(0,0,0,0.0)'); // Encke Gap
-        gradient.addColorStop(0.92, 'rgba(0,0,0,0.0)');
-        gradient.addColorStop(0.93, 'rgba(210,195,160,0.5)');
-        gradient.addColorStop(0.96, 'rgba(205,190,155,0.4)');
-        gradient.addColorStop(0.97, 'rgba(0,0,0,0.0)');
-        // F Ring (~0.99)
-        gradient.addColorStop(0.98, 'rgba(200,184,150,0.3)');
-        gradient.addColorStop(0.99, 'rgba(200,184,150,0.1)');
-        gradient.addColorStop(1.00, 'rgba(0,0,0,0.0)');
-    } else if (preset === 'uranus') {
-        // Dark charcoal narrow bands
-        gradient.addColorStop(0.00, 'rgba(0,0,0,0.0)');
-        // 6 ring (~0.05)
-        gradient.addColorStop(0.04, 'rgba(60,65,75,0.0)');
-        gradient.addColorStop(0.05, 'rgba(60,65,75,0.15)');
-        gradient.addColorStop(0.06, 'rgba(60,65,75,0.0)');
-        // alpha, beta, etc
-        gradient.addColorStop(0.34, 'rgba(0,0,0,0.0)');
-        gradient.addColorStop(0.35, 'rgba(74,79,82,0.15)');
-        gradient.addColorStop(0.36, 'rgba(0,0,0,0.0)');
-        
-        gradient.addColorStop(0.59, 'rgba(0,0,0,0.0)');
-        gradient.addColorStop(0.60, 'rgba(60,65,75,0.2)');
-        gradient.addColorStop(0.61, 'rgba(0,0,0,0.0)');
-        // epsilon ring (outer, brightest)
-        gradient.addColorStop(0.98, 'rgba(0,0,0,0.0)');
-        gradient.addColorStop(0.99, 'rgba(80,85,88,0.35)');
-        gradient.addColorStop(1.00, 'rgba(0,0,0,0.0)');
-    } else if (preset === 'neptune') {
-        // Faint reddish arcs
-        gradient.addColorStop(0.00, 'rgba(0,0,0,0.0)');
-        // Galle
-        gradient.addColorStop(0.05, 'rgba(69,53,53,0.05)');
-        gradient.addColorStop(0.15, 'rgba(0,0,0,0.0)');
-        // Le Verrier
-        gradient.addColorStop(0.53, 'rgba(82,64,64,0.08)');
-        gradient.addColorStop(0.55, 'rgba(0,0,0,0.0)');
-        // Adams (outer)
-        gradient.addColorStop(0.98, 'rgba(0,0,0,0.0)');
-        gradient.addColorStop(0.99, 'rgba(90,69,69,0.12)');
-        gradient.addColorStop(1.00, 'rgba(0,0,0,0.0)');
-    } else if (preset === 'jupiter') {
-        // Faint dusty gossamer
-        gradient.addColorStop(0.0, 'rgba(0,0,0,0.0)');
-        gradient.addColorStop(0.1, 'rgba(160,130,100,0.08)');
-        gradient.addColorStop(0.9, 'rgba(160,130,100,0.02)');
-        gradient.addColorStop(1.0, 'rgba(0,0,0,0.0)');
-    } else {
-        gradient.addColorStop(0.0, 'rgba(255,255,255,0.0)');
-        gradient.addColorStop(0.5, 'rgba(255,255,255,0.8)');
-        gradient.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    for (const stop of profile.stops) {
+        // Convert hex + alpha to rgba string if needed
+        let colorStr = stop.color;
+        if (stop.color.startsWith('#')) {
+            const r = parseInt(stop.color.slice(1, 3), 16);
+            const g = parseInt(stop.color.slice(3, 5), 16);
+            const b = parseInt(stop.color.slice(5, 7), 16);
+            colorStr = `rgba(${r},${g},${b},${stop.alpha})`;
+        }
+        gradient.addColorStop(stop.pos, colorStr);
     }
 
     ctx.fillStyle = gradient;
@@ -1599,6 +1630,21 @@ export class BodyRenderer {
         line.geometry.computeBoundingSphere();
     }
 
+    updateBodyRingProfile(id: number, profile: RingProfile): void {
+        const mesh = this.bodies.get(id);
+        if (mesh) {
+            mesh.updateRingProfile(profile);
+        }
+    }
+
+    getBodyRingProfile(id: number): RingProfile | undefined {
+        const mesh = this.bodies.get(id);
+        if (mesh && mesh.ringMesh) {
+            return mesh.ringMesh.userData.profile as RingProfile;
+        }
+        return undefined;
+    }
+
     // Visualization options
     private showOrbitTrails = true;
     private showStarLabels = false;
@@ -2023,18 +2069,21 @@ class BodyMesh {
                 uvs.setY(i, v);
             }
             
-            const ringTex = createRingTexture(body.rings.texturePreset);
+            const profile = getDefaultRingProfile(body.rings.texturePreset);
+            profile.baseOpacity = body.rings.baseOpacity;
+            const ringTex = createRingTexture(profile);
             const ringMat = new THREE.MeshBasicMaterial({
                 map: ringTex,
                 color: 0xffffff,
                 side: THREE.DoubleSide,
                 transparent: true,
-                opacity: body.rings.baseOpacity,
+                opacity: profile.baseOpacity,
                 depthWrite: false, // Prevents z-fighting artifacts
             });
             this.ringMesh = new THREE.Mesh(ringGeom, ringMat);
             this.ringMesh.renderOrder = 2; // Render after the planet
             this.ringMesh.userData.preset = body.rings.texturePreset;
+            this.ringMesh.userData.profile = profile;
 
             // Rings align with the equator. RingGeometry normal is +Z.
             // We want to align the normal with the spin axis.
@@ -2309,6 +2358,27 @@ class BodyMesh {
         mat.uniforms.u_sunPos.value.copy(sunPos);
         mat.uniforms.u_planetCenter.value.copy(planetPos);
         mat.uniforms.u_planetRadius.value = scaleRadius(this.realRadius * renderScale);
+    }
+
+    updateRingProfile(profile: RingProfile): void {
+        if (!this.ringMesh) return;
+        
+        // Rebuild texture
+        const newTex = createRingTexture(profile);
+        this.ringMesh.userData.profile = profile;
+
+        const mat = this.ringMesh.material;
+        if (mat instanceof THREE.ShaderMaterial) {
+            const oldMap = mat.uniforms.u_ringMap.value as THREE.Texture | null;
+            if (oldMap) oldMap.dispose();
+            mat.uniforms.u_ringMap.value = newTex;
+            mat.uniforms.u_g.value = profile.scatteringG;
+            mat.userData.baseOpacity = profile.baseOpacity;
+        } else if (mat instanceof THREE.MeshBasicMaterial) {
+            if (mat.map) mat.map.dispose();
+            mat.map = newTex;
+            mat.opacity = profile.baseOpacity;
+        }
     }
 
     dispose(): void {
