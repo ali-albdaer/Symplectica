@@ -33,8 +33,29 @@ See [FEATURES.md](FEATURES.md) for a comprehensive list of implemented, in progr
    npm run dev
    ```
 
+## Data & Assets Scripts
+
+The repository includes helper scripts to fetch production assets and real-world ephemeris data.
+
+1. **High-Res Textures (Optional)**  
+   To download 2K high-resolution textures (from Solar System Scope) for planets, moons, and Saturn's rings, run:
+   ```bash
+   node scripts/download_textures.js
+   ```
+   This will place the textures into `src/client/public/local/textures/planets/` for use when the "Use High-Res Textures" toggle is enabled.
+
+2. **HORIZONS Ephemeris Data**  
+   To fetch high-precision state vectors and orbital elements from NASA JPL HORIZONS (useful when creating or updating physics presets), use the Python script:
+   ```bash
+   # Install dependencies first
+   pip install requests
+
+   # Fetch data for a specific epoch
+   python scripts/fetch_horizons.py --epoch 2026-01-01
+   ```
+   This script outputs structured JSON data to `scripts/fetched/` which can be translated into Symplectica physics presets.
+
 ## Sources
-All sources I used while researching physics, numerical methods, and simulation design will be listed in [SOURCES.md](SOURCES.md).
 
 ## License
 Symplectica is licensed under the [MIT LICENSE](LICENSE).
