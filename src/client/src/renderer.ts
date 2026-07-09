@@ -197,6 +197,8 @@ uniform vec3 u_planetCenter;
 uniform float u_planetRadius;
 uniform float u_g; // Henyey-Greenstein scattering parameter
 uniform float u_perfMode;
+uniform float u_isHorizontal;
+uniform float u_textureVScale;
 
 varying vec3 vWorldNormal;
 varying vec3 vViewDir;
@@ -211,7 +213,10 @@ float henyeyGreenstein(float cosTheta, float g) {
 
 void main() {
     // Look up ring color/opacity from 1D radial map
-    vec4 ring = texture2D(u_ringMap, vec2(0.5, vUv.y));
+    vec2 samplePos = u_isHorizontal > 0.5 ? vec2(vUv.y * u_textureVScale, 0.5) : vec2(0.5, vUv.y * u_textureVScale);
+    if (samplePos.x > 1.0 || samplePos.y > 1.0) discard;
+    
+    vec4 ring = texture2D(u_ringMap, samplePos);
     if (ring.a < 0.01) discard;
 
     vec3 normal = normalize(vWorldNormal);
@@ -2024,6 +2029,7 @@ class BodyMesh {
     private granulationTexture: THREE.Texture | null = null;
     private flareSystem: StarFlareSystem | null = null;
     public ringMesh: THREE.Mesh | null = null;
+    public cloudMesh: THREE.Mesh | null = null;
     private ringData: { innerMult: number, outerMult: number } | null = null;
     
     // Texture Cache for Solar System Scope textures
@@ -2244,13 +2250,16 @@ class BodyMesh {
                     u_planetCenter: { value: new THREE.Vector3() },
                     u_planetRadius: { value: 1.0 },
                     u_g: { value: g },
-                    u_perfMode: { value: 1.0 }
+                    u_perfMode: { value: starOptions.performanceMode ? 1.0 : 0.0 },
+                    u_isHorizontal: { value: 0.0 },
+                    u_textureVScale: { value: 1.0 }
                 },
                 transparent: true,
                 side: THREE.DoubleSide,
                 depthWrite: false,
             });
             ringMat.userData.baseOpacity = profile.baseOpacity;
+            ringMat.userData.proceduralMap = ringTex;
             this.ringMesh = new THREE.Mesh(ringGeom, ringMat);
             this.ringMesh.renderOrder = 2; // Render after the planet
             this.ringMesh.userData.preset = body.rings.texturePreset;
@@ -2355,6 +2364,9 @@ class BodyMesh {
         this.mesh.rotation.y = angle;
         if (this.atmosphereMesh) {
             this.atmosphereMesh.rotation.y = angle;
+        }
+        if (this.cloudMesh) {
+            this.cloudMesh.rotation.y = simTime * (this.cloudMesh.userData.rotationSpeed ?? 0);
         }
     }
 
@@ -2531,17 +2543,30 @@ class BodyMesh {
         if (this.type === 'star' || !(this.material instanceof THREE.MeshStandardMaterial)) return;
 
         const mat = this.material as THREE.MeshStandardMaterial;
+        const name = this.group.name.toLowerCase();
 
         if (!enabled) {
             // Revert to colored sphere
             mat.map = null;
             mat.color.set(this.baseColor ?? 0xffffff);
             mat.needsUpdate = true;
+            
+            // Hide clouds
+            if (this.cloudMesh) {
+                this.cloudMesh.visible = false;
+            }
+            // Revert ring to procedural
+            if (this.ringMesh && this.ringMesh.material instanceof THREE.ShaderMaterial) {
+                const ringMat = this.ringMesh.material;
+                if (ringMat.userData.proceduralMap) {
+                    ringMat.uniforms.u_ringMap.value = ringMat.userData.proceduralMap;
+                    ringMat.uniforms.u_isHorizontal.value = 0.0;
+                    ringMat.uniforms.u_textureVScale.value = 1.0;
+                }
+            }
             return;
         }
 
-        const name = this.group.name.toLowerCase();
-        
         let textureName = '';
         if (name === 'mercury') textureName = '2k_mercury.jpg';
         else if (name === 'venus') textureName = '2k_venus_surface.jpg';
@@ -2553,25 +2578,83 @@ class BodyMesh {
         else if (name === 'uranus') textureName = '2k_uranus.jpg';
         else if (name === 'neptune') textureName = '2k_neptune.jpg';
 
-        if (!textureName) return; // Not a known planet with a texture
+        if (textureName) {
+            const url = `/local/textures/planets/${textureName}`;
+            if (BodyMesh.textureCache.has(url)) {
+                mat.map = BodyMesh.textureCache.get(url)!;
+                mat.color.set(0xffffff);
+                mat.needsUpdate = true;
+            } else {
+                BodyMesh.textureLoader.load(url, (tex) => {
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    BodyMesh.textureCache.set(url, tex);
+                    if (mat === this.material) {
+                        mat.map = tex;
+                        mat.color.set(0xffffff);
+                        mat.needsUpdate = true;
+                    }
+                });
+            }
+        }
 
-        const url = `/local/textures/planets/${textureName}`;
+        // Earth Clouds
+        if (name === 'earth') {
+            if (!this.cloudMesh) {
+                const cloudGeo = new THREE.SphereGeometry(this.geometry.parameters.radius * 1.005, 64, 64);
+                const cloudMat = new THREE.MeshLambertMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.9,
+                    blending: THREE.NormalBlending,
+                    depthWrite: false
+                });
+                this.cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+                // Ensure clouds rotate slightly over time
+                this.cloudMesh.userData.rotationSpeed = 0.05; 
+                this.mesh.add(this.cloudMesh); // Add as child of Earth mesh so it inherits orientation
+            }
+            this.cloudMesh.visible = true;
 
-        if (BodyMesh.textureCache.has(url)) {
-            mat.map = BodyMesh.textureCache.get(url)!;
-            mat.color.set(0xffffff); // Clear base color so texture shows cleanly
-            mat.needsUpdate = true;
-        } else {
-            BodyMesh.textureLoader.load(url, (tex) => {
-                tex.colorSpace = THREE.SRGBColorSpace;
-                BodyMesh.textureCache.set(url, tex);
-                // Only apply if the feature is still enabled by the time it loads
-                if (mat === this.material) {
-                    mat.map = tex;
-                    mat.color.set(0xffffff);
-                    mat.needsUpdate = true;
-                }
-            });
+            const cloudUrl = '/local/textures/planets/2k_earth_clouds.jpg';
+            if (BodyMesh.textureCache.has(cloudUrl)) {
+                (this.cloudMesh.material as THREE.MeshLambertMaterial).alphaMap = BodyMesh.textureCache.get(cloudUrl)!;
+                (this.cloudMesh.material as THREE.MeshLambertMaterial).needsUpdate = true;
+            } else {
+                BodyMesh.textureLoader.load(cloudUrl, (tex) => {
+                    BodyMesh.textureCache.set(cloudUrl, tex);
+                    if (this.cloudMesh) {
+                        (this.cloudMesh.material as THREE.MeshLambertMaterial).alphaMap = tex;
+                        (this.cloudMesh.material as THREE.MeshLambertMaterial).needsUpdate = true;
+                    }
+                });
+            }
+        }
+
+        // Saturn Rings
+        if (name === 'saturn' && this.ringMesh && this.ringMesh.material instanceof THREE.ShaderMaterial) {
+            const ringMat = this.ringMesh.material;
+            const ringUrl = '/local/textures/planets/2k_saturn_ring_alpha.png';
+            
+            const inner = this.ringData?.innerMult || 1.11;
+            const outer = this.ringData?.outerMult || 7.96;
+            const textureOuter = 2.35; // The physical radius the realistic texture maps to
+            const vScale = (outer - inner) / (textureOuter - inner);
+
+            if (BodyMesh.textureCache.has(ringUrl)) {
+                ringMat.uniforms.u_ringMap.value = BodyMesh.textureCache.get(ringUrl)!;
+                ringMat.uniforms.u_isHorizontal.value = 1.0;
+                ringMat.uniforms.u_textureVScale.value = vScale;
+            } else {
+                BodyMesh.textureLoader.load(ringUrl, (tex) => {
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    BodyMesh.textureCache.set(ringUrl, tex);
+                    if (this.ringMesh && this.ringMesh.material === ringMat) {
+                        ringMat.uniforms.u_ringMap.value = tex;
+                        ringMat.uniforms.u_isHorizontal.value = 1.0;
+                        ringMat.uniforms.u_textureVScale.value = vScale;
+                    }
+                });
+            }
         }
     }
 
