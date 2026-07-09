@@ -2609,8 +2609,8 @@ class BodyMesh {
                     depthWrite: false
                 });
                 this.cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
-                // Ensure clouds rotate slightly over time
-                this.cloudMesh.userData.rotationSpeed = 0.05; 
+                // Ensure clouds rotate slightly over time relative to the planet's surface
+                this.cloudMesh.userData.rotationSpeed = 1.5e-6; 
                 this.mesh.add(this.cloudMesh); // Add as child of Earth mesh so it inherits orientation
             }
             this.cloudMesh.visible = true;
