@@ -1623,6 +1623,17 @@ export class BodyRenderer {
                 mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
                 mesh.updateRingLighting(sunPos, mesh.group.position, this.renderScale);
 
+                // Dynamic Level of Detail (LOD) based on distance
+                // Note (Plan for future implementation): We could replace the polygon SphereGeometry with a raytraced impostor. This involves rendering a simple bounding box and calculating exact mathematical intersections of the camera's view ray with an oblate spheroid in a custom Fragment Shader. This is highly performant and eliminates polygonal edges entirely, but requires rewriting the standard materials and integrating custom depth writing for proper clipping with rings and atmospheres.
+                const actualVisRadius = scaleRadius(mesh.realRadius * this.renderScale);
+                if (distanceToCamera < actualVisRadius * 20) {
+                    mesh.setSegments(512, 256); // Ultra LOD when very close
+                } else if (distanceToCamera < actualVisRadius * 100) {
+                    mesh.setSegments(128, 64); // Medium LOD
+                } else {
+                    mesh.setSegments(this.sphereSegments.width, this.sphereSegments.height); // Base LOD
+                }
+
                 // Update label position (offset above body)
                 const label = this.bodyLabels.get(id);
                 if (label && label.el.style.display !== 'none') {
@@ -2004,6 +2015,9 @@ class BodyMesh {
 
     // Body rotation
     private rotationRate = 0;
+    
+    // Geometry state for LOD
+    private currentSegments = { width: 0, height: 0 };
 
     constructor(
         body: BodyData,
@@ -2293,9 +2307,19 @@ class BodyMesh {
     }
 
     setSegments(segmentsWidth: number, segmentsHeight: number): void {
-        this.geometry.dispose();
+        if (this.currentSegments.width === segmentsWidth && this.currentSegments.height === segmentsHeight) {
+            return;
+        }
+        this.currentSegments = { width: segmentsWidth, height: segmentsHeight };
+
+        if (this.geometry) this.geometry.dispose();
         this.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
-        this.mesh.geometry = this.geometry;
+        if (this.mesh) this.mesh.geometry = this.geometry;
+        
+        if (this.atmosphereMesh) {
+            this.atmosphereMesh.geometry.dispose();
+            this.atmosphereMesh.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
+        }
     }
 
     private addStarGlow(color: number, luminosity: number): void {
