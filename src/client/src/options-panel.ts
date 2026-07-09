@@ -1,7 +1,7 @@
 /**
  * Options Panel
  *
- * Consolidated settings for Visualization and Camera.
+ * Consolidated settings for Visualization, Camera and Experimental features.
  */
 
 import { APP_DEFAULTS } from './defaults';

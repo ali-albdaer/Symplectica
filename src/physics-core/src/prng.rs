@@ -4,8 +4,6 @@
 //! for cross-platform deterministic random number generation.
 //!
 //! Reference: https://www.pcg-random.org/
-//! This implementation matches the reference PCG32 algorithm exactly,
-//! ensuring reproducibility between Rust and JavaScript implementations.
 
 use serde::{Deserialize, Serialize};
 

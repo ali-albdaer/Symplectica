@@ -1,5 +1,4 @@
 // Canonical physical constants (SI units)
-// Single source of truth — import from here, never redeclare.
 
 /** Astronomical Unit (meters) */
 export const AU = 1.495978707e11;

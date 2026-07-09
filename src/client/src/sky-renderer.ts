@@ -2,8 +2,6 @@
  * Sky Renderer
  * 
  * Deterministic starfield and sky background for the simulation.
- * Replaces the old Math.random()-based starfield in main.ts with a
- * seeded PRNG for reproducible visuals across sessions.
  * 
  * Features:
  * - Seeded starfield with IMF-weighted star color distribution

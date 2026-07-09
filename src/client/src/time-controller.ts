@@ -1,7 +1,7 @@
 /**
  * Centralized Time Controller
  * 
- * Implements the industry-standard fixed timestep + accumulator pattern:
+ * Implements fixed timestep + accumulator pattern:
  * - Physics runs at a fixed timestep (dt = 3600s = 1 hour)
  * - Rendering runs at variable rate (requestAnimationFrame)
  * - Accumulator ensures deterministic simulation regardless of framerate

@@ -1,7 +1,7 @@
 /**
  * Shared Protocol Types
  *
- * Single source of truth for all client ↔ server message types.
+ * Single source of truth for all client <-> server message types.
  * Client imports directly (Vite bundler resolution).
  * Server re-exports via src/server/src/protocol.ts (NodeNext workaround).
  */
