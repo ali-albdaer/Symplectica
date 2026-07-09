@@ -688,15 +688,22 @@ export class OptionsPanel {
                 pointer-events: none;
             }
             .opt-btn {
-                background: #4fc3f7;
-                color: #000;
-                border: none;
-                padding: 6px;
-                border-radius: 4px;
+                width: 100%;
+                background: rgba(79, 195, 247, 0.2);
+                border: 1px solid rgba(79, 195, 247, 0.6);
+                border-radius: 6px;
+                color: #dff3ff;
+                padding: 8px;
+                font-size: 11px;
+                font-weight: 600;
                 cursor: pointer;
-                font-weight: bold;
+                margin-bottom: 6px;
+                transition: background 0.2s, border-color 0.2s, color 0.2s;
+                box-sizing: border-box;
             }
-            .opt-btn:hover { background: #81d4fa; }
+            .opt-btn:hover {
+                background: rgba(79, 195, 247, 0.3);
+            }
         `;
         document.head.appendChild(style);
         return container;
