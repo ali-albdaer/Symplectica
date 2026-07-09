@@ -30,6 +30,7 @@ export interface ExperimentalOptions {
     fixedFlareRate: number;
     flareBrightness: number;
     ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways';
+    useRealisticTextures: boolean;
     
     // Ring Generator Events (these don't store state, they just fire actions)
     onRingGeneratorLoadRequest?: () => void;
@@ -89,6 +90,7 @@ export class OptionsPanel {
         flaresVisible: true,
         fixedFlareRate: 2.0,
         ringQuality: 'HighQualityClose',
+        useRealisticTextures: false,
     };
 
     // UI Elements
@@ -121,6 +123,18 @@ export class OptionsPanel {
     private fixedFlareRateValue!: HTMLElement;
     private fixedFlareRateField!: HTMLElement;
     private ringQualitySelect!: HTMLSelectElement;
+    private realisticTexturesCheckbox!: HTMLInputElement;
+
+    // Ring Generator UI Elements
+    private ringGenLoadBtn!: HTMLButtonElement;
+    private ringGenApplyBtn!: HTMLButtonElement;
+    private ringGenExportBtn!: HTMLButtonElement;
+    private ringGenAddStopBtn!: HTMLButtonElement;
+    private ringGenBaseOpacityInput!: HTMLInputElement;
+    private ringGenBaseOpacityValue!: HTMLElement;
+    private ringGenScatteringGInput!: HTMLInputElement;
+    private ringGenScatteringGValue!: HTMLElement;
+    private ringGenStopsContainer!: HTMLElement;
 
     // Grid Spacing Helpers (Logarithmic)
     private sliderToSpacing(t: number): number {
@@ -458,6 +472,15 @@ export class OptionsPanel {
                     </div>
                 </section>
                 <section class="opt-section">
+                    <h3>Realistic Textures</h3>
+                    <div class="opt-row">
+                        <label class="opt-toggle">
+                            <input type="checkbox" id="opt-realistic-textures">
+                            <span>Use High-Res Textures (Requires Download)</span>
+                        </label>
+                    </div>
+                </section>
+                <section class="opt-section">
                     <h3>Planetary Rings</h3>
                     <div class="opt-field">
                         <label>Render Quality</label>
@@ -760,6 +783,7 @@ export class OptionsPanel {
         this.fixedFlareRateValue = this.container.querySelector('#opt-fixed-flare-rate-value')!;
         this.fixedFlareRateField = this.container.querySelector('#opt-fixed-rate-field')!;
         this.ringQualitySelect = this.container.querySelector('#opt-ring-quality')!;
+        this.realisticTexturesCheckbox = this.container.querySelector('#opt-realistic-textures')!;
     }
 
     private bindEvents(): void {
@@ -961,6 +985,12 @@ export class OptionsPanel {
         this.flaresVisibleCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
             this.experimentalOptions.flaresVisible = this.flaresVisibleCheckbox.checked;
+            this.emitExperimentalChange();
+        });
+
+        this.realisticTexturesCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.experimentalOptions.useRealisticTextures = this.realisticTexturesCheckbox.checked;
             this.emitExperimentalChange();
         });
 
@@ -1258,6 +1288,7 @@ export class OptionsPanel {
         this.fovValue.textContent = `${this.cameraFov}°`;
 
         this.flaresVisibleCheckbox.checked = this.experimentalOptions.flaresVisible;
+        this.realisticTexturesCheckbox.checked = this.experimentalOptions.useRealisticTextures;
         this.flareFrequencySelect.value = this.experimentalOptions.flareFrequencyMode;
         this.flareBrightnessInput.value = this.experimentalOptions.flareBrightness.toString();
         this.flareBrightnessValue.textContent = `${this.experimentalOptions.flareBrightness.toFixed(2)}x`;

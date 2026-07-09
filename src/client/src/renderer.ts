@@ -1405,6 +1405,14 @@ export class BodyRenderer {
             mesh.setFlareFrequencyMode(mode);
         }
     }
+    private realisticTexturesEnabled = false;
+
+    setRealisticTexturesEnabled(enabled: boolean): void {
+        this.realisticTexturesEnabled = enabled;
+        for (const mesh of this.bodies.values()) {
+            mesh.applyRealisticTextures(enabled);
+        }
+    }
 
     setRingQuality(quality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways'): void {
         this.ringQuality = quality;
@@ -1430,6 +1438,7 @@ export class BodyRenderer {
             this.sphereSegments.height,
             this.starRenderOptions,
         );
+        mesh.applyRealisticTextures(this.realisticTexturesEnabled);
         this.bodies.set(body.id, mesh);
         this.scene.add(mesh.group);
 
@@ -2016,6 +2025,13 @@ class BodyMesh {
     private flareSystem: StarFlareSystem | null = null;
     public ringMesh: THREE.Mesh | null = null;
     private ringData: { innerMult: number, outerMult: number } | null = null;
+    
+    // Texture Cache for Solar System Scope textures
+    private static textureLoader = new THREE.TextureLoader();
+    private static textureCache = new Map<string, THREE.Texture>();
+    
+    // Fallback colored material
+    private baseColor: string | null = null;
 
     // Expose for dynamic rescaling
     readonly realRadius: number;
@@ -2088,6 +2104,7 @@ class BodyMesh {
         } else {
             // F4: Physics-derived planet surface color as fallback
             const color = body.color || this.deriveColorFromPhysics(body);
+            this.baseColor = color;
             this.material = new THREE.MeshStandardMaterial({
                 color: color,
                 roughness: 0.8,
@@ -2507,6 +2524,54 @@ class BodyMesh {
             mat.uniforms.u_ringMap.value = newTex;
             mat.uniforms.u_g.value = profile.scatteringG ?? 0.3;
             mat.userData.baseOpacity = profile.baseOpacity;
+        }
+    }
+
+    applyRealisticTextures(enabled: boolean): void {
+        if (this.type === 'star' || !(this.material instanceof THREE.MeshStandardMaterial)) return;
+
+        const mat = this.material as THREE.MeshStandardMaterial;
+
+        if (!enabled) {
+            // Revert to colored sphere
+            mat.map = null;
+            mat.color.set(this.baseColor ?? 0xffffff);
+            mat.needsUpdate = true;
+            return;
+        }
+
+        const name = this.group.name.toLowerCase();
+        
+        let textureName = '';
+        if (name === 'mercury') textureName = '2k_mercury.jpg';
+        else if (name === 'venus') textureName = '2k_venus_surface.jpg';
+        else if (name === 'earth') textureName = '2k_earth_daymap.jpg';
+        else if (name === 'moon') textureName = '2k_moon.jpg';
+        else if (name === 'mars') textureName = '2k_mars.jpg';
+        else if (name === 'jupiter') textureName = '2k_jupiter.jpg';
+        else if (name === 'saturn') textureName = '2k_saturn.jpg';
+        else if (name === 'uranus') textureName = '2k_uranus.jpg';
+        else if (name === 'neptune') textureName = '2k_neptune.jpg';
+
+        if (!textureName) return; // Not a known planet with a texture
+
+        const url = `/local/textures/planets/${textureName}`;
+
+        if (BodyMesh.textureCache.has(url)) {
+            mat.map = BodyMesh.textureCache.get(url)!;
+            mat.color.set(0xffffff); // Clear base color so texture shows cleanly
+            mat.needsUpdate = true;
+        } else {
+            BodyMesh.textureLoader.load(url, (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                BodyMesh.textureCache.set(url, tex);
+                // Only apply if the feature is still enabled by the time it loads
+                if (mat === this.material) {
+                    mat.map = tex;
+                    mat.color.set(0xffffff);
+                    mat.needsUpdate = true;
+                }
+            });
         }
     }
 

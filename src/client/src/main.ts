@@ -269,6 +269,7 @@ class NBodyClient {
                 );
                 this.bodyRenderer.setFlareFrequencyMode(experimental.flareFrequencyMode);
                 this.bodyRenderer.setRingQuality(experimental.ringQuality);
+                this.bodyRenderer.setRealisticTexturesEnabled(experimental.useRealisticTextures);
             },
             () => { // onRingGeneratorLoadRequest
                 if (this.followBodyIndex !== null && this.followBodyIndex >= 0) {
