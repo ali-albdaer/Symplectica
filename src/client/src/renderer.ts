@@ -1467,12 +1467,7 @@ export class BodyRenderer {
         this.updateLabelVisibility(body.id);
 
         // Create rotation axis arrow overlay
-        const tilt = body.axialTilt ?? 0;
-        const axisDir = new THREE.Vector3(
-            -Math.sin(tilt),
-            Math.cos(tilt),
-            0
-        ).normalize();
+        const axisDir = new THREE.Vector3(0, 1, 0); // group is permanently tilted, so local Y is spin axis
         const bodyVisRadius = scaleRadius(body.radius * this.renderScale);
         const axisLength = bodyVisRadius * 3;
         const axisColor = body.type === 'star' ? 0xffaa00 : 0x44ddff;
@@ -1499,24 +1494,15 @@ export class BodyRenderer {
             depthWrite: false,
         });
         const planeMesh = new THREE.Mesh(planeGeo, planeMat);
-        // Orient disc perpendicular to the tilt axis:
-        // Default RingGeometry is in XY plane (normal = +Z).
-        // We want the normal to be the axis direction.
-        const upZ = new THREE.Vector3(0, 0, 1);
-        const quat = new THREE.Quaternion().setFromUnitVectors(upZ, axisDir);
-        planeMesh.quaternion.copy(quat);
+        // Orient disc perpendicular to local Y axis
+        planeMesh.rotation.x = -Math.PI / 2;
         planeMesh.visible = this.showRefPlaneFlag;
         mesh.group.add(planeMesh);
         this.refPlanes.set(body.id, planeMesh);
 
         // Create per-body pole-to-pole meridian arc (on surface)
-        // We need an equator direction first (reused for ref point below)
-        const equatorDir = new THREE.Vector3(0, 0, 1).cross(axisDir);
-        if (equatorDir.lengthSq() < 0.001) {
-            equatorDir.set(1, 0, 0).cross(axisDir);
-        }
-        equatorDir.normalize();
-        const surfaceR = bodyVisRadius;
+        // Added directly to mesh.mesh so it spins and scales with the planet
+        const equatorDir = new THREE.Vector3(1, 0, 0);
         const meridianSegments = 32;
         const meridianPoints: THREE.Vector3[] = [];
         for (let s = 0; s <= meridianSegments; s++) {
@@ -1524,29 +1510,27 @@ export class BodyRenderer {
             const theta = Math.PI * (1 - s / meridianSegments);
             const sinT = Math.sin(theta);
             const cosT = Math.cos(theta);
-            // Point on sphere: cosT * axis + sinT * equatorDir
+            // Point on unit sphere
             meridianPoints.push(
-                axisDir.clone().multiplyScalar(cosT * surfaceR)
-                    .add(equatorDir.clone().multiplyScalar(sinT * surfaceR))
+                axisDir.clone().multiplyScalar(cosT * 1.0)
+                    .add(equatorDir.clone().multiplyScalar(sinT * 1.0))
             );
         }
         const lineGeo = new THREE.BufferGeometry().setFromPoints(meridianPoints);
         const lineMat = new THREE.LineBasicMaterial({ color: 0xff6644 });
         const refLine = new THREE.Line(lineGeo, lineMat);
         refLine.visible = this.showRefLineFlag;
-        mesh.group.add(refLine);
+        mesh.mesh.add(refLine);
         this.refLines.set(body.id, refLine);
 
-        // Create per-body equator reference point (reuses equatorDir from meridian arc)
-        const dotRadius = bodyVisRadius * 0.08;
+        // Create per-body equator reference point
+        const dotRadius = 0.08; // Normalized radius
         const dotGeo = new THREE.SphereGeometry(dotRadius, 8, 6);
         const dotMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
         const dot = new THREE.Mesh(dotGeo, dotMat);
-        // equatorDir was normalized then mutated by multiplyScalar above, so re-normalize
-        equatorDir.normalize();
-        dot.position.copy(equatorDir.clone().multiplyScalar(surfaceR));
+        dot.position.copy(equatorDir.clone().multiplyScalar(1.0));
         dot.visible = this.showRefPointFlag;
-        mesh.group.add(dot);
+        mesh.mesh.add(dot);
         this.refPoints.set(body.id, dot);
     }
 
@@ -2003,7 +1987,7 @@ export class BodyRenderer {
 
 class BodyMesh {
     group: THREE.Group;
-    private mesh: THREE.Mesh;
+    public mesh: THREE.Mesh;
     private geometry: THREE.SphereGeometry;
     private material: THREE.Material;
     private atmosphereMesh: THREE.Mesh | null = null;
@@ -2020,7 +2004,6 @@ class BodyMesh {
 
     // Body rotation
     private rotationRate = 0;
-    private spinAxis: THREE.Vector3 | null = null;
 
     constructor(
         body: BodyData,
@@ -2038,13 +2021,9 @@ class BodyMesh {
         // Store rotation data for all body types
         this.rotationRate = body.rotationRate ?? 0;
         const tilt = body.axialTilt ?? 0;
-        if (this.rotationRate !== 0) {
-            this.spinAxis = new THREE.Vector3(
-                -Math.sin(tilt),
-                Math.cos(tilt),
-                0,
-            ).normalize();
-        }
+        
+        // Tilt the entire group so its local Y axis becomes the spin axis
+        this.group.rotation.z = tilt;
 
         // Create sphere geometry - initially at default scale (will be set by renderer)
         const initialRadius = 1; // Placeholder, will be scaled
@@ -2156,11 +2135,9 @@ class BodyMesh {
             this.ringMesh.userData.profile = profile;
 
             // Rings align with the equator. RingGeometry normal is +Z.
-            // We want to align the normal with the spin axis.
-            const tilt = body.axialTilt ?? 0;
-            const axisDir = new THREE.Vector3(-Math.sin(tilt), Math.cos(tilt), 0).normalize();
-            const upZ = new THREE.Vector3(0, 0, 1);
-            this.ringMesh.quaternion.setFromUnitVectors(upZ, axisDir);
+            // The group is already tilted so its local Y axis is the spin axis.
+            // We just need to align the ring's +Z normal to the local +Y axis.
+            this.ringMesh.rotation.x = -Math.PI / 2;
             
             this.group.add(this.ringMesh);
         }
@@ -2249,10 +2226,14 @@ class BodyMesh {
 
         this.flareSystem?.update(simTime);
 
-        if (!this.spinAxis || this.rotationRate === 0) return;
+        if (this.rotationRate === 0) return;
         const angle = this.rotationRate * simTime;
-        const q = new THREE.Quaternion().setFromAxisAngle(this.spinAxis, angle);
-        this.group.quaternion.copy(q);
+        
+        // Daily rotation applies around the local Y axis (which is already tilted to the spin axis)
+        this.mesh.rotation.y = angle;
+        if (this.atmosphereMesh) {
+            this.atmosphereMesh.rotation.y = angle;
+        }
     }
 
     setGranulationEnabled(enabled: boolean): void {
