@@ -665,7 +665,7 @@ pub fn create_integrator_test2(seed: u64) -> Simulation {
     saturn.color = hex_to_rgb(0xead6a7);
     saturn.rings = Some(RingParameters {
         inner_radius_mult: 1.11,
-        outer_radius_mult: 2.27,
+        outer_radius_mult: 7.96,
         texture_preset: "saturn".to_string(),
         base_opacity: 0.9,
     });
@@ -1055,7 +1055,7 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
     saturn.color = hex_to_rgb(0xead6a7);
     saturn.rings = Some(RingParameters {
         inner_radius_mult: 1.11,
-        outer_radius_mult: 2.27,
+        outer_radius_mult: 7.96,
         texture_preset: "saturn".to_string(),
         base_opacity: 0.9,
     });
@@ -1540,7 +1540,7 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     saturn.color = hex_to_rgb(0xead6a7);
     saturn.rings = Some(RingParameters {
         inner_radius_mult: 1.11,
-        outer_radius_mult: 2.27,
+        outer_radius_mult: 7.96,
         texture_preset: "saturn".to_string(),
         base_opacity: 0.9,
     });
@@ -1973,7 +1973,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     saturn.color = hex_to_rgb(0xead6a7);
     saturn.rings = Some(RingParameters {
         inner_radius_mult: 1.11,
-        outer_radius_mult: 2.27,
+        outer_radius_mult: 7.96,
         texture_preset: "saturn".to_string(),
         base_opacity: 0.9,
     });

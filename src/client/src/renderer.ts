@@ -322,25 +322,48 @@ export function getDefaultRingProfile(preset: string): RingProfile {
     if (preset === 'saturn') {
         scatteringG = 0.7;
         stops = [
-            { pos: 0.00, color: '#000000', alpha: 0.0 },
-            { pos: 0.12, color: '#b8a88a', alpha: 0.05 },
-            { pos: 0.30, color: '#c3b294', alpha: 0.35 },
-            { pos: 0.31, color: '#e6d7be', alpha: 0.85 },
-            { pos: 0.50, color: '#e6d7be', alpha: 0.95 },
-            { pos: 0.68, color: '#e1d2b9', alpha: 0.8 },
-            { pos: 0.70, color: '#000000', alpha: 0.0 },
-            { pos: 0.73, color: '#b4a58c', alpha: 0.05 },
-            { pos: 0.77, color: '#000000', alpha: 0.0 },
-            { pos: 0.78, color: '#d7c8a5', alpha: 0.7 },
-            { pos: 0.88, color: '#d7c8a5', alpha: 0.6 },
-            { pos: 0.90, color: '#000000', alpha: 0.0 },
-            { pos: 0.92, color: '#000000', alpha: 0.0 },
-            { pos: 0.93, color: '#d2c3a0', alpha: 0.5 },
-            { pos: 0.96, color: '#cdbe9b', alpha: 0.4 },
-            { pos: 0.97, color: '#000000', alpha: 0.0 },
-            { pos: 0.98, color: '#c8b896', alpha: 0.3 },
-            { pos: 0.99, color: '#c8b896', alpha: 0.1 },
-            { pos: 1.00, color: '#000000', alpha: 0.0 },
+            // D Ring: 66,900 - 74,491 km
+            { pos: 0.000, color: '#ffffff', alpha: 0.00 },
+            { pos: 0.009, color: '#ffffff', alpha: 0.03 },
+            { pos: 0.018, color: '#ffffff', alpha: 0.00 },
+            // C Ring: 74,491 - 91,975 km (bluish-grey)
+            { pos: 0.019, color: '#9ca6b5', alpha: 0.05 },
+            { pos: 0.040, color: '#9ca6b5', alpha: 0.35 },
+            { pos: 0.060, color: '#8b96a8', alpha: 0.20 },
+            { pos: 0.061, color: '#000000', alpha: 0.00 },
+            // B Ring: 91,975 - 117,507 km (densest, reddish white)
+            { pos: 0.062, color: '#e0c8b0', alpha: 0.90 },
+            { pos: 0.090, color: '#d9c0a3', alpha: 0.99 },
+            { pos: 0.122, color: '#e0c8b0', alpha: 0.85 },
+            { pos: 0.123, color: '#000000', alpha: 0.00 },
+            // Cassini Division: 117,500 - 122,050 km
+            { pos: 0.124, color: '#000000', alpha: 0.02 },
+            { pos: 0.128, color: '#c3b294', alpha: 0.10 },
+            { pos: 0.133, color: '#000000', alpha: 0.02 },
+            { pos: 0.134, color: '#000000', alpha: 0.00 },
+            // A Ring: 122,050 - 136,780 km
+            { pos: 0.135, color: '#d7c8a5', alpha: 0.70 },
+            { pos: 0.155, color: '#d7c8a5', alpha: 0.65 },
+            { pos: 0.160, color: '#d7c8a5', alpha: 0.60 },
+            { pos: 0.161, color: '#000000', alpha: 0.00 }, // Encke Gap
+            { pos: 0.162, color: '#d2c3a0', alpha: 0.55 },
+            { pos: 0.167, color: '#d2c3a0', alpha: 0.50 },
+            { pos: 0.168, color: '#000000', alpha: 0.00 }, // Keeler Gap
+            { pos: 0.169, color: '#cdbe9b', alpha: 0.40 },
+            // F Ring: ~140,180 km
+            { pos: 0.176, color: '#000000', alpha: 0.00 },
+            { pos: 0.177, color: '#e0c8b0', alpha: 0.50 },
+            { pos: 0.178, color: '#000000', alpha: 0.00 },
+            // G Ring: 166,000 - 175,000 km
+            { pos: 0.239, color: '#000000', alpha: 0.00 },
+            { pos: 0.240, color: '#a08264', alpha: 0.05 },
+            { pos: 0.250, color: '#a08264', alpha: 0.08 },
+            { pos: 0.262, color: '#000000', alpha: 0.00 },
+            // E Ring: 180,000 - 480,000 km (ice ejecta)
+            { pos: 0.273, color: '#000000', alpha: 0.00 },
+            { pos: 0.274, color: '#aaddff', alpha: 0.02 },
+            { pos: 0.414, color: '#aaddff', alpha: 0.08 }, // Peak at Enceladus orbit
+            { pos: 1.000, color: '#000000', alpha: 0.00 },
         ];
     } else if (preset === 'uranus') {
         scatteringG = 0.3;
@@ -394,10 +417,10 @@ export function getDefaultRingProfile(preset: string): RingProfile {
 function createRingTexture(profile: RingProfile): THREE.Texture {
     const canvas = document.createElement('canvas');
     canvas.width = 1;
-    canvas.height = 1024;
+    canvas.height = 4096;
     const ctx = canvas.getContext('2d')!;
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, 1024);
+    const gradient = ctx.createLinearGradient(0, 0, 0, 4096);
 
     for (const stop of profile.stops) {
         // Convert hex + alpha to rgba string if needed
@@ -412,13 +435,14 @@ function createRingTexture(profile: RingProfile): THREE.Texture {
     }
 
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 1, 1024);
+    ctx.fillRect(0, 0, 1, 4096);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
     texture.format = THREE.RGBAFormat;
     texture.colorSpace = THREE.SRGBColorSpace;
+    texture.flipY = false;
     return texture;
 }
 // Real world: Sun radius = 6.96e8m, Earth = 6.37e6m, Moon = 1.74e6m
