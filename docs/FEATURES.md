@@ -1,7 +1,6 @@
 # Features
 
 Intended features and capabilities of **Symplectica**.
-
 ---
 
 ## 1. High-Precision Coordinate System
@@ -10,7 +9,7 @@ Intended features and capabilities of **Symplectica**.
     - Float64 for physics and authoritative state. Float32 for GPU rendering.
 - Floating-origin system:
     - Camera fixed at (0, 0, 0).
-    - World re-centering triggered by a configurable distance threshold
+    - World re-centering triggered by a configurable distance threshold.
 - Reference-frame management for Orbital motion, SOI transitions, and camera stability.
 - Logarithmic depth buffer for large-scale depth ranges.
 
@@ -20,7 +19,7 @@ Intended features and capabilities of **Symplectica**.
 
 ### 2.1 Gravity Solvers
 - Pairwise N-body solver (default).
-- Barnes–Hut octree solver.
+- Barnes-Hut octree solver.
 - Fast Multipole Method (FMM).
 - Solvers switchable in run-time (in admin-panel).
 
@@ -30,8 +29,7 @@ Intended features and capabilities of **Symplectica**.
     - Detection via distance + Hill-sphere estimate.
     - Refinement using acceleration / jerk thresholds.
     - Adaptive Runge–Kutta 45.
-    - 5th-order Gauss–Radau. 
-    - No visible discontinuities.
+    - 5th-order Gauss–Radau.
 - Fixed 60 Hz physics timestep using accumulator pattern.
 - Sub-stepping support for stability at high gradients.
 
@@ -101,7 +99,7 @@ Intended features and capabilities of **Symplectica**.
 
 ---
 
-## 8. World-Builder Mode (activated in admin panel)
+## 8. World-Builder Mode
 
 - World editing with orthographic ecliptic projection view.
 - Spawn, delete, edit, and move bodies in real time.
@@ -109,6 +107,7 @@ Intended features and capabilities of **Symplectica**.
 ---
 
 ## 9. Visualization Panel
+
 - Object velocity, acceleration, force vector visualization with magnitude scaling.
 - Gravitational field strength and direction.
 - Potential and gradient fields.
