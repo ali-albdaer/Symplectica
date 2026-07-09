@@ -2031,7 +2031,7 @@ class BodyMesh {
     private static textureCache = new Map<string, THREE.Texture>();
     
     // Fallback colored material
-    private baseColor: string | null = null;
+    private baseColor: number | null = null;
 
     // Expose for dynamic rescaling
     readonly realRadius: number;
