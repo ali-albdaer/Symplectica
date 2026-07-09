@@ -37,6 +37,14 @@ export interface BuildBodyParams {
     // Body properties
     axialTilt?: number;
     rotationPeriod?: number;
+    // Atmosphere
+    hasAtmosphere?: boolean;
+    atmosphereHeight?: number;
+    atmosphereRayleighR?: number;
+    atmosphereRayleighG?: number;
+    atmosphereRayleighB?: number;
+    atmosphereMieColor?: number;
+    atmosphereMieWeight?: number;
 }
 
 interface BodyTypeDefaults {
@@ -154,6 +162,13 @@ export class BuildPanel {
             effectiveTemperature: defaults.effectiveTemperature,
             axialTilt: 0,
             rotationPeriod: defaults.rotationPeriod ?? 86400,
+            hasAtmosphere: false,
+            atmosphereHeight: 60000,
+            atmosphereRayleighR: 0.005,
+            atmosphereRayleighG: 0.012,
+            atmosphereRayleighB: 0.030,
+            atmosphereMieColor: 0xffffff,
+            atmosphereMieWeight: 0.001,
         };
     }
 
@@ -288,6 +303,46 @@ export class BuildPanel {
                     <div class="build-field">
                         <label>Rotation Period (hours)</label>
                         <input type="number" id="build-rotation" value="24" step="0.1" min="0">
+                    </div>
+                </section>
+
+                <section class="build-section" id="build-atmo-section">
+                    <h3>Atmosphere</h3>
+                    <div class="build-row">
+                        <label class="build-toggle">
+                            <input type="checkbox" id="build-has-atmo">
+                            <span>Enable Atmosphere</span>
+                        </label>
+                    </div>
+                    <div id="build-atmo-props" style="display: none; margin-top: 6px;">
+                        <div class="build-field">
+                            <label>Height (km)</label>
+                            <input type="number" id="build-atmo-height" value="60" step="1" min="0">
+                        </div>
+                        <div class="build-row-3">
+                            <div class="build-field-col">
+                                <label>Rayleigh R</label>
+                                <input type="number" id="build-atmo-rr" value="0.005" step="0.001">
+                            </div>
+                            <div class="build-field-col">
+                                <label>Rayleigh G</label>
+                                <input type="number" id="build-atmo-rg" value="0.012" step="0.001">
+                            </div>
+                            <div class="build-field-col">
+                                <label>Rayleigh B</label>
+                                <input type="number" id="build-atmo-rb" value="0.03" step="0.001">
+                            </div>
+                        </div>
+                        <div class="build-row" style="margin-top: 6px;">
+                            <div class="build-field-sm">
+                                <label>Mie Color</label>
+                                <input type="color" id="build-atmo-mie-color" value="#ffffff">
+                            </div>
+                            <div class="build-field-col">
+                                <label>Mie Weight</label>
+                                <input type="number" id="build-atmo-mie-weight" value="0.001" step="0.0001">
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -683,7 +738,9 @@ export class BuildPanel {
         const inputs = ['build-name', 'build-mass', 'build-radius', 'build-color',
                         'build-x', 'build-y', 'build-z', 'build-vx', 'build-vy', 'build-vz',
                         'build-luminosity', 'build-temperature', 'build-physics', 'build-massive',
-                        'build-tilt', 'build-rotation'];
+                        'build-tilt', 'build-rotation', 'build-has-atmo', 'build-atmo-height',
+                        'build-atmo-rr', 'build-atmo-rg', 'build-atmo-rb', 'build-atmo-mie-color',
+                        'build-atmo-mie-weight'];
         
         inputs.forEach(id => {
             const el = container.querySelector(`#${id}`);
@@ -795,6 +852,7 @@ export class BuildPanel {
         const massiveCheckbox = this.container.querySelector('#build-massive') as HTMLInputElement;
         const starSection = this.container.querySelector('#build-star-section') as HTMLElement;
         const rotationInput = this.container.querySelector('#build-rotation') as HTMLInputElement;
+        const hasAtmoCheck = this.container.querySelector('#build-has-atmo') as HTMLInputElement;
 
         nameInput.value = `${type.charAt(0).toUpperCase() + type.slice(1)} ${this.bodyCounter + 1}`;
         massInput.value = defaults.mass.toExponential(3);
@@ -809,6 +867,14 @@ export class BuildPanel {
         if (type === 'star' && defaults.luminosity !== undefined) {
             (this.container.querySelector('#build-luminosity') as HTMLInputElement).value = defaults.luminosity.toString();
             (this.container.querySelector('#build-temperature') as HTMLInputElement).value = (defaults.effectiveTemperature ?? 5778).toString();
+        }
+
+        if (type === 'planet') {
+            hasAtmoCheck.checked = true;
+            this.container.querySelector('#build-atmo-props')!.setAttribute('style', 'display: block; margin-top: 6px;');
+        } else {
+            hasAtmoCheck.checked = false;
+            this.container.querySelector('#build-atmo-props')!.setAttribute('style', 'display: none; margin-top: 6px;');
         }
 
         this.updateParamsFromUI();
@@ -846,11 +912,21 @@ export class BuildPanel {
             vz: (parseFloat(vzInput.value) || 0) * 1000,
             contributesToPhysics: physicsCheckbox.checked,
             isMassive: massiveCheckbox.checked,
-            luminosity: this.selectedType === 'star' ? parseFloat(luminosityInput.value) || 1 : undefined,
-            effectiveTemperature: this.selectedType === 'star' ? parseFloat(temperatureInput.value) || 5778 : undefined,
-            axialTilt: (parseFloat(tiltInput.value) || 0) * Math.PI / 180, // deg to rad
-            rotationPeriod: (parseFloat(rotationInput.value) || 24) * 3600, // hours to seconds
+            luminosity: parseFloat((this.container.querySelector('#build-luminosity') as HTMLInputElement).value) || 1.0,
+            effectiveTemperature: parseFloat((this.container.querySelector('#build-temperature') as HTMLInputElement).value) || 5778,
+            axialTilt: parseFloat((this.container.querySelector('#build-tilt') as HTMLInputElement).value) || 0,
+            rotationPeriod: (parseFloat((this.container.querySelector('#build-rotation') as HTMLInputElement).value) || 24) * 3600,
+            hasAtmosphere: (this.container.querySelector('#build-has-atmo') as HTMLInputElement).checked,
+            atmosphereHeight: (parseFloat((this.container.querySelector('#build-atmo-height') as HTMLInputElement).value) || 60) * 1000,
+            atmosphereRayleighR: parseFloat((this.container.querySelector('#build-atmo-rr') as HTMLInputElement).value) || 0.005,
+            atmosphereRayleighG: parseFloat((this.container.querySelector('#build-atmo-rg') as HTMLInputElement).value) || 0.012,
+            atmosphereRayleighB: parseFloat((this.container.querySelector('#build-atmo-rb') as HTMLInputElement).value) || 0.03,
+            atmosphereMieColor: parseInt((this.container.querySelector('#build-atmo-mie-color') as HTMLInputElement).value.replace('#', ''), 16),
+            atmosphereMieWeight: parseFloat((this.container.querySelector('#build-atmo-mie-weight') as HTMLInputElement).value) || 0.001,
         };
+
+        const atmoProps = this.container.querySelector('#build-atmo-props') as HTMLElement;
+        atmoProps.style.display = this.params.hasAtmosphere ? 'block' : 'none';
 
         this.onParamsChange?.(this.params);
     }

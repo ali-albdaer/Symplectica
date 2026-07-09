@@ -135,13 +135,14 @@ void main() {
 const ATMO_VERTEX = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_vertex>
-varying vec3 vNormal;
-varying vec3 vViewDir;
+varying vec3 vWorldNormal;
+varying vec3 vWorldPos;
 void main() {
-    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-    vNormal = normalize(normalMatrix * normal);
-    vViewDir = normalize(-mvPos.xyz);
-    gl_Position = projectionMatrix * mvPos;
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPos = worldPosition.xyz;
+    vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+    
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
     #include <logdepthbuf_vertex>
 }
 `;
@@ -151,17 +152,48 @@ const ATMO_FRAGMENT = /* glsl */ `
 #include <logdepthbuf_pars_fragment>
 uniform vec3 u_rayleighColor;
 uniform vec3 u_mieColor;
-uniform float u_mieWeight;   // 0 = pure Rayleigh, 1 = pure Mie
+uniform float u_mieWeight;
 uniform float u_intensity;
-varying vec3 vNormal;
-varying vec3 vViewDir;
+uniform vec3 u_sunPos;
+
+varying vec3 vWorldNormal;
+varying vec3 vWorldPos;
+
+// Henyey-Greenstein phase function for Mie scattering
+float henyeyGreenstein(float cosTheta, float g) {
+    float g2 = g * g;
+    return (1.0 - g2) / (4.0 * 3.14159 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
+}
+
 void main() {
-    float mu = dot(normalize(vNormal), normalize(vViewDir));
-    // Fresnel-like: bright at edges (mu→0), transparent at center (mu→1)
-    float rim = pow(1.0 - max(mu, 0.0), 3.0);
-    // Blend Rayleigh (molecular) and Mie (aerosol/dust) scattering colors
-    vec3 color = mix(u_rayleighColor, u_mieColor, u_mieWeight);
-    gl_FragColor = vec4(color, rim * u_intensity);
+    vec3 normal = normalize(vWorldNormal);
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    vec3 lightDir = normalize(u_sunPos - vWorldPos);
+
+    float NdotV = max(0.0, dot(normal, viewDir));
+    float NdotL = dot(normal, lightDir);
+    float VdotL = dot(viewDir, lightDir);
+
+    // Optical depth approximation: thicker at the edges
+    float opticalDepth = pow(1.0 - NdotV, 4.0);
+    
+    // Day/Night transition with a soft terminator
+    float sunInfluence = smoothstep(-0.2, 0.2, NdotL);
+    
+    // Rayleigh scattering
+    float rayleighPhase = 0.75 * (1.0 + VdotL * VdotL);
+    vec3 rayleighScattering = u_rayleighColor * rayleighPhase;
+    
+    // Mie scattering
+    float miePhase = henyeyGreenstein(VdotL, 0.76);
+    vec3 mieScattering = u_mieColor * miePhase;
+    
+    // Combine scattering
+    vec3 scatterColor = mix(rayleighScattering, mieScattering, u_mieWeight);
+    
+    vec3 finalColor = scatterColor * opticalDepth * sunInfluence * u_intensity * 2.5;
+    
+    gl_FragColor = vec4(finalColor, 1.0);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -1345,6 +1377,7 @@ export class BodyRenderer {
 
     // Ghost preview for world builder
     private ghostMesh: THREE.Mesh | null = null;
+    private ghostAtmoMesh: THREE.Mesh | null = null;
     private ghostVisible = false;
 
     private labelContainer: HTMLDivElement;
@@ -1644,7 +1677,7 @@ export class BodyRenderer {
                 // Update ring quality dynamically based on distance
                 const distanceToCamera = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
                 mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
-                mesh.updateRingLighting(sunPos, mesh.group.position, this.renderScale);
+                mesh.updateLighting(sunPos, mesh.group.position, this.renderScale);
 
                 // Dynamic Level of Detail (LOD) based on distance
                 // Note (Plan for future implementation): We could replace the polygon SphereGeometry with a raytraced impostor. This involves rendering a simple bounding box and calculating exact mathematical intersections of the camera's view ray with an oblate spheroid in a custom Fragment Shader. This is highly performant and eliminates polygonal edges entirely, but requires rewriting the standard materials and integrating custom depth writing for proper clipping with rings and atmospheres.
@@ -1851,7 +1884,11 @@ export class BodyRenderer {
      * @param color Hex color
      * @param type Body type string for material selection
      */
-    setGhostPreview(radius: number, color: number, type: string): void {
+    setGhostPreview(params: any): void {
+        const radius = params.radius;
+        const color = params.color;
+        const type = params.type;
+        
         // Scale radius using same function as real bodies
         const visualRadius = scaleRadius(radius * this.renderScale);
 
@@ -1874,6 +1911,60 @@ export class BodyRenderer {
         material.color.setHex(color);
         material.wireframe = type === 'spacecraft';
         this.ghostMesh.scale.setScalar(visualRadius);
+
+        // Atmosphere
+        if (params.hasAtmosphere) {
+            if (!this.ghostAtmoMesh) {
+                const geometry = new THREE.SphereGeometry(1, 32, 16);
+                const atmoMat = new THREE.ShaderMaterial({
+                    vertexShader: ATMO_VERTEX,
+                    fragmentShader: ATMO_FRAGMENT,
+                    uniforms: {
+                        u_cameraPos: { value: this.camera.getCamera().position },
+                        u_sunPos: { value: new THREE.Vector3(0, 0, 0) },
+                        u_planetRadius: { value: 1.0 },
+                        u_atmoRadius: { value: 1.05 },
+                        u_rayleighScaleHeight: { value: 0.085 },
+                        u_rayleighCoeff: { value: new THREE.Vector3() },
+                        u_mieCoeff: { value: 0.0 },
+                        u_mieDir: { value: 0.758 },
+                        u_mieColor: { value: new THREE.Vector3(1, 1, 1) }
+                    },
+                    transparent: true,
+                    depthWrite: false,
+                    side: THREE.BackSide,
+                    blending: THREE.NormalBlending
+                });
+                this.ghostAtmoMesh = new THREE.Mesh(geometry, atmoMat);
+                this.ghostAtmoMesh.visible = false;
+                this.scene.add(this.ghostAtmoMesh);
+            }
+
+            const atmoMat = this.ghostAtmoMesh.material as THREE.ShaderMaterial;
+            const atmoHeight = params.atmosphereHeight ? params.atmosphereHeight * this.renderScale : visualRadius * 0.05;
+            const outerRadius = visualRadius + atmoHeight;
+            this.ghostAtmoMesh.scale.setScalar(outerRadius);
+            
+            atmoMat.uniforms.u_planetRadius.value = visualRadius;
+            atmoMat.uniforms.u_atmoRadius.value = outerRadius;
+            atmoMat.uniforms.u_rayleighScaleHeight.value = (params.atmosphereHeight ? params.atmosphereHeight * 0.085 : 8500) * this.renderScale;
+            atmoMat.uniforms.u_rayleighCoeff.value.set(
+                params.atmosphereRayleighR ?? 0.005,
+                params.atmosphereRayleighG ?? 0.012,
+                params.atmosphereRayleighB ?? 0.030
+            );
+            atmoMat.uniforms.u_mieCoeff.value = params.atmosphereMieWeight ?? 0.001;
+            
+            const mieHex = params.atmosphereMieColor ?? 0xffffff;
+            atmoMat.uniforms.u_mieColor.value.set(
+                ((mieHex >> 16) & 255) / 255,
+                ((mieHex >> 8) & 255) / 255,
+                (mieHex & 255) / 255
+            );
+            this.ghostAtmoMesh.visible = this.ghostMesh.visible;
+        } else if (this.ghostAtmoMesh) {
+            this.ghostAtmoMesh.visible = false;
+        }
     }
 
     /**
@@ -1884,6 +1975,18 @@ export class BodyRenderer {
         if (this.ghostMesh) {
             this.ghostMesh.position.set(localX, localY, localZ);
         }
+        if (this.ghostAtmoMesh) {
+            this.ghostAtmoMesh.position.set(localX, localY, localZ);
+            
+            // update sun pos for atmosphere lighting
+            let sunPos = new THREE.Vector3(0, 0, 0);
+            if (this.lights.length > 0) {
+                sunPos.copy(this.lights[0].position);
+            }
+            const atmoMat = this.ghostAtmoMesh.material as THREE.ShaderMaterial;
+            atmoMat.uniforms.u_sunPos.value.copy(sunPos);
+            atmoMat.uniforms.u_cameraPos.value.copy(this.camera.getCamera().position);
+        }
     }
 
     /**
@@ -1893,6 +1996,16 @@ export class BodyRenderer {
         this.ghostVisible = visible;
         if (this.ghostMesh) {
             this.ghostMesh.visible = visible;
+        }
+        if (this.ghostAtmoMesh) {
+            // Only make atmo visible if it was enabled (via params processing earlier)
+            // But if visible is false, always hide it
+            if (!visible) {
+                this.ghostAtmoMesh.visible = false;
+            } else {
+                // If the user checked it, `setGhostPreview` should have set it visible earlier, but let's just make it visible
+                this.ghostAtmoMesh.visible = true;
+            }
         }
     }
 
@@ -2305,9 +2418,10 @@ class BodyMesh {
                 u_mieColor:      { value: mieColor },
                 u_mieWeight:     { value: mieWeight },
                 u_intensity:     { value: intensity },
+                u_sunPos:        { value: new THREE.Vector3() },
             },
             transparent: true,
-            side: THREE.BackSide,
+            side: THREE.FrontSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending,
         });
@@ -2501,13 +2615,18 @@ class BodyMesh {
         mat.uniforms.u_perfMode.value = useHighQuality ? 0.0 : 1.0;
     }
 
-    updateRingLighting(sunPos: THREE.Vector3, planetPos: THREE.Vector3, renderScale: number): void {
+    updateLighting(sunPos: THREE.Vector3, planetPos: THREE.Vector3, renderScale: number): void {
         const radius = scaleRadius(this.realRadius * renderScale);
         if (this.ringMesh && this.ringMesh.material instanceof THREE.ShaderMaterial) {
             const mat = this.ringMesh.material as THREE.ShaderMaterial;
             mat.uniforms.u_sunPos.value.copy(sunPos);
             mat.uniforms.u_planetCenter.value.copy(planetPos);
             mat.uniforms.u_planetRadius.value = radius;
+        }
+
+        if (this.atmosphereMesh && this.atmosphereMesh.material instanceof THREE.ShaderMaterial) {
+            const mat = this.atmosphereMesh.material as THREE.ShaderMaterial;
+            mat.uniforms.u_sunPos.value.copy(sunPos);
         }
 
         if (this.material.userData.sunPos) {

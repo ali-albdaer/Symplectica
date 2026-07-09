@@ -1997,7 +1997,7 @@ class NBodyClient {
     private onBuildParamsChange(params: BuildBodyParams): void {
         // Update ghost preview appearance in renderer
         if (this.buildMode && this.buildPanel.isVisible()) {
-            this.bodyRenderer.setGhostPreview(params.radius, params.color, params.type);
+            this.bodyRenderer.setGhostPreview(params);
             this.bodyRenderer.setGhostVisible(true);
             
             // Position ghost at world coordinates (convert to camera-local using floating origin)
@@ -2071,19 +2071,46 @@ class NBodyClient {
 
         const bodyType = bodyTypeMap[params.type] ?? 3; // Default to asteroid
 
-        // Add body via physics (which uses WASM addBody)
-        this.physics.addBodyDirect({
+        const hexToRgb = (hex: number): [number, number, number] => {
+            return [
+                ((hex >> 16) & 255) / 255,
+                ((hex >> 8) & 255) / 255,
+                (hex & 255) / 255,
+            ];
+        };
+
+        const bodyJson = {
+            id: 0,
             name: params.name,
-            bodyType,
+            body_type: params.type.charAt(0).toUpperCase() + params.type.slice(1),
             mass: params.mass,
             radius: params.radius,
-            x: params.x,
-            y: params.y,
-            z: params.z,
-            vx: params.vx,
-            vy: params.vy,
-            vz: params.vz,
-        });
+            color: hexToRgb(params.color),
+            position: { x: params.x, y: params.y, z: params.z },
+            velocity: { x: params.vx, y: params.vy, z: params.vz },
+            acceleration: { x: 0, y: 0, z: 0 },
+            prev_acceleration: { x: 0, y: 0, z: 0 },
+            albedo: 0.3,
+            is_active: true,
+            parent_id: null,
+            axial_tilt: params.axialTilt,
+            rotation_rate: params.rotationPeriod ? 2.0 * Math.PI / params.rotationPeriod : 0,
+            atmosphere: params.hasAtmosphere ? {
+                scale_height: params.atmosphereHeight ? params.atmosphereHeight * 0.085 : 8500, // roughly 8.5% scale height
+                rayleigh_coefficients: [params.atmosphereRayleighR, params.atmosphereRayleighG, params.atmosphereRayleighB],
+                mie_coefficient: params.atmosphereMieWeight,
+                mie_direction: 0.758,
+                height: params.atmosphereHeight,
+                mie_color: hexToRgb(params.atmosphereMieColor ?? 0xffffff)
+            } : null,
+            contributes_gravity: params.contributesToPhysics,
+            feels_gravity: params.contributesToPhysics,
+            luminosity: params.luminosity ?? 0,
+            effective_temperature: params.effectiveTemperature ?? 0,
+        };
+
+        // Add body via JSON to support complex fields like atmosphere
+        (this.physics as any).simulation.addBodyFromJson(JSON.stringify(bodyJson));
 
         // Refresh the body list and renderer
         this.refreshBodies();
