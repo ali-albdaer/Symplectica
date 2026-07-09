@@ -88,7 +88,7 @@ export class OptionsPanel {
         flareBrightness: 1.0,
         flaresVisible: true,
         fixedFlareRate: 2.0,
-        ringQuality: 'Performance',
+        ringQuality: 'HighQualityClose',
     };
 
     // UI Elements
@@ -462,8 +462,8 @@ export class OptionsPanel {
                     <div class="opt-field">
                         <label>Render Quality</label>
                         <select id="opt-ring-quality">
-                            <option value="Performance">Performance (Default)</option>
-                            <option value="HighQualityClose">High Quality (Close Range)</option>
+                            <option value="Performance">Performance</option>
+                            <option value="HighQualityClose" selected>High Quality (Close-range) (Default)</option>
                             <option value="HighQualityAlways">High Quality (Always)</option>
                         </select>
                     </div>

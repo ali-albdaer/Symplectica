@@ -363,15 +363,15 @@ export function getDefaultRingProfile(preset: string): RingProfile {
             { pos: 0.176, color: '#000000', alpha: 0.00 },
             { pos: 0.177, color: '#e0c8b0', alpha: 0.50 },
             { pos: 0.178, color: '#000000', alpha: 0.00 },
-            // G Ring: 166,000 - 175,000 km
-            { pos: 0.239, color: '#000000', alpha: 0.00 },
-            { pos: 0.240, color: '#a08264', alpha: 0.05 },
-            { pos: 0.250, color: '#a08264', alpha: 0.08 },
-            { pos: 0.262, color: '#000000', alpha: 0.00 },
-            // E Ring: 180,000 - 480,000 km (ice ejecta)
-            { pos: 0.273, color: '#000000', alpha: 0.00 },
-            { pos: 0.274, color: '#aaddff', alpha: 0.02 },
-            { pos: 0.414, color: '#aaddff', alpha: 0.08 }, // Peak at Enceladus orbit
+            // G Ring: 166,000 - 175,000 km (very faint - so we will not render them)
+            // { pos: 0.239, color: '#000000', alpha: 0.00 },
+            // { pos: 0.240, color: '#a08264', alpha: 0.05 },
+            // { pos: 0.250, color: '#a08264', alpha: 0.08 },
+            // { pos: 0.262, color: '#000000', alpha: 0.00 },
+            // // E Ring: 180,000 - 480,000 km (ice ejecta)
+            // { pos: 0.273, color: '#000000', alpha: 0.00 },
+            // { pos: 0.274, color: '#aaddff', alpha: 0.02 },
+            // { pos: 0.414, color: '#aaddff', alpha: 0.08 }, // Peak at Enceladus orbit
             { pos: 1.000, color: '#000000', alpha: 0.00 },
         ];
     } else if (preset === 'uranus') {
@@ -1318,7 +1318,7 @@ export class BodyRenderer {
         starspotsEnabled: false,
         flareQuality: 'Low',
     };
-    private ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways' = 'Performance';
+    private ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways' = 'HighQualityClose';
 
     // Orbit trails
     private orbitLines: Map<number, THREE.Line> = new Map();
