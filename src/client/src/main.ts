@@ -2106,7 +2106,7 @@ class NBodyClient {
             } : null,
             contributes_gravity: params.contributesToPhysics,
             feels_gravity: params.contributesToPhysics,
-            luminosity: params.luminosity ?? 0,
+            luminosity: (params.luminosity ?? 0) * L_SUN,
             effective_temperature: params.effectiveTemperature ?? 0,
         };
 
