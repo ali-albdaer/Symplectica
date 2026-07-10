@@ -1848,12 +1848,8 @@ export class BodyRenderer {
         }
         
         // Also update ghost preview if it exists
-        if (this.ghostPreviewMesh && this.ghostPreviewMesh.children.length > 0) {
-            for (const child of this.ghostPreviewMesh.children) {
-                if (child.userData.isAtmosphere) {
-                    child.visible = show;
-                }
-            }
+        if (this.ghostAtmoMesh) {
+            this.ghostAtmoMesh.visible = show && this.ghostVisible;
         }
     }
 
@@ -2017,8 +2013,11 @@ export class BodyRenderer {
             
             // update sun pos for atmosphere lighting
             let sunPos = new THREE.Vector3(0, 0, 0);
-            if (this.lights.length > 0) {
-                sunPos.copy(this.lights[0].position);
+            for (const mesh of this.bodies.values()) {
+                if (mesh.type === 'star') {
+                    sunPos.copy(mesh.group.position);
+                    break;
+                }
             }
             const atmoMat = this.ghostAtmoMesh.material as THREE.ShaderMaterial;
             atmoMat.uniforms.u_sunPos.value.copy(sunPos);
@@ -2045,7 +2044,7 @@ export class BodyRenderer {
                 this.ghostAtmoMesh.visible = false;
             } else {
                 // If the user checked it, `setGhostPreview` should have set it visible earlier, but let's just make it visible
-                this.ghostAtmoMesh.visible = true;
+                this.ghostAtmoMesh.visible = this.showAtmospheres;
             }
         }
     }
@@ -2404,7 +2403,7 @@ class BodyMesh {
                     u_planetCenter: { value: new THREE.Vector3() },
                     u_planetRadius: { value: 1.0 },
                     u_g: { value: g },
-                    u_perfMode: { value: starOptions.performanceMode ? 1.0 : 0.0 },
+                    u_perfMode: { value: 0.0 },
                     u_isHorizontal: { value: 0.0 },
                     u_textureVScale: { value: 1.0 }
                 },
