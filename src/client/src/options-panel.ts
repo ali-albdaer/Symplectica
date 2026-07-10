@@ -8,6 +8,7 @@ import { APP_DEFAULTS } from './defaults';
 import { RingProfile, RingStop } from './renderer';
 
 export interface VisualizationOptions {
+    showAtmospheres: boolean;
     showOrbitTrails: boolean;
     showStarLabels: boolean;
     showPlanetLabels: boolean;
@@ -94,6 +95,7 @@ export class OptionsPanel {
     };
 
     // UI Elements
+    private atmospheresCheckbox!: HTMLInputElement;
     private orbitsCheckbox!: HTMLInputElement;
     private starLabelsCheckbox!: HTMLInputElement;
     private planetLabelsCheckbox!: HTMLInputElement;
@@ -265,10 +267,16 @@ export class OptionsPanel {
                     <h3>Display</h3>
 
                     <div class="opt-row">
-                        <label class="opt-toggle">
-                            <input type="checkbox" id="opt-orbits">
-                            <span>Trails</span>
-                        </label>
+                        <div style="display: flex; gap: 8px;">
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-atmospheres">
+                                <span>Atmo</span>
+                            </label>
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-orbits">
+                                <span>Trails</span>
+                            </label>
+                        </div>
                         <div style="display: flex; gap: 8px;">
                             <label class="opt-toggle">
                                 <input type="checkbox" id="opt-star-labels">
@@ -733,6 +741,7 @@ export class OptionsPanel {
     }
 
     private cacheElements(): void {
+        this.atmospheresCheckbox = this.container.querySelector('#opt-atmospheres')!;
         this.orbitsCheckbox = this.container.querySelector('#opt-orbits')!;
         this.starLabelsCheckbox = this.container.querySelector('#opt-star-labels')!;
         this.planetLabelsCheckbox = this.container.querySelector('#opt-planet-labels')!;
@@ -791,6 +800,12 @@ export class OptionsPanel {
 
         this.setupDrag();
         this.setupTabs();
+
+        this.atmospheresCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.options.showAtmospheres = this.atmospheresCheckbox.checked;
+            this.emitChange();
+        });
 
         this.orbitsCheckbox.addEventListener('change', () => {
             if (this.ignoreEvents) return;
@@ -1241,6 +1256,7 @@ export class OptionsPanel {
     private syncUIFromOptions(): void {
         this.ignoreEvents = true;
 
+        this.atmospheresCheckbox.checked = this.options.showAtmospheres;
         this.orbitsCheckbox.checked = this.options.showOrbitTrails;
         this.starLabelsCheckbox.checked = this.options.showStarLabels;
         this.planetLabelsCheckbox.checked = this.options.showPlanetLabels;

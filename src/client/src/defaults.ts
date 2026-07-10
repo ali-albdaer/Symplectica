@@ -48,6 +48,7 @@ export interface AdminDefaults {
 }
 
 export interface OptionsDefaults {
+    showAtmospheres: boolean;
     showOrbitTrails: boolean;
     showStarLabels: boolean;
     showPlanetLabels: boolean;

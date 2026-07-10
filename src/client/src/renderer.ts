@@ -1788,6 +1788,7 @@ export class BodyRenderer {
     }
 
     // Visualization options
+    private showAtmospheres = true;
     private showOrbitTrails = true;
     private showStarLabels = false;
     private showPlanetLabels = false;
@@ -1837,6 +1838,22 @@ export class BodyRenderer {
         this.showOrbitTrails = show;
         for (const line of this.orbitLines.values()) {
             line.visible = show;
+        }
+    }
+
+    setShowAtmospheres(show: boolean): void {
+        this.showAtmospheres = show;
+        for (const bodyRenderer of this.bodies.values()) {
+            bodyRenderer.setAtmosphereVisibility(show);
+        }
+        
+        // Also update ghost preview if it exists
+        if (this.ghostPreviewMesh && this.ghostPreviewMesh.children.length > 0) {
+            for (const child of this.ghostPreviewMesh.children) {
+                if (child.userData.isAtmosphere) {
+                    child.visible = show;
+                }
+            }
         }
     }
 
@@ -2451,6 +2468,7 @@ class BodyMesh {
         this.atmosphereMesh = new THREE.Mesh(atmoGeo, atmoMat);
         // Scale will be set in setScale — atmosphere is slightly larger than body
         this.atmosphereMesh.userData.atmosphereScale = 1 + relHeight;
+        this.atmosphereMesh.userData.isAtmosphere = true;
         this.group.add(this.atmosphereMesh);
     }
 
@@ -2635,6 +2653,12 @@ class BodyMesh {
 
         const mat = this.ringMesh.material as THREE.ShaderMaterial;
         mat.uniforms.u_perfMode.value = useHighQuality ? 0.0 : 1.0;
+    }
+
+    setAtmosphereVisibility(show: boolean): void {
+        if (this.atmosphereMesh) {
+            this.atmosphereMesh.visible = show;
+        }
     }
 
     updateLighting(sunPos: THREE.Vector3, planetPos: THREE.Vector3, cameraPos: THREE.Vector3, renderScale: number): void {

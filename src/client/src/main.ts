@@ -497,6 +497,7 @@ class NBodyClient {
     }
 
     private applyVisualizationToRenderer(options: VisualizationOptions): void {
+        this.bodyRenderer.setShowAtmospheres(options.showAtmospheres);
         this.bodyRenderer.setShowOrbitTrails(options.showOrbitTrails);
         this.bodyRenderer.setShowStarLabels(options.showStarLabels);
         this.bodyRenderer.setShowPlanetLabels(options.showPlanetLabels);
