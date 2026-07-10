@@ -1692,7 +1692,7 @@ class NBodyClient {
             const localX = params.x - cameraOrigin.x;
             const localY = params.y - cameraOrigin.y;
             const localZ = params.z - cameraOrigin.z;
-            this.bodyRenderer.updateGhostPosition(localX, localY, localZ);
+            this.bodyRenderer.updateGhostPosition(localX, localY, localZ, this.camera.getCamera().position);
         }
 
         // Update star rotations from simulation time
@@ -2005,7 +2005,7 @@ class NBodyClient {
             const localX = params.x - origin.x;
             const localY = params.y - origin.y;
             const localZ = params.z - origin.z;
-            this.bodyRenderer.updateGhostPosition(localX, localY, localZ);
+            this.bodyRenderer.updateGhostPosition(localX, localY, localZ, this.camera.getCamera().position);
         } else {
             this.bodyRenderer.setGhostVisible(false);
         }

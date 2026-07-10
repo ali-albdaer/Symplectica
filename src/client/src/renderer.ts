@@ -152,9 +152,10 @@ const ATMO_FRAGMENT = /* glsl */ `
 #include <logdepthbuf_pars_fragment>
 uniform vec3 u_rayleighColor;
 uniform vec3 u_mieColor;
-uniform float u_mieWeight;
 uniform float u_intensity;
 uniform vec3 u_sunPos;
+uniform vec3 u_planetCenter;
+uniform float u_isInside;
 
 varying vec3 vWorldNormal;
 varying vec3 vWorldPos;
@@ -166,32 +167,52 @@ float henyeyGreenstein(float cosTheta, float g) {
 }
 
 void main() {
+    // If inside, vWorldNormal points outward, but we are looking from inside, so flip it or just use viewDir
     vec3 normal = normalize(vWorldNormal);
     vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    
+    // For optical depth, we want the angle between the view ray and the surface normal.
+    // If we are outside, NdotV is positive at center, 0 at edges.
+    // If we are inside, we use BackSide, so NdotV would be negative. Let's use abs(dot).
+    float NdotV = abs(dot(normal, viewDir));
+    
     vec3 lightDir = normalize(u_sunPos - vWorldPos);
-
-    float NdotV = max(0.0, dot(normal, viewDir));
+    vec3 zenithDir = normalize(vWorldPos - u_planetCenter);
+    
     float NdotL = dot(normal, lightDir);
     float VdotL = dot(viewDir, lightDir);
 
-    // Optical depth approximation: thicker at the edges
+    // Optical depth approximation: thicker at the edges (limb darkening/brightening)
     float opticalDepth = pow(1.0 - NdotV, 4.0);
+    if (u_isInside > 0.5) {
+        opticalDepth = mix(1.0, 3.0, pow(1.0 - NdotV, 2.0)); // Brighter near horizon
+    }
     
     // Day/Night transition with a soft terminator
-    float sunInfluence = smoothstep(-0.2, 0.2, NdotL);
+    float sunInfluence = smoothstep(-0.2, 0.2, dot(zenithDir, lightDir));
     
     // Rayleigh scattering
     float rayleighPhase = 0.75 * (1.0 + VdotL * VdotL);
     vec3 rayleighScattering = u_rayleighColor * rayleighPhase;
     
-    // Mie scattering
-    float miePhase = henyeyGreenstein(VdotL, 0.76);
+    // Mie scattering (with ambient term for dust visibility on dark side/away from sun)
+    float miePhase = henyeyGreenstein(VdotL, 0.76) + 0.1;
     vec3 mieScattering = u_mieColor * miePhase;
     
-    // Combine scattering
-    vec3 scatterColor = mix(rayleighScattering, mieScattering, u_mieWeight);
+    // Total physical scattering and density
+    vec3 totalDensity = u_rayleighColor + u_mieColor;
+    vec3 scatterColor = rayleighScattering + mieScattering;
     
-    vec3 finalColor = scatterColor * opticalDepth * sunInfluence * u_intensity * 2.5;
+    // Analytical integration of scattering along the view ray
+    // (scatter / totalDensity) * (1.0 - exp(-totalDensity * opticalDepth))
+    // Add epsilon to prevent division by zero
+    vec3 safeDensity = max(totalDensity, vec3(1e-6));
+    vec3 finalColor = (scatterColor / safeDensity) * (1.0 - exp(-totalDensity * opticalDepth * 2.0));
+    
+    finalColor *= sunInfluence * u_intensity * 1.5;
+    
+    // Tone mapping to prevent blowouts (ACES-like filmic approximation)
+    finalColor = finalColor / (finalColor + vec3(0.5));
     
     gl_FragColor = vec4(finalColor, 1.0);
     #include <logdepthbuf_fragment>
@@ -1677,7 +1698,7 @@ export class BodyRenderer {
                 // Update ring quality dynamically based on distance
                 const distanceToCamera = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
                 mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
-                mesh.updateLighting(sunPos, mesh.group.position, this.renderScale);
+                mesh.updateLighting(sunPos, mesh.group.position, camera.position, this.renderScale);
 
                 // Dynamic Level of Detail (LOD) based on distance
                 // Note (Plan for future implementation): We could replace the polygon SphereGeometry with a raytraced impostor. This involves rendering a simple bounding box and calculating exact mathematical intersections of the camera's view ray with an oblate spheroid in a custom Fragment Shader. This is highly performant and eliminates polygonal edges entirely, but requires rewriting the standard materials and integrating custom depth writing for proper clipping with rings and atmospheres.
@@ -1920,19 +1941,16 @@ export class BodyRenderer {
                     vertexShader: ATMO_VERTEX,
                     fragmentShader: ATMO_FRAGMENT,
                     uniforms: {
-                        u_cameraPos: { value: this.camera.getCamera().position },
+                        u_rayleighColor: { value: new THREE.Vector3() },
+                        u_mieColor: { value: new THREE.Vector3() },
+                        u_intensity: { value: 1.0 },
                         u_sunPos: { value: new THREE.Vector3(0, 0, 0) },
-                        u_planetRadius: { value: 1.0 },
-                        u_atmoRadius: { value: 1.05 },
-                        u_rayleighScaleHeight: { value: 0.085 },
-                        u_rayleighCoeff: { value: new THREE.Vector3() },
-                        u_mieCoeff: { value: 0.0 },
-                        u_mieDir: { value: 0.758 },
-                        u_mieColor: { value: new THREE.Vector3(1, 1, 1) }
+                        u_planetCenter: { value: new THREE.Vector3(0, 0, 0) },
+                        u_isInside: { value: 0.0 }
                     },
                     transparent: true,
                     depthWrite: false,
-                    side: THREE.BackSide,
+                    side: THREE.DoubleSide,
                     blending: THREE.NormalBlending
                 });
                 this.ghostAtmoMesh = new THREE.Mesh(geometry, atmoMat);
@@ -1945,21 +1963,23 @@ export class BodyRenderer {
             const outerRadius = visualRadius + atmoHeight;
             this.ghostAtmoMesh.scale.setScalar(outerRadius);
             
-            atmoMat.uniforms.u_planetRadius.value = visualRadius;
-            atmoMat.uniforms.u_atmoRadius.value = outerRadius;
-            atmoMat.uniforms.u_rayleighScaleHeight.value = (params.atmosphereHeight ? params.atmosphereHeight * 0.085 : 8500) * this.renderScale;
-            atmoMat.uniforms.u_rayleighCoeff.value.set(
-                params.atmosphereRayleighR ?? 0.005,
-                params.atmosphereRayleighG ?? 0.012,
-                params.atmosphereRayleighB ?? 0.030
-            );
-            atmoMat.uniforms.u_mieCoeff.value = params.atmosphereMieWeight ?? 0.001;
+            // Scale intensity by relative height
+            const relHeight = atmoHeight / visualRadius;
+            atmoMat.uniforms.u_intensity.value = Math.min(1.0, 0.4 + relHeight * 2.0);
             
+            const visualScale = 1e5;
+            const rcR = params.atmosphereRayleighR ?? 0.005;
+            const rcG = params.atmosphereRayleighG ?? 0.012;
+            const rcB = params.atmosphereRayleighB ?? 0.030;
+            atmoMat.uniforms.u_rayleighColor.value.set(rcR * visualScale, rcG * visualScale, rcB * visualScale);
+            
+            const mieCoeff = params.atmosphereMieWeight ?? 0.001;
+            const mieDensityScale = mieCoeff * visualScale;
             const mieHex = params.atmosphereMieColor ?? 0xffffff;
             atmoMat.uniforms.u_mieColor.value.set(
-                ((mieHex >> 16) & 255) / 255,
-                ((mieHex >> 8) & 255) / 255,
-                (mieHex & 255) / 255
+                (((mieHex >> 16) & 255) / 255) * mieDensityScale,
+                (((mieHex >> 8) & 255) / 255) * mieDensityScale,
+                ((mieHex & 255) / 255) * mieDensityScale
             );
             this.ghostAtmoMesh.visible = this.ghostMesh.visible;
         } else if (this.ghostAtmoMesh) {
@@ -1971,7 +1991,7 @@ export class BodyRenderer {
      * Update ghost preview position (world coordinates).
      * Position is camera-relative for floating origin.
      */
-    updateGhostPosition(localX: number, localY: number, localZ: number): void {
+    updateGhostPosition(localX: number, localY: number, localZ: number, cameraPos: THREE.Vector3): void {
         if (this.ghostMesh) {
             this.ghostMesh.position.set(localX, localY, localZ);
         }
@@ -1985,7 +2005,11 @@ export class BodyRenderer {
             }
             const atmoMat = this.ghostAtmoMesh.material as THREE.ShaderMaterial;
             atmoMat.uniforms.u_sunPos.value.copy(sunPos);
-            atmoMat.uniforms.u_cameraPos.value.copy(this.camera.getCamera().position);
+            atmoMat.uniforms.u_planetCenter.value.set(localX, localY, localZ);
+            
+            const dist = cameraPos.distanceTo(new THREE.Vector3(localX, localY, localZ));
+            const outerRadius = this.ghostAtmoMesh.scale.x;
+            atmoMat.uniforms.u_isInside.value = (dist < outerRadius) ? 1.0 : 0.0;
         }
     }
 
@@ -2391,19 +2415,16 @@ class BodyMesh {
     private addAtmosphereShell(body: BodyData, segW: number, segH: number): void {
         const atm = body.atmosphere!;
 
-        // Rayleigh coefficients → normalized visible color [0,1]
+        const visualScale = 1e5;
+
+        // Rayleigh coefficients
         const rc = atm.rayleighCoefficients;
-        const maxR = Math.max(rc[0], rc[1], rc[2], 1e-10);
-        const rayleighColor = new THREE.Vector3(rc[0] / maxR, rc[1] / maxR, rc[2] / maxR);
+        const rayleighColor = new THREE.Vector3(rc[0] * visualScale, rc[1] * visualScale, rc[2] * visualScale);
 
         // Mie scattering color from dust/haze composition
         const mc = atm.mieColor ?? [1, 1, 1];
-        const mieColor = new THREE.Vector3(mc[0], mc[1], mc[2]);
-
-        // Weight: how much Mie dominates vs Rayleigh
-        // Uses ratio of mie coefficient to average Rayleigh coefficient
-        const avgRayleigh = (rc[0] + rc[1] + rc[2]) / 3;
-        const mieWeight = atm.mieCoefficient / (atm.mieCoefficient + avgRayleigh + 1e-15);
+        const mieDensityScale = atm.mieCoefficient * visualScale;
+        const mieColor = new THREE.Vector3(mc[0] * mieDensityScale, mc[1] * mieDensityScale, mc[2] * mieDensityScale);
 
         // Intensity based on atmosphere thickness relative to body size
         const relHeight = atm.height / body.radius;
@@ -2416,12 +2437,13 @@ class BodyMesh {
             uniforms: {
                 u_rayleighColor: { value: rayleighColor },
                 u_mieColor:      { value: mieColor },
-                u_mieWeight:     { value: mieWeight },
                 u_intensity:     { value: intensity },
                 u_sunPos:        { value: new THREE.Vector3() },
+                u_planetCenter:  { value: new THREE.Vector3() },
+                u_isInside:      { value: 0.0 },
             },
             transparent: true,
-            side: THREE.FrontSide,
+            side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending,
         });
@@ -2615,7 +2637,7 @@ class BodyMesh {
         mat.uniforms.u_perfMode.value = useHighQuality ? 0.0 : 1.0;
     }
 
-    updateLighting(sunPos: THREE.Vector3, planetPos: THREE.Vector3, renderScale: number): void {
+    updateLighting(sunPos: THREE.Vector3, planetPos: THREE.Vector3, cameraPos: THREE.Vector3, renderScale: number): void {
         const radius = scaleRadius(this.realRadius * renderScale);
         if (this.ringMesh && this.ringMesh.material instanceof THREE.ShaderMaterial) {
             const mat = this.ringMesh.material as THREE.ShaderMaterial;
@@ -2627,6 +2649,16 @@ class BodyMesh {
         if (this.atmosphereMesh && this.atmosphereMesh.material instanceof THREE.ShaderMaterial) {
             const mat = this.atmosphereMesh.material as THREE.ShaderMaterial;
             mat.uniforms.u_sunPos.value.copy(sunPos);
+            if (mat.uniforms.u_planetCenter) {
+                mat.uniforms.u_planetCenter.value.copy(planetPos);
+            }
+            
+            const dist = cameraPos.distanceTo(planetPos);
+            const atmoScale = (this.atmosphereMesh.userData.atmosphereScale as number) || 1.0;
+            const atmoRadius = radius * atmoScale;
+            if (mat.uniforms.u_isInside) {
+                mat.uniforms.u_isInside.value = (dist < atmoRadius) ? 1.0 : 0.0;
+            }
         }
 
         if (this.material.userData.sunPos) {
