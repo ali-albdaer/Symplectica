@@ -61,6 +61,9 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     // Pointer lock
     private canvas?: HTMLElement;
     private pointerLocked = false;
+    
+    // Input control
+    private ignoredButtons: Set<number> = new Set();
 
     // Free camera look sensitivity multiplier
     private freeLookSensitivity = 0.3;
@@ -76,6 +79,7 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     private lastMouseY = 0;
     private isRightDrag = false;
     private lastDragMoveTime = 0;
+    private currentDragButton = 0;
     private readonly dragMomentumCutoffMs = 120;
 
     // Momentum
@@ -119,8 +123,13 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
                 e.preventDefault();
                 return;
             }
+            
+            if (this.ignoredButtons.has(e.button)) {
+                return;
+            }
 
             this.isDragging = true;
+            this.currentDragButton = e.button;
             this.isRightDrag = e.button === 2;
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
@@ -282,6 +291,14 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
     setFreeLookSensitivity(multiplier: number): void {
         if (!Number.isFinite(multiplier) || multiplier <= 0) return;
         this.freeLookSensitivity = multiplier;
+    }
+
+    setIgnoredButtons(buttons: number[]): void {
+        this.ignoredButtons.clear();
+        for (const b of buttons) this.ignoredButtons.add(b);
+        if (this.isDragging && this.ignoredButtons.has(this.currentDragButton)) {
+            this.isDragging = false;
+        }
     }
 
     update(delta: number): void {

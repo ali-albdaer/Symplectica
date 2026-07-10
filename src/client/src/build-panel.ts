@@ -38,9 +38,10 @@ export interface BuildBodyParams {
     axialTilt?: number;
     rotationPeriod?: number;
     // Atmosphere
-    hasAtmosphere?: boolean;
-    atmosphereHeight?: number;
-    atmosphereRayleighR?: number;
+    hasAtmosphere: boolean;
+    hasRings: boolean;
+    atmosphereHeight: number;
+    atmosphereRayleighR: number;
     atmosphereRayleighG?: number;
     atmosphereRayleighB?: number;
     atmosphereMieColor?: number;
@@ -163,6 +164,7 @@ export class BuildPanel {
             axialTilt: 0,
             rotationPeriod: defaults.rotationPeriod ?? 86400,
             hasAtmosphere: false,
+            hasRings: false,
             atmosphereHeight: 60000,
             atmosphereRayleighR: 0.005,
             atmosphereRayleighG: 0.012,
@@ -316,6 +318,15 @@ export class BuildPanel {
                     </div>
                     <div id="build-atmo-props" style="display: none; margin-top: 6px;">
                         <div class="build-field">
+                            <label>Base Config</label>
+                            <select id="build-atmo-preset">
+                                <option value="earth">Earth-like</option>
+                                <option value="mars">Mars-like</option>
+                                <option value="venus">Venus-like</option>
+                                <option value="titan">Titan-like</option>
+                            </select>
+                        </div>
+                        <div class="build-field">
                             <label>Height (km)</label>
                             <input type="number" id="build-atmo-height" value="60" step="1" min="0">
                         </div>
@@ -344,6 +355,14 @@ export class BuildPanel {
                             </div>
                         </div>
                     </div>
+                </section>
+
+                <section class="build-section" id="build-rings-section">
+                    <h3>Rings</h3>
+                    <label class="build-toggle">
+                        <input type="checkbox" id="build-has-rings">
+                        <span>Has Rings (Saturn-like)</span>
+                    </label>
                 </section>
             </div>
 
@@ -545,7 +564,8 @@ export class BuildPanel {
             
             .build-field input[type="text"],
             .build-field input[type="number"],
-            .build-field-col input {
+            .build-field-col input,
+            .build-field select {
                 width: 100%;
                 padding: 5px 6px;
                 background: rgba(0, 0, 0, 0.3);
@@ -742,9 +762,9 @@ export class BuildPanel {
         const inputs = ['build-name', 'build-mass', 'build-radius', 'build-color',
                         'build-x', 'build-y', 'build-z', 'build-vx', 'build-vy', 'build-vz',
                         'build-luminosity', 'build-temperature', 'build-physics', 'build-massive',
-                        'build-tilt', 'build-rotation', 'build-has-atmo', 'build-atmo-height',
-                        'build-atmo-rr', 'build-atmo-rg', 'build-atmo-rb', 'build-atmo-mie-color',
-                        'build-atmo-mie-weight'];
+                        'build-tilt', 'build-rotation', 'build-has-atmo', 'build-has-rings',
+                        'build-atmo-height', 'build-atmo-rr', 'build-atmo-rg', 'build-atmo-rb',
+                        'build-atmo-mie-color', 'build-atmo-mie-weight'];
         
         inputs.forEach(id => {
             const el = container.querySelector(`#${id}`);
@@ -754,7 +774,7 @@ export class BuildPanel {
 
         // Spawn button
         container.querySelector('#build-spawn')?.addEventListener('click', () => {
-            this.spawn();
+            this.triggerSpawn();
         });
 
         // Calculate orbital velocity button
@@ -834,6 +854,10 @@ export class BuildPanel {
             }
 
             if (e.key === 'Escape' && this.isOpen) {
+                if (this.buildModeEnabled && this.params.y !== 0) {
+                    this.setCoordinates(this.params.x, 0, this.params.z);
+                    return;
+                }
                 this.close();
             }
         });
@@ -854,7 +878,6 @@ export class BuildPanel {
         const radiusInput = this.container.querySelector('#build-radius') as HTMLInputElement;
         const colorInput = this.container.querySelector('#build-color') as HTMLInputElement;
         const massiveCheckbox = this.container.querySelector('#build-massive') as HTMLInputElement;
-        const starSection = this.container.querySelector('#build-star-section') as HTMLElement;
         const rotationInput = this.container.querySelector('#build-rotation') as HTMLInputElement;
         const hasAtmoCheck = this.container.querySelector('#build-has-atmo') as HTMLInputElement;
 
@@ -864,9 +887,6 @@ export class BuildPanel {
         colorInput.value = '#' + defaults.color.toString(16).padStart(6, '0');
         massiveCheckbox.checked = type !== 'spacecraft';
         rotationInput.value = ((defaults.rotationPeriod ?? 86400) / 3600).toFixed(1);
-
-        // Show/hide star-specific options
-        starSection.classList.toggle('hidden', type !== 'star');
 
         if (type === 'star' && defaults.luminosity !== undefined) {
             (this.container.querySelector('#build-luminosity') as HTMLInputElement).value = defaults.luminosity.toString();
@@ -897,10 +917,7 @@ export class BuildPanel {
         const vzInput = this.container.querySelector('#build-vz') as HTMLInputElement;
         const physicsCheckbox = this.container.querySelector('#build-physics') as HTMLInputElement;
         const massiveCheckbox = this.container.querySelector('#build-massive') as HTMLInputElement;
-        const luminosityInput = this.container.querySelector('#build-luminosity') as HTMLInputElement;
-        const temperatureInput = this.container.querySelector('#build-temperature') as HTMLInputElement;
-        const tiltInput = this.container.querySelector('#build-tilt') as HTMLInputElement;
-        const rotationInput = this.container.querySelector('#build-rotation') as HTMLInputElement;
+        const ringsCheckbox = this.container.querySelector('#build-has-rings') as HTMLInputElement;
 
         this.params = {
             type: this.selectedType,
@@ -911,7 +928,7 @@ export class BuildPanel {
             x: (parseFloat(xInput.value) || 0) * AU,
             y: (parseFloat(yInput.value) || 0) * AU,
             z: (parseFloat(zInput.value) || 0) * AU,
-            vx: (parseFloat(vxInput.value) || 0) * 1000, // km/s to m/s
+            vx: (parseFloat(vxInput.value) || 0) * 1000,
             vy: (parseFloat(vyInput.value) || 0) * 1000,
             vz: (parseFloat(vzInput.value) || 0) * 1000,
             contributesToPhysics: physicsCheckbox.checked,
@@ -921,6 +938,7 @@ export class BuildPanel {
             axialTilt: parseFloat((this.container.querySelector('#build-tilt') as HTMLInputElement).value) || 0,
             rotationPeriod: (parseFloat((this.container.querySelector('#build-rotation') as HTMLInputElement).value) || 24) * 3600,
             hasAtmosphere: (this.container.querySelector('#build-has-atmo') as HTMLInputElement).checked,
+            hasRings: ringsCheckbox ? ringsCheckbox.checked : false,
             atmosphereHeight: (parseFloat((this.container.querySelector('#build-atmo-height') as HTMLInputElement).value) || 60) * 1000,
             atmosphereRayleighR: parseFloat((this.container.querySelector('#build-atmo-rr') as HTMLInputElement).value) || 0.005,
             atmosphereRayleighG: parseFloat((this.container.querySelector('#build-atmo-rg') as HTMLInputElement).value) || 0.012,
@@ -936,8 +954,6 @@ export class BuildPanel {
     }
 
     private calculateOrbitalVelocity(): void {
-        // Calculate circular orbital velocity around central mass at current position
-        // v = sqrt(G * M / r)
         const r = Math.sqrt(this.params.x ** 2 + this.params.y ** 2 + this.params.z ** 2);
         
         if (r < 1e6) {
@@ -945,17 +961,14 @@ export class BuildPanel {
             return;
         }
 
-        // Assume orbiting around a solar-mass object at origin
         const centralMass = M_SUN;
         const v = Math.sqrt(G * centralMass / r);
 
-        // Direction perpendicular to position vector (in XZ plane by default)
         const dx = this.params.x;
         const dz = this.params.z;
         const dist2D = Math.sqrt(dx * dx + dz * dz);
         
         if (dist2D > 0) {
-            // Counter-clockwise orbit
             const vx = (-dz / dist2D) * v;
             const vz = (dx / dist2D) * v;
             
@@ -967,14 +980,35 @@ export class BuildPanel {
         }
     }
 
-    private spawn(): void {
+    setCoordinates(x: number, y: number, z: number): void {
+        const xInput = this.container.querySelector('#build-x') as HTMLInputElement;
+        const yInput = this.container.querySelector('#build-y') as HTMLInputElement;
+        const zInput = this.container.querySelector('#build-z') as HTMLInputElement;
+        
+        if (xInput && yInput && zInput) {
+            xInput.value = (x / AU).toFixed(4);
+            yInput.value = (y / AU).toFixed(4);
+            zInput.value = (z / AU).toFixed(4);
+            this.updateParamsFromUI();
+        }
+    }
+
+    triggerSpawn(): void {
+        this.updateParamsFromUI();
         this.bodyCounter++;
         this.onSpawn?.(this.params);
         
-        // Update name for next body
         const nameInput = this.container.querySelector('#build-name') as HTMLInputElement;
         nameInput.value = `${this.selectedType.charAt(0).toUpperCase() + this.selectedType.slice(1)} ${this.bodyCounter + 1}`;
         
+        this.updateParamsFromUI();
+    }
+
+    /** Set position from external source (e.g., camera) */
+    setPosition(x: number, y: number, z: number): void {
+        (this.container.querySelector('#build-x') as HTMLInputElement).value = (x / AU).toFixed(4);
+        (this.container.querySelector('#build-y') as HTMLInputElement).value = (y / AU).toFixed(4);
+        (this.container.querySelector('#build-z') as HTMLInputElement).value = (z / AU).toFixed(4);
         this.updateParamsFromUI();
     }
 
@@ -1046,13 +1080,7 @@ export class BuildPanel {
         return { ...this.params };
     }
 
-    /** Set position from external source (e.g., camera) */
-    setPosition(x: number, y: number, z: number): void {
-        (this.container.querySelector('#build-x') as HTMLInputElement).value = (x / AU).toFixed(4);
-        (this.container.querySelector('#build-y') as HTMLInputElement).value = (y / AU).toFixed(4);
-        (this.container.querySelector('#build-z') as HTMLInputElement).value = (z / AU).toFixed(4);
-        this.updateParamsFromUI();
-    }
+
 
     /** Reset for a new world */
     reset(): void {

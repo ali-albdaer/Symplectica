@@ -94,6 +94,15 @@ class NBodyClient {
     // Time control (centralized)
     private timeController = new TimeController();
     private uiHidden = false;
+    private timeScaleKeyMultiplier = 1;
+    
+    // Interactive Placement (World-Builder)
+    private buildRaycaster = new THREE.Raycaster();
+    private buildMouse = new THREE.Vector2();
+    private buildPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    private isMiddleDragging = false;
+    private lastMiddleDragY = 0;
+
     private hintsVisible = true;
     private showSimulationParams = false;
     private showFollowingDetails = true;
@@ -787,12 +796,75 @@ class NBodyClient {
         });
 
         document.getElementById('canvas-container')?.addEventListener('mousedown', (e) => {
+            // Interactive placement handling
+            if (this.buildPanel.isVisible() && this.buildMode) {
+                if (e.button === 1) { // Middle click
+                    this.isMiddleDragging = true;
+                    this.lastMiddleDragY = e.clientY;
+                    e.preventDefault();
+                    return; // Handled
+                }
+                if (e.button === 2) { // Right click
+                    // Spawn the body!
+                    this.buildPanel.triggerSpawn();
+                    e.preventDefault();
+                    return; // Handled
+                }
+            }
+
             if (!this.freeCamera || e.button !== 0) return;
             const id = this.pickBodyFromCenter();
             if (id === null) return;
             const index = this.findBodyIndexById(id);
             if (index === null) return;
             this.switchToFollowBody(index);
+        });
+
+        // Add mousemove for interactive placement
+        document.getElementById('canvas-container')?.addEventListener('mousemove', (e) => {
+            if (this.buildPanel.isVisible() && this.buildMode) {
+                // If middle dragging, adjust Y
+                if (this.isMiddleDragging) {
+                    const deltaY = e.clientY - this.lastMiddleDragY;
+                    this.lastMiddleDragY = e.clientY;
+                    
+                    const params = this.buildPanel.getParams();
+                    // Sensitivity reduced from 0.01 to 0.002 AU per pixel
+                    const newY = params.y - deltaY * 0.002 * AU;
+                    this.buildPanel.setCoordinates(params.x, newY, params.z);
+                    return;
+                }
+
+                // Otherwise, update plane intersection
+                const params = this.buildPanel.getParams();
+                const cameraOrigin = this.resolveCameraOrigin(!this.freeCamera && !this.surfaceCamera);
+                
+                // The raycast is in rendering coordinates, so the plane must be defined in rendering space.
+                const renderingY = params.y - cameraOrigin.y;
+                this.buildPlane.constant = -renderingY; 
+                
+                const rect = this.renderer.domElement.getBoundingClientRect();
+                this.buildMouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                this.buildMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                this.buildRaycaster.setFromCamera(this.buildMouse, this.camera);
+                
+                const target = new THREE.Vector3();
+                if (this.buildRaycaster.ray.intersectPlane(this.buildPlane, target)) {
+                    // Convert intersected target back to world coordinates
+                    this.buildPanel.setCoordinates(target.x + cameraOrigin.x, params.y, target.z + cameraOrigin.z);
+                }
+            }
+        });
+
+        document.getElementById('canvas-container')?.addEventListener('mouseup', (e) => {
+            if (e.button === 1) {
+                this.isMiddleDragging = false;
+            }
+        });
+
+        document.getElementById('canvas-container')?.addEventListener('mouseleave', () => {
+            this.isMiddleDragging = false;
         });
 
         this.updateSimulationSections();
@@ -1689,11 +1761,16 @@ class NBodyClient {
 
         // Update ghost preview position if in build mode (must track floating origin each frame)
         if (this.buildMode && this.buildPanel.isVisible()) {
+            // Disable panning (right click) and dragging (middle click)
+            this.camera.setIgnoredButtons([1, 2]);
             const params = this.buildPanel.getParams();
             const localX = params.x - cameraOrigin.x;
             const localY = params.y - cameraOrigin.y;
             const localZ = params.z - cameraOrigin.z;
             this.bodyRenderer.updateGhostPosition(localX, localY, localZ, this.camera.position);
+        } else {
+            this.camera.setIgnoredButtons([]);
+            this.bodyRenderer.setGhostVisible(false);
         }
 
         // Update star rotations from simulation time
@@ -2108,6 +2185,12 @@ class NBodyClient {
             feels_gravity: params.contributesToPhysics,
             luminosity: (params.luminosity ?? 0) * L_SUN,
             effective_temperature: params.effectiveTemperature ?? 0,
+            rings: params.hasRings ? {
+                inner_radius_mult: 1.11,
+                outer_radius_mult: 2.27,
+                texture_preset: "saturn",
+                base_opacity: 0.8
+            } : null
         };
 
         // Add body via JSON to support complex fields like atmosphere
