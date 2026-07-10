@@ -9,6 +9,7 @@
  * - Simulation reset
  */
 
+import { RingProfile } from './renderer';
 import { PhysicsClient } from './physics';
 import { TimeController } from './time-controller';
 import { AdminStatePayload, NetworkClient } from './network';
@@ -40,6 +41,10 @@ export class AdminPanel {
     private network?: NetworkClient;
     private onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }) => void;
     private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
+    private onRingGeneratorLoadRequest?: () => void;
+    private onRingGeneratorApply?: (profile: RingProfile) => void;
+    private onRingGeneratorExport?: (profile: RingProfile) => void;
+    private currentRingProfile: RingProfile = { stops: [], baseOpacity: 1.0, scatteringG: 0.3 };
     private isOpen = false;
     private config: ServerConfig = {
         tickRate: APP_DEFAULTS.adminDefaults.tickRate,
@@ -64,17 +69,24 @@ export class AdminPanel {
         timeController: TimeController,
         network?: NetworkClient,
         onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }) => void,
-        onSimModeChange?: (mode: 'tick' | 'accumulator') => void
+        onSimModeChange?: (mode: 'tick' | 'accumulator') => void,
+        onRingGeneratorLoadRequest?: () => void,
+        onRingGeneratorApply?: (profile: RingProfile) => void,
+        onRingGeneratorExport?: (profile: RingProfile) => void
     ) {
         this.physics = physics;
         this.timeController = timeController;
         this.network = network;
         this.onPresetChange = onPresetChange;
         this.onSimModeChange = onSimModeChange;
+        this.onRingGeneratorLoadRequest = onRingGeneratorLoadRequest;
+        this.onRingGeneratorApply = onRingGeneratorApply;
+        this.onRingGeneratorExport = onRingGeneratorExport;
         this.container = this.createUI();
         document.body.appendChild(this.container);
         this.applyServerSettings(this.defaultAdminState());
         this.setupKeyboardShortcut();
+        this.setupRingGeneratorEvents();
     }
 
     private defaultAdminState(): AdminStatePayload {
@@ -121,6 +133,7 @@ export class AdminPanel {
             <div class="opt-tabs admin-tabs">
                 <button class="opt-tab active" data-tab="admin-general">General</button>
                 <button class="opt-tab" data-tab="admin-close">Close Encounters</button>
+                <button class="opt-tab" data-tab="admin-ring">Ring Gen</button>
             </div>
 
             <div class="opt-content admin-content active" id="tab-admin-general">
@@ -150,11 +163,11 @@ export class AdminPanel {
                         </select>
                     </div>
                     <div class="admin-field" id="barycentric-field">
-                        <label>
+                        <label class="opt-toggle">
                             <input type="checkbox" id="admin-barycentric" ${APP_DEFAULTS.defaultPreset.barycentric ? 'checked' : ''}>
-                            Barycentric Mode
+                            <span>Barycentric Mode</span>
                         </label>
-                        <div class="admin-hint">Shift to center-of-mass frame (zero system momentum)</div>
+                        <div class="admin-hint">Shift to center-of-mass frame</div>
                     </div>
                     <div class="admin-field" id="body-count-field" style="display: none;">
                         <label>Number of Bodies</label>
@@ -233,7 +246,7 @@ export class AdminPanel {
                     <h3>Switching</h3>
                     <div class="admin-grid-two">
                         <div class="admin-field">
-                            <label>Close-Encounter Integrator</label>
+                            <label>Integrator</label>
                             <select id="admin-close-encounter">
                                 <option value="none" ${APP_DEFAULTS.adminDefaults.closeEncounterIntegrator === 'none' ? 'selected' : ''}>None (Verlet only)</option>
                                 <option value="gauss-radau" ${APP_DEFAULTS.adminDefaults.closeEncounterIntegrator === 'gauss-radau' ? 'selected' : ''}>Gauss-Radau 5th</option>
@@ -292,6 +305,42 @@ export class AdminPanel {
                         </div>
                     </div>
                     <button class="admin-btn" id="admin-apply-close">Apply Close-Encounter Settings</button>
+                </section>
+            </div>
+
+            <div class="opt-content admin-content" id="tab-admin-ring" style="display: none;">
+                <section class="admin-section">
+                    <h3>Ring Generator</h3>
+                    <div class="admin-field">
+                        <button id="admin-ring-gen-load" class="admin-btn">Load Current Followed Body</button>
+                    </div>
+                    <div class="admin-field">
+                        <label>Base Opacity</label>
+                        <div class="admin-slider-row">
+                            <input type="range" id="admin-ring-gen-opacity" min="0" max="2" step="0.05" value="1.0">
+                            <span id="admin-ring-gen-opacity-val">1.0</span>
+                        </div>
+                    </div>
+                    <div class="admin-field">
+                        <label>Scattering (g)</label>
+                        <div class="admin-slider-row">
+                            <input type="range" id="admin-ring-gen-g" min="-0.99" max="0.99" step="0.01" value="0.3">
+                            <span id="admin-ring-gen-g-val">0.3</span>
+                        </div>
+                    </div>
+                    <div class="admin-field" style="margin-top:10px;">
+                        <label style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>Gradient Stops</span>
+                            <button id="admin-ring-gen-add-stop" class="admin-btn" style="padding:2px 6px; font-size:10px; width:auto; margin-bottom:0;">+ Add Stop</button>
+                        </label>
+                        <div id="admin-ring-gen-stops" style="display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto;border:1px solid rgba(255,255,255,0.1);padding:5px;background:rgba(0,0,0,0.3); border-radius:4px;">
+                            <!-- Stops injected here -->
+                        </div>
+                    </div>
+                    <div class="admin-grid-two" style="margin-top:10px;">
+                        <button id="admin-ring-gen-apply" class="admin-btn">Apply (Preview)</button>
+                        <button id="admin-ring-gen-export" class="admin-btn">Export Code</button>
+                    </div>
                 </section>
             </div>
         `;
@@ -386,7 +435,11 @@ export class AdminPanel {
                 border-bottom-color: #4fc3f7;
             }
 
-            .opt-content { padding: 10px 12px; }
+            .opt-content { 
+                padding: 10px 12px; 
+                overflow-y: auto;
+                max-height: calc(100vh - 120px);
+            }
             .opt-content.active { display: block; }
             
             .admin-section {
@@ -434,6 +487,26 @@ export class AdminPanel {
                 accent-color: #4fc3f7;
             }
 
+            .opt-toggle {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 0;
+                cursor: pointer;
+            }
+
+            .opt-toggle input[type="checkbox"] {
+                width: 14px;
+                height: 14px;
+                accent-color: #4fc3f7;
+                margin: 0;
+            }
+
+            .opt-toggle span {
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.9);
+            }
+
             .admin-slider-row {
                 display: flex;
                 align-items: center;
@@ -474,6 +547,7 @@ export class AdminPanel {
                 cursor: pointer;
                 margin-bottom: 6px;
                 transition: background 0.2s, border-color 0.2s, color 0.2s;
+                box-sizing: border-box;
             }
             
             .admin-btn:hover {
@@ -880,4 +954,128 @@ export class AdminPanel {
             document.addEventListener('mouseup', onMouseUp);
         });
     }
+
+    private setupRingGeneratorEvents(): void {
+        const rgLoadBtn = this.container.querySelector('#admin-ring-gen-load') as HTMLButtonElement;
+        const rgApplyBtn = this.container.querySelector('#admin-ring-gen-apply') as HTMLButtonElement;
+        const rgExportBtn = this.container.querySelector('#admin-ring-gen-export') as HTMLButtonElement;
+        const rgAddStopBtn = this.container.querySelector('#admin-ring-gen-add-stop') as HTMLButtonElement;
+        const rgOpacityInput = this.container.querySelector('#admin-ring-gen-opacity') as HTMLInputElement;
+        const rgGInput = this.container.querySelector('#admin-ring-gen-g') as HTMLInputElement;
+
+        rgLoadBtn?.addEventListener('click', () => {
+            if (this.onRingGeneratorLoadRequest) this.onRingGeneratorLoadRequest();
+        });
+
+        rgApplyBtn?.addEventListener('click', () => {
+            this.syncRingGeneratorProfileFromUI();
+            if (this.onRingGeneratorApply) this.onRingGeneratorApply(this.currentRingProfile);
+        });
+
+        rgExportBtn?.addEventListener('click', () => {
+            this.syncRingGeneratorProfileFromUI();
+            if (this.onRingGeneratorExport) this.onRingGeneratorExport(this.currentRingProfile);
+        });
+
+        rgAddStopBtn?.addEventListener('click', () => {
+            this.currentRingProfile.stops.push({ pos: 0.5, color: '#ffffff', alpha: 1.0 });
+            this.currentRingProfile.stops.sort((a, b) => a.pos - b.pos);
+            this.renderRingGeneratorStops();
+        });
+
+        const updateEvent = () => {
+            this.syncRingGeneratorProfileFromUI();
+            this.renderRingGeneratorStops();
+        };
+
+        rgOpacityInput?.addEventListener('input', updateEvent);
+        rgGInput?.addEventListener('input', updateEvent);
+    }
+
+    private syncRingGeneratorProfileFromUI(): void {
+        const rgOpacityInput = this.container.querySelector('#admin-ring-gen-opacity') as HTMLInputElement;
+        const rgGInput = this.container.querySelector('#admin-ring-gen-g') as HTMLInputElement;
+        const rgOpacityVal = this.container.querySelector('#admin-ring-gen-opacity-val');
+        const rgGVal = this.container.querySelector('#admin-ring-gen-g-val');
+
+        if (rgOpacityInput && rgGInput && rgOpacityVal && rgGVal) {
+            this.currentRingProfile.baseOpacity = parseFloat(rgOpacityInput.value);
+            this.currentRingProfile.scatteringG = parseFloat(rgGInput.value);
+            rgOpacityVal.textContent = this.currentRingProfile.baseOpacity.toFixed(2);
+            rgGVal.textContent = this.currentRingProfile.scatteringG.toFixed(2);
+        }
+
+        this.currentRingProfile.stops.sort((a, b) => a.pos - b.pos);
+
+        const stopsContainer = this.container.querySelector('#admin-ring-gen-stops');
+        if (!stopsContainer) return;
+
+        const stopRows = stopsContainer.querySelectorAll('.rg-stop-row');
+        this.currentRingProfile.stops.forEach((stop, index) => {
+            if (index < stopRows.length) {
+                const row = stopRows[index] as HTMLElement;
+                const posInput = row.querySelector('.rg-pos') as HTMLInputElement;
+                const colorInput = row.querySelector('.rg-col') as HTMLInputElement;
+                const alphaInput = row.querySelector('.rg-alpha') as HTMLInputElement;
+                stop.pos = parseFloat(posInput.value);
+                stop.color = colorInput.value;
+                stop.alpha = parseFloat(alphaInput.value);
+            }
+        });
+    }
+
+    private renderRingGeneratorStops(): void {
+        const stopsContainer = this.container.querySelector('#admin-ring-gen-stops');
+        if (!stopsContainer) return;
+        stopsContainer.innerHTML = '';
+        this.currentRingProfile.stops.forEach((stop, index) => {
+            const row = document.createElement('div');
+            row.className = 'rg-stop-row';
+            row.style.display = 'flex';
+            row.style.gap = '5px';
+            row.style.alignItems = 'center';
+
+            row.innerHTML = `
+                <input type="number" class="rg-pos" value="${stop.pos.toFixed(3)}" step="0.01" min="0" max="1" style="width:50px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:2px; font-size:11px;" title="Position (0-1)">
+                <input type="color" class="rg-col" value="${stop.color}" style="width:24px; padding:0; border:none; cursor:pointer;" title="Color">
+                <input type="number" class="rg-alpha" value="${stop.alpha.toFixed(2)}" step="0.05" min="0" max="1" style="width:45px; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:2px; font-size:11px;" title="Alpha (0-1)">
+                <button class="rg-del admin-btn" style="padding:2px 6px; margin:0; width:auto; color:#ff6b6b; border-color:rgba(255,107,107,0.3);" title="Remove">✕</button>
+            `;
+
+            row.querySelector('.rg-del')?.addEventListener('click', () => {
+                this.currentRingProfile.stops.splice(index, 1);
+                this.renderRingGeneratorStops();
+            });
+
+            row.querySelectorAll('input').forEach(inp => {
+                inp.addEventListener('change', () => this.syncRingGeneratorProfileFromUI());
+            });
+
+            stopsContainer.appendChild(row);
+        });
+    }
+
+    setRingGeneratorProfile(profile: RingProfile): void {
+        // Deep copy
+        this.currentRingProfile = {
+            baseOpacity: profile.baseOpacity,
+            scatteringG: profile.scatteringG,
+            stops: profile.stops.map(s => ({ ...s }))
+        };
+
+        const rgOpacityInput = this.container.querySelector('#admin-ring-gen-opacity') as HTMLInputElement;
+        const rgGInput = this.container.querySelector('#admin-ring-gen-g') as HTMLInputElement;
+        const rgOpacityVal = this.container.querySelector('#admin-ring-gen-opacity-val');
+        const rgGVal = this.container.querySelector('#admin-ring-gen-g-val');
+
+        if (rgOpacityInput && rgGInput && rgOpacityVal && rgGVal) {
+            rgOpacityInput.value = this.currentRingProfile.baseOpacity.toString();
+            rgOpacityVal.textContent = this.currentRingProfile.baseOpacity.toFixed(2);
+            rgGInput.value = this.currentRingProfile.scatteringG.toString();
+            rgGVal.textContent = this.currentRingProfile.scatteringG.toFixed(2);
+        }
+
+        this.renderRingGeneratorStops();
+    }
 }
+

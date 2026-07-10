@@ -442,6 +442,8 @@ export class BuildPanel {
             .build-content { 
                 padding: 10px 12px; 
                 display: none;
+                overflow-y: auto;
+                max-height: calc(100vh - 80px);
             }
             .build-content.active { display: block; }
             
@@ -582,6 +584,7 @@ export class BuildPanel {
                 font-size: 10px;
                 cursor: pointer;
                 transition: all 0.15s;
+                box-sizing: border-box;
             }
 
             .build-btn-small:hover {
@@ -605,6 +608,7 @@ export class BuildPanel {
                 font-weight: 600;
                 cursor: pointer;
                 transition: all 0.15s;
+                box-sizing: border-box;
             }
             
             .build-btn-spawn:hover {

@@ -208,6 +208,42 @@ class NBodyClient {
             },
             (mode) => {
                 this.setLocalSimMode(mode);
+            },
+            () => { // onRingGeneratorLoadRequest
+                if (this.followBodyIndex !== null && this.followBodyIndex >= 0) {
+                    const body = this.getFollowBody(this.followBodyIndex);
+                    if (body) {
+                        const profile = this.bodyRenderer.getBodyRingProfile(body.id);
+                        if (profile) {
+                            this.adminPanel.setRingGeneratorProfile(profile);
+                        } else {
+                            console.warn("Followed body does not have rings.");
+                        }
+                    }
+                }
+            },
+            (profile) => { // onRingGeneratorApply
+                if (this.followBodyIndex !== null && this.followBodyIndex >= 0) {
+                    const body = this.getFollowBody(this.followBodyIndex);
+                    if (body) {
+                        this.bodyRenderer.updateBodyRingProfile(body.id, profile);
+                    }
+                }
+            },
+            (profile) => { // onRingGeneratorExport
+                let out = `{\n  scatteringG: ${profile.scatteringG},\n  baseOpacity: ${profile.baseOpacity},\n  stops: [\n`;
+                for (const s of profile.stops) {
+                    out += `    { pos: ${s.pos.toFixed(2)}, color: '${s.color}', alpha: ${s.alpha.toFixed(2)} },\n`;
+                }
+                out += `  ]\n}`;
+                
+                // Copy to clipboard
+                navigator.clipboard.writeText(out).then(() => {
+                    console.log("Ring profile copied to clipboard:\n" + out);
+                }).catch(err => {
+                    console.error("Failed to copy:", err);
+                    console.log("Ring profile:\n" + out);
+                });
             }
         );
 
@@ -270,42 +306,6 @@ class NBodyClient {
                 this.bodyRenderer.setFlareFrequencyMode(experimental.flareFrequencyMode);
                 this.bodyRenderer.setRingQuality(experimental.ringQuality);
                 this.bodyRenderer.setRealisticTexturesEnabled(experimental.useRealisticTextures);
-            },
-            () => { // onRingGeneratorLoadRequest
-                if (this.followBodyIndex !== null && this.followBodyIndex >= 0) {
-                    const body = this.getFollowBody(this.followBodyIndex);
-                    if (body) {
-                        const profile = this.bodyRenderer.getBodyRingProfile(body.id);
-                        if (profile) {
-                            this.optionsPanel.setRingGeneratorProfile(profile);
-                        } else {
-                            console.warn("Followed body does not have rings.");
-                        }
-                    }
-                }
-            },
-            (profile) => { // onRingGeneratorApply
-                if (this.followBodyIndex !== null && this.followBodyIndex >= 0) {
-                    const body = this.getFollowBody(this.followBodyIndex);
-                    if (body) {
-                        this.bodyRenderer.updateBodyRingProfile(body.id, profile);
-                    }
-                }
-            },
-            (profile) => { // onRingGeneratorExport
-                let out = `{\n  scatteringG: ${profile.scatteringG},\n  baseOpacity: ${profile.baseOpacity},\n  stops: [\n`;
-                for (const s of profile.stops) {
-                    out += `    { pos: ${s.pos.toFixed(2)}, color: '${s.color}', alpha: ${s.alpha.toFixed(2)} },\n`;
-                }
-                out += `  ]\n}`;
-                
-                // Copy to clipboard
-                navigator.clipboard.writeText(out).then(() => {
-                    console.log("Ring profile copied to clipboard:\n" + out);
-                }).catch(err => {
-                    console.error("Failed to copy:", err);
-                    console.log("Ring profile:\n" + out);
-                });
             }
         );
         this.optionsPanel.setPresetRenderScale(
@@ -1693,7 +1693,7 @@ class NBodyClient {
             const localX = params.x - cameraOrigin.x;
             const localY = params.y - cameraOrigin.y;
             const localZ = params.z - cameraOrigin.z;
-            this.bodyRenderer.updateGhostPosition(localX, localY, localZ, this.camera.getCamera().position);
+            this.bodyRenderer.updateGhostPosition(localX, localY, localZ, this.camera.position);
         }
 
         // Update star rotations from simulation time
@@ -2006,7 +2006,7 @@ class NBodyClient {
             const localX = params.x - origin.x;
             const localY = params.y - origin.y;
             const localZ = params.z - origin.z;
-            this.bodyRenderer.updateGhostPosition(localX, localY, localZ, this.camera.getCamera().position);
+            this.bodyRenderer.updateGhostPosition(localX, localY, localZ, this.camera.position);
         } else {
             this.bodyRenderer.setGhostVisible(false);
         }

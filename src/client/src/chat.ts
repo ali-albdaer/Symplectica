@@ -70,11 +70,10 @@ export class Chat {
                 bottom: 16px;
                 left: 16px;
                 width: 300px;
-                background: linear-gradient(160deg, rgba(8, 14, 28, 0.55), rgba(10, 22, 36, 0.62));
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(120, 160, 240, 0.14);
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-                border-radius: 10px;
+                background: rgba(10, 15, 30, 0.95);
+                backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
                 color: #fff;
                 font-family: 'Segoe UI', system-ui, sans-serif;
                 font-size: 13px;
