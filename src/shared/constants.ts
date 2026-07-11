@@ -1,33 +1,6 @@
-// Canonical physical constants (SI units)
+export * from './physics_constants';
 
-/** Astronomical Unit (meters) */
-export const AU = 1.495978707e11;
-
-/** Gravitational constant (m³ kg⁻¹ s⁻²) */
-export const G = 6.6743e-11;
-
-/** Solar mass (kg) */
-export const M_SUN = 1.98892e30;
-
-/** Earth mass (kg) */
-export const M_EARTH = 5.9722e24;
-
-/** Lunar mass (kg) */
-export const M_MOON = 7.342e22;
-
-/** Solar radius (meters) */
-export const R_SUN = 6.9634e8;
-
-/** Earth radius (meters) */
-export const R_EARTH = 6.371e6;
-
-/** Lunar radius (meters) */
-export const R_MOON = 1.7374e6;
-
-/** Solar luminosity (watts) */
-export const L_SUN = 3.828e26;
-
-/** Speed levels for time warp UI (shared between client and server) */
+/** Speed levels for time warp UI */
 export interface SpeedLevel {
     /** Simulation seconds per real second */
     sim: number;

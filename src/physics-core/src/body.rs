@@ -54,6 +54,8 @@ pub enum PlanetComposition {
     IceGiant = 2,
     /// Dwarf planet / minor body
     Dwarf = 3,
+    /// Rocky / terrestrial (CO₂ atmosphere)
+    RockyCO2 = 4,
 }
 
 impl Default for PlanetComposition {
@@ -67,6 +69,7 @@ impl PlanetComposition {
     pub fn mean_molecular_weight(&self) -> f64 {
         match self {
             Self::Rocky => crate::constants::MU_ROCKY,
+            Self::RockyCO2 => crate::constants::MU_CO2,
             Self::GasGiant => crate::constants::MU_GAS_GIANT,
             Self::IceGiant => crate::constants::MU_ICE_GIANT,
             Self::Dwarf => crate::constants::MU_DWARF,

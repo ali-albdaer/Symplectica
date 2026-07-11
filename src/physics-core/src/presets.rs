@@ -879,7 +879,7 @@ pub fn create_inner_solar_system(seed: u64) -> Simulation {
         mars.inclination = 0.0323;
         mars.parent_id = Some(sun_id);
         mars.color = hex_to_rgb(0xc1440e);
-        mars.composition = PlanetComposition::Rocky;
+    mars.composition = PlanetComposition::RockyCO2;
         mars.albedo = 0.25;
         mars.atmosphere = Some(Atmosphere::mars_like());
         mars.compute_derived();
@@ -1400,7 +1400,7 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     venus.mean_anomaly = j2000::VENUS.mean_anomaly;
     venus.parent_id = Some(sun_id);
     venus.color = hex_to_rgb(0xe6c229);
-    venus.composition = PlanetComposition::Rocky;
+    venus.composition = PlanetComposition::RockyCO2;
     venus.albedo = 0.77;
     venus.atmosphere = Some(Atmosphere::venus_like());
     venus.softening_length = compute_softening(6.0518e6);
@@ -1718,7 +1718,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     venus.mean_anomaly = 303.8486165108158 * deg;
     venus.parent_id = Some(sun_id);
     venus.color = hex_to_rgb(0xe6c229);
-    venus.composition = PlanetComposition::Rocky;
+    venus.composition = PlanetComposition::RockyCO2;
     venus.albedo = 0.77;
     venus.atmosphere = Some(Atmosphere::venus_like());
     venus.softening_length = compute_softening(6.05184e6);
@@ -1764,9 +1764,9 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     moon.axial_tilt = 0.02692;
     moon.mean_surface_temperature = 250.0;
     moon.seed = seed.wrapping_add(4);
-    moon.semi_major_axis = 158221976583.3624;
+    moon.semi_major_axis = 384_400_000.0;
     moon.eccentricity = 0.07586278949852443;
-    moon.inclination = 0.01952857082753733 * deg;
+    moon.inclination = 0.01952857082753733;
     moon.longitude_asc_node = 42.00460263999287 * deg;
     moon.arg_periapsis = 41.38501390659234 * deg;
     moon.mean_anomaly = 14.56870417917833 * deg;
@@ -1809,7 +1809,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #401 — mass from NASA fact sheet (GM=7.09e-4 km³/s²)
     let mut phobos = Body::new(
         0, "Phobos", BodyType::Moon,
-        1.0659e16, 13100.0,
+        1.0659e16, 11260.0,
         Vec3::new(50947366239.00896, -207501379431.18384, -5596900585.285694),
         Vec3::new(26276.144888207426, 7238.706660368854, -1422.0976410611206),
     );
@@ -1828,7 +1828,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #402 — mass from NASA fact sheet
     let mut deimos = Body::new(
         0, "Deimos", BodyType::Moon,
-        1.4762e15, 7800.0,
+        1.4762e15, 6200.0,
         Vec3::new(50960858151.2132, -207472045051.07797, -5600953046.942488),
         Vec3::new(23381.403824232595, 8511.628465950784, 82.54899501365614),
     );
@@ -1847,7 +1847,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #599
     let mut jupiter = Body::new(
         0, "Jupiter", BodyType::Planet,
-        1.8981246258034552e+27, 66854000.0,
+        1.8981246258034552e+27, 69911000.0,
         Vec3::new(-253419345368.912, 737350305794.7006, 2606925500.009656),
         Vec3::new(-12520.041395089607, -3640.294521136214, 295.1466824685907),
     );
@@ -1955,7 +1955,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #699
     let mut saturn = Body::new(
         0, "Saturn", BodyType::Planet,
-        5.683173701212113e+26, 54364000.0,
+        5.683173701212113e+26, 58232000.0,
         Vec3::new(1422278067199.8396, 38557211581.593666, -57286362617.60134),
         Vec3::new(-802.2902327476618, 9633.913344037814, -135.29821308327544),
     );
@@ -2130,7 +2130,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     // Horizons #799
     let mut uranus = Body::new(
         0, "Uranus", BodyType::Planet,
-        8.680986186266726e+25, 24973000.0,
+        8.680986186266726e+25, 25362000.0,
         Vec3::new(1478073476913.7825, 2513246041395.4673, -9831518091.484814),
         Vec3::new(-5932.790537281172, 3134.649152126628, 88.8076829043664),
     );

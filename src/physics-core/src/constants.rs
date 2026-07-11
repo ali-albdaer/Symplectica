@@ -19,7 +19,7 @@ pub const M_SUN: f64 = 1.988_409_870e30;
 pub const M_EARTH: f64 = 5.972_167_867e24;
 
 /// Moon mass in kg
-pub const M_MOON: f64 = 7.342e22;
+pub const M_MOON: f64 = 7.3458e22;
 
 /// Solar radius in meters (IAU 2015 nominal)
 pub const R_SUN: f64 = 6.957e8;
@@ -93,6 +93,9 @@ pub const R_GAS: f64 = K_BOLTZMANN * N_AVOGADRO;
 
 /// Rocky / terrestrial atmosphere (N₂/O₂ dominated)
 pub const MU_ROCKY: f64 = 0.029;
+
+/// Rocky / CO2 atmosphere (Venus/Mars)
+pub const MU_CO2: f64 = 0.044;
 
 /// Gas giant atmosphere (H₂/He dominated)
 pub const MU_GAS_GIANT: f64 = 0.002;
