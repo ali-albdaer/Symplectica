@@ -1356,9 +1356,25 @@ void main() {
 
 
 
+export function isGenericBody(body: BodyData): boolean {
+    if (body.type === 'star') return false;
+    if (body.rings) return false;
+    if (body.atmosphere && body.atmosphere.height > 0) return false;
+    const lowerName = body.name.toLowerCase();
+    const texturedNames = ['mercury', 'venus', 'earth', 'moon', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
+    if (texturedNames.includes(lowerName)) return false;
+    return true;
+}
+
 export class BodyRenderer {
     private scene: THREE.Scene;
     private bodies: Map<number, BodyMesh> = new Map();
+
+    // Generic bodies instancing
+    private instancedMesh: THREE.InstancedMesh | null = null;
+    private genericBodyIds: number[] = [];
+    private dummyMatrix = new THREE.Matrix4();
+    private dummyColor = new THREE.Color();
 
     // Grid
     private gridGroup: THREE.Group | null = null;
@@ -1417,6 +1433,16 @@ export class BodyRenderer {
         this.labelContainer.style.overflow = 'hidden';
         this.labelContainer.style.zIndex = '10';
         document.getElementById('canvas-container')?.appendChild(this.labelContainer);
+
+        // Pre-allocate InstancedMesh for generic bodies
+        const geom = new THREE.SphereGeometry(1, this.sphereSegments.width, this.sphereSegments.height);
+        const mat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
+        this.instancedMesh = new THREE.InstancedMesh(geom, mat, 5000);
+        this.instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        if (this.instancedMesh.instanceColor) this.instancedMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        this.instancedMesh.count = 0;
+        this.instancedMesh.frustumCulled = false;
+        this.scene.add(this.instancedMesh);
     }
 
     setRenderScale(scale: number): void {
@@ -1491,11 +1517,23 @@ export class BodyRenderer {
     }
 
     addBody(body: BodyData): void {
+        let instanceId: number | undefined = undefined;
+        let genericInstancedMesh: THREE.InstancedMesh | undefined = undefined;
+        
+        if (isGenericBody(body) && this.instancedMesh) {
+            genericInstancedMesh = this.instancedMesh;
+            instanceId = this.genericBodyIds.length;
+            this.genericBodyIds.push(body.id);
+            this.instancedMesh.count = this.genericBodyIds.length;
+        }
+
         const mesh = new BodyMesh(
             body,
             this.sphereSegments.width,
             this.sphereSegments.height,
             this.starRenderOptions,
+            genericInstancedMesh,
+            instanceId
         );
         mesh.applyRealisticTextures(this.realisticTexturesEnabled);
         this.bodies.set(body.id, mesh);
@@ -1534,6 +1572,7 @@ export class BodyRenderer {
             });
 
             const line = new THREE.Line(geometry, material);
+            line.frustumCulled = false;
             this.orbitLines.set(body.id, line);
             this.scene.add(line);
         }
@@ -1621,6 +1660,10 @@ export class BodyRenderer {
         for (const mesh of this.bodies.values()) {
             mesh.setSegments(clampedWidth, clampedHeight);
         }
+        if (this.instancedMesh) {
+            this.instancedMesh.geometry.dispose();
+            this.instancedMesh.geometry = new THREE.SphereGeometry(1, clampedWidth, clampedHeight);
+        }
     }
 
     private createLabelElement(text: string, type: string): HTMLDivElement {
@@ -1634,6 +1677,12 @@ export class BodyRenderer {
     removeBody(id: number): void {
         const mesh = this.bodies.get(id);
         if (mesh) {
+            if (mesh.isInstanced && this.instancedMesh) {
+                // Shrink to 0 to hide it without breaking indices
+                this.dummyMatrix.makeScale(0, 0, 0);
+                this.instancedMesh.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+                this.instancedMesh.instanceMatrix.needsUpdate = true;
+            }
             this.scene.remove(mesh.group);
             mesh.dispose();
             this.bodies.delete(id);
@@ -1681,6 +1730,8 @@ export class BodyRenderer {
             idx++;
         }
 
+        let instancedUpdated = false;
+
         let i = 0;
         for (const [id, mesh] of this.bodies) {
             if (i * 3 + 2 < positions.length) {
@@ -1694,6 +1745,17 @@ export class BodyRenderer {
                 const localZ = worldZ - origin.z;
 
                 mesh.group.position.set(localX, localY, localZ);
+
+                if (mesh.isInstanced && this.instancedMesh) {
+                    const radius = scaleRadius(mesh.realRadius * this.renderScale);
+                    const q = mesh.group.quaternion.clone().multiply(mesh.mesh.quaternion);
+                    // Use cast to access oblateness safely
+                    const meshAny = mesh as any;
+                    const scale = new THREE.Vector3(radius, radius * (1 - meshAny.oblateness), radius);
+                    this.dummyMatrix.compose(new THREE.Vector3(localX, localY, localZ), q, scale);
+                    this.instancedMesh.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+                    instancedUpdated = true;
+                }
 
                 // Update ring quality dynamically based on distance
                 const distanceToCamera = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
@@ -1746,6 +1808,10 @@ export class BodyRenderer {
             }
             i++;
         }
+
+        if (instancedUpdated && this.instancedMesh) {
+            this.instancedMesh.instanceMatrix.needsUpdate = true;
+        }
     }
 
     private updateOrbitLine(id: number, history: Array<{ x: number; y: number; z: number }>, origin: { x: number; y: number; z: number }): void {
@@ -1769,7 +1835,6 @@ export class BodyRenderer {
 
         positions.needsUpdate = true;
         line.geometry.setDrawRange(0, count);
-        line.geometry.computeBoundingSphere();
     }
 
     updateBodyRingProfile(id: number, profile: RingProfile): void {
@@ -2174,9 +2239,9 @@ export class BodyRenderer {
 
 class BodyMesh {
     group: THREE.Group;
-    public mesh: THREE.Mesh;
+    public mesh!: THREE.Object3D;
     private geometry: THREE.SphereGeometry;
-    private material: THREE.Material;
+    private material?: THREE.Material;
     private atmosphereMesh: THREE.Mesh | null = null;
     private starMaterial: THREE.ShaderMaterial | null = null;
     private granulationTexture: THREE.Texture | null = null;
@@ -2184,6 +2249,10 @@ class BodyMesh {
     public ringMesh: THREE.Mesh | null = null;
     public cloudMesh: THREE.Mesh | null = null;
     private ringData: { innerMult: number, outerMult: number } | null = null;
+    
+    public isInstanced = false;
+    public instanceId = -1;
+    private instancedMeshRef: THREE.InstancedMesh | null = null;
     
     // Texture Cache for Solar System Scope textures
     private static textureLoader = new THREE.TextureLoader();
@@ -2208,6 +2277,8 @@ class BodyMesh {
         segmentsWidth: number,
         segmentsHeight: number,
         starOptions: StarRenderOptions,
+        instancedMesh?: THREE.InstancedMesh,
+        instanceId?: number
     ) {
         this.realRadius = body.radius;
         this.type = body.type;
@@ -2261,36 +2332,55 @@ class BodyMesh {
                 starOptions.flareQuality,
             );
         } else {
-            // F4: Physics-derived planet surface color as fallback
-            const color = body.color || this.deriveColorFromPhysics(body);
-            this.baseColor = color;
-            this.material = new THREE.MeshStandardMaterial({
-                color: color,
-                roughness: 0.8,
-                metalness: 0.1,
-            });
+            if (instancedMesh && instanceId !== undefined) {
+                this.isInstanced = true;
+                this.instancedMeshRef = instancedMesh;
+                this.instanceId = instanceId;
+                
+                const color = body.color || BodyMesh.deriveColorFromPhysics(body);
+                this.baseColor = color;
+                
+                this.mesh = new THREE.Group();
+                this.mesh.userData.bodyId = body.id;
+                
+                const instColor = new THREE.Color(color);
+                instancedMesh.setColorAt(instanceId, instColor);
+                if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+            } else {
+                // F4: Physics-derived planet surface color as fallback
+                const color = body.color || BodyMesh.deriveColorFromPhysics(body);
+                this.baseColor = color;
+                const standardMat = new THREE.MeshStandardMaterial({
+                    color: color,
+                    roughness: 0.8,
+                    metalness: 0.1,
+                });
+                this.material = standardMat;
 
             // Implement shadow cast BY rings onto the planet
             if (body.rings) {
                 const tilt = body.axialTilt ?? 0;
                 const ringNormal = new THREE.Vector3(-Math.sin(tilt), Math.cos(tilt), 0).normalize();
                 
-                this.material.userData.sunPos = new THREE.Vector3();
-                this.material.userData.planetCenter = new THREE.Vector3();
-                this.material.userData.planetRadius = { value: 1.0 };
-                this.material.userData.innerRadius = { value: body.rings.innerRadiusMult };
-                this.material.userData.outerRadius = { value: body.rings.outerRadiusMult };
-                this.material.userData.ringMap = { value: null };
-                this.material.userData.ringNormal = { value: ringNormal };
+                standardMat.userData.sunPos = new THREE.Vector3();
+                standardMat.userData.planetCenter = new THREE.Vector3();
+                standardMat.userData.planetRadius = { value: 1.0 };
+                standardMat.userData.innerRadius = { value: body.rings.innerRadiusMult };
+                standardMat.userData.outerRadius = { value: body.rings.outerRadiusMult };
+                standardMat.userData.ringMap = { value: null };
+                standardMat.userData.ringNormal = { value: ringNormal };
                 
-                this.material.onBeforeCompile = (shader) => {
-                    shader.uniforms.u_sunPosPlanet = { value: this.material.userData.sunPos };
-                    shader.uniforms.u_planetCenter = { value: this.material.userData.planetCenter };
-                    shader.uniforms.u_planetRadius = this.material.userData.planetRadius;
-                    shader.uniforms.u_innerRadius = this.material.userData.innerRadius;
-                    shader.uniforms.u_outerRadius = this.material.userData.outerRadius;
-                    shader.uniforms.u_ringMapPlanet = this.material.userData.ringMap;
-                    shader.uniforms.u_ringNormal = this.material.userData.ringNormal;
+                standardMat.onBeforeCompile = (shader) => {
+                    // Add custom program cache key to prevent duplicate compiles
+                    standardMat.customProgramCacheKey = () => 'planet_ring_shadow';
+                    
+                    shader.uniforms.u_sunPosPlanet = { value: standardMat.userData.sunPos };
+                    shader.uniforms.u_planetCenter = { value: standardMat.userData.planetCenter };
+                    shader.uniforms.u_planetRadius = standardMat.userData.planetRadius;
+                    shader.uniforms.u_innerRadius = standardMat.userData.innerRadius;
+                    shader.uniforms.u_outerRadius = standardMat.userData.outerRadius;
+                    shader.uniforms.u_ringMapPlanet = standardMat.userData.ringMap;
+                    shader.uniforms.u_ringNormal = standardMat.userData.ringNormal;
 
                     shader.vertexShader = shader.vertexShader.replace(
                         '#include <common>',
@@ -2337,10 +2427,14 @@ class BodyMesh {
                     );
                 };
             }
+            }
         }
 
-        this.mesh = new THREE.Mesh(this.geometry, this.material);
-        this.mesh.userData.bodyId = body.id;
+        if (!this.isInstanced && this.material) {
+            this.mesh = new THREE.Mesh(this.geometry, this.material);
+            this.mesh.userData.bodyId = body.id;
+        }
+
         this.group.add(this.mesh);
 
         if (this.flareSystem) {
@@ -2388,7 +2482,7 @@ class BodyMesh {
             const profile = getDefaultRingProfile(body.rings.texturePreset);
             profile.baseOpacity = body.rings.baseOpacity;
             const ringTex = createRingTexture(profile);
-            if (this.material.userData.ringMap) {
+            if (this.material && this.material.userData.ringMap) {
                 this.material.userData.ringMap.value = ringTex;
             }
 
@@ -2472,7 +2566,7 @@ class BodyMesh {
     }
 
     /** F4: Derive a reasonable surface color from physics when no named color exists */
-    private deriveColorFromPhysics(body: BodyData): number {
+    public static deriveColorFromPhysics(body: BodyData): number {
         const comp = body.composition ?? 'Rocky';
         const albedo = body.albedo ?? 0.3;
         const a = Math.max(0.15, Math.min(0.95, albedo));
@@ -2580,6 +2674,7 @@ class BodyMesh {
     }
 
     setSegments(segmentsWidth: number, segmentsHeight: number): void {
+        if (this.isInstanced) return;
         if (this.currentSegments.width === segmentsWidth && this.currentSegments.height === segmentsHeight) {
             return;
         }
@@ -2587,7 +2682,7 @@ class BodyMesh {
 
         if (this.geometry) this.geometry.dispose();
         this.geometry = new THREE.SphereGeometry(1, segmentsWidth, segmentsHeight);
-        if (this.mesh) this.mesh.geometry = this.geometry;
+        if (this.mesh && this.mesh instanceof THREE.Mesh) this.mesh.geometry = this.geometry;
         
         if (this.atmosphereMesh) {
             this.atmosphereMesh.geometry.dispose();
@@ -2684,7 +2779,7 @@ class BodyMesh {
             }
         }
 
-        if (this.material.userData.sunPos) {
+        if (this.material && this.material.userData.sunPos) {
             this.material.userData.sunPos.copy(sunPos);
             this.material.userData.planetCenter.copy(planetPos);
             this.material.userData.planetRadius.value = radius;
@@ -2698,7 +2793,7 @@ class BodyMesh {
         const newTex = createRingTexture(profile);
         this.ringMesh.userData.profile = profile;
 
-        if (this.material.userData.ringMap) {
+        if (this.material && this.material.userData.ringMap) {
             if (this.material.userData.ringMap.value) this.material.userData.ringMap.value.dispose();
             this.material.userData.ringMap.value = newTex;
         }
@@ -2833,8 +2928,10 @@ class BodyMesh {
     }
 
     dispose(): void {
-        this.geometry.dispose();
-        this.material.dispose();
+        if (!this.isInstanced) {
+            if (this.geometry) this.geometry.dispose();
+            if (this.material) this.material.dispose();
+        }
         this.granulationTexture?.dispose();
         this.flareSystem?.dispose();
         if (this.atmosphereMesh) {
@@ -2843,7 +2940,7 @@ class BodyMesh {
         }
     }
 
-    getPickMesh(): THREE.Mesh {
+    getPickMesh(): THREE.Object3D {
         return this.mesh;
     }
 }
