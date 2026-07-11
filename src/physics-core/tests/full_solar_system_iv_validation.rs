@@ -74,16 +74,16 @@ fn test_full_solar_system_iv_energy_conservation() {
     let mut sim = create_full_solar_system_iv(42, true);
     sim.set_dt(3600.0);
     
-    let initial_energy = compute_total_energy(sim.bodies(), DEFAULT_SOFTENING);
+    let initial_energy = sim.total_energy();
     
     for _ in 0..50 {
         sim.step();
     }
     
-    let final_energy = compute_total_energy(sim.bodies(), DEFAULT_SOFTENING);
+    let final_energy = sim.total_energy();
     let error = (final_energy - initial_energy).abs() / initial_energy.abs();
     
-    assert!(error < 0.01, "Energy not conserved: error = {}", error);
+    assert!(error < 2e-10, "Energy not conserved: error = {}", error);
 }
 
 #[test]

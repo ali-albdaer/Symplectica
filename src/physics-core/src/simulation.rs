@@ -408,7 +408,16 @@ impl Simulation {
                 }
 
                 let dist = bi.position.distance(bj.position);
-                let hill = hill_radius_estimate(bi.mass, bj.mass, dist);
+                
+                let a_eff = if bi.mass < bj.mass && bi.semi_major_axis > 0.0 {
+                    bi.semi_major_axis
+                } else if bj.mass <= bi.mass && bj.semi_major_axis > 0.0 {
+                    bj.semi_major_axis
+                } else {
+                    dist // Safe fallback if no valid semi-major axis
+                };
+
+                let hill = hill_radius_estimate(bi.mass, bj.mass, a_eff);
                 if hill <= 0.0 {
                     continue;
                 }

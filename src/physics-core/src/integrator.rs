@@ -800,7 +800,7 @@ mod tests {
             Body::new(
                 1, "Earth", BodyType::Planet, M_EARTH, R_EARTH,
                 Vec3::new(AU, 0.0, 0.0),
-                Vec3::new(0.0, 29784.0, 0.0), // Circular orbital velocity
+                Vec3::new(0.0, 29784.69, 0.0), // Circular orbital velocity
             ),
         ];
 
@@ -840,16 +840,20 @@ mod tests {
             }
         }
 
-        let final_pos = bodies[1].position;
         let final_energy = compute_total_energy(&bodies, config.force_config.softening);
+
+        // Calculate interpolated position at exactly y=0 to remove timestep quantization error
+        let y_after = bodies[1].position.y;
+        let vy = bodies[1].velocity.y;
+        let t_past = y_after / vy;
+        let final_pos = bodies[1].position - bodies[1].velocity * t_past;
 
         // Check Earth returned close to starting position
         let position_error = (final_pos - initial_pos).length();
         println!("Position error after 1 orbit: {} m ({:.1} km)", position_error, position_error / 1000.0);
         
-        // Allow up to 1000 km error (as per spec tolerance: positional_error_meters_after_1_orbit: 1000)
-        // The spec says 1000 meters, but that's extremely tight; using 1000 km as stated in spec comments
-        assert!(position_error < 1_000_000.0, "Position error {} m exceeds 1000 km", position_error);
+        // Allow up to 1000 meters error
+        assert!(position_error < 1000.0, "Position error {} m exceeds 1000 meters", position_error);
 
         // Check energy conservation
         let energy_drift = ((final_energy - initial_energy) / initial_energy).abs();
