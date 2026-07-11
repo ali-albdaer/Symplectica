@@ -632,7 +632,7 @@ class NBodyClient {
         this.camera = new OrbitCamera(
             APP_DEFAULTS.cameraDefaults.cameraFov,
             window.innerWidth / window.innerHeight,
-            1e2,     // 100 m near plane
+            0.1,     // 0.1 m near plane to avoid surface and small body clipping
             1e15     // ~1000 AU far plane
         );
         this.camera.setDistance(this.initialFollowDistance); // Start at 0.020 AU distance
@@ -1023,7 +1023,7 @@ class NBodyClient {
             this.camera.setFreeMode(false);
             // Update camera focus to the target position before setting orbit
             if (body) {
-                this.camera.setTrackedBodyRadius(body.radius);
+                this.camera.setTrackedBodyRadius(body.radius * this.bodyRenderer.getRenderScale());
             }
             this.camera.setFocus(target.x, target.y, target.z);
             this.camera.setOrbitFromOffset(offset);
@@ -1055,7 +1055,7 @@ class NBodyClient {
             this.lastFollowBodyIndex = bodyIndex;
             this.camera.setSurfaceMode(false);
             if (body) {
-                this.camera.setTrackedBodyRadius(body.radius);
+                this.camera.setTrackedBodyRadius(body.radius * this.bodyRenderer.getRenderScale());
             }
             this.camera.setFocus(target.x, target.y, target.z);
             this.camera.setOrbitFromOffset(offset);
@@ -1157,7 +1157,7 @@ class NBodyClient {
         this.camera.setFreeMode(false);
         // Update camera focus to the target position before setting orbit
         if (body) {
-            this.camera.setTrackedBodyRadius(body.radius);
+            this.camera.setTrackedBodyRadius(body.radius * this.bodyRenderer.getRenderScale());
         }
         this.camera.setFocus(target.x, target.y, target.z);
         this.camera.setOrbitFromOffset(offset);
@@ -1403,7 +1403,7 @@ class NBodyClient {
         if (!body) return;
 
         const target = this.getFollowTargetPosition(this.followBodyIndex);
-        this.camera.setTrackedBodyRadius(body.radius);
+        this.camera.setTrackedBodyRadius(body.radius * this.bodyRenderer.getRenderScale());
         this.camera.setFocus(target.x, target.y, target.z);
         this.camera.setDistance(this.initialFollowDistance);
         this.lastFollowBodyIndex = this.followBodyIndex;
@@ -1414,7 +1414,7 @@ class NBodyClient {
         if (!body) return;
 
         const target = this.getFollowTargetPosition(index);
-        this.camera.setTrackedBodyRadius(body.radius);
+        this.camera.setTrackedBodyRadius(body.radius * this.bodyRenderer.getRenderScale());
         this.camera.setFocus(target.x, target.y, target.z);
         this.followBodyIndex = index;
         this.lastFollowBodyIndex = index;

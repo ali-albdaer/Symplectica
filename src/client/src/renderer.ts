@@ -1411,8 +1411,9 @@ export class BodyRenderer {
     private trailIndices: Uint16Array;
     private trailHeads: Uint16Array;
     private trailOffsets: Map<number, number> = new Map();
+    private trailInitialized: Set<number> = new Set();
     private nextTrailOffset = 0;
-
+    
     private readonly TRAIL_SAMPLE_INTERVAL = 5; // Sample every N frames
     private frameCount = 0;
     private lastOrigin = { x: 0, y: 0, z: 0 };
@@ -1494,6 +1495,10 @@ export class BodyRenderer {
         if (!Number.isFinite(scale) || scale <= 0) return;
         this.renderScale = scale;
         this.updateBodySizes();
+    }
+    
+    getRenderScale(): number {
+        return this.renderScale;
     }
 
     setStarRenderOptions(options: Partial<StarRenderOptions>): void {
@@ -1792,10 +1797,14 @@ export class BodyRenderer {
 
                 mesh.group.position.set(localX, localY, localZ);
 
+                const dx = camera.position.x - localX;
+                const dy = camera.position.y - localY;
+                const dz = camera.position.z - localZ;
+                const distanceToCamera = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
                 if (mesh.isInstanced && this.instancedMesh) {
                     const radius = scaleRadius(mesh.realRadius * this.renderScale);
                     const actualVisRadius = radius;
-                    const distanceToCamera = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
                     
                     // Hero Mesh logic
                     if (distanceToCamera < actualVisRadius * 20) {
@@ -1816,7 +1825,6 @@ export class BodyRenderer {
                 }
 
                 // Update ring quality dynamically based on distance
-                const distanceToCamera = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
                 mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
                 mesh.updateLighting(sunPos, mesh.group.position, camera.position, this.renderScale);
 
@@ -1856,10 +1864,20 @@ export class BodyRenderer {
                     const head = this.trailHeads[offset];
                     const vIndex = offset * this.maxTrailPoints + head;
                     
-                    // Write absolute world coordinates
-                    this.trailPositions[vIndex * 3 + 0] = worldX;
-                    this.trailPositions[vIndex * 3 + 1] = worldY;
-                    this.trailPositions[vIndex * 3 + 2] = worldZ;
+                    if (!this.trailInitialized.has(id)) {
+                        this.trailInitialized.add(id);
+                        for (let t = 0; t < this.maxTrailPoints; t++) {
+                            const tIdx = offset * this.maxTrailPoints + t;
+                            this.trailPositions[tIdx * 3 + 0] = worldX;
+                            this.trailPositions[tIdx * 3 + 1] = worldY;
+                            this.trailPositions[tIdx * 3 + 2] = worldZ;
+                        }
+                    } else {
+                        // Write absolute world coordinates
+                        this.trailPositions[vIndex * 3 + 0] = worldX;
+                        this.trailPositions[vIndex * 3 + 1] = worldY;
+                        this.trailPositions[vIndex * 3 + 2] = worldZ;
+                    }
                     
                     // Advance head
                     const nextHead = (head + 1) % this.maxTrailPoints;
@@ -1984,9 +2002,50 @@ export class BodyRenderer {
     }
 
     setMaxTrailPoints(points: number): void {
-        // Changing maxTrailPoints dynamically is disabled in the flat buffer
-        // implementation to keep performance high and logic simple.
-        // (A full implementation would resize and recreate the flat buffers).
+        if (points === this.maxTrailPoints) return;
+        this.maxTrailPoints = points;
+        this.reallocateTrailBuffers();
+    }
+
+    private reallocateTrailBuffers(): void {
+        if (!this.globalTrailGeometry) return;
+        
+        const oldPositions = this.trailPositions;
+        const oldIndices = this.trailIndices;
+        const oldHeads = this.trailHeads;
+        const oldMaxPoints = oldPositions.length / (this.maxBodies * 3) || 100;
+        
+        // Reallocate arrays
+        this.trailPositions = new Float32Array(this.maxBodies * this.maxTrailPoints * 3);
+        this.trailIndices = new Uint16Array(this.maxBodies * this.maxTrailPoints * 2);
+        this.trailHeads = new Uint16Array(this.maxBodies);
+        
+        // Initialize new indices and copy heads/positions
+        for (let offset = 0; offset < this.nextTrailOffset; offset++) {
+            const head = oldHeads[offset];
+            // Since copying the exact circular buffer states to a resized buffer is complex, 
+            // we will simply reset the trail heads and mark them as uninitialized so they safely snap to the current body position.
+            this.trailHeads[offset] = 0;
+            
+            // Find body id for this offset to remove from initialized set
+            for (const [id, off] of this.trailOffsets.entries()) {
+                if (off === offset) {
+                    this.trailInitialized.delete(id);
+                    break;
+                }
+            }
+
+            const idxBase = offset * this.maxTrailPoints * 2;
+            const vBase = offset * this.maxTrailPoints;
+            for (let i = 0; i < this.maxTrailPoints; i++) {
+                this.trailIndices[idxBase + i * 2] = vBase + i;
+                this.trailIndices[idxBase + i * 2 + 1] = vBase + ((i + 1) % this.maxTrailPoints);
+            }
+        }
+        
+        this.globalTrailGeometry.setAttribute('position', new THREE.BufferAttribute(this.trailPositions, 3));
+        this.globalTrailGeometry.setIndex(new THREE.BufferAttribute(this.trailIndices, 1));
+        this.globalTrailGeometry.setDrawRange(0, this.nextTrailOffset * this.maxTrailPoints * 2);
     }
 
     setGridOptions(showXY: boolean, showXZ: boolean, showYZ: boolean, spacing: number, size: number): void {
