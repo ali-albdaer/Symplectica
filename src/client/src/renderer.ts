@@ -1386,7 +1386,14 @@ export class BodyRenderer {
 
     // Scale settings
     private renderScale = 1;
-    private sphereSegments = { width: 64, height: 32 };
+    private sphereSegments = { width: 16, height: 8 };
+
+    // Pre-allocated dummy variables to avoid GC churn in update loop
+    private dummyPosition = new THREE.Vector3();
+    private dummyScale = new THREE.Vector3();
+    private dummyQuaternion = new THREE.Quaternion();
+    private dummyProjectVec = new THREE.Vector3();
+
     private starRenderOptions: StarRenderOptions = {
         granulationEnabled: true,
         starspotsEnabled: false,
@@ -1395,9 +1402,17 @@ export class BodyRenderer {
     private ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways' = 'HighQualityClose';
 
     // Orbit trails
-    private orbitLines: Map<number, THREE.Line> = new Map();
-    private orbitHistory: Map<number, Array<{ x: number; y: number; z: number }>> = new Map();
     private maxTrailPoints = 100; // Default 100 points, configurable via setMaxTrailPoints
+    private maxBodies = 5000;
+    private globalTrailGeometry: THREE.BufferGeometry;
+    private globalTrailMesh: THREE.LineSegments;
+    private globalTrailMaterial: THREE.LineBasicMaterial;
+    private trailPositions: Float32Array;
+    private trailIndices: Uint16Array;
+    private trailHeads: Uint16Array;
+    private trailOffsets: Map<number, number> = new Map();
+    private nextTrailOffset = 0;
+
     private readonly TRAIL_SAMPLE_INTERVAL = 5; // Sample every N frames
     private frameCount = 0;
     private lastOrigin = { x: 0, y: 0, z: 0 };
@@ -1443,6 +1458,36 @@ export class BodyRenderer {
         this.instancedMesh.count = 0;
         this.instancedMesh.frustumCulled = false;
         this.scene.add(this.instancedMesh);
+
+        // Pre-allocate global trail buffers
+        this.trailPositions = new Float32Array(this.maxBodies * this.maxTrailPoints * 3);
+        this.trailIndices = new Uint16Array(this.maxBodies * this.maxTrailPoints * 2);
+        this.trailHeads = new Uint16Array(this.maxBodies);
+        
+        this.globalTrailGeometry = new THREE.BufferGeometry();
+        this.globalTrailGeometry.setAttribute('position', new THREE.BufferAttribute(this.trailPositions, 3));
+        this.globalTrailGeometry.setIndex(new THREE.BufferAttribute(this.trailIndices, 1));
+        this.globalTrailGeometry.setDrawRange(0, 0);
+
+        this.globalTrailMaterial = new THREE.LineBasicMaterial({
+            color: 0x4488ff,
+            transparent: true,
+            opacity: 0.4,
+        });
+        
+        this.globalTrailMaterial.onBeforeCompile = (shader) => {
+            shader.uniforms.u_origin = { value: new THREE.Vector3() };
+            this.globalTrailMaterial.userData.shader = shader;
+            shader.vertexShader = 'uniform vec3 u_origin;\n' + shader.vertexShader;
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <begin_vertex>',
+                'vec3 transformed = vec3( position ) - u_origin;'
+            );
+        };
+        
+        this.globalTrailMesh = new THREE.LineSegments(this.globalTrailGeometry, this.globalTrailMaterial);
+        this.globalTrailMesh.frustumCulled = false;
+        this.scene.add(this.globalTrailMesh);
     }
 
     setRenderScale(scale: number): void {
@@ -1557,24 +1602,19 @@ export class BodyRenderer {
 
         // Initialize orbit trail for non-stars
         if (body.type !== 'star') {
-            this.orbitHistory.set(body.id, []);
+            const offset = this.nextTrailOffset++;
+            this.trailOffsets.set(body.id, offset);
+            this.trailHeads[offset] = 0;
 
-            // Create orbit line
-            const geometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(2000 * 3); // Max allocation for trail buffer
-            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            geometry.setDrawRange(0, 0);
-
-            const material = new THREE.LineBasicMaterial({
-                color: body.color || 0x4488ff,
-                transparent: true,
-                opacity: 0.4,
-            });
-
-            const line = new THREE.Line(geometry, material);
-            line.frustumCulled = false;
-            this.orbitLines.set(body.id, line);
-            this.scene.add(line);
+            // Initialize index buffer for this trail (line segments)
+            const idxBase = offset * this.maxTrailPoints * 2;
+            const vBase = offset * this.maxTrailPoints;
+            for (let i = 0; i < this.maxTrailPoints; i++) {
+                this.trailIndices[idxBase + i * 2] = vBase + i;
+                this.trailIndices[idxBase + i * 2 + 1] = vBase + ((i + 1) % this.maxTrailPoints);
+            }
+            // Update draw range to encompass all active trails
+            this.globalTrailGeometry.setDrawRange(0, this.nextTrailOffset * this.maxTrailPoints * 2);
         }
 
         // Create text label HTML
@@ -1688,15 +1728,17 @@ export class BodyRenderer {
             this.bodies.delete(id);
         }
 
-        const orbit = this.orbitLines.get(id);
-        if (orbit) {
-            this.scene.remove(orbit);
-            orbit.geometry.dispose();
-            (orbit.material as THREE.Material).dispose();
-            this.orbitLines.delete(id);
+        // Note: Trail buffer reclamation is not fully implemented to keep code simple.
+        // We just hide the trail by zeroing its indices.
+        const offset = this.trailOffsets.get(id);
+        if (offset !== undefined) {
+            const idxBase = offset * this.maxTrailPoints * 2;
+            for (let i = 0; i < this.maxTrailPoints * 2; i++) {
+                this.trailIndices[idxBase + i] = 0;
+            }
+            this.trailOffsets.delete(id);
+            this.globalTrailGeometry.index!.needsUpdate = true;
         }
-
-        this.orbitHistory.delete(id);
 
         const label = this.bodyLabels.get(id);
         if (label) {
@@ -1710,6 +1752,10 @@ export class BodyRenderer {
         this.frameCount++;
         const shouldSample = this.frameCount % this.TRAIL_SAMPLE_INTERVAL === 0;
         this.lastOrigin = origin;
+
+        if (this.globalTrailMaterial.userData.shader) {
+            this.globalTrailMaterial.userData.shader.uniforms.u_origin.value.set(origin.x, origin.y, origin.z);
+        }
 
         if (this.gridGroup) {
             this.gridGroup.position.set(-origin.x, -origin.y, -origin.z);
@@ -1748,11 +1794,23 @@ export class BodyRenderer {
 
                 if (mesh.isInstanced && this.instancedMesh) {
                     const radius = scaleRadius(mesh.realRadius * this.renderScale);
-                    const q = mesh.group.quaternion.clone().multiply(mesh.mesh.quaternion);
-                    // Use cast to access oblateness safely
-                    const meshAny = mesh as any;
-                    const scale = new THREE.Vector3(radius, radius * (1 - meshAny.oblateness), radius);
-                    this.dummyMatrix.compose(new THREE.Vector3(localX, localY, localZ), q, scale);
+                    const actualVisRadius = radius;
+                    const distanceToCamera = Math.sqrt(localX * localX + localY * localY + localZ * localZ);
+                    
+                    // Hero Mesh logic
+                    if (distanceToCamera < actualVisRadius * 20) {
+                        this.dummyScale.set(0, 0, 0); // Hide instance
+                        if (!mesh.heroMesh) mesh.createHeroMesh();
+                        if (mesh.heroMesh) mesh.heroMesh.visible = true;
+                    } else {
+                        const meshAny = mesh as any;
+                        this.dummyScale.set(radius, radius * (1 - meshAny.oblateness), radius);
+                        if (mesh.heroMesh) mesh.heroMesh.visible = false;
+                    }
+                    
+                    this.dummyQuaternion.copy(mesh.group.quaternion).multiply(mesh.mesh.quaternion);
+                    this.dummyPosition.set(localX, localY, localZ);
+                    this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
                     this.instancedMesh.setMatrixAt(mesh.instanceId, this.dummyMatrix);
                     instancedUpdated = true;
                 }
@@ -1780,8 +1838,8 @@ export class BodyRenderer {
                     const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
                     const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
                     
-                    const worldPos = new THREE.Vector3(localX, localY + labelOffset, localZ);
-                    const screenPos = worldPos.clone().project(camera);
+                    this.dummyProjectVec.set(localX, localY + labelOffset, localZ);
+                    const screenPos = this.dummyProjectVec.project(camera);
                     
                     if (screenPos.z > 1.0) {
                         label.el.style.transform = `translate(-10000px, -10000px)`;
@@ -1793,17 +1851,27 @@ export class BodyRenderer {
                 }
 
                 // Update orbit trail
-                if (shouldSample && this.orbitHistory.has(id)) {
-                    const history = this.orbitHistory.get(id)!;
-                    history.push({ x: worldX, y: worldY, z: worldZ });
-
-                    // Remove oldest points when exceeding limit (one at a time)
-                    while (history.length > this.maxTrailPoints) {
-                        history.shift();
-                    }
-
-                    // Update orbit line geometry
-                    this.updateOrbitLine(id, history, origin);
+                if (shouldSample && this.trailOffsets.has(id)) {
+                    const offset = this.trailOffsets.get(id)!;
+                    const head = this.trailHeads[offset];
+                    const vIndex = offset * this.maxTrailPoints + head;
+                    
+                    // Write absolute world coordinates
+                    this.trailPositions[vIndex * 3 + 0] = worldX;
+                    this.trailPositions[vIndex * 3 + 1] = worldY;
+                    this.trailPositions[vIndex * 3 + 2] = worldZ;
+                    
+                    // Advance head
+                    const nextHead = (head + 1) % this.maxTrailPoints;
+                    this.trailHeads[offset] = nextHead;
+                    
+                    // Update index buffer to hide the wraparound segment
+                    const idxBase = offset * this.maxTrailPoints * 2;
+                    // Restore previous gap (connect old head to its next)
+                    const prevHead = (head - 1 + this.maxTrailPoints) % this.maxTrailPoints;
+                    this.trailIndices[idxBase + prevHead * 2 + 1] = offset * this.maxTrailPoints + head;
+                    // Create new gap (disconnect new head from nextHead)
+                    this.trailIndices[idxBase + head * 2 + 1] = offset * this.maxTrailPoints + head; // Degenerate segment
                 }
             }
             i++;
@@ -1812,29 +1880,13 @@ export class BodyRenderer {
         if (instancedUpdated && this.instancedMesh) {
             this.instancedMesh.instanceMatrix.needsUpdate = true;
         }
-    }
 
-    private updateOrbitLine(id: number, history: Array<{ x: number; y: number; z: number }>, origin: { x: number; y: number; z: number }): void {
-        const line = this.orbitLines.get(id);
-        if (!line) return;
-
-        const positions = line.geometry.attributes.position as THREE.BufferAttribute;
-        const arr = positions.array as Float32Array;
-        const count = Math.min(history.length, this.maxTrailPoints);
-
-        if (count < 2) {
-            line.geometry.setDrawRange(0, 0);
-            return;
+        if (shouldSample) {
+            this.globalTrailGeometry.attributes.position.needsUpdate = true;
+            if (this.globalTrailGeometry.index) {
+                this.globalTrailGeometry.index.needsUpdate = true;
+            }
         }
-
-        for (let i = 0; i < count; i++) {
-            arr[i * 3] = history[i].x - origin.x;
-            arr[i * 3 + 1] = history[i].y - origin.y;
-            arr[i * 3 + 2] = history[i].z - origin.z;
-        }
-
-        positions.needsUpdate = true;
-        line.geometry.setDrawRange(0, count);
     }
 
     updateBodyRingProfile(id: number, profile: RingProfile): void {
@@ -1901,8 +1953,8 @@ export class BodyRenderer {
 
     setShowOrbitTrails(show: boolean): void {
         this.showOrbitTrails = show;
-        for (const line of this.orbitLines.values()) {
-            line.visible = show;
+        if (this.globalTrailMesh) {
+            this.globalTrailMesh.visible = show;
         }
     }
 
@@ -1932,18 +1984,9 @@ export class BodyRenderer {
     }
 
     setMaxTrailPoints(points: number): void {
-        const capped = Math.max(2, Math.min(points, 2000));
-        this.maxTrailPoints = capped;
-        // Trim existing histories if needed (keep newest points)
-        for (const [id, history] of this.orbitHistory) {
-            if (history.length > capped) {
-                // Replace with only the newest points
-                const trimmed = history.slice(-capped);
-                history.length = 0;
-                history.push(...trimmed);
-            }
-            this.updateOrbitLine(id, history, this.lastOrigin);
-        }
+        // Changing maxTrailPoints dynamically is disabled in the flat buffer
+        // implementation to keep performance high and logic simple.
+        // (A full implementation would resize and recreate the flat buffers).
     }
 
     setGridOptions(showXY: boolean, showXZ: boolean, showYZ: boolean, spacing: number, size: number): void {
@@ -2135,11 +2178,8 @@ export class BodyRenderer {
     }
 
     getTrailStats(): { lineCount: number; totalVertices: number } {
-        let totalVertices = 0;
-        for (const history of this.orbitHistory.values()) {
-            totalVertices += history.length;
-        }
-        return { lineCount: this.orbitLines.size, totalVertices };
+        const totalVertices = this.nextTrailOffset * this.maxTrailPoints;
+        return { lineCount: this.nextTrailOffset, totalVertices };
     }
 
     dispose(): void {
@@ -2149,13 +2189,12 @@ export class BodyRenderer {
         }
         this.bodies.clear();
 
-        for (const orbit of this.orbitLines.values()) {
-            this.scene.remove(orbit);
-            orbit.geometry.dispose();
-            (orbit.material as THREE.Material).dispose();
+        if (this.globalTrailMesh) {
+            this.scene.remove(this.globalTrailMesh);
+            this.globalTrailGeometry.dispose();
+            this.globalTrailMaterial.dispose();
         }
-        this.orbitLines.clear();
-        this.orbitHistory.clear();
+        this.trailOffsets.clear();
 
         for (const label of this.bodyLabels.values()) {
             if (label.el.parentNode) label.el.parentNode.removeChild(label.el);
@@ -2250,6 +2289,7 @@ class BodyMesh {
     public cloudMesh: THREE.Mesh | null = null;
     private ringData: { innerMult: number, outerMult: number } | null = null;
     
+    public heroMesh: THREE.Mesh | null = null;
     public isInstanced = false;
     public instanceId = -1;
     private instancedMeshRef: THREE.InstancedMesh | null = null;
@@ -2271,6 +2311,20 @@ class BodyMesh {
     
     // Geometry state for LOD
     private currentSegments = { width: 0, height: 0 };
+
+    public createHeroMesh(): void {
+        if (this.heroMesh || !this.baseColor) return;
+        const geom = new THREE.SphereGeometry(1, 256, 128);
+        const mat = new THREE.MeshStandardMaterial({
+            color: this.baseColor,
+            roughness: 0.8,
+            metalness: 0.1,
+        });
+        this.heroMesh = new THREE.Mesh(geom, mat);
+        this.heroMesh.visible = false;
+        // The hero mesh replaces the instanced mesh's base sphere, so we attach it to this.mesh (which rotates)
+        this.mesh.add(this.heroMesh);
+    }
 
     constructor(
         body: BodyData,
