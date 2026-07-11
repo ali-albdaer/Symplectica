@@ -325,6 +325,8 @@ interface BodyData {
     radius: number;
     color: number;
     axialTilt?: number; // radians, obliquity — used for rotation axis overlay
+    poleRa?: number;
+    poleDec?: number;
     // Extended physics fields — populated from derive modules
     luminosity?: number;
     effectiveTemperature?: number;
@@ -2485,10 +2487,22 @@ class BodyMesh {
 
         // Store rotation data for all body types
         this.rotationRate = body.rotationRate ?? 0;
-        const tilt = body.axialTilt ?? 0;
         
-        // Tilt the entire group so its local Y axis becomes the spin axis
-        this.group.rotation.z = tilt;
+        // Orient the body
+        if (body.poleRa !== undefined && body.poleDec !== undefined) {
+            const pJ2000 = new THREE.Vector3(
+                Math.cos(body.poleDec) * Math.cos(body.poleRa),
+                Math.cos(body.poleDec) * Math.sin(body.poleRa),
+                Math.sin(body.poleDec)
+            );
+            // Transform to WebGL frame (X, Z, -Y)
+            const pWebGL = new THREE.Vector3(pJ2000.x, pJ2000.z, -pJ2000.y);
+            this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pWebGL);
+        } else {
+            const tilt = body.axialTilt ?? 0;
+            // Legacy tilt for Y-up: tilt around X axis so it leans into the orbital plane (XZ)
+            this.group.rotation.x = tilt;
+        }
 
         // Create sphere geometry - initially at default scale (will be set by renderer)
         const initialRadius = 1; // Placeholder, will be scaled
@@ -2555,8 +2569,18 @@ class BodyMesh {
 
             // Implement shadow cast BY rings onto the planet
             if (body.rings) {
-                const tilt = body.axialTilt ?? 0;
-                const ringNormal = new THREE.Vector3(-Math.sin(tilt), Math.cos(tilt), 0).normalize();
+                let ringNormal: THREE.Vector3;
+                if (body.poleRa !== undefined && body.poleDec !== undefined) {
+                    const pJ2000 = new THREE.Vector3(
+                        Math.cos(body.poleDec) * Math.cos(body.poleRa),
+                        Math.cos(body.poleDec) * Math.sin(body.poleRa),
+                        Math.sin(body.poleDec)
+                    );
+                    ringNormal = new THREE.Vector3(pJ2000.x, pJ2000.z, -pJ2000.y).normalize();
+                } else {
+                    const tilt = body.axialTilt ?? 0;
+                    ringNormal = new THREE.Vector3(0, Math.cos(tilt), Math.sin(tilt)).normalize();
+                }
                 
                 standardMat.userData.sunPos = new THREE.Vector3();
                 standardMat.userData.planetCenter = new THREE.Vector3();

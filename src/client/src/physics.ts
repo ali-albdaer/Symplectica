@@ -86,6 +86,8 @@ export interface BodyInfo {
     radius: number;
     color: number;
     axialTilt: number;
+    poleRa?: number;
+    poleDec?: number;
     // Extended physics fields (from derive modules)
     luminosity: number;
     effectiveTemperature: number;
@@ -355,6 +357,8 @@ export class PhysicsClient {
                 effective_temperature?: number;
                 rotation_rate?: number;
                 axial_tilt?: number;
+                pole_ra?: number;
+                pole_dec?: number;
                 seed?: number;
                 oblateness?: number;
                 scale_height?: number;
@@ -392,9 +396,11 @@ export class PhysicsClient {
                 type: this.parseBodyType(b.body_type),
                 mass: b.mass,
                 radius: b.radius,
-                // Use named color lookup first, then body struct color (RGB 0-1 → hex)
+                // Use named color lookup first, then body struct color (RGB 0-1 -> hex)
                 color: BODY_COLORS[b.name] ?? rgbToHex(b.color),
                 axialTilt: b.axial_tilt ?? 0,
+                poleRa: b.pole_ra,
+                poleDec: b.pole_dec,
                 luminosity: b.luminosity ?? 0,
                 effectiveTemperature: b.effective_temperature ?? 0,
                 rotationRate: b.rotation_rate ?? 0,

@@ -226,6 +226,14 @@ pub struct Body {
     #[serde(default)]
     pub axial_tilt: f64,
 
+    /// Right Ascension of the North Pole (rad, J2000)
+    #[serde(default)]
+    pub pole_ra: Option<f64>,
+
+    /// Declination of the North Pole (rad, J2000)
+    #[serde(default)]
+    pub pole_dec: Option<f64>,
+
     /// Average density (kg/m³). Computed by `compute_derived()` if zero.
     #[serde(default)]
     pub bulk_density: f64,
@@ -385,6 +393,8 @@ impl Body {
             softening_length: 0.0,
             rotation_rate: 0.0,
             axial_tilt: 0.0,
+            pole_ra: None,
+            pole_dec: None,
             bulk_density: 0.0,
             surface_gravity: 0.0,
             escape_velocity_surface: 0.0,
@@ -592,6 +602,8 @@ impl Default for Body {
             softening_length: 0.0,
             rotation_rate: 0.0,
             axial_tilt: 0.0,
+            pole_ra: None,
+            pole_dec: None,
             bulk_density: 0.0,
             surface_gravity: 0.0,
             escape_velocity_surface: 0.0,

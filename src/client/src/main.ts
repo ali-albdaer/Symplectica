@@ -579,6 +579,27 @@ class NBodyClient {
     }
 
     private applySnapshot(snapshot: string): void {
+        try {
+            const parsed = JSON.parse(snapshot);
+            if (parsed && parsed.bodies && Array.isArray(parsed.bodies)) {
+                for (const body of parsed.bodies) {
+                    if (body.position) {
+                        const py = body.position.y;
+                        body.position.y = body.position.z;
+                        body.position.z = -py;
+                    }
+                    if (body.velocity) {
+                        const vy = body.velocity.y;
+                        body.velocity.y = body.velocity.z;
+                        body.velocity.z = -vy;
+                    }
+                }
+            }
+            snapshot = JSON.stringify(parsed);
+        } catch (e) {
+            logger.warn('Failed to parse snapshot for coordinate mapping', e);
+        }
+
         const oldBodyCount = this.physics.bodyCount();
         const restored = this.physics.restoreSnapshot(snapshot);
         if (!restored) {
