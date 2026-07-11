@@ -1403,13 +1403,14 @@ export class BodyRenderer {
 
     // Orbit trails
     private maxTrailPoints = 100; // Default 100 points, configurable via setMaxTrailPoints
-    private maxBodies = 5000;
+    private currentNumTrails = 0;
     private globalTrailGeometry: THREE.BufferGeometry;
     private globalTrailMesh: THREE.LineSegments;
     private globalTrailMaterial: THREE.LineBasicMaterial;
-    private trailPositions: Float32Array;
+    private trailPositionsHigh: Float32Array;
+    private trailPositionsLow: Float32Array;
     private trailIndices: Uint16Array;
-    private trailHeads: Uint16Array;
+    private globalTrailHead = 0;
     private trailOffsets: Map<number, number> = new Map();
     private trailInitialized: Set<number> = new Set();
     private nextTrailOffset = 0;
@@ -1460,13 +1461,14 @@ export class BodyRenderer {
         this.instancedMesh.frustumCulled = false;
         this.scene.add(this.instancedMesh);
 
-        // Pre-allocate global trail buffers
-        this.trailPositions = new Float32Array(this.maxBodies * this.maxTrailPoints * 3);
-        this.trailIndices = new Uint16Array(this.maxBodies * this.maxTrailPoints * 2);
-        this.trailHeads = new Uint16Array(this.maxBodies);
+        // Pre-allocate global trail buffers (empty initially, resized dynamically)
+        this.trailPositionsHigh = new Float32Array(0);
+        this.trailPositionsLow = new Float32Array(0);
+        this.trailIndices = new Uint16Array(0);
         
         this.globalTrailGeometry = new THREE.BufferGeometry();
-        this.globalTrailGeometry.setAttribute('position', new THREE.BufferAttribute(this.trailPositions, 3));
+        this.globalTrailGeometry.setAttribute('positionHigh', new THREE.BufferAttribute(this.trailPositionsHigh, 3));
+        this.globalTrailGeometry.setAttribute('positionLow', new THREE.BufferAttribute(this.trailPositionsLow, 3));
         this.globalTrailGeometry.setIndex(new THREE.BufferAttribute(this.trailIndices, 1));
         this.globalTrailGeometry.setDrawRange(0, 0);
 
@@ -1477,12 +1479,13 @@ export class BodyRenderer {
         });
         
         this.globalTrailMaterial.onBeforeCompile = (shader) => {
-            shader.uniforms.u_origin = { value: new THREE.Vector3() };
+            shader.uniforms.u_originHigh = { value: new THREE.Vector3() };
+            shader.uniforms.u_originLow = { value: new THREE.Vector3() };
             this.globalTrailMaterial.userData.shader = shader;
-            shader.vertexShader = 'uniform vec3 u_origin;\n' + shader.vertexShader;
+            shader.vertexShader = 'uniform vec3 u_originHigh;\nuniform vec3 u_originLow;\nattribute vec3 positionHigh;\nattribute vec3 positionLow;\n' + shader.vertexShader;
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <begin_vertex>',
-                'vec3 transformed = vec3( position ) - u_origin;'
+                'vec3 transformed = (positionHigh - u_originHigh) + (positionLow - u_originLow);'
             );
         };
         
@@ -1609,17 +1612,6 @@ export class BodyRenderer {
         if (body.type !== 'star') {
             const offset = this.nextTrailOffset++;
             this.trailOffsets.set(body.id, offset);
-            this.trailHeads[offset] = 0;
-
-            // Initialize index buffer for this trail (line segments)
-            const idxBase = offset * this.maxTrailPoints * 2;
-            const vBase = offset * this.maxTrailPoints;
-            for (let i = 0; i < this.maxTrailPoints; i++) {
-                this.trailIndices[idxBase + i * 2] = vBase + i;
-                this.trailIndices[idxBase + i * 2 + 1] = vBase + ((i + 1) % this.maxTrailPoints);
-            }
-            // Update draw range to encompass all active trails
-            this.globalTrailGeometry.setDrawRange(0, this.nextTrailOffset * this.maxTrailPoints * 2);
         }
 
         // Create text label HTML
@@ -1758,8 +1750,17 @@ export class BodyRenderer {
         const shouldSample = this.frameCount % this.TRAIL_SAMPLE_INTERVAL === 0;
         this.lastOrigin = origin;
 
+        if (this.currentNumTrails !== this.nextTrailOffset) {
+            this.currentNumTrails = this.nextTrailOffset;
+            this.reallocateTrailBuffers();
+        }
+
         if (this.globalTrailMaterial.userData.shader) {
-            this.globalTrailMaterial.userData.shader.uniforms.u_origin.value.set(origin.x, origin.y, origin.z);
+            const hx = Math.fround(origin.x);
+            const hy = Math.fround(origin.y);
+            const hz = Math.fround(origin.z);
+            this.globalTrailMaterial.userData.shader.uniforms.u_originHigh.value.set(hx, hy, hz);
+            this.globalTrailMaterial.userData.shader.uniforms.u_originLow.value.set(origin.x - hx, origin.y - hy, origin.z - hz);
         }
 
         if (this.gridGroup) {
@@ -1861,35 +1862,35 @@ export class BodyRenderer {
                 // Update orbit trail
                 if (shouldSample && this.trailOffsets.has(id)) {
                     const offset = this.trailOffsets.get(id)!;
-                    const head = this.trailHeads[offset];
-                    const vIndex = offset * this.maxTrailPoints + head;
+                    const head = this.globalTrailHead;
+                    const numTrails = this.currentNumTrails;
                     
+                    const vIndex = head * numTrails + offset;
+                    
+                    const hx = Math.fround(worldX);
+                    const hy = Math.fround(worldY);
+                    const hz = Math.fround(worldZ);
+
                     if (!this.trailInitialized.has(id)) {
                         this.trailInitialized.add(id);
                         for (let t = 0; t < this.maxTrailPoints; t++) {
-                            const tIdx = offset * this.maxTrailPoints + t;
-                            this.trailPositions[tIdx * 3 + 0] = worldX;
-                            this.trailPositions[tIdx * 3 + 1] = worldY;
-                            this.trailPositions[tIdx * 3 + 2] = worldZ;
+                            const tIdx = t * numTrails + offset;
+                            this.trailPositionsHigh[tIdx * 3 + 0] = hx;
+                            this.trailPositionsHigh[tIdx * 3 + 1] = hy;
+                            this.trailPositionsHigh[tIdx * 3 + 2] = hz;
+                            this.trailPositionsLow[tIdx * 3 + 0] = worldX - hx;
+                            this.trailPositionsLow[tIdx * 3 + 1] = worldY - hy;
+                            this.trailPositionsLow[tIdx * 3 + 2] = worldZ - hz;
                         }
                     } else {
                         // Write absolute world coordinates
-                        this.trailPositions[vIndex * 3 + 0] = worldX;
-                        this.trailPositions[vIndex * 3 + 1] = worldY;
-                        this.trailPositions[vIndex * 3 + 2] = worldZ;
+                        this.trailPositionsHigh[vIndex * 3 + 0] = hx;
+                        this.trailPositionsHigh[vIndex * 3 + 1] = hy;
+                        this.trailPositionsHigh[vIndex * 3 + 2] = hz;
+                        this.trailPositionsLow[vIndex * 3 + 0] = worldX - hx;
+                        this.trailPositionsLow[vIndex * 3 + 1] = worldY - hy;
+                        this.trailPositionsLow[vIndex * 3 + 2] = worldZ - hz;
                     }
-                    
-                    // Advance head
-                    const nextHead = (head + 1) % this.maxTrailPoints;
-                    this.trailHeads[offset] = nextHead;
-                    
-                    // Update index buffer to hide the wraparound segment
-                    const idxBase = offset * this.maxTrailPoints * 2;
-                    // Restore previous gap (connect old head to its next)
-                    const prevHead = (head - 1 + this.maxTrailPoints) % this.maxTrailPoints;
-                    this.trailIndices[idxBase + prevHead * 2 + 1] = offset * this.maxTrailPoints + head;
-                    // Create new gap (disconnect new head from nextHead)
-                    this.trailIndices[idxBase + head * 2 + 1] = offset * this.maxTrailPoints + head; // Degenerate segment
                 }
             }
             i++;
@@ -1899,11 +1900,53 @@ export class BodyRenderer {
             this.instancedMesh.instanceMatrix.needsUpdate = true;
         }
 
-        if (shouldSample) {
-            this.globalTrailGeometry.attributes.position.needsUpdate = true;
-            if (this.globalTrailGeometry.index) {
-                this.globalTrailGeometry.index.needsUpdate = true;
+        if (shouldSample && this.currentNumTrails > 0) {
+            const head = this.globalTrailHead;
+            const numTrails = this.currentNumTrails;
+            
+            // Advance global head
+            const nextHead = (head + 1) % this.maxTrailPoints;
+            
+            // Re-connect previous gap
+            const prevHead = (head - 1 + this.maxTrailPoints) % this.maxTrailPoints;
+            const prevIdxBase = prevHead * numTrails * 2;
+            for (let b = 0; b < numTrails; b++) {
+                this.trailIndices[prevIdxBase + b * 2 + 1] = head * numTrails + b;
             }
+            
+            // Disconnect new head (degenerate segment)
+            const idxBase = head * numTrails * 2;
+            for (let b = 0; b < numTrails; b++) {
+                this.trailIndices[idxBase + b * 2 + 1] = head * numTrails + b;
+            }
+            
+            this.globalTrailHead = nextHead;
+            
+            // Use updateRange for highly optimal GPU upload
+            const posAttrHigh = this.globalTrailGeometry.attributes.positionHigh as THREE.BufferAttribute;
+            const posAttrLow = this.globalTrailGeometry.attributes.positionLow as THREE.BufferAttribute;
+            const idxAttr = this.globalTrailGeometry.index as THREE.BufferAttribute;
+            
+            posAttrHigh.clearUpdateRanges();
+            posAttrHigh.addUpdateRange(head * numTrails * 3, numTrails * 3);
+            posAttrHigh.needsUpdate = true;
+            
+            posAttrLow.clearUpdateRanges();
+            posAttrLow.addUpdateRange(head * numTrails * 3, numTrails * 3);
+            posAttrLow.needsUpdate = true;
+            
+            idxAttr.clearUpdateRanges();
+            if (head === 0) {
+                // At wrap-around, prevHead and head are at opposite ends, so update everything
+                // Three.js allows updating the whole buffer by passing large numbers, or just not adding ranges.
+                // But if clearUpdateRanges is used, it might require adding a full range.
+                // Or we can just add a range covering the whole buffer.
+                idxAttr.addUpdateRange(0, idxAttr.array.length);
+            } else {
+                // Adjacent gaps in memory, update tightly
+                idxAttr.addUpdateRange(prevHead * numTrails * 2, numTrails * 4);
+            }
+            idxAttr.needsUpdate = true;
         }
     }
 
@@ -2010,42 +2053,35 @@ export class BodyRenderer {
     private reallocateTrailBuffers(): void {
         if (!this.globalTrailGeometry) return;
         
-        const oldPositions = this.trailPositions;
-        const oldIndices = this.trailIndices;
-        const oldHeads = this.trailHeads;
-        const oldMaxPoints = oldPositions.length / (this.maxBodies * 3) || 100;
-        
-        // Reallocate arrays
-        this.trailPositions = new Float32Array(this.maxBodies * this.maxTrailPoints * 3);
-        this.trailIndices = new Uint16Array(this.maxBodies * this.maxTrailPoints * 2);
-        this.trailHeads = new Uint16Array(this.maxBodies);
-        
-        // Initialize new indices and copy heads/positions
-        for (let offset = 0; offset < this.nextTrailOffset; offset++) {
-            const head = oldHeads[offset];
-            // Since copying the exact circular buffer states to a resized buffer is complex, 
-            // we will simply reset the trail heads and mark them as uninitialized so they safely snap to the current body position.
-            this.trailHeads[offset] = 0;
-            
-            // Find body id for this offset to remove from initialized set
-            for (const [id, off] of this.trailOffsets.entries()) {
-                if (off === offset) {
-                    this.trailInitialized.delete(id);
-                    break;
-                }
-            }
+        const numTrails = this.currentNumTrails;
+        if (numTrails === 0) {
+            this.globalTrailGeometry.setDrawRange(0, 0);
+            return;
+        }
 
-            const idxBase = offset * this.maxTrailPoints * 2;
-            const vBase = offset * this.maxTrailPoints;
-            for (let i = 0; i < this.maxTrailPoints; i++) {
-                this.trailIndices[idxBase + i * 2] = vBase + i;
-                this.trailIndices[idxBase + i * 2 + 1] = vBase + ((i + 1) % this.maxTrailPoints);
+        // Reallocate arrays for exactly numTrails to avoid processing unused geometry
+        this.trailPositionsHigh = new Float32Array(numTrails * this.maxTrailPoints * 3);
+        this.trailPositionsLow = new Float32Array(numTrails * this.maxTrailPoints * 3);
+        this.trailIndices = new Uint16Array(numTrails * this.maxTrailPoints * 2);
+        
+        // Setup initial static indices
+        for (let h = 0; h < this.maxTrailPoints; h++) {
+            const idxBase = h * numTrails * 2;
+            const nextH = (h + 1) % this.maxTrailPoints;
+            for (let b = 0; b < numTrails; b++) {
+                this.trailIndices[idxBase + b * 2 + 0] = h * numTrails + b;
+                this.trailIndices[idxBase + b * 2 + 1] = nextH * numTrails + b;
             }
         }
         
-        this.globalTrailGeometry.setAttribute('position', new THREE.BufferAttribute(this.trailPositions, 3));
+        // Reset state so trails snap to current body positions
+        this.globalTrailHead = 0;
+        this.trailInitialized.clear();
+        
+        this.globalTrailGeometry.setAttribute('positionHigh', new THREE.BufferAttribute(this.trailPositionsHigh, 3));
+        this.globalTrailGeometry.setAttribute('positionLow', new THREE.BufferAttribute(this.trailPositionsLow, 3));
         this.globalTrailGeometry.setIndex(new THREE.BufferAttribute(this.trailIndices, 1));
-        this.globalTrailGeometry.setDrawRange(0, this.nextTrailOffset * this.maxTrailPoints * 2);
+        this.globalTrailGeometry.setDrawRange(0, numTrails * this.maxTrailPoints * 2);
     }
 
     setGridOptions(showXY: boolean, showXZ: boolean, showYZ: boolean, spacing: number, size: number): void {
