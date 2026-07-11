@@ -44,3 +44,9 @@ export const SPEED_LEVELS: readonly SpeedLevel[] = [
     { sim: 2592000, label: '1mo/s' },
     { sim: 31536000, label: '1yr/s' },
 ];
+
+/** Performance Monitor and general HUD update interval (ms) */
+export const UI_UPDATE_INTERVAL_MS = 200;
+
+/** Simulation Tab update interval (ms) */
+export const SIM_TAB_UPDATE_INTERVAL_MS = 100;

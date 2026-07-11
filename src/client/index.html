@@ -322,6 +322,10 @@
       transition: width 0.1s linear;
     }
 
+    #perf-overlay .perf-good { color: #4caf50 !important; }
+    #perf-overlay .perf-warn { color: #ffeb3b !important; }
+    #perf-overlay .perf-critical { color: #f44336 !important; }
+
     #perf-overlay .perf-section {
       margin-top: 8px;
       padding-top: 8px;
@@ -699,6 +703,16 @@
         <div class="perf-row">
           <span class="label">JS Heap</span>
           <span class="value" id="perf-memory">---</span>
+        </div>
+      </div>
+      <div class="perf-section">
+        <div class="perf-row">
+          <span class="label">Bottleneck</span>
+          <span class="value" id="perf-bottleneck">None</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Contributors</span>
+          <span class="value" id="perf-contributors" style="text-align: right; max-width: 140px; word-wrap: break-word;">---</span>
         </div>
       </div>
     </div>

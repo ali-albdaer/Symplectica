@@ -30,7 +30,7 @@ import { APP_DEFAULTS } from './defaults';
 import { logger } from './logger';
 import { MediaCapture } from './recorder';
 
-import { AU, G, M_SUN, L_SUN } from '../../shared/constants';
+import { AU, G, M_SUN, L_SUN, UI_UPDATE_INTERVAL_MS, SIM_TAB_UPDATE_INTERVAL_MS } from '../../shared/constants';
 const LOCAL_TICK_RATE = APP_DEFAULTS.adminDefaults.tickRate;
 const LOCAL_PRESET_PLAYER = 'local';
 
@@ -127,6 +127,16 @@ class NBodyClient {
     };
     private frameTimingSeeded = false; // First frame seeds the average
     private readonly EMA_ALPHA = 0.05; // Smoothing factor (lower = smoother)
+
+    // UI Throttling
+    private lastPerfDomUpdate = 0;
+    private lastUiDomUpdate = 0;
+    private lastSimTabUpdate = 0;
+
+    // Refresh rate detection
+    private frameDeltas: number[] = [];
+    private dynamicBudgetMs = 16.67; // Defaults to 60fps
+    private detectedRefreshRate = false;
 
     // Body following
     private followBodyIndex = 0; // -1 = follow origin, 0+ = body index (initialized in initPhysics)
@@ -1207,6 +1217,10 @@ class NBodyClient {
             this.frameTimingAvg.stepsThisFrame = a * this.frameTiming.stepsThisFrame + (1 - a) * this.frameTimingAvg.stepsThisFrame;
         }
 
+        const now = performance.now();
+        if (now - this.lastPerfDomUpdate < UI_UPDATE_INTERVAL_MS) return;
+        this.lastPerfDomUpdate = now;
+
         const frameEl = document.getElementById('perf-frame-time');
         const physicsEl = document.getElementById('perf-physics-time');
         const renderEl = document.getElementById('perf-render-time');
@@ -1215,17 +1229,38 @@ class NBodyClient {
         const bodiesEl = document.getElementById('perf-bodies');
         const barEl = document.getElementById('perf-bar-fill');
 
+        const budgetMs = this.dynamicBudgetMs;
+
+        const applyColor = (el: HTMLElement | null, val: number, limit: number) => {
+            if (!el) return;
+            el.classList.remove('perf-good', 'perf-warn', 'perf-critical');
+            const ratio = val / limit;
+            if (ratio > 0.85) el.classList.add('perf-critical');
+            else if (ratio > 0.5) el.classList.add('perf-warn');
+            else el.classList.add('perf-good');
+        };
+
         // Format: "instant (avg)" for better readability
-        if (frameEl) frameEl.textContent = `${this.frameTiming.total.toFixed(1)} (${this.frameTimingAvg.total.toFixed(1)}) ms`;
+        if (frameEl) {
+            frameEl.textContent = `${this.frameTiming.total.toFixed(1)} (${this.frameTimingAvg.total.toFixed(1)}) ms`;
+            applyColor(frameEl, this.frameTimingAvg.total, budgetMs);
+        }
         if (physicsEl) {
             const useServer = this.network?.isConnected() && this.lastServerState;
             const label = useServer ? 'Physics (server)' : 'Physics';
             const span = physicsEl.closest('.perf-row')?.querySelector('.label');
             if (span) span.textContent = label;
             physicsEl.textContent = `${this.frameTiming.physics.toFixed(1)} (${this.frameTimingAvg.physics.toFixed(1)}) ms`;
+            applyColor(physicsEl, this.frameTimingAvg.physics, budgetMs);
         }
-        if (renderEl) renderEl.textContent = `${this.frameTiming.render.toFixed(1)} (${this.frameTimingAvg.render.toFixed(1)}) ms`;
-        if (uiEl) uiEl.textContent = `${this.frameTiming.ui.toFixed(1)} (${this.frameTimingAvg.ui.toFixed(1)}) ms`;
+        if (renderEl) {
+            renderEl.textContent = `${this.frameTiming.render.toFixed(1)} (${this.frameTimingAvg.render.toFixed(1)}) ms`;
+            applyColor(renderEl, this.frameTimingAvg.render, budgetMs);
+        }
+        if (uiEl) {
+            uiEl.textContent = `${this.frameTiming.ui.toFixed(1)} (${this.frameTimingAvg.ui.toFixed(1)}) ms`;
+            applyColor(uiEl, this.frameTimingAvg.ui, budgetMs);
+        }
         if (stepsEl) stepsEl.textContent = `${this.frameTiming.stepsThisFrame} (${this.frameTimingAvg.stepsThisFrame.toFixed(1)})`;
         if (bodiesEl) bodiesEl.textContent = this.state.bodyCount.toString();
 
@@ -1260,14 +1295,40 @@ class NBodyClient {
 
         // JS heap memory (Chrome only)
         const memoryEl = document.getElementById('perf-memory');
+        let memoryUsedMB = 0;
         if (memoryEl) {
             const perf = performance as Performance & { memory?: { usedJSHeapSize: number } };
             if (perf.memory) {
-                const mb = perf.memory.usedJSHeapSize / (1024 * 1024);
-                memoryEl.textContent = `${mb.toFixed(1)} MB`;
+                memoryUsedMB = perf.memory.usedJSHeapSize / (1024 * 1024);
+                memoryEl.textContent = `${memoryUsedMB.toFixed(1)} MB`;
             } else {
                 memoryEl.textContent = 'N/A';
             }
+        }
+
+        // Bottleneck Analysis
+        const bottleneckEl = document.getElementById('perf-bottleneck');
+        const contributorsEl = document.getElementById('perf-contributors');
+        if (bottleneckEl && contributorsEl) {
+            let bottleneck = "None";
+            let contributor = "---";
+
+            if (this.frameTimingAvg.total > budgetMs * 0.85) {
+                if (this.frameTimingAvg.render > this.frameTimingAvg.physics) {
+                    bottleneck = "GPU Bound";
+                    contributor = `Draw Calls: ${info.render.calls}, Tris: ${(info.render.triangles / 1000).toFixed(0)}k, Tex: ${info.memory.textures}`;
+                    bottleneckEl.className = "value perf-critical";
+                } else {
+                    bottleneck = "CPU Bound";
+                    contributor = `Phys: ${this.frameTimingAvg.physics.toFixed(1)}ms, UI: ${this.frameTimingAvg.ui.toFixed(1)}ms`;
+                    if (memoryUsedMB > 0) contributor += `, Mem: ${memoryUsedMB.toFixed(1)}MB`;
+                    bottleneckEl.className = "value perf-critical";
+                }
+            } else {
+                bottleneckEl.className = "value perf-good";
+            }
+            bottleneckEl.textContent = bottleneck;
+            contributorsEl.textContent = contributor;
         }
 
         // Show simulation status for debugging
@@ -1288,8 +1349,7 @@ class NBodyClient {
             }
         }
 
-        // Bar shows frame time as percentage of 16.67ms (60fps budget)
-        const budgetMs = 16.67;
+        // Bar shows frame time as percentage of budget
         const usedPercent = Math.min((this.frameTiming.total / budgetMs) * 100, 100);
         if (barEl) barEl.style.width = `${usedPercent.toFixed(0)}%`;
     }
@@ -1588,6 +1648,25 @@ class NBodyClient {
         const delta = (frameStart - this.lastFrameTime) / 1000;
         this.lastFrameTime = frameStart;
 
+        // Refresh rate detection (first 100 frames)
+        if (!this.detectedRefreshRate) {
+            this.frameDeltas.push(delta * 1000);
+            if (this.frameDeltas.length >= 100) {
+                // Find median delta to avoid outliers
+                const sorted = [...this.frameDeltas].sort((a, b) => a - b);
+                const medianDelta = sorted[Math.floor(sorted.length / 2)];
+                // Snap to common refresh rates
+                if (medianDelta < 7.5) this.dynamicBudgetMs = 6.94; // ~144Hz
+                else if (medianDelta < 9) this.dynamicBudgetMs = 8.33; // 120Hz
+                else if (medianDelta < 12) this.dynamicBudgetMs = 11.11; // 90Hz
+                else this.dynamicBudgetMs = 16.67; // Default 60Hz
+                this.detectedRefreshRate = true;
+                
+                const targetFpsEl = document.getElementById('perf-target-fps');
+                if (targetFpsEl) targetFpsEl.textContent = Math.round(1000 / this.dynamicBudgetMs).toString();
+            }
+        }
+
         // Update FPS counter
         const fps = 1 / delta;
         this.fpsHistory.push(fps);
@@ -1799,6 +1878,10 @@ class NBodyClient {
     };
 
     private updateUI(): void {
+        const now = performance.now();
+        if (now - this.lastUiDomUpdate < SIM_TAB_UPDATE_INTERVAL_MS) return;
+        this.lastUiDomUpdate = now;
+
         document.getElementById('sim-time')!.textContent = this.formatTime(this.state.time);
         document.getElementById('sim-bodies')!.textContent = this.state.bodyCount.toString();
 

@@ -8,6 +8,7 @@
  */
 
 import { PhysicsClient } from './physics';
+import { SIM_TAB_UPDATE_INTERVAL_MS } from '../../shared/constants';
 
 /** Snapshot of conserved quantities at a reference point in time. */
 interface ConservationSnapshot {
@@ -47,6 +48,7 @@ export class DriftMonitor {
 
     // DOM element cache
     private els: Record<string, HTMLElement | null> = {};
+    private lastDomUpdate = 0;
 
     constructor() {
         this.cacheElements();
@@ -142,8 +144,13 @@ export class DriftMonitor {
 
     /** Update the DOM with current drift values. */
     update(physics: PhysicsClient, currentTick: number): void {
+        const now = performance.now();
+        if (now - this.lastDomUpdate < SIM_TAB_UPDATE_INTERVAL_MS) return;
+        
         const drift = this.compute(physics, currentTick);
         if (!drift) return;
+
+        this.lastDomUpdate = now;
 
         this.setDriftCell('drift-energy', drift.energyDrift);
         this.setDriftCell('drift-momentum', drift.momentumDrift);
