@@ -1755,6 +1755,11 @@ export class BodyRenderer {
             this.reallocateTrailBuffers();
         }
 
+        // Hide trails until they are fully initialized to prevent lines stretching across the screen
+        if (this.globalTrailMesh) {
+            this.globalTrailMesh.visible = this.showOrbitTrails && this.currentNumTrails > 0 && this.trailInitialized.size >= this.currentNumTrails;
+        }
+
         if (this.globalTrailMaterial.userData.shader) {
             const hx = Math.fround(origin.x);
             const hy = Math.fround(origin.y);
@@ -1873,6 +1878,7 @@ export class BodyRenderer {
 
                     if (!this.trailInitialized.has(id)) {
                         this.trailInitialized.add(id);
+                        this.fullBufferUpdateNeeded = true;
                         for (let t = 0; t < this.maxTrailPoints; t++) {
                             const tIdx = t * numTrails + offset;
                             this.trailPositionsHigh[tIdx * 3 + 0] = hx;
@@ -1927,26 +1933,37 @@ export class BodyRenderer {
             const posAttrLow = this.globalTrailGeometry.attributes.positionLow as THREE.BufferAttribute;
             const idxAttr = this.globalTrailGeometry.index as THREE.BufferAttribute;
             
-            posAttrHigh.clearUpdateRanges();
-            posAttrHigh.addUpdateRange(head * numTrails * 3, numTrails * 3);
-            posAttrHigh.needsUpdate = true;
-            
-            posAttrLow.clearUpdateRanges();
-            posAttrLow.addUpdateRange(head * numTrails * 3, numTrails * 3);
-            posAttrLow.needsUpdate = true;
-            
-            idxAttr.clearUpdateRanges();
-            if (head === 0) {
-                // At wrap-around, prevHead and head are at opposite ends, so update everything
-                // Three.js allows updating the whole buffer by passing large numbers, or just not adding ranges.
-                // But if clearUpdateRanges is used, it might require adding a full range.
-                // Or we can just add a range covering the whole buffer.
+            if (this.fullBufferUpdateNeeded) {
+                posAttrHigh.clearUpdateRanges();
+                posAttrHigh.addUpdateRange(0, posAttrHigh.array.length);
+                posAttrHigh.needsUpdate = true;
+                
+                posAttrLow.clearUpdateRanges();
+                posAttrLow.addUpdateRange(0, posAttrLow.array.length);
+                posAttrLow.needsUpdate = true;
+                
+                idxAttr.clearUpdateRanges();
                 idxAttr.addUpdateRange(0, idxAttr.array.length);
+                idxAttr.needsUpdate = true;
+                
+                this.fullBufferUpdateNeeded = false;
             } else {
-                // Adjacent gaps in memory, update tightly
-                idxAttr.addUpdateRange(prevHead * numTrails * 2, numTrails * 4);
+                posAttrHigh.clearUpdateRanges();
+                posAttrHigh.addUpdateRange(head * numTrails * 3, numTrails * 3);
+                posAttrHigh.needsUpdate = true;
+                
+                posAttrLow.clearUpdateRanges();
+                posAttrLow.addUpdateRange(head * numTrails * 3, numTrails * 3);
+                posAttrLow.needsUpdate = true;
+                
+                idxAttr.clearUpdateRanges();
+                if (head === 0) {
+                    idxAttr.addUpdateRange(0, idxAttr.array.length);
+                } else {
+                    idxAttr.addUpdateRange(prevHead * numTrails * 2, numTrails * 4);
+                }
+                idxAttr.needsUpdate = true;
             }
-            idxAttr.needsUpdate = true;
         }
     }
 
@@ -2062,7 +2079,8 @@ export class BodyRenderer {
         // Reallocate arrays for exactly numTrails to avoid processing unused geometry
         this.trailPositionsHigh = new Float32Array(numTrails * this.maxTrailPoints * 3);
         this.trailPositionsLow = new Float32Array(numTrails * this.maxTrailPoints * 3);
-        this.trailIndices = new Uint16Array(numTrails * this.maxTrailPoints * 2);
+        this.trailColors = new Float32Array(numTrails * this.maxTrailPoints * 3);
+        this.trailIndices = new Uint32Array(numTrails * this.maxTrailPoints * 2);
         
         // Setup initial static indices
         for (let h = 0; h < this.maxTrailPoints; h++) {
@@ -2074,12 +2092,31 @@ export class BodyRenderer {
             }
         }
         
+        // Assign colors based on current bodies
+        const offsetToColor = new Map<number, THREE.Color>();
+        for (const [id, mesh] of this.bodies) {
+            if (this.trailOffsets.has(id)) {
+                offsetToColor.set(this.trailOffsets.get(id)!, new THREE.Color(mesh.baseColor ?? 0x4488ff));
+            }
+        }
+        for (let h = 0; h < this.maxTrailPoints; h++) {
+            for (let b = 0; b < numTrails; b++) {
+                const color = offsetToColor.get(b) || new THREE.Color(0x4488ff);
+                const cIdx = (h * numTrails + b) * 3;
+                this.trailColors[cIdx + 0] = color.r;
+                this.trailColors[cIdx + 1] = color.g;
+                this.trailColors[cIdx + 2] = color.b;
+            }
+        }
+
         // Reset state so trails snap to current body positions
         this.globalTrailHead = 0;
         this.trailInitialized.clear();
+        this.fullBufferUpdateNeeded = true;
         
         this.globalTrailGeometry.setAttribute('positionHigh', new THREE.BufferAttribute(this.trailPositionsHigh, 3));
         this.globalTrailGeometry.setAttribute('positionLow', new THREE.BufferAttribute(this.trailPositionsLow, 3));
+        this.globalTrailGeometry.setAttribute('color', new THREE.BufferAttribute(this.trailColors, 3));
         this.globalTrailGeometry.setIndex(new THREE.BufferAttribute(this.trailIndices, 1));
         this.globalTrailGeometry.setDrawRange(0, numTrails * this.maxTrailPoints * 2);
     }
@@ -2290,6 +2327,12 @@ export class BodyRenderer {
             this.globalTrailMaterial.dispose();
         }
         this.trailOffsets.clear();
+        this.nextTrailOffset = 0;
+        this.currentNumTrails = 0;
+        this.trailInitialized.clear();
+        
+        // Force reallocation to clean buffers when switching presets
+        this.reallocateTrailBuffers();
 
         for (const label of this.bodyLabels.values()) {
             if (label.el.parentNode) label.el.parentNode.removeChild(label.el);
@@ -2394,7 +2437,7 @@ class BodyMesh {
     private static textureCache = new Map<string, THREE.Texture>();
     
     // Fallback colored material
-    private baseColor: number | null = null;
+    public baseColor: number | null = null;
 
     // Expose for dynamic rescaling
     readonly realRadius: number;
