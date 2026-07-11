@@ -1250,7 +1250,7 @@ class NBodyClient {
             const label = useServer ? 'Physics (server)' : 'Physics';
             const span = physicsEl.closest('.perf-row')?.querySelector('.label');
             if (span) span.textContent = label;
-            physicsEl.textContent = `${this.frameTiming.physics.toFixed(1)} (${this.frameTimingAvg.physics.toFixed(1)}) ms`;
+            physicsEl.textContent = useServer ? `0.0 (0.0) ms` : `${this.frameTiming.physics.toFixed(1)} (${this.frameTimingAvg.physics.toFixed(1)}) ms`;
             applyColor(physicsEl, this.frameTimingAvg.physics, budgetMs);
         }
         if (renderEl) {
@@ -1261,8 +1261,17 @@ class NBodyClient {
             uiEl.textContent = `${this.frameTiming.ui.toFixed(1)} (${this.frameTimingAvg.ui.toFixed(1)}) ms`;
             applyColor(uiEl, this.frameTimingAvg.ui, budgetMs);
         }
-        if (stepsEl) stepsEl.textContent = `${this.frameTiming.stepsThisFrame} (${this.frameTimingAvg.stepsThisFrame.toFixed(1)})`;
+        if (stepsEl) {
+            const useServer = this.network?.isConnected() && this.lastServerState;
+            stepsEl.textContent = useServer ? '---' : `${this.frameTiming.stepsThisFrame} (${this.frameTimingAvg.stepsThisFrame.toFixed(1)})`;
+        }
         if (bodiesEl) bodiesEl.textContent = this.state.bodyCount.toString();
+
+        const actualFpsEl = document.getElementById('perf-actual-fps');
+        if (actualFpsEl) {
+            const avgFps = this.fpsHistory.length > 0 ? this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length : 0;
+            actualFpsEl.textContent = avgFps.toFixed(0);
+        }
 
         // Three.js renderer stats
         const info = this.renderer.info;
@@ -1275,12 +1284,12 @@ class NBodyClient {
         if (geometriesEl) geometriesEl.textContent = info.memory.geometries.toString();
         if (texturesEl) texturesEl.textContent = info.memory.textures.toString();
 
-        // Trail stats
+        // Line Primitives
         const trailStats = this.bodyRenderer.getTrailStats();
-        const trailLinesEl = document.getElementById('perf-trail-lines');
-        const trailVertsEl = document.getElementById('perf-trail-verts');
-        if (trailLinesEl) trailLinesEl.textContent = trailStats.lineCount.toString();
-        if (trailVertsEl) trailVertsEl.textContent = trailStats.totalVertices.toLocaleString();
+        const linePrimsEl = document.getElementById('perf-line-prims');
+        const lineVertsEl = document.getElementById('perf-line-verts');
+        if (linePrimsEl) linePrimsEl.textContent = trailStats.lineCount.toString();
+        if (lineVertsEl) lineVertsEl.textContent = trailStats.totalVertices.toLocaleString();
 
         // Network latency
         const latencyEl = document.getElementById('perf-latency');
@@ -1835,6 +1844,9 @@ class NBodyClient {
         // Calculate camera origin based on followed body
         const cameraOrigin = this.resolveCameraOrigin(!this.freeCamera && !this.surfaceCamera);
 
+        // --- Render timing ---
+        const renderStart = performance.now();
+
         // Update body positions with floating origin
         this.bodyRenderer.update(this.state.positions, cameraOrigin, this.camera);
 
@@ -1855,8 +1867,6 @@ class NBodyClient {
         // Update star rotations from simulation time
         this.bodyRenderer.updateBodies(this.state.time);
 
-        // --- Render timing ---
-        const renderStart = performance.now();
         this.renderer.render(this.scene, this.camera);
         const renderEnd = performance.now();
         this.frameTiming.render = renderEnd - renderStart;

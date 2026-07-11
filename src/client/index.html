@@ -629,7 +629,6 @@
   <div id="perf-overlay">
     <div class="stats-card">
       <h3>Performance</h3>
-      <div style="font-size: 9px; color: rgba(255,255,255,0.4); margin-bottom: 6px;">instant (avg)</div>
       <div class="perf-section">
         <div class="perf-row">
           <span class="label">Frame</span>
@@ -661,8 +660,8 @@
           <span class="value" id="perf-bodies">0</span>
         </div>
         <div class="perf-row">
-          <span class="label">Target FPS</span>
-          <span class="value" id="perf-target-fps">60</span>
+          <span class="label">FPS/TPS</span>
+          <span class="value"><span id="perf-actual-fps">0</span> / <span id="perf-target-fps">60</span></span>
         </div>
         <div class="perf-row">
           <span class="label">Status</span>
@@ -689,12 +688,12 @@
       </div>
       <div class="perf-section">
         <div class="perf-row">
-          <span class="label">Trail Lines</span>
-          <span class="value" id="perf-trail-lines">0</span>
+          <span class="label">Line Primitives</span>
+          <span class="value" id="perf-line-prims">0</span>
         </div>
         <div class="perf-row">
-          <span class="label">Trail Verts</span>
-          <span class="value" id="perf-trail-verts">0</span>
+          <span class="label">Line Vertices</span>
+          <span class="value" id="perf-line-verts">0</span>
         </div>
         <div class="perf-row">
           <span class="label">Latency</span>
