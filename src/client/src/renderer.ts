@@ -1409,10 +1409,12 @@ export class BodyRenderer {
     private globalTrailMaterial: THREE.LineBasicMaterial;
     private trailPositionsHigh: Float32Array;
     private trailPositionsLow: Float32Array;
-    private trailIndices: Uint16Array;
+    private trailColors: Float32Array;
+    private trailIndices: Uint32Array;
     private globalTrailHead = 0;
     private trailOffsets: Map<number, number> = new Map();
     private trailInitialized: Set<number> = new Set();
+    private fullBufferUpdateNeeded = false;
     private nextTrailOffset = 0;
     
     private readonly TRAIL_SAMPLE_INTERVAL = 5; // Sample every N frames
@@ -1464,18 +1466,20 @@ export class BodyRenderer {
         // Pre-allocate global trail buffers (empty initially, resized dynamically)
         this.trailPositionsHigh = new Float32Array(0);
         this.trailPositionsLow = new Float32Array(0);
-        this.trailIndices = new Uint16Array(0);
+        this.trailColors = new Float32Array(0);
+        this.trailIndices = new Uint32Array(0);
         
         this.globalTrailGeometry = new THREE.BufferGeometry();
         this.globalTrailGeometry.setAttribute('positionHigh', new THREE.BufferAttribute(this.trailPositionsHigh, 3));
         this.globalTrailGeometry.setAttribute('positionLow', new THREE.BufferAttribute(this.trailPositionsLow, 3));
+        this.globalTrailGeometry.setAttribute('color', new THREE.BufferAttribute(this.trailColors, 3));
         this.globalTrailGeometry.setIndex(new THREE.BufferAttribute(this.trailIndices, 1));
         this.globalTrailGeometry.setDrawRange(0, 0);
 
         this.globalTrailMaterial = new THREE.LineBasicMaterial({
-            color: 0x4488ff,
+            vertexColors: true,
             transparent: true,
-            opacity: 0.4,
+            opacity: 0.6,
         });
         
         this.globalTrailMaterial.onBeforeCompile = (shader) => {
