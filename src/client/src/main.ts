@@ -60,7 +60,12 @@ class NBodyClient {
     private touchControls!: TouchControls;
     private buildPanel!: BuildPanel;
     private mediaCapture!: MediaCapture;
-    private buildMode = false; // True when in world builder mode
+    private buildMode = false;
+
+    // Server TPS tracking
+    private lastTpsTime = performance.now();
+    private lastTpsTick = 0;
+    private serverTps = 0;
     private driftMonitor!: DriftMonitor;
 
     private state: SimState = {
@@ -1270,7 +1275,13 @@ class NBodyClient {
         const actualFpsEl = document.getElementById('perf-actual-fps');
         if (actualFpsEl) {
             const avgFps = this.fpsHistory.length > 0 ? this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length : 0;
-            actualFpsEl.textContent = avgFps.toFixed(0);
+            const targetFps = Math.round(1000 / this.dynamicBudgetMs);
+            actualFpsEl.textContent = `${avgFps.toFixed(0)} / ${targetFps}`;
+        }
+        
+        const serverTpsEl = document.getElementById('perf-server-tps');
+        if (serverTpsEl) {
+            serverTpsEl.textContent = `${this.serverTps.toFixed(0)} / ${LOCAL_TICK_RATE}`;
         }
 
         // Three.js renderer stats
@@ -1670,9 +1681,6 @@ class NBodyClient {
                 else if (medianDelta < 12) this.dynamicBudgetMs = 11.11; // 90Hz
                 else this.dynamicBudgetMs = 16.67; // Default 60Hz
                 this.detectedRefreshRate = true;
-                
-                const targetFpsEl = document.getElementById('perf-target-fps');
-                if (targetFpsEl) targetFpsEl.textContent = Math.round(1000 / this.dynamicBudgetMs).toString();
             }
         }
 
@@ -1682,6 +1690,16 @@ class NBodyClient {
         if (this.fpsHistory.length > 60) this.fpsHistory.shift();
 
         const useServerState = this.network?.isConnected() && this.lastServerState;
+
+        // Calculate Server TPS every 1 second
+        const now = performance.now();
+        if (now - this.lastTpsTime >= 1000) {
+            const tickDelta = Number(this.state.tick - this.lastTpsTick);
+            const timeDelta = (now - this.lastTpsTime) / 1000;
+            this.serverTps = tickDelta / timeDelta;
+            this.lastTpsTime = now;
+            this.lastTpsTick = this.state.tick;
+        }
 
         // --- Physics timing ---
         const physicsStart = performance.now();
