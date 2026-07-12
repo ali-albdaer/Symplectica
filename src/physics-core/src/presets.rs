@@ -1664,6 +1664,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
         sun.luminosity = L_SUN;
         sun.effective_temperature = 5772.0;
         sun.rotation_rate = 2.8653290845717256e-6;
+        sun.pole_ra = Some(286.13_f64.to_radians());
+        sun.pole_dec = Some(63.87_f64.to_radians());
         sun.mean_surface_temperature = 5772.0;
         sun.seed = seed.wrapping_add(0);
         sun.metallicity = METALLICITY_SUN;
@@ -1682,6 +1684,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     mercury.rotation_rate = 1.24001e-6;
     mercury.axial_tilt = 0.00059;
+    mercury.pole_ra = Some(281.01_f64.to_radians());
+    mercury.pole_dec = Some(61.45_f64.to_radians());
     mercury.mean_surface_temperature = 440.0;
     mercury.seed = seed.wrapping_add(1);
     mercury.semi_major_axis = 59212300557.43999;
@@ -1708,6 +1712,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     venus.rotation_rate = -2.9924e-7;
     venus.axial_tilt = 3.0943;
+    venus.pole_ra = Some(272.76_f64.to_radians());
+    venus.pole_dec = Some(67.16_f64.to_radians());
     venus.mean_surface_temperature = 735.0;
     venus.seed = seed.wrapping_add(2);
     venus.semi_major_axis = 109667353851.7825;
@@ -1736,6 +1742,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     earth.atmosphere = Some(Atmosphere::earth_like());
     earth.rotation_rate = 7.292115e-5;
     earth.axial_tilt = AXIAL_TILT_EARTH;
+    earth.pole_ra = Some(0.0_f64.to_radians());
+    earth.pole_dec = Some(90.0_f64.to_radians());
     earth.mean_surface_temperature = T_SURFACE_EARTH;
     earth.seed = seed.wrapping_add(3);
     earth.semi_major_axis = 147650674422.1825;
@@ -1762,6 +1770,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     moon.rotation_rate = 2.6617e-6;
     moon.axial_tilt = 0.02692;
+    moon.pole_ra = Some(269.99_f64.to_radians());
+    moon.pole_dec = Some(66.54_f64.to_radians());
     moon.mean_surface_temperature = 250.0;
     moon.seed = seed.wrapping_add(4);
     moon.semi_major_axis = 384_400_000.0;
@@ -1788,6 +1798,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     mars.rotation_rate = 7.088218111185524e-5;
     mars.axial_tilt = 0.4396;
+    mars.pole_ra = Some(317.68_f64.to_radians());
+    mars.pole_dec = Some(52.88_f64.to_radians());
     mars.mean_surface_temperature = 210.0;
     mars.seed = seed.wrapping_add(5);
     mars.semi_major_axis = 229419926126.27258;
@@ -1853,6 +1865,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     jupiter.rotation_rate = 1.7585e-4;
     jupiter.axial_tilt = 0.0546;
+    jupiter.pole_ra = Some(268.05_f64.to_radians());
+    jupiter.pole_dec = Some(64.49_f64.to_radians());
     jupiter.mean_surface_temperature = 165.0;
     jupiter.seed = seed.wrapping_add(10);
     jupiter.semi_major_axis = 777615551082.3237;
@@ -1961,6 +1975,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     saturn.rotation_rate = 1.63785e-4;
     saturn.axial_tilt = 0.4665;
+    saturn.pole_ra = Some(40.589_f64.to_radians());
+    saturn.pole_dec = Some(83.537_f64.to_radians());
     saturn.mean_surface_temperature = 134.0;
     saturn.seed = seed.wrapping_add(20);
     saturn.semi_major_axis = 1426282424721.493;
@@ -2136,6 +2152,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     uranus.rotation_rate = -1.01237e-4;
     uranus.axial_tilt = 1.7064;
+    uranus.pole_ra = Some(257.311_f64.to_radians());
+    uranus.pole_dec = Some(-15.175_f64.to_radians());
     uranus.mean_surface_temperature = 76.0;
     uranus.seed = seed.wrapping_add(30);
     uranus.semi_major_axis = 2870646874755.253;
@@ -2263,6 +2281,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     neptune.rotation_rate = 1.08338e-4;
     neptune.axial_tilt = 0.4943;
+    neptune.pole_ra = Some(299.36_f64.to_radians());
+    neptune.pole_dec = Some(42.95_f64.to_radians());
     neptune.mean_surface_temperature = 72.0;
     neptune.seed = seed.wrapping_add(40);
     neptune.semi_major_axis = 4497806205857.0625;
@@ -2332,6 +2352,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     );
     pluto.rotation_rate = -1.1386e-5;
     pluto.axial_tilt = 2.1387;
+    pluto.pole_ra = Some(132.99_f64.to_radians());
+    pluto.pole_dec = Some(-6.16_f64.to_radians());
     pluto.mean_surface_temperature = 44.0;
     pluto.seed = seed.wrapping_add(50);
     pluto.semi_major_axis = 5949805524558.921;

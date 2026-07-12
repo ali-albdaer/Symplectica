@@ -66,8 +66,9 @@ pub fn gravitational_acceleration(
 /// - Body i must have `feels_gravity == true` to receive accelerations.
 /// - Body j must have `contributes_gravity == true` to exert forces.
 /// - Per-body softening is used when available; else global fallback.
-pub fn compute_accelerations_direct(bodies: &mut [Body], config: &ForceConfig) {
+pub fn compute_accelerations_direct(bodies: &mut [Body], config: &ForceConfig) -> f64 {
     let n = bodies.len();
+    let mut total_pe = 0.0;
 
     // Reset accelerations
     for body in bodies.iter_mut() {
@@ -90,16 +91,26 @@ pub fn compute_accelerations_direct(bodies: &mut [Body], config: &ForceConfig) {
                 .max(bodies[j].effective_softening(config.softening));
             let softening_squared = eps * eps;
 
-            let acc = gravitational_acceleration(
-                bodies[i].position,
-                bodies[j].position,
-                bodies[j].mass,
-                softening_squared,
-            );
+            let r_squared = bodies[i].position.distance_squared(bodies[j].position);
+            
+            // Only add to potential energy once per pair (when i < j)
+            if i < j {
+                let r = (r_squared + softening_squared).sqrt();
+                if r > 0.0 {
+                    total_pe -= G * bodies[i].mass * bodies[j].mass / r;
+                }
+            }
 
-            bodies[i].acceleration += acc;
+            let denom = (r_squared + softening_squared).powf(1.5);
+            if denom > 0.0 {
+                let r_vec = bodies[j].position - bodies[i].position;
+                let acc = r_vec * (G * bodies[j].mass / denom);
+                bodies[i].acceleration += acc;
+            }
         }
     }
+    
+    total_pe
 }
 
 /// Compute total gravitational potential energy of the system.

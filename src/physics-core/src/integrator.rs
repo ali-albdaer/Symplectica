@@ -11,7 +11,7 @@ use crate::body::Body;
 use crate::force::{compute_accelerations_direct, ForceConfig};
 use crate::vector::Vec3;
 
-pub type AccelerationFn = fn(&mut [Body], &ForceConfig);
+pub type AccelerationFn = fn(&mut [Body], &ForceConfig) -> f64;
 
 /// Available integration methods
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,8 +132,8 @@ impl Default for IntegratorConfig {
 /// 1. x(t+dt) = x(t) + v(t)*dt + 0.5*a(t)*dt²
 /// 2. Compute a(t+dt) from new positions
 /// 3. v(t+dt) = v(t) + 0.5*(a(t) + a(t+dt))*dt
-pub fn step_velocity_verlet(bodies: &mut [Body], dt: f64, force_config: &ForceConfig) {
-    step_velocity_verlet_with(bodies, dt, force_config, compute_accelerations_direct);
+pub fn step_velocity_verlet(bodies: &mut [Body], dt: f64, force_config: &ForceConfig) -> f64 {
+    step_velocity_verlet_with(bodies, dt, force_config, compute_accelerations_direct)
 }
 
 fn step_velocity_verlet_with(
@@ -141,7 +141,7 @@ fn step_velocity_verlet_with(
     dt: f64,
     force_config: &ForceConfig,
     accel_fn: AccelerationFn,
-) {
+) -> f64 {
     let half_dt_squared = 0.5 * dt * dt;
     let half_dt = 0.5 * dt;
 
@@ -160,7 +160,7 @@ fn step_velocity_verlet_with(
     }
 
     // Step 2: Compute new accelerations from new positions
-    accel_fn(bodies, force_config);
+    let pe = accel_fn(bodies, force_config);
 
     // Step 3: Update velocities using average of old and new accelerations
     // v(t+dt) = v(t) + 0.5*(a(t) + a(t+dt))*dt
@@ -171,19 +171,21 @@ fn step_velocity_verlet_with(
         
         body.velocity += (body.prev_acceleration + body.acceleration) * half_dt;
     }
+    
+    pe
 }
 
 /// Simple Euler integration (for comparison/testing only).
 /// 
 /// First-order method with poor energy conservation.
 /// Do not use for production simulations!
-pub fn step_euler(bodies: &mut [Body], dt: f64, force_config: &ForceConfig) {
-    step_euler_with(bodies, dt, force_config, compute_accelerations_direct);
+pub fn step_euler(bodies: &mut [Body], dt: f64, force_config: &ForceConfig) -> f64 {
+    step_euler_with(bodies, dt, force_config, compute_accelerations_direct)
 }
 
-fn step_euler_with(bodies: &mut [Body], dt: f64, force_config: &ForceConfig, accel_fn: AccelerationFn) {
+fn step_euler_with(bodies: &mut [Body], dt: f64, force_config: &ForceConfig, accel_fn: AccelerationFn) -> f64 {
     // Compute accelerations
-    accel_fn(bodies, force_config);
+    let pe = accel_fn(bodies, force_config);
 
     // Update velocities and positions
     for body in bodies.iter_mut() {
@@ -194,14 +196,16 @@ fn step_euler_with(bodies: &mut [Body], dt: f64, force_config: &ForceConfig, acc
         body.velocity += body.acceleration * dt;
         body.position += body.velocity * dt;
     }
+    
+    pe
 }
 
 /// Leapfrog integration.
 /// 
 /// Equivalent to Velocity-Verlet but with different formulation.
 /// Velocities are stored at half-timestep offsets.
-pub fn step_leapfrog(bodies: &mut [Body], dt: f64, force_config: &ForceConfig) {
-    step_leapfrog_with(bodies, dt, force_config, compute_accelerations_direct);
+pub fn step_leapfrog(bodies: &mut [Body], dt: f64, force_config: &ForceConfig) -> f64 {
+    step_leapfrog_with(bodies, dt, force_config, compute_accelerations_direct)
 }
 
 fn step_leapfrog_with(
@@ -209,7 +213,7 @@ fn step_leapfrog_with(
     dt: f64,
     force_config: &ForceConfig,
     accel_fn: AccelerationFn,
-) {
+) -> f64 {
     let half_dt = 0.5 * dt;
 
     // Kick: v(t+dt/2) = v(t) + a(t) * dt/2
@@ -229,7 +233,7 @@ fn step_leapfrog_with(
     }
 
     // Compute new accelerations
-    accel_fn(bodies, force_config);
+    let pe = accel_fn(bodies, force_config);
 
     // Kick: v(t+dt) = v(t+dt/2) + a(t+dt) * dt/2
     for body in bodies.iter_mut() {
@@ -238,43 +242,48 @@ fn step_leapfrog_with(
         }
         body.velocity += body.acceleration * half_dt;
     }
+    
+    pe
 }
 
 /// Perform one integration step with the specified method.
-pub fn step(bodies: &mut [Body], config: &IntegratorConfig) {
-    step_with_accel(bodies, config, compute_accelerations_direct);
+pub fn step(bodies: &mut [Body], config: &IntegratorConfig) -> f64 {
+    step_with_accel(bodies, config, compute_accelerations_direct)
 }
 
-pub fn step_with_accel(bodies: &mut [Body], config: &IntegratorConfig, accel_fn: AccelerationFn) {
+pub fn step_with_accel(bodies: &mut [Body], config: &IntegratorConfig, accel_fn: AccelerationFn) -> f64 {
     let substep_dt = config.dt / config.substeps as f64;
+    let mut pe = 0.0;
 
     for _ in 0..config.substeps {
         match config.method {
             IntegratorType::VelocityVerlet => {
-                step_velocity_verlet_with(bodies, substep_dt, &config.force_config, accel_fn);
+                pe = step_velocity_verlet_with(bodies, substep_dt, &config.force_config, accel_fn);
             }
             IntegratorType::Euler => {
-                step_euler_with(bodies, substep_dt, &config.force_config, accel_fn);
+                pe = step_euler_with(bodies, substep_dt, &config.force_config, accel_fn);
             }
             IntegratorType::Leapfrog => {
-                step_leapfrog_with(bodies, substep_dt, &config.force_config, accel_fn);
+                pe = step_leapfrog_with(bodies, substep_dt, &config.force_config, accel_fn);
             }
         }
     }
+    
+    pe
 }
 
 /// Initialize accelerations before first step.
 /// Must be called once at simulation start.
-pub fn initialize_accelerations(bodies: &mut [Body], force_config: &ForceConfig) {
-    initialize_accelerations_with(bodies, force_config, compute_accelerations_direct);
+pub fn initialize_accelerations(bodies: &mut [Body], force_config: &ForceConfig) -> f64 {
+    initialize_accelerations_with(bodies, force_config, compute_accelerations_direct)
 }
 
 pub fn initialize_accelerations_with(
     bodies: &mut [Body],
     force_config: &ForceConfig,
     accel_fn: AccelerationFn,
-) {
-    accel_fn(bodies, force_config);
+) -> f64 {
+    accel_fn(bodies, force_config)
 }
 
 // === Close-encounter subset integrators ===

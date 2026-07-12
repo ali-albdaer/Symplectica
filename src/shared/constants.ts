@@ -22,4 +22,4 @@ export const SPEED_LEVELS: readonly SpeedLevel[] = [
 export const UI_UPDATE_INTERVAL_MS = 200;
 
 /** Simulation Tab update interval (ms) */
-export const SIM_TAB_UPDATE_INTERVAL_MS = 100;
+export const SIM_TAB_UPDATE_INTERVAL_MS = 1000;

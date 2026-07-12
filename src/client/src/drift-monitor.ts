@@ -57,8 +57,7 @@ export class DriftMonitor {
     private cacheElements(): void {
         const ids = [
             'drift-energy', 'drift-momentum', 'drift-angular',
-            'drift-com', 'drift-ke', 'drift-pe', 'drift-total-e',
-            'drift-momentum-abs', 'drift-angular-abs', 'drift-steps',
+            'drift-com', 'drift-steps',
         ];
         for (const id of ids) {
             this.els[id] = document.getElementById(id);
@@ -164,21 +163,6 @@ export class DriftMonitor {
                 ? `${(drift.comDrift / 1e3).toExponential(2)} km`
                 : `${(drift.comDrift / AU).toExponential(2)} AU`;
         }
-
-        const keEl = this.els['drift-ke'];
-        if (keEl) keEl.textContent = drift.kineticEnergy.toExponential(4) + ' J';
-
-        const peEl = this.els['drift-pe'];
-        if (peEl) peEl.textContent = drift.potentialEnergy.toExponential(4) + ' J';
-
-        const teEl = this.els['drift-total-e'];
-        if (teEl) teEl.textContent = drift.totalEnergy.toExponential(4) + ' J';
-
-        const momEl = this.els['drift-momentum-abs'];
-        if (momEl) momEl.textContent = drift.momentumMag.toExponential(3) + ' kg·m/s';
-
-        const angEl = this.els['drift-angular-abs'];
-        if (angEl) angEl.textContent = drift.angularMag.toExponential(3) + ' kg·m²/s';
 
         const stepsEl = this.els['drift-steps'];
         if (stepsEl) stepsEl.textContent = drift.stepsSinceReset.toLocaleString();

@@ -129,29 +129,10 @@ export function decodeBinaryState(buffer: ArrayBuffer): StatePayload {
     const energy = view.getFloat64(16, true);
 
     const posOffset = BINARY_STATE_HEADER_BYTES;
-    const posRaw = new Float64Array(buffer, posOffset, bodyCount * 3);
-    const positions = new Array(bodyCount * 3);
+    const positions = Array.from(new Float64Array(buffer, posOffset, bodyCount * 3));
 
     const velOffset = posOffset + bodyCount * 3 * 8;
-    const velRaw = new Float64Array(buffer, velOffset, bodyCount * 3);
-    const velocities = new Array(bodyCount * 3);
-
-    // Transform J2000 (X, Y, Z) -> WebGL (X, Z, -Y)
-    for (let i = 0; i < bodyCount; i++) {
-        const jx = posRaw[i * 3];
-        const jy = posRaw[i * 3 + 1];
-        const jz = posRaw[i * 3 + 2];
-        positions[i * 3]     = jx;
-        positions[i * 3 + 1] = jz;
-        positions[i * 3 + 2] = -jy;
-
-        const vx = velRaw[i * 3];
-        const vy = velRaw[i * 3 + 1];
-        const vz = velRaw[i * 3 + 2];
-        velocities[i * 3]     = vx;
-        velocities[i * 3 + 1] = vz;
-        velocities[i * 3 + 2] = -vy;
-    }
+    const velocities = Array.from(new Float64Array(buffer, velOffset, bodyCount * 3));
 
     return { tick, time, positions, velocities, energy };
 }
