@@ -1123,6 +1123,7 @@ void main() {
         }
     }
 
+
     /** Flare frequency mode: 'fixed' = constant visual rate, 'scaled' = scales with sim time */
     setFrequencyMode(mode: 'fixed' | 'scaled'): void {
         this.frequencyMode = mode;
@@ -1824,100 +1825,14 @@ export class BodyRenderer {
                 const distanceToCamera = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
                 if (mesh.isInstanced && this.instancedMesh) {
-                    const radius = scaleRadius(mesh.realRadius * this.renderScale);
-                    const actualVisRadius = radius;
-                    
-                    // Hero Mesh logic
-                    if (distanceToCamera < actualVisRadius * 20) {
-                        this.dummyScale.set(0, 0, 0); // Hide instance
-                        if (!mesh.heroMesh) mesh.createHeroMesh();
-                        if (mesh.heroMesh) mesh.heroMesh.visible = true;
-                    } else {
-                        const meshAny = mesh as any;
-                        this.dummyScale.set(radius, radius * (1 - meshAny.oblateness), radius);
-                        if (mesh.heroMesh) mesh.heroMesh.visible = false;
-                    }
-                    
-                    this.dummyQuaternion.copy(mesh.group.quaternion).multiply(mesh.mesh.quaternion);
-                    this.dummyPosition.set(localX, localY, localZ);
-                    this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
-                    this.instancedMesh.setMatrixAt(mesh.instanceId, this.dummyMatrix);
-                    instancedUpdated = true;
-                }
-
-                // Update ring quality dynamically based on distance
-                mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
-                mesh.updateLighting(sunPos, mesh.group.position, camJ2000, this.renderScale);
-
-                // Dynamic Level of Detail (LOD) based on distance
-                // Note (Plan for future implementation): We could replace the polygon SphereGeometry with a raytraced impostor. This involves rendering a simple bounding box and calculating exact mathematical intersections of the camera's view ray with an oblate spheroid in a custom Fragment Shader. This is highly performant and eliminates polygonal edges entirely, but requires rewriting the standard materials and integrating custom depth writing for proper clipping with rings and atmospheres.
-                const actualVisRadius = scaleRadius(mesh.realRadius * this.renderScale);
-                if (distanceToCamera < actualVisRadius * 20) {
-                    mesh.setSegments(512, 256); // Ultra LOD when very close
-                } else if (distanceToCamera < actualVisRadius * 100) {
-                    mesh.setSegments(128, 64); // Medium LOD
-                } else {
-                    mesh.setSegments(this.sphereSegments.width, this.sphereSegments.height); // Base LOD
-                }
-
-                // Update label position (offset above body)
-                const label = this.bodyLabels.get(id);
-                if (label && label.el.style.display !== 'none') {
-                    const bodyMesh = this.bodies.get(id);
-                    const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
-                    const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
-                    
-                    // Manually map J2000 local position to World space (solarSystemRoot applies -90 on X)
-                    // X_world = X_j
-                    // Y_world = Z_j
-                    // Z_world = -Y_j
-                    this.dummyProjectVec.set(localX, localZ, -localY);
-                    this.dummyProjectVec.y += labelOffset;
-                    const screenPos = this.dummyProjectVec.project(camera);
-                    
-                    if (screenPos.z > 1.0) {
-                        label.el.style.transform = `translate(-10000px, -10000px)`;
-                    } else {
-                        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-                        const y = (screenPos.y * -0.5 + 0.5) * window.innerHeight;
-                        label.el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
+                    if (this.updateBodyMatrix(mesh, localX, localY, localZ, distanceToCamera)) {
+                        instancedUpdated = true;
                     }
                 }
 
-                // Update orbit trail
-                if (shouldSample && this.trailOffsets.has(id)) {
-                    const offset = this.trailOffsets.get(id)!;
-                    const head = this.globalTrailHead;
-                    const numTrails = this.currentNumTrails;
-                    
-                    const vIndex = head * numTrails + offset;
-                    
-                    const hx = Math.fround(worldX);
-                    const hy = Math.fround(worldY);
-                    const hz = Math.fround(worldZ);
-
-                    if (!this.trailInitialized.has(id)) {
-                        this.trailInitialized.add(id);
-                        this.fullBufferUpdateNeeded = true;
-                        for (let t = 0; t < this.maxTrailPoints; t++) {
-                            const tIdx = t * numTrails + offset;
-                            this.trailPositionsHigh[tIdx * 3 + 0] = hx;
-                            this.trailPositionsHigh[tIdx * 3 + 1] = hy;
-                            this.trailPositionsHigh[tIdx * 3 + 2] = hz;
-                            this.trailPositionsLow[tIdx * 3 + 0] = worldX - hx;
-                            this.trailPositionsLow[tIdx * 3 + 1] = worldY - hy;
-                            this.trailPositionsLow[tIdx * 3 + 2] = worldZ - hz;
-                        }
-                    } else {
-                        // Write absolute world coordinates
-                        this.trailPositionsHigh[vIndex * 3 + 0] = hx;
-                        this.trailPositionsHigh[vIndex * 3 + 1] = hy;
-                        this.trailPositionsHigh[vIndex * 3 + 2] = hz;
-                        this.trailPositionsLow[vIndex * 3 + 0] = worldX - hx;
-                        this.trailPositionsLow[vIndex * 3 + 1] = worldY - hy;
-                        this.trailPositionsLow[vIndex * 3 + 2] = worldZ - hz;
-                    }
-                }
+                this.updateBodyLOD(mesh, distanceToCamera, sunPos, camJ2000, localX, localY, localZ);
+                this.updateBodyLabel(id, localX, localY, localZ, camera);
+                this.updateBodyTrail(id, shouldSample, worldX, worldY, worldZ);
             }
             i++;
         }
@@ -1984,6 +1899,102 @@ export class BodyRenderer {
                 }
                 idxAttr.needsUpdate = true;
             }
+        }
+    }
+
+    private updateBodyMatrix(mesh: BodyMesh, localX: number, localY: number, localZ: number, distanceToCamera: number): boolean {
+        if (!this.instancedMesh) return false;
+        const radius = scaleRadius(mesh.realRadius * this.renderScale);
+        const actualVisRadius = radius;
+        
+        // Hero Mesh logic
+        if (distanceToCamera < actualVisRadius * 20) {
+            this.dummyScale.set(0, 0, 0); // Hide instance
+            if (!mesh.heroMesh) mesh.createHeroMesh();
+            if (mesh.heroMesh) mesh.heroMesh.visible = true;
+        } else {
+            const meshAny = mesh as any;
+            this.dummyScale.set(radius, radius * (1 - meshAny.oblateness), radius);
+            if (mesh.heroMesh) mesh.heroMesh.visible = false;
+        }
+        
+        this.dummyQuaternion.copy(mesh.group.quaternion).multiply(mesh.mesh.quaternion);
+        this.dummyPosition.set(localX, localY, localZ);
+        this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
+        this.instancedMesh.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+        return true;
+    }
+
+    private updateBodyLOD(mesh: BodyMesh, distanceToCamera: number, sunPos: THREE.Vector3, camJ2000: THREE.Vector3, localX: number, localY: number, localZ: number): void {
+        // Update ring quality dynamically based on distance
+        mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
+        mesh.updateLighting(sunPos, mesh.group.position, camJ2000, this.renderScale);
+
+        // Dynamic Level of Detail (LOD) based on distance
+        const actualVisRadius = scaleRadius(mesh.realRadius * this.renderScale);
+        if (distanceToCamera < actualVisRadius * 20) {
+            mesh.setSegments(512, 256); // Ultra LOD when very close
+        } else if (distanceToCamera < actualVisRadius * 100) {
+            mesh.setSegments(128, 64); // Medium LOD
+        } else {
+            mesh.setSegments(this.sphereSegments.width, this.sphereSegments.height); // Base LOD
+        }
+    }
+
+    private updateBodyLabel(id: number, localX: number, localY: number, localZ: number, camera: THREE.Camera): void {
+        const label = this.bodyLabels.get(id);
+        if (label && label.el.style.display !== 'none') {
+            const bodyMesh = this.bodies.get(id);
+            const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
+            const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
+            
+            // Manually map J2000 local position to World space (solarSystemRoot applies -90 on X)
+            this.dummyProjectVec.set(localX, localZ, -localY);
+            this.dummyProjectVec.y += labelOffset;
+            const screenPos = this.dummyProjectVec.project(camera);
+            
+            if (screenPos.z > 1.0) {
+                label.el.style.transform = `translate(-10000px, -10000px)`;
+            } else {
+                const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (screenPos.y * -0.5 + 0.5) * window.innerHeight;
+                label.el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
+            }
+        }
+    }
+
+    private updateBodyTrail(id: number, shouldSample: boolean, worldX: number, worldY: number, worldZ: number): void {
+        if (!shouldSample || !this.trailOffsets.has(id)) return;
+        const offset = this.trailOffsets.get(id)!;
+        const head = this.globalTrailHead;
+        const numTrails = this.currentNumTrails;
+        
+        const vIndex = head * numTrails + offset;
+        
+        const hx = Math.fround(worldX);
+        const hy = Math.fround(worldY);
+        const hz = Math.fround(worldZ);
+
+        if (!this.trailInitialized.has(id)) {
+            this.trailInitialized.add(id);
+            this.fullBufferUpdateNeeded = true;
+            for (let t = 0; t < this.maxTrailPoints; t++) {
+                const tIdx = t * numTrails + offset;
+                this.trailPositionsHigh[tIdx * 3 + 0] = hx;
+                this.trailPositionsHigh[tIdx * 3 + 1] = hy;
+                this.trailPositionsHigh[tIdx * 3 + 2] = hz;
+                this.trailPositionsLow[tIdx * 3 + 0] = worldX - hx;
+                this.trailPositionsLow[tIdx * 3 + 1] = worldY - hy;
+                this.trailPositionsLow[tIdx * 3 + 2] = worldZ - hz;
+            }
+        } else {
+            // Write absolute world coordinates
+            this.trailPositionsHigh[vIndex * 3 + 0] = hx;
+            this.trailPositionsHigh[vIndex * 3 + 1] = hy;
+            this.trailPositionsHigh[vIndex * 3 + 2] = hz;
+            this.trailPositionsLow[vIndex * 3 + 0] = worldX - hx;
+            this.trailPositionsLow[vIndex * 3 + 1] = worldY - hy;
+            this.trailPositionsLow[vIndex * 3 + 2] = worldZ - hz;
         }
     }
 
