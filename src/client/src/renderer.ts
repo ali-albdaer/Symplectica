@@ -2345,8 +2345,10 @@ export class BodyRenderer {
     }
 
     dispose(): void {
+        if (this.solarSystemRoot) {
+            this.scene.remove(this.solarSystemRoot);
+        }
         for (const mesh of this.bodies.values()) {
-            this.scene.remove(mesh.group);
             mesh.dispose();
         }
         this.bodies.clear();
@@ -2519,6 +2521,9 @@ class BodyMesh {
                 Math.cos(body.poleDec) * Math.sin(body.poleRa),
                 Math.sin(body.poleDec)
             );
+            // Convert from Equatorial J2000 to Ecliptic J2000
+            pJ2000.applyAxisAngle(new THREE.Vector3(1, 0, 0), 23.4392811 * Math.PI / 180);
+            
             // In J2000, pole is mapped directly (solarSystemRoot will rotate it to WebGL frame)
             this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pJ2000);
         } else {
@@ -2600,6 +2605,7 @@ class BodyMesh {
                         Math.cos(body.poleDec) * Math.sin(body.poleRa),
                         Math.sin(body.poleDec)
                     );
+                    pJ2000.applyAxisAngle(new THREE.Vector3(1, 0, 0), 23.4392811 * Math.PI / 180);
                     ringNormal = new THREE.Vector3(pJ2000.x, pJ2000.z, -pJ2000.y).normalize();
                 } else {
                     const tilt = body.axialTilt ?? 0;
