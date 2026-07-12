@@ -145,9 +145,10 @@ impl OctreeNode {
         pos: Vec3,
         theta: f64,
         softening_squared: f64,
-    ) -> Vec3 {
+        body_mass: f64,
+    ) -> (Vec3, f64) {
         if self.body_count == 0 || self.total_mass <= 0.0 {
-            return Vec3::ZERO;
+            return (Vec3::ZERO, 0.0);
         }
 
         let r = self.center_of_mass - pos;
@@ -155,7 +156,7 @@ impl OctreeNode {
         
         // Avoid self-interaction
         if r_squared < softening_squared * 0.01 {
-            return Vec3::ZERO;
+            return (Vec3::ZERO, 0.0);
         }
 
         let distance = r_squared.sqrt();
@@ -166,20 +167,30 @@ impl OctreeNode {
         if cell_size / distance < theta || self.body_index.is_some() {
             // Far enough to approximate as point mass, or this is a single-body leaf
             let denom = (r_squared + softening_squared).powf(1.5);
+            let mut acc = Vec3::ZERO;
+            let mut pe = 0.0;
+            
             if denom > 0.0 {
-                return r * (G * self.total_mass / denom);
+                acc = r * (G * self.total_mass / denom);
             }
-            return Vec3::ZERO;
+            if distance > 0.0 {
+                let r_softened = (r_squared + softening_squared).sqrt();
+                pe = -G * body_mass * self.total_mass / r_softened;
+            }
+            return (acc, pe);
         }
 
         // Too close, need to traverse children
         let mut acceleration = Vec3::ZERO;
+        let mut total_pe = 0.0;
         for child in &self.children {
             if let Some(ref node) = child {
-                acceleration += node.calculate_acceleration(pos, theta, softening_squared);
+                let (acc, pe) = node.calculate_acceleration(pos, theta, softening_squared, body_mass);
+                acceleration += acc;
+                total_pe += pe;
             }
         }
-        acceleration
+        (acceleration, total_pe)
     }
 }
 
@@ -255,10 +266,10 @@ impl Octree {
     }
 
     /// Calculate acceleration on a body using Barnes-Hut
-    pub fn calculate_acceleration(&self, pos: Vec3, theta: f64, softening_squared: f64) -> Vec3 {
+    pub fn calculate_acceleration(&self, pos: Vec3, theta: f64, softening_squared: f64, body_mass: f64) -> (Vec3, f64) {
         match &self.root {
-            Some(root) => root.calculate_acceleration(pos, theta, softening_squared),
-            None => Vec3::ZERO,
+            Some(root) => root.calculate_acceleration(pos, theta, softening_squared, body_mass),
+            None => (Vec3::ZERO, 0.0),
         }
     }
 
@@ -302,11 +313,12 @@ pub struct OctreeStats {
 }
 
 /// Compute accelerations using Barnes-Hut algorithm
-pub fn compute_accelerations_barnes_hut(bodies: &mut [Body], config: &ForceConfig) {
+pub fn compute_accelerations_barnes_hut(bodies: &mut [Body], config: &ForceConfig) -> f64 {
     
     // Build octree
     let mut octree = Octree::new();
     octree.build(bodies);
+    let mut total_pe = 0.0;
     
     // Calculate accelerations for bodies that feel gravity
     for body in bodies.iter_mut() {
@@ -321,12 +333,17 @@ pub fn compute_accelerations_barnes_hut(bodies: &mut [Body], config: &ForceConfi
         let eps = body.effective_softening(config.softening).max(config.softening);
         let eps_sq = eps * eps;
 
-        body.acceleration = octree.calculate_acceleration(
+        let (acc, pe) = octree.calculate_acceleration(
             body.position,
             config.barnes_hut_theta,
             eps_sq,
+            body.mass,
         );
+        body.acceleration = acc;
+        total_pe += pe;
     }
+    
+    total_pe / 2.0
 }
 
 /// Compare Barnes-Hut accuracy against direct sum
@@ -433,10 +450,11 @@ mod tests {
         let mut octree = Octree::new();
         octree.build(&bodies);
         
-        let acc = octree.calculate_acceleration(
+        let (acc, _) = octree.calculate_acceleration(
             Vec3::new(AU, 0.0, 0.0),
             0.5,
             DEFAULT_SOFTENING * DEFAULT_SOFTENING,
+            1.0,
         );
         
         // Acceleration toward sun

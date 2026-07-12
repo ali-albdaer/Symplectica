@@ -103,6 +103,9 @@ pub struct Simulation {
     
     /// Whether accelerations need initialization
     needs_init: bool,
+    
+    /// Cached potential energy from the last force evaluation
+    cached_potential_energy: Option<f64>,
 }
 
 impl Simulation {
@@ -121,6 +124,7 @@ impl Simulation {
             close_encounter_last_body_ids: Vec::new(),
             next_id: 0,
             needs_init: true,
+            cached_potential_energy: None,
         }
     }
 
@@ -245,7 +249,7 @@ impl Simulation {
         let close_cfg = self.config.integrator.close_encounter;
 
         if self.needs_init {
-            initialize_accelerations_with(&mut self.bodies, &self.config.integrator.force_config, accel_fn);
+            self.cached_potential_energy = Some(initialize_accelerations_with(&mut self.bodies, &self.config.integrator.force_config, accel_fn));
             self.needs_init = false;
         }
 
@@ -266,7 +270,7 @@ impl Simulation {
                 self.close_encounter_last_body_ids.clear();
             }
             // Advance physics normally
-            step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn);
+            self.cached_potential_energy = Some(step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn));
             self.time += dt;
             self.tick += 1;
             self.sequence += 1;
@@ -278,7 +282,7 @@ impl Simulation {
         let pre_velocities: Vec<Vec3> = self.bodies.iter().map(|b| b.velocity).collect();
 
         // Baseline step for all bodies (Velocity-Verlet / configured integrator)
-        step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn);
+        self.cached_potential_energy = Some(step_with_accel(&mut self.bodies, &self.config.integrator, accel_fn));
         self.time += dt;
         self.tick += 1;
         self.sequence += 1;
@@ -330,7 +334,7 @@ impl Simulation {
             }
 
             // Recompute accelerations for consistency
-            accel_fn(&mut self.bodies, &self.config.integrator.force_config);
+            self.cached_potential_energy = Some(accel_fn(&mut self.bodies, &self.config.integrator.force_config));
             for body in &mut self.bodies {
                 body.prev_acceleration = body.acceleration;
             }
@@ -532,7 +536,7 @@ impl Simulation {
 
     /// Get total energy of the system
     pub fn total_energy(&self) -> f64 {
-        compute_total_energy(&self.bodies, self.config.integrator.force_config.softening)
+        self.kinetic_energy() + self.potential_energy()
     }
 
     /// Get kinetic energy of the system
@@ -542,7 +546,9 @@ impl Simulation {
 
     /// Get potential energy of the system
     pub fn potential_energy(&self) -> f64 {
-        compute_potential_energy(&self.bodies, self.config.integrator.force_config.softening)
+        self.cached_potential_energy.unwrap_or_else(|| {
+            compute_potential_energy(&self.bodies, self.config.integrator.force_config.softening)
+        })
     }
 
     /// Get total linear momentum as (px, py, pz)
@@ -594,6 +600,7 @@ impl Simulation {
         self.config.integrator = (&snapshot.integrator_config).into();
         self.config.integrator.force_config = (&snapshot.force_config).into();
         self.needs_init = true;
+        self.cached_potential_energy = None;
         self.close_encounter_active = false;
         self.close_encounter_last_body_ids.clear();
 
