@@ -579,27 +579,6 @@ class NBodyClient {
     }
 
     private applySnapshot(snapshot: string): void {
-        try {
-            const parsed = JSON.parse(snapshot);
-            if (parsed && parsed.bodies && Array.isArray(parsed.bodies)) {
-                for (const body of parsed.bodies) {
-                    if (body.position) {
-                        const py = body.position.y;
-                        body.position.y = body.position.z;
-                        body.position.z = -py;
-                    }
-                    if (body.velocity) {
-                        const vy = body.velocity.y;
-                        body.velocity.y = body.velocity.z;
-                        body.velocity.z = -vy;
-                    }
-                }
-            }
-            snapshot = JSON.stringify(parsed);
-        } catch (e) {
-            logger.warn('Failed to parse snapshot for coordinate mapping', e);
-        }
-
         const oldBodyCount = this.physics.bodyCount();
         const restored = this.physics.restoreSnapshot(snapshot);
         if (!restored) {
@@ -1129,24 +1108,25 @@ class NBodyClient {
     }
 
     private resolveCameraOrigin(useFollowTarget: boolean): { x: number; y: number; z: number } {
-        let origin = this.camera.getWorldOrigin();
         if (useFollowTarget && this.followBodyIndex >= 0 && this.followBodyIndex * 3 + 2 < this.state.positions.length) {
-            origin = {
+            return {
                 x: this.state.positions[this.followBodyIndex * 3],
                 y: this.state.positions[this.followBodyIndex * 3 + 1],
                 z: this.state.positions[this.followBodyIndex * 3 + 2],
             };
         }
-        return origin;
+        const origin = this.camera.getWorldOrigin();
+        // Convert World Space (X, Z, -Y) back to J2000 (X, Y, Z) for the physics renderer
+        return { x: origin.x, y: -origin.z, z: origin.y };
     }
 
     private getFollowTargetPosition(index: number): { x: number; y: number; z: number } {
         if (index >= 0 && index * 3 + 2 < this.state.positions.length) {
-            return {
-                x: this.state.positions[index * 3],
-                y: this.state.positions[index * 3 + 1],
-                z: this.state.positions[index * 3 + 2],
-            };
+            const px = this.state.positions[index * 3];
+            const py = this.state.positions[index * 3 + 1];
+            const pz = this.state.positions[index * 3 + 2];
+            // Map J2000 to World Space for the camera focus
+            return { x: px, y: pz, z: -py };
         }
         return { x: 0, y: 0, z: 0 };
     }

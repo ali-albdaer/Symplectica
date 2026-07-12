@@ -1370,6 +1370,7 @@ export function isGenericBody(body: BodyData): boolean {
 
 export class BodyRenderer {
     private scene: THREE.Scene;
+    public solarSystemRoot: THREE.Group;
     private bodies: Map<number, BodyMesh> = new Map();
 
     // Generic bodies instancing
@@ -1442,6 +1443,9 @@ export class BodyRenderer {
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
+        this.solarSystemRoot = new THREE.Group();
+        this.solarSystemRoot.rotation.x = -Math.PI / 2;
+        this.scene.add(this.solarSystemRoot);
         
         this.labelContainer = document.createElement('div');
         this.labelContainer.id = 'body-label-container';
@@ -1463,7 +1467,7 @@ export class BodyRenderer {
         if (this.instancedMesh.instanceColor) this.instancedMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
         this.instancedMesh.count = 0;
         this.instancedMesh.frustumCulled = false;
-        this.scene.add(this.instancedMesh);
+        this.solarSystemRoot.add(this.instancedMesh);
 
         // Pre-allocate global trail buffers (empty initially, resized dynamically)
         this.trailPositionsHigh = new Float32Array(0);
@@ -1497,7 +1501,7 @@ export class BodyRenderer {
         
         this.globalTrailMesh = new THREE.LineSegments(this.globalTrailGeometry, this.globalTrailMaterial);
         this.globalTrailMesh.frustumCulled = false;
-        this.scene.add(this.globalTrailMesh);
+        this.solarSystemRoot.add(this.globalTrailMesh);
     }
 
     setRenderScale(scale: number): void {
@@ -1858,7 +1862,13 @@ export class BodyRenderer {
                     const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
                     const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
                     
-                    this.dummyProjectVec.set(localX, localY + labelOffset, localZ);
+                    if (bodyMesh) {
+                        bodyMesh.group.getWorldPosition(this.dummyProjectVec);
+                    } else {
+                        // Fallback (shouldn't happen)
+                        this.dummyProjectVec.set(localX, localY, localZ);
+                    }
+                    this.dummyProjectVec.y += labelOffset;
                     const screenPos = this.dummyProjectVec.project(camera);
                     
                     if (screenPos.z > 1.0) {
