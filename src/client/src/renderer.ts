@@ -1461,7 +1461,7 @@ export class BodyRenderer {
         document.getElementById('canvas-container')?.appendChild(this.labelContainer);
 
         // Pre-allocate InstancedMesh for generic bodies
-        const geom = new THREE.SphereGeometry(1, this.sphereSegments.width, this.sphereSegments.height);
+        const geom = new THREE.IcosahedronGeometry(1, 2); // 320 triangles base LOD
         const mat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
         this.instancedMesh = new THREE.InstancedMesh(geom, mat, 5000);
         this.instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -1708,10 +1708,8 @@ export class BodyRenderer {
         for (const mesh of this.bodies.values()) {
             mesh.setSegments(clampedWidth, clampedHeight);
         }
-        if (this.instancedMesh) {
-            this.instancedMesh.geometry.dispose();
-            this.instancedMesh.geometry = new THREE.SphereGeometry(1, clampedWidth, clampedHeight);
-        }
+        // Do not update the base InstancedMesh geometry here anymore.
+        // It stays as an Icosahedron to save millions of triangles.
     }
 
     private createLabelElement(text: string, type: string): HTMLDivElement {
