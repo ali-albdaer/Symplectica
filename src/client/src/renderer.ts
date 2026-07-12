@@ -1627,7 +1627,7 @@ export class BodyRenderer {
 
         // Create text label HTML
         const labelEl = this.createLabelElement(body.name, body.type);
-        this.bodyLabels.set(body.id, { el: labelEl, type: body.type });
+        this.bodyLabels.set(body.id, { el: labelEl, type: body.type, visible: false, wasOffScreen: false });
         this.updateLabelVisibility(body.id);
 
         // Create rotation axis arrow overlay
@@ -1941,7 +1941,7 @@ export class BodyRenderer {
 
     private updateBodyLabel(id: number, localX: number, localY: number, localZ: number, camera: THREE.Camera): void {
         const label = this.bodyLabels.get(id);
-        if (label && label.el.style.display !== 'none') {
+        if (label && label.visible) {
             const bodyMesh = this.bodies.get(id);
             const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
             const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
@@ -1951,12 +1951,18 @@ export class BodyRenderer {
             this.dummyProjectVec.y += labelOffset;
             const screenPos = this.dummyProjectVec.project(camera);
             
-            if (screenPos.z > 1.0) {
-                label.el.style.transform = `translate(-10000px, -10000px)`;
+            const isOffScreen = screenPos.z < 0 || screenPos.z > 1.0 || Math.abs(screenPos.x) > 1.05 || Math.abs(screenPos.y) > 1.05;
+            
+            if (isOffScreen) {
+                if (!label.wasOffScreen) {
+                    label.el.style.transform = `translate(-10000px, -10000px)`;
+                    label.wasOffScreen = true;
+                }
             } else {
                 const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
                 const y = (screenPos.y * -0.5 + 0.5) * window.innerHeight;
                 label.el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
+                label.wasOffScreen = false;
             }
         }
     }
@@ -2017,7 +2023,7 @@ export class BodyRenderer {
     private showStarLabels = false;
     private showPlanetLabels = false;
     private showMoonLabels = false;
-    private bodyLabels: Map<number, { el: HTMLDivElement, type: string }> = new Map();
+    private bodyLabels: Map<number, { el: HTMLDivElement, type: string, visible: boolean, wasOffScreen: boolean }> = new Map();
 
     private updateLabelVisibility(id: number): void {
         const label = this.bodyLabels.get(id);
@@ -2027,7 +2033,13 @@ export class BodyRenderer {
         else if (label.type === 'planet') visible = this.showPlanetLabels;
         else if (label.type === 'moon') visible = this.showMoonLabels;
         
+        label.visible = visible;
         label.el.style.display = visible ? 'block' : 'none';
+        
+        // Reset off-screen flag if label gets turned off
+        if (!visible) {
+            label.wasOffScreen = false;
+        }
     }
 
     setShowAxisLines(show: boolean): void {
