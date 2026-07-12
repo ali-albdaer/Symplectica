@@ -1601,7 +1601,7 @@ export class BodyRenderer {
         );
         mesh.applyRealisticTextures(this.realisticTexturesEnabled);
         this.bodies.set(body.id, mesh);
-        this.scene.add(mesh.group);
+        this.solarSystemRoot.add(mesh.group);
 
         // Apply current scale settings to new body
         const radius = scaleRadius(body.radius * this.renderScale);
@@ -2519,13 +2519,13 @@ class BodyMesh {
                 Math.cos(body.poleDec) * Math.sin(body.poleRa),
                 Math.sin(body.poleDec)
             );
-            // Transform to WebGL frame (X, Z, -Y)
-            const pWebGL = new THREE.Vector3(pJ2000.x, pJ2000.z, -pJ2000.y);
-            this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pWebGL);
+            // In J2000, pole is mapped directly (solarSystemRoot will rotate it to WebGL frame)
+            this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pJ2000);
         } else {
             const tilt = body.axialTilt ?? 0;
-            // Legacy tilt for Y-up: tilt around X axis so it leans into the orbital plane (XZ)
-            this.group.rotation.x = tilt;
+            // In J2000, default North is Z-axis (0, 0, 1). Axial tilt rotates away from it.
+            const pJ2000 = new THREE.Vector3(-Math.sin(tilt), 0, Math.cos(tilt));
+            this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pJ2000);
         }
 
         // Create sphere geometry - initially at default scale (will be set by renderer)
