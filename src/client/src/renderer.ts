@@ -1799,6 +1799,11 @@ export class BodyRenderer {
 
         let instancedUpdated = false;
 
+        const camJ2000X = camera.position.x;
+        const camJ2000Y = -camera.position.z;
+        const camJ2000Z = camera.position.y;
+        const camJ2000 = new THREE.Vector3(camJ2000X, camJ2000Y, camJ2000Z);
+
         let i = 0;
         for (const [id, mesh] of this.bodies) {
             if (i * 3 + 2 < positions.length) {
@@ -1813,9 +1818,9 @@ export class BodyRenderer {
 
                 mesh.group.position.set(localX, localY, localZ);
 
-                const dx = camera.position.x - localX;
-                const dy = camera.position.y - localY;
-                const dz = camera.position.z - localZ;
+                const dx = camJ2000X - localX;
+                const dy = camJ2000Y - localY;
+                const dz = camJ2000Z - localZ;
                 const distanceToCamera = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
                 if (mesh.isInstanced && this.instancedMesh) {
@@ -1842,7 +1847,7 @@ export class BodyRenderer {
 
                 // Update ring quality dynamically based on distance
                 mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
-                mesh.updateLighting(sunPos, mesh.group.position, camera.position, this.renderScale);
+                mesh.updateLighting(sunPos, mesh.group.position, camJ2000, this.renderScale);
 
                 // Dynamic Level of Detail (LOD) based on distance
                 // Note (Plan for future implementation): We could replace the polygon SphereGeometry with a raytraced impostor. This involves rendering a simple bounding box and calculating exact mathematical intersections of the camera's view ray with an oblate spheroid in a custom Fragment Shader. This is highly performant and eliminates polygonal edges entirely, but requires rewriting the standard materials and integrating custom depth writing for proper clipping with rings and atmospheres.
@@ -1862,12 +1867,11 @@ export class BodyRenderer {
                     const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
                     const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
                     
-                    if (bodyMesh) {
-                        bodyMesh.group.getWorldPosition(this.dummyProjectVec);
-                    } else {
-                        // Fallback (shouldn't happen)
-                        this.dummyProjectVec.set(localX, localY, localZ);
-                    }
+                    // Manually map J2000 local position to World space (solarSystemRoot applies -90 on X)
+                    // X_world = X_j
+                    // Y_world = Z_j
+                    // Z_world = -Y_j
+                    this.dummyProjectVec.set(localX, localZ, -localY);
                     this.dummyProjectVec.y += labelOffset;
                     const screenPos = this.dummyProjectVec.project(camera);
                     
@@ -2279,7 +2283,8 @@ export class BodyRenderer {
             atmoMat.uniforms.u_sunPos.value.copy(sunPos);
             atmoMat.uniforms.u_planetCenter.value.set(localX, localY, localZ);
             
-            const dist = cameraPos.distanceTo(new THREE.Vector3(localX, localY, localZ));
+            const camJ2000 = new THREE.Vector3(cameraPos.x, -cameraPos.z, cameraPos.y);
+            const dist = camJ2000.distanceTo(new THREE.Vector3(localX, localY, localZ));
             const outerRadius = this.ghostAtmoMesh.scale.x;
             atmoMat.uniforms.u_isInside.value = (dist < outerRadius) ? 1.0 : 0.0;
         }
