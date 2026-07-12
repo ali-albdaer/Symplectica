@@ -2237,7 +2237,7 @@ export class BodyRenderer {
                 });
                 this.ghostAtmoMesh = new THREE.Mesh(geometry, atmoMat);
                 this.ghostAtmoMesh.visible = false;
-                this.scene.add(this.ghostAtmoMesh);
+                this.solarSystemRoot.add(this.ghostAtmoMesh);
             }
 
             const atmoMat = this.ghostAtmoMesh.material as THREE.ShaderMaterial;
@@ -2289,8 +2289,8 @@ export class BodyRenderer {
                 }
             }
             const atmoMat = this.ghostAtmoMesh.material as THREE.ShaderMaterial;
-            atmoMat.uniforms.u_sunPos.value.copy(sunPos);
-            atmoMat.uniforms.u_planetCenter.value.set(localX, localY, localZ);
+            atmoMat.uniforms.u_sunPos.value.set(sunPos.x, sunPos.z, -sunPos.y);
+            atmoMat.uniforms.u_planetCenter.value.set(localX, localZ, -localY);
             
             const camJ2000 = new THREE.Vector3(cameraPos.x, -cameraPos.z, cameraPos.y);
             const dist = camJ2000.distanceTo(new THREE.Vector3(localX, localY, localZ));
@@ -3003,16 +3003,16 @@ class BodyMesh {
         const radius = scaleRadius(this.realRadius * renderScale);
         if (this.ringMesh && this.ringMesh.material instanceof THREE.ShaderMaterial) {
             const mat = this.ringMesh.material as THREE.ShaderMaterial;
-            mat.uniforms.u_sunPos.value.copy(sunPos);
-            mat.uniforms.u_planetCenter.value.copy(planetPos);
+            mat.uniforms.u_sunPos.value.set(sunPos.x, sunPos.z, -sunPos.y);
+            mat.uniforms.u_planetCenter.value.set(planetPos.x, planetPos.z, -planetPos.y);
             mat.uniforms.u_planetRadius.value = radius;
         }
 
         if (this.atmosphereMesh && this.atmosphereMesh.material instanceof THREE.ShaderMaterial) {
             const mat = this.atmosphereMesh.material as THREE.ShaderMaterial;
-            mat.uniforms.u_sunPos.value.copy(sunPos);
+            mat.uniforms.u_sunPos.value.set(sunPos.x, sunPos.z, -sunPos.y);
             if (mat.uniforms.u_planetCenter) {
-                mat.uniforms.u_planetCenter.value.copy(planetPos);
+                mat.uniforms.u_planetCenter.value.set(planetPos.x, planetPos.z, -planetPos.y);
             }
             
             const dist = cameraPos.distanceTo(planetPos);
@@ -3024,8 +3024,8 @@ class BodyMesh {
         }
 
         if (this.material && this.material.userData.sunPos) {
-            this.material.userData.sunPos.copy(sunPos);
-            this.material.userData.planetCenter.copy(planetPos);
+            this.material.userData.sunPos.set(sunPos.x, sunPos.z, -sunPos.y);
+            this.material.userData.planetCenter.set(planetPos.x, planetPos.z, -planetPos.y);
             this.material.userData.planetRadius.value = radius;
         }
     }
