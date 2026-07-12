@@ -838,15 +838,15 @@ class NBodyClient {
         // Add mousemove for interactive placement
         document.getElementById('canvas-container')?.addEventListener('mousemove', (e) => {
             if (this.buildPanel.isVisible() && this.buildMode) {
-                // If middle dragging, adjust Y
+                // If middle dragging, adjust Z (vertical physics coordinate)
                 if (this.isMiddleDragging) {
                     const deltaY = e.clientY - this.lastMiddleDragY;
                     this.lastMiddleDragY = e.clientY;
                     
                     const params = this.buildPanel.getParams();
                     // Sensitivity reduced from 0.01 to 0.002 AU per pixel
-                    const newY = params.y - deltaY * 0.002 * AU;
-                    this.buildPanel.setCoordinates(params.x, newY, params.z);
+                    const newZ = params.z - deltaY * 0.002 * AU;
+                    this.buildPanel.setCoordinates(params.x, params.y, newZ);
                     return;
                 }
 
@@ -855,8 +855,9 @@ class NBodyClient {
                 const cameraOrigin = this.resolveCameraOrigin(!this.freeCamera && !this.surfaceCamera);
                 
                 // The raycast is in rendering coordinates, so the plane must be defined in rendering space.
-                const renderingY = params.y - cameraOrigin.y;
-                this.buildPlane.constant = -renderingY; 
+                // Physics Z is vertical, which corresponds to WebGL Y.
+                const renderingHeight = params.z - cameraOrigin.z;
+                this.buildPlane.constant = -renderingHeight; 
                 
                 const rect = this.renderer.domElement.getBoundingClientRect();
                 this.buildMouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -867,7 +868,8 @@ class NBodyClient {
                 const target = new THREE.Vector3();
                 if (this.buildRaycaster.ray.intersectPlane(this.buildPlane, target)) {
                     // Convert intersected target back to world coordinates
-                    this.buildPanel.setCoordinates(target.x + cameraOrigin.x, params.y, target.z + cameraOrigin.z);
+                    // WebGL X is physics X. WebGL Z is physics -Y. Physics Z stays constant at params.z.
+                    this.buildPanel.setCoordinates(target.x + cameraOrigin.x, -target.z + cameraOrigin.y, params.z);
                 }
             }
         });

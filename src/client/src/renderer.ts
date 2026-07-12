@@ -2206,7 +2206,7 @@ export class BodyRenderer {
             });
             this.ghostMesh = new THREE.Mesh(geometry, material);
             this.ghostMesh.visible = false;
-            this.scene.add(this.ghostMesh);
+            this.solarSystemRoot.add(this.ghostMesh);
         }
 
         // Update ghost appearance
@@ -2331,10 +2331,16 @@ export class BodyRenderer {
      */
     removeGhost(): void {
         if (this.ghostMesh) {
-            this.scene.remove(this.ghostMesh);
+            this.solarSystemRoot.remove(this.ghostMesh);
             this.ghostMesh.geometry.dispose();
             (this.ghostMesh.material as THREE.Material).dispose();
             this.ghostMesh = null;
+        }
+        if (this.ghostAtmoMesh) {
+            this.solarSystemRoot.remove(this.ghostAtmoMesh);
+            this.ghostAtmoMesh.geometry.dispose();
+            (this.ghostAtmoMesh.material as THREE.Material).dispose();
+            this.ghostAtmoMesh = null;
         }
         this.ghostVisible = false;
     }
@@ -2345,6 +2351,7 @@ export class BodyRenderer {
     }
 
     dispose(): void {
+        this.removeGhost();
         if (this.solarSystemRoot) {
             this.scene.remove(this.solarSystemRoot);
         }
