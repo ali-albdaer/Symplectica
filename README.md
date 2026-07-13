@@ -1,6 +1,10 @@
 # Symplectica
 
-**Symplectica** is a high-fidelity, multiplayer, N-body space simulator focused on scientific accuracy. Built with **Rust + WebAssembly**, **TypeScript**, **Three.js**, and **Node.js**. Currently in early development phases.
+**Symplectica** is a high-fidelity, multiplayer, N-body space simulator focused on scientific accuracy. Built with **Rust + WebAssembly**, **TypeScript**, **Three.js**, and **Node.js**. Development in progress.
+
+## Visuals
+
+Soon.
 
 ## Key Features 
 - Several accurate presets, including a Solar System preset with HORIZONS-based data for planets and major bodies, plus Proxima Centauri and TRAPPIST-1 system presets.
