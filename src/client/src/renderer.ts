@@ -44,6 +44,7 @@ uniform float u_time;
 uniform float u_spotFraction;
 uniform float u_spotEnabled;
 uniform float u_spotSeed;
+uniform float u_emissiveStrength;
 varying vec3 vNormal;
 varying vec3 vViewDir;
 varying vec3 vObjNormal;
@@ -124,7 +125,7 @@ void main() {
     vec3 finalColor = u_color * limb * granulation;
     finalColor *= (1.0 - spotCoverage * spotDarkening);
 
-    gl_FragColor = vec4(finalColor, 1.0);
+    gl_FragColor = vec4(finalColor * u_emissiveStrength, 1.0);
     #include <logdepthbuf_fragment>
 }
 `;
@@ -1963,7 +1964,7 @@ export class BodyRenderer {
         mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
         
         const sigLights = manager.getSignificantSources(mesh.group.position, 4);
-        mesh.updateLighting(sigLights, mesh.group.position, camJ2000, this.renderScale);
+        mesh.updateLighting(sigLights, manager.resultCount, mesh.group.position, camJ2000, this.renderScale);
 
         // Dynamic Level of Detail (LOD) based on distance
         const actualVisRadius = scaleRadius(mesh.realRadius * this.renderScale);
@@ -2615,6 +2616,7 @@ class BodyMesh {
                     u_spotFraction: { value: spotFraction },
                     u_spotEnabled: { value: starOptions.starspotsEnabled ? 1.0 : 0.0 },
                     u_spotSeed: { value: seed === 0 ? 1 : seed },
+                    u_emissiveStrength: { value: 10.0 },
                 },
             });
             this.starMaterial = this.material as THREE.ShaderMaterial;
@@ -3093,11 +3095,10 @@ class BodyMesh {
         }
     }
 
-    updateLighting(lights: LightSourceInfo[], planetPos: THREE.Vector3, cameraPos: THREE.Vector3, renderScale: number): void {
+    updateLighting(lights: readonly LightSourceInfo[], numLights: number, planetPos: THREE.Vector3, cameraPos: THREE.Vector3, renderScale: number): void {
         const radius = scaleRadius(this.realRadius * renderScale);
         
         // Populate arrays for uniforms
-        const numLights = Math.min(lights.length, 4);
         const lightPos = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
         const lightColor = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
         const lightIntensity = [0, 0, 0, 0];

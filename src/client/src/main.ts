@@ -1907,33 +1907,43 @@ class NBodyClient {
         this.bodyRenderer.updateBodies(this.state.time);
 
         // --- Phase 2: Dynamic Auto-Exposure ---
-        const sigLights = this.bodyRenderer.lightSourceManager.getSignificantSources(this.camera.position, 1);
-        if (sigLights.length > 0) {
-            const primaryLight = sigLights[0];
-            const dist = primaryLight.position.distanceTo(this.camera.position);
-            const distAu = dist / AU;
-            let targetExposure = 4.0 * (distAu * distAu) / Math.max(primaryLight.luminosity, 0.0001);
+        const allLights = this.bodyRenderer.lightSourceManager.getAllSources();
+        if (allLights.length > 0) {
+            // Sum apparent irradiance: L / d^2 for each source
+            let totalIrradiance = 0;
+            for (const light of allLights) {
+                const dist = light.position.distanceTo(this.camera.position);
+                const distAu = Math.max(dist / AU, 1e-5); // prevent division by zero
+                totalIrradiance += light.luminosity / (distAu * distAu);
+            }
             
+            // targetExposure is proportional to the reciprocal of total irradiance
+            // At 1 AU from a 1.0 luminosity star, irradiance is 1.0, baseline exposure is 4.0
+            let targetExposure = 4.0 / Math.max(totalIrradiance, 0.0001);
+
             // Add a slight baseline earthshine boost when near planets if enabled
             if (this.currentExperimentalOptions?.earthshineEnabled) {
                 targetExposure *= 1.25; // 25% exposure boost to simulate ambient bounce light
             }
 
-            const clampedExposure = Math.min(1000, Math.max(0.1, targetExposure));
-            // Smoothly adapt the eye
-            this.renderer.toneMappingExposure = THREE.MathUtils.lerp(this.renderer.toneMappingExposure, clampedExposure, 2.0 * delta);
-
-            // [DIAGNOSTIC] Log exposure values roughly once per second
-            if (Math.random() < 0.02) { // roughly every 50 frames
-                console.log(`[Diagnostic] DistAU: ${distAu.toFixed(3)}, TargetExposure: ${targetExposure.toFixed(2)}, CurrentExposure: ${this.renderer.toneMappingExposure.toFixed(2)}, AmbientIntensity: ${this.ambientLight?.intensity}`);
-            }
+            const clampedExposure = Math.min(1000, Math.max(0.05, targetExposure));
+            
+            // Asymmetric EMA (Exponential Moving Average) adaptation:
+            // Fast adaptation when going brighter (pupil constriction: smaller exposure value)
+            // Slow adaptation when going darker (dark adaptation: larger exposure value)
+            const goingBrighter = clampedExposure < this.renderer.toneMappingExposure;
+            const tau = goingBrighter ? 0.15 : 2.0; // 150ms for bright, 2s for dark
+            const alpha = 1.0 - Math.exp(-delta / tau);
+            
+            this.renderer.toneMappingExposure = THREE.MathUtils.lerp(
+                this.renderer.toneMappingExposure,
+                clampedExposure,
+                alpha
+            );
         } else {
-            this.renderer.toneMappingExposure = THREE.MathUtils.lerp(this.renderer.toneMappingExposure, 4.0, 2.0 * delta);
+            const alpha = 1.0 - Math.exp(-delta / 2.0);
+            this.renderer.toneMappingExposure = THREE.MathUtils.lerp(this.renderer.toneMappingExposure, 4.0, alpha);
         }
-
-        // [DIAGNOSTIC OVERRIDE] Force a massive exposure to test if shader is responsive
-        // Uncomment the next line to test extreme brightness:
-        // this.renderer.toneMappingExposure = 100000;
 
         this.renderer.render(this.scene, this.camera);
         const renderEnd = performance.now();
