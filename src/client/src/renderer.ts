@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 import { blackbodyToRGBNorm } from './blackbody';
-import { AU } from '../../shared/constants';
+import { AU, L_SUN } from '../../shared/constants';
 import { LightSourceManager, LightSourceInfo } from './light-source-manager';
 
 // ── Star surface shader ────────────────────────────────────────────────
@@ -200,11 +200,14 @@ void main() {
     for (int i = 0; i < MAX_LIGHTS; i++) {
         if (i >= u_numLights) break;
         
-        vec3 lightDir = normalize(u_lightPos[i] - vWorldPos);
+        vec3 lightVec = u_lightPos[i] - vWorldPos;
+        float distSq = max(dot(lightVec, lightVec), 1.0);
+        vec3 lightDir = lightVec * inversesqrt(max(distSq, 1e-12));
         float VdotL = dot(viewDir, lightDir);
         float NdotL = dot(normal, lightDir);
         
         float sunInfluence = smoothstep(-0.2, 0.2, dot(zenithDir, lightDir));
+        float attenuation = 1.0 / distSq;
         
         float rayleighPhase = 0.75 * (1.0 + VdotL * VdotL);
         vec3 rayleighScattering = u_rayleighColor * rayleighPhase;
@@ -215,14 +218,13 @@ void main() {
         vec3 scatterColor = rayleighScattering + mieScattering;
         vec3 lightContrib = scatterColor * scatterIntegral;
         
-        finalColor += lightContrib * sunInfluence * (u_lightColor[i] * u_lightIntensity[i]) * 1.5;
+        finalColor += lightContrib * sunInfluence * (u_lightColor[i] * (u_lightIntensity[i] * attenuation)) * 1.5;
     }
-    
-    // Tone mapping to prevent blowouts (ACES-like filmic approximation)
-    finalColor = finalColor / (finalColor + vec3(0.5));
     
     gl_FragColor = vec4(finalColor, 1.0);
     #include <logdepthbuf_fragment>
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
 }
 `;
 
@@ -297,7 +299,10 @@ void main() {
     for (int i = 0; i < MAX_LIGHTS; i++) {
         if (i >= u_numLights) break;
         
-        vec3 lightDir = normalize(u_lightPos[i] - vWorldPos);
+        vec3 lightVec = u_lightPos[i] - vWorldPos;
+        float distSq = max(dot(lightVec, lightVec), 1.0);
+        vec3 lightDir = lightVec * inversesqrt(max(distSq, 1e-12));
+        float attenuation = 1.0 / distSq;
 
         // 2. Planet Shadow (Ray-Sphere intersection)
         vec3 oc = vWorldPos - u_planetCenter;
@@ -307,7 +312,7 @@ void main() {
         float inShadow = (disc > 0.0 && b < 0.0) ? 0.05 : 1.0;
 
         if (u_perfMode > 0.5) {
-            finalColor += ring.rgb * inShadow * u_lightColor[i] * u_lightIntensity[i];
+            finalColor += ring.rgb * inShadow * u_lightColor[i] * (u_lightIntensity[i] * attenuation);
         } else {
             // Rings are double-sided, so abs(dot(N, L)) for diffuse
             float NdotL = abs(dot(normal, lightDir));
@@ -318,17 +323,13 @@ void main() {
             
             float lighting = mix(diffuse, scattering * 5.0, 0.4);
 
-            finalColor += ring.rgb * lighting * inShadow * u_lightColor[i] * u_lightIntensity[i];
+            finalColor += ring.rgb * lighting * inShadow * u_lightColor[i] * (u_lightIntensity[i] * attenuation);
         }
     }
 
     if (u_perfMode > 0.5) {
         gl_FragColor = vec4(finalColor, ring.a * viewFade);
     } else {
-        // Tone mapping
-        finalColor = finalColor / (finalColor + vec3(0.5));
-        
-
         gl_FragColor = vec4(finalColor, ring.a * viewFade);
     }
     #include <logdepthbuf_fragment>
@@ -1634,10 +1635,12 @@ export class BodyRenderer {
             const teff = body.effectiveTemperature ?? 5778;
             const [lr, lg, lb] = blackbodyToRGBNorm(teff > 0 ? teff : 5778);
             const lightColor = new THREE.Color(lr, lg, lb);
-            // Intensity proportional to luminosity (log scale, clamped)
-            const lum = body.luminosity ?? 1;
-            const intensity = Math.min(10, Math.max(0.5, 1.5 + Math.log10(Math.max(lum, 0.001))));
-            const light = new THREE.PointLight(lightColor, intensity, 0, 0);
+            const lum = (body.luminosity && body.luminosity > 0) ? (body.luminosity / L_SUN) : 1.0;
+            const baseIntensity = Math.min(10, Math.max(0.5, 1.5 + Math.log10(Math.max(lum, 0.001))));
+            // Use inverse-square decay (decay=2). 
+            // Scale intensity by AU^2 so that illuminance at 1 AU matches old ~1.5 values.
+            const physicalIntensity = baseIntensity * AU * AU;
+            const light = new THREE.PointLight(lightColor, physicalIntensity, 0, 2);
             mesh.group.add(light);
             
             this.lightSourceManager.registerSource(body.id, {
@@ -2834,6 +2837,7 @@ class BodyMesh {
                 transparent: true,
                 side: THREE.DoubleSide,
                 depthWrite: false,
+                toneMapped: true,
             });
             ringMat.userData.baseOpacity = profile.baseOpacity;
             ringMat.userData.proceduralMap = ringTex;
@@ -2889,6 +2893,7 @@ class BodyMesh {
             side: THREE.DoubleSide,
             depthWrite: false,
             blending: THREE.AdditiveBlending,
+            toneMapped: true,
         });
 
         this.atmosphereMesh = new THREE.Mesh(atmoGeo, atmoMat);
@@ -3103,8 +3108,9 @@ class BodyMesh {
             
             // Replicate the original intensity logic from addBody
             const lum = lights[i].luminosity;
-            const intensity = Math.min(10, Math.max(0.5, 1.5 + Math.log10(Math.max(lum, 0.001))));
-            lightIntensity[i] = intensity;
+            const baseIntensity = Math.min(10, Math.max(0.5, 1.5 + Math.log10(Math.max(lum, 0.001))));
+            // For custom shaders, apply physical intensity (base * AU * AU). Shaders handle 1/d^2 attenuation.
+            lightIntensity[i] = baseIntensity * AU * AU;
         }
         
         // Update Ring Shadow on planet

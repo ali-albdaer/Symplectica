@@ -31,6 +31,8 @@ export interface ExperimentalOptions {
     flareBrightness: number;
     ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways';
     useRealisticTextures: boolean;
+    globalIllumination: number;
+    earthshineEnabled: boolean;
 }
 
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
@@ -80,6 +82,8 @@ export class OptionsPanel {
         fixedFlareRate: 2.0,
         ringQuality: 'HighQualityClose',
         useRealisticTextures: false,
+        globalIllumination: 0,
+        earthshineEnabled: true,
     };
 
     // UI Elements
@@ -114,6 +118,9 @@ export class OptionsPanel {
     private fixedFlareRateField!: HTMLElement;
     private ringQualitySelect!: HTMLSelectElement;
     private realisticTexturesCheckbox!: HTMLInputElement;
+    private globalIlluminationInput!: HTMLInputElement;
+    private globalIlluminationValue!: HTMLElement;
+    private earthshineCheckbox!: HTMLInputElement;
 
     // Grid Spacing Helpers (Logarithmic)
     private sliderToSpacing(t: number): number {
@@ -472,6 +479,22 @@ export class OptionsPanel {
                         </div>
                     </div>
                 </section>
+                <section class="opt-section">
+                    <h3>Illumination (Physical)</h3>
+                    <div class="opt-field">
+                        <label>Global Illumination (Ambient)</label>
+                        <div class="opt-slider-row">
+                            <input type="range" id="opt-global-illumination" min="0" max="0.5" step="0.01" value="0">
+                            <span id="opt-global-illumination-value">0.00</span>
+                        </div>
+                    </div>
+                    <div class="opt-row">
+                        <label class="opt-toggle" title="Approximate secondary light from nearby bodies (e.g. Earthshine on the Moon).">
+                            <input type="checkbox" id="opt-earthshine" checked>
+                            <span>Enable Earthshine</span>
+                        </label>
+                    </div>
+                </section>
             </div>
         `;
 
@@ -737,6 +760,9 @@ export class OptionsPanel {
         this.fixedFlareRateField = this.container.querySelector('#opt-fixed-rate-field')!;
         this.ringQualitySelect = this.container.querySelector('#opt-ring-quality')!;
         this.realisticTexturesCheckbox = this.container.querySelector('#opt-realistic-textures')!;
+        this.globalIlluminationInput = this.container.querySelector('#opt-global-illumination')!;
+        this.globalIlluminationValue = this.container.querySelector('#opt-global-illumination-value')!;
+        this.earthshineCheckbox = this.container.querySelector('#opt-earthshine')!;
     }
 
     private bindEvents(): void {
@@ -982,6 +1008,19 @@ export class OptionsPanel {
             this.experimentalOptions.ringQuality = this.ringQualitySelect.value as 'Performance' | 'HighQualityClose' | 'HighQualityAlways';
             this.emitExperimentalChange();
         });
+
+        this.globalIlluminationInput.addEventListener('input', () => {
+            if (this.ignoreEvents) return;
+            this.experimentalOptions.globalIllumination = parseFloat(this.globalIlluminationInput.value);
+            this.globalIlluminationValue.textContent = this.experimentalOptions.globalIllumination.toFixed(2);
+            this.emitExperimentalChange();
+        });
+
+        this.earthshineCheckbox.addEventListener('change', () => {
+            if (this.ignoreEvents) return;
+            this.experimentalOptions.earthshineEnabled = this.earthshineCheckbox.checked;
+            this.emitExperimentalChange();
+        });
     }
 
     private setupTabs(): void {
@@ -1119,6 +1158,14 @@ export class OptionsPanel {
         this.fixedFlareRateValue.textContent = `${this.experimentalOptions.fixedFlareRate.toFixed(1)}`;
         this.fixedFlareRateField.style.display = this.experimentalOptions.flareFrequencyMode === 'fixed' ? '' : 'none';
         this.ringQualitySelect.value = this.experimentalOptions.ringQuality;
+        
+        if (this.experimentalOptions.globalIllumination !== undefined) {
+            this.globalIlluminationInput.value = this.experimentalOptions.globalIllumination.toString();
+            this.globalIlluminationValue.textContent = this.experimentalOptions.globalIllumination.toFixed(2);
+        }
+        if (this.experimentalOptions.earthshineEnabled !== undefined) {
+            this.earthshineCheckbox.checked = this.experimentalOptions.earthshineEnabled;
+        }
         
         this.ignoreEvents = false;
     }

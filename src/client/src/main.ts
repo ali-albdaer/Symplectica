@@ -163,7 +163,21 @@ class NBodyClient {
     private freeCamCrosshair: HTMLElement | null = null;
     private raycaster = new THREE.Raycaster();
     private skyRenderer!: SkyRenderer;
-    private readonly initialFollowDistance = 0.020 * AU;
+    private ambientLight!: THREE.AmbientLight;
+    private initialFollowDistance = 0.02 * AU;
+
+    // Additional Tracking for Phase 2
+    private currentExperimentalOptions: ExperimentalOptions = {
+        flareFrequencyMode: 'scaled',
+        flareBrightness: 1.0,
+        flaresVisible: true,
+        fixedFlareRate: 2.0,
+        ringQuality: 'HighQualityClose',
+        useRealisticTextures: false,
+        globalIllumination: 0,
+        earthshineEnabled: true
+    };
+
     private readonly orbitalKeyRotateSpeedRadPerSec = 0.6;
     private readonly orbitalKeyRollSpeedRadPerSec = 0.8;
     private readonly orbitalKeyZoomRatePerSec = 2.4;
@@ -330,6 +344,10 @@ class NBodyClient {
                 this.bodyRenderer.setFlareFrequencyMode(experimental.flareFrequencyMode);
                 this.bodyRenderer.setRingQuality(experimental.ringQuality);
                 this.bodyRenderer.setRealisticTexturesEnabled(experimental.useRealisticTextures);
+                this.currentExperimentalOptions = experimental;
+                if (this.ambientLight) {
+                    this.ambientLight.intensity = experimental.globalIllumination;
+                }
             }
         );
         this.optionsPanel.setPresetRenderScale(
@@ -645,9 +663,9 @@ class NBodyClient {
         this.skyRenderer = new SkyRenderer(this.scene, { seed: 42 });
         this.skyRenderer.generate();
 
-        // Add ambient light (space is dark but we need some fill)
-        const ambient = new THREE.AmbientLight(0x111122, 0.3);
-        this.scene.add(ambient);
+        // Add ambient light (intensity controlled by Global Illumination slider)
+        this.ambientLight = new THREE.AmbientLight(0xffffff, this.currentExperimentalOptions?.globalIllumination ?? 0);
+        this.scene.add(this.ambientLight);
 
         // Handle resize
         window.addEventListener('resize', () => this.onResize());
@@ -1887,6 +1905,35 @@ class NBodyClient {
 
         // Update star rotations from simulation time
         this.bodyRenderer.updateBodies(this.state.time);
+
+        // --- Phase 2: Dynamic Auto-Exposure ---
+        const sigLights = this.bodyRenderer.lightSourceManager.getSignificantSources(this.camera.position, 1);
+        if (sigLights.length > 0) {
+            const primaryLight = sigLights[0];
+            const dist = primaryLight.position.distanceTo(this.camera.position);
+            const distAu = dist / AU;
+            let targetExposure = 4.0 * (distAu * distAu) / Math.max(primaryLight.luminosity, 0.0001);
+            
+            // Add a slight baseline earthshine boost when near planets if enabled
+            if (this.currentExperimentalOptions?.earthshineEnabled) {
+                targetExposure *= 1.25; // 25% exposure boost to simulate ambient bounce light
+            }
+
+            const clampedExposure = Math.min(1000, Math.max(0.1, targetExposure));
+            // Smoothly adapt the eye
+            this.renderer.toneMappingExposure = THREE.MathUtils.lerp(this.renderer.toneMappingExposure, clampedExposure, 2.0 * delta);
+
+            // [DIAGNOSTIC] Log exposure values roughly once per second
+            if (Math.random() < 0.02) { // roughly every 50 frames
+                console.log(`[Diagnostic] DistAU: ${distAu.toFixed(3)}, TargetExposure: ${targetExposure.toFixed(2)}, CurrentExposure: ${this.renderer.toneMappingExposure.toFixed(2)}, AmbientIntensity: ${this.ambientLight?.intensity}`);
+            }
+        } else {
+            this.renderer.toneMappingExposure = THREE.MathUtils.lerp(this.renderer.toneMappingExposure, 4.0, 2.0 * delta);
+        }
+
+        // [DIAGNOSTIC OVERRIDE] Force a massive exposure to test if shader is responsive
+        // Uncomment the next line to test extreme brightness:
+        // this.renderer.toneMappingExposure = 100000;
 
         this.renderer.render(this.scene, this.camera);
         const renderEnd = performance.now();
