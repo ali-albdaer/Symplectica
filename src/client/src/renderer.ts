@@ -1823,11 +1823,12 @@ export class BodyRenderer {
         let lIdx = 0;
         for (const [id, mesh] of this.bodies) {
             if (mesh.type === 'star' && lIdx * 3 + 2 < positions.length) {
-                this.lightSourceManager.updatePosition(id, new THREE.Vector3(
-                    positions[lIdx * 3] - origin.x,
+                this.lightSourceManager.updatePosition(
+                    id,
+                    positions[lIdx * 3]     - origin.x,
                     positions[lIdx * 3 + 1] - origin.y,
                     positions[lIdx * 3 + 2] - origin.z
-                ));
+                );
             }
             lIdx++;
         }
@@ -2539,6 +2540,15 @@ class BodyMesh {
     // Geometry state for LOD
     private currentSegments = { width: 0, height: 0 };
 
+    // Pre-allocated scratch arrays for updateLighting — avoids 8 Vector3 allocations per call
+    private readonly _lightPosScratch = [
+        new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()
+    ];
+    private readonly _lightColorScratch = [
+        new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()
+    ];
+    private readonly _lightIntensityScratch = [0, 0, 0, 0];
+
     public createHeroMesh(): void {
         if (this.heroMesh || !this.baseColor) return;
         const geom = new THREE.SphereGeometry(1, 256, 128);
@@ -2616,7 +2626,7 @@ class BodyMesh {
                     u_spotFraction: { value: spotFraction },
                     u_spotEnabled: { value: starOptions.starspotsEnabled ? 1.0 : 0.0 },
                     u_spotSeed: { value: seed === 0 ? 1 : seed },
-                    u_emissiveStrength: { value: 10.0 },
+                    u_emissiveStrength: { value: 0.7 },
                 },
             });
             this.starMaterial = this.material as THREE.ShaderMaterial;
@@ -3098,10 +3108,10 @@ class BodyMesh {
     updateLighting(lights: readonly LightSourceInfo[], numLights: number, planetPos: THREE.Vector3, cameraPos: THREE.Vector3, renderScale: number): void {
         const radius = scaleRadius(this.realRadius * renderScale);
         
-        // Populate arrays for uniforms
-        const lightPos = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-        const lightColor = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-        const lightIntensity = [0, 0, 0, 0];
+        // Use pre-allocated scratch arrays to avoid per-frame Vector3 allocations
+        const lightPos = this._lightPosScratch;
+        const lightColor = this._lightColorScratch;
+        const lightIntensity = this._lightIntensityScratch;
         
         for (let i = 0; i < numLights; i++) {
             lightPos[i].set(lights[i].position.x, lights[i].position.z, -lights[i].position.y);

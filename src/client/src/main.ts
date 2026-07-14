@@ -1907,16 +1907,17 @@ class NBodyClient {
         this.bodyRenderer.updateBodies(this.state.time);
 
         // --- Phase 2: Dynamic Auto-Exposure ---
-        const allLights = this.bodyRenderer.lightSourceManager.getAllSources();
-        if (allLights.length > 0) {
-            // Sum apparent irradiance: L / d^2 for each source
-            let totalIrradiance = 0;
-            for (const light of allLights) {
-                const dist = light.position.distanceTo(this.camera.position);
-                const distAu = Math.max(dist / AU, 1e-5); // prevent division by zero
-                totalIrradiance += light.luminosity / (distAu * distAu);
-            }
-            
+        // Sum apparent irradiance: L / d^2 for each source (zero-allocation iteration)
+        let totalIrradiance = 0;
+        let lightCount = 0;
+        this.bodyRenderer.lightSourceManager.forEachSource((light) => {
+            const dist = light.position.distanceTo(this.camera.position);
+            const distAu = Math.max(dist / AU, 1e-5); // prevent division by zero
+            totalIrradiance += light.luminosity / (distAu * distAu);
+            lightCount++;
+        });
+
+        if (lightCount > 0) {
             // targetExposure is proportional to the reciprocal of total irradiance
             // At 1 AU from a 1.0 luminosity star, irradiance is 1.0, baseline exposure is 4.0
             let targetExposure = 4.0 / Math.max(totalIrradiance, 0.0001);

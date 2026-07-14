@@ -25,10 +25,11 @@ export class LightSourceManager {
         this.sources.delete(id);
     }
 
-    updatePosition(id: number, position: THREE.Vector3): void {
+    /** Update the position of a registered light source using pre-computed local coordinates. */
+    updatePosition(id: number, x: number, y: number, z: number): void {
         const source = this.sources.get(id);
         if (source) {
-            source.position.copy(position);
+            source.position.set(x, y, z);
         }
     }
 
@@ -79,8 +80,14 @@ export class LightSourceManager {
         return this.sources.size;
     }
 
-    getAllSources(): LightSourceInfo[] {
-        return Array.from(this.sources.values());
+    /**
+     * Iterate over all sources without allocating an intermediate array.
+     * Used by the auto-exposure system to sum total irradiance.
+     */
+    forEachSource(callback: (info: LightSourceInfo) => void): void {
+        for (const source of this.sources.values()) {
+            callback(source);
+        }
     }
 }
 
