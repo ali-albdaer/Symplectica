@@ -1927,7 +1927,7 @@ class NBodyClient {
                 targetExposure *= 1.25; // 25% exposure boost to simulate ambient bounce light
             }
 
-            const clampedExposure = Math.min(1000, Math.max(0.05, targetExposure));
+            const clampedExposure = Math.min(1000, Math.max(0.6, targetExposure));
             
             // Asymmetric EMA (Exponential Moving Average) adaptation:
             // Fast adaptation when going brighter (pupil constriction: smaller exposure value)

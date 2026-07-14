@@ -2626,7 +2626,7 @@ class BodyMesh {
                     u_spotFraction: { value: spotFraction },
                     u_spotEnabled: { value: starOptions.starspotsEnabled ? 1.0 : 0.0 },
                     u_spotSeed: { value: seed === 0 ? 1 : seed },
-                    u_emissiveStrength: { value: 0.7 },
+                    u_emissiveStrength: { value: 1.2 },
                 },
             });
             this.starMaterial = this.material as THREE.ShaderMaterial;
