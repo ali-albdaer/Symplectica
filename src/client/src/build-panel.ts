@@ -34,6 +34,7 @@ export interface BuildBodyParams {
     // Star-specific
     luminosity?: number;
     effectiveTemperature?: number;
+    starDerive?: boolean;
     // Body properties
     axialTilt?: number;
     rotationPeriod?: number;
@@ -286,13 +287,21 @@ export class BuildPanel {
             <div class="build-content" id="tab-props" style="display: none;">
                 <section class="build-section" id="build-star-section">
                     <h3>Star Properties</h3>
-                    <div class="build-field">
-                        <label>Luminosity (L☉)</label>
-                        <input type="number" id="build-luminosity" value="1.0" step="0.01" min="0">
+                    <div class="build-row" style="margin-bottom: 12px;">
+                        <label class="build-toggle">
+                            <input type="checkbox" id="build-star-derive" checked>
+                            <span>Auto-Derive (Main Sequence)</span>
+                        </label>
                     </div>
-                    <div class="build-field">
-                        <label>Temperature (K)</label>
-                        <input type="number" id="build-temperature" value="5778" step="100" min="1000">
+                    <div id="build-star-manual-props" style="display: none;">
+                        <div class="build-field">
+                            <label>Luminosity (L☉)</label>
+                            <input type="number" id="build-luminosity" value="1.0" step="0.01" min="0">
+                        </div>
+                        <div class="build-field">
+                            <label>Temperature (K)</label>
+                            <input type="number" id="build-temperature" value="5778" step="100" min="1000">
+                        </div>
                     </div>
                 </section>
 
@@ -761,8 +770,8 @@ export class BuildPanel {
         // Parameter inputs - update on change
         const inputs = ['build-name', 'build-mass', 'build-radius', 'build-color',
                         'build-x', 'build-y', 'build-z', 'build-vx', 'build-vy', 'build-vz',
-                        'build-luminosity', 'build-temperature', 'build-physics', 'build-massive',
-                        'build-tilt', 'build-rotation', 'build-has-atmo', 'build-has-rings',
+                        'build-star-derive', 'build-luminosity', 'build-temperature', 'build-physics',
+                        'build-massive', 'build-tilt', 'build-rotation', 'build-has-atmo', 'build-has-rings',
                         'build-atmo-height', 'build-atmo-rr', 'build-atmo-rg', 'build-atmo-rb',
                         'build-atmo-mie-color', 'build-atmo-mie-weight'];
         
@@ -919,6 +928,12 @@ export class BuildPanel {
         const massiveCheckbox = this.container.querySelector('#build-massive') as HTMLInputElement;
         const ringsCheckbox = this.container.querySelector('#build-has-rings') as HTMLInputElement;
 
+        const starDeriveCheckbox = this.container.querySelector('#build-star-derive') as HTMLInputElement;
+        const starManualProps = this.container.querySelector('#build-star-manual-props') as HTMLElement;
+        if (starManualProps && starDeriveCheckbox) {
+            starManualProps.style.display = starDeriveCheckbox.checked ? 'none' : 'block';
+        }
+
         this.params = {
             type: this.selectedType,
             name: nameInput.value,
@@ -933,8 +948,13 @@ export class BuildPanel {
             vz: (parseFloat(vzInput.value) || 0) * 1000,
             contributesToPhysics: physicsCheckbox.checked,
             isMassive: massiveCheckbox.checked,
-            luminosity: parseFloat((this.container.querySelector('#build-luminosity') as HTMLInputElement).value) || 1.0,
-            effectiveTemperature: parseFloat((this.container.querySelector('#build-temperature') as HTMLInputElement).value) || 5778,
+            starDerive: starDeriveCheckbox ? starDeriveCheckbox.checked : true,
+            luminosity: starDeriveCheckbox && starDeriveCheckbox.checked
+                ? 0.0
+                : (parseFloat((this.container.querySelector('#build-luminosity') as HTMLInputElement).value) || 1.0),
+            effectiveTemperature: starDeriveCheckbox && starDeriveCheckbox.checked
+                ? 0.0
+                : (parseFloat((this.container.querySelector('#build-temperature') as HTMLInputElement).value) || 5778),
             axialTilt: parseFloat((this.container.querySelector('#build-tilt') as HTMLInputElement).value) || 0,
             rotationPeriod: (parseFloat((this.container.querySelector('#build-rotation') as HTMLInputElement).value) || 24) * 3600,
             hasAtmosphere: (this.container.querySelector('#build-has-atmo') as HTMLInputElement).checked,
