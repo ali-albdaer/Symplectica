@@ -3460,7 +3460,8 @@ class BodyMesh {
             shader.fragmentShader = shader.fragmentShader.replace(
                 '#include <dithering_fragment>',
                 `#include <dithering_fragment>
-                vec3 finalShadowColorMultiplier = vec3(1.0);
+                float totalIrradiance = 0.0;
+                float shadowFactor = 0.0;
                 
                 for (int i = 0; i < MAX_LIGHTS; i++) {
                     if (i >= u_numLightsPlanet) break;
@@ -3494,6 +3495,9 @@ class BodyMesh {
                                     lightVisAmt = 0.0;
                                 }
                             } else { // Penumbra
+                                if (angularDist >= lightAngularRadius + casterAngularRadius) {
+                                    continue; // Fast early-out
+                                }
                                 float overlap = diskOverlapArea(angularDist, lightAngularRadius, casterAngularRadius);
                                 float occludedFrac = clamp(overlap / lightArea, 0.0, 1.0);
                                 lightVisAmt *= (1.0 - occludedFrac);
@@ -3517,10 +3521,12 @@ class BodyMesh {
                         }
                     }
                     
-                    finalShadowColorMultiplier = min(finalShadowColorMultiplier, vec3(lightVisAmt));
+                    float irradiance = u_lightIntensityPlanet[i] / (distLight * distLight);
+                    totalIrradiance += irradiance;
+                    shadowFactor += lightVisAmt * irradiance;
                 }
                 
-                gl_FragColor.rgb *= finalShadowColorMultiplier;
+                gl_FragColor.rgb *= max(0.05, shadowFactor / max(totalIrradiance, 1e-8));
                 `
             );
         };

@@ -9,21 +9,24 @@ export interface ShadowCasterInfo {
 
 export class ShadowCasterManager {
     private casters: Map<number, ShadowCasterInfo> = new Map();
+    private casterArray: ShadowCasterInfo[] = [];
     
     // Pre-allocated scratch buffers to prevent garbage collection overhead
     private readonly _resultBuffer: (ShadowCasterInfo | null)[] = new Array(4).fill(null);
     private readonly _scratchScore = new Float64Array(4);
     private _resultCount = 0;
-    
-    private readonly _vecToCaster = new THREE.Vector3();
-    private readonly _dirToLight = new THREE.Vector3();
 
     registerCaster(id: number, info: ShadowCasterInfo): void {
         this.casters.set(id, info);
+        this.casterArray.push(info);
     }
 
     removeCaster(id: number): void {
         this.casters.delete(id);
+        const idx = this.casterArray.findIndex(c => c.id === id);
+        if (idx >= 0) {
+            this.casterArray.splice(idx, 1);
+        }
     }
 
     updatePosition(id: number, x: number, y: number, z: number): void {
@@ -36,7 +39,7 @@ export class ShadowCasterManager {
     /** 
      * Get the N most significant casters for a given receiver body.
      * Ranks by estimated shadow contribution (combining solid angle and geometric alignment with lights).
-     * Zero-allocation implementation.
+     * Zero-allocation, heavily optimized O(N) implementation.
      */
     getSignificantCasters(
         receiverId: number, 
@@ -47,26 +50,48 @@ export class ShadowCasterManager {
     ): readonly ShadowCasterInfo[] {
         const cap = Math.min(maxCount, 4);
         let found = 0;
+        
+        const rx = receiverPosition.x;
+        const ry = receiverPosition.y;
+        const rz = receiverPosition.z;
+        const casters = this.casterArray;
+        const len = casters.length;
 
-        for (const caster of this.casters.values()) {
+        for (let c = 0; c < len; c++) {
+            const caster = casters[c];
             if (caster.id === receiverId) continue;
 
-            this._vecToCaster.subVectors(caster.position, receiverPosition);
-            const dSq = this._vecToCaster.lengthSq();
+            const dx = caster.position.x - rx;
+            const dy = caster.position.y - ry;
+            const dz = caster.position.z - rz;
+            const dSq = dx*dx + dy*dy + dz*dz;
+            
             const solidAngleScore = (caster.radius * caster.radius) / Math.max(dSq, 1e-8);
             
-            // If the body is too far / too small to matter at all, skip early
-            if (solidAngleScore < 1e-12) continue;
+            // If the body is too far / too small to matter at all, skip early before heavy math
+            if (solidAngleScore < 1e-6) continue;
             
-            this._vecToCaster.normalize();
+            const dist = Math.sqrt(dSq);
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const nz = dz / dist;
+            
             let maxAlignment = 0;
             
             for (let i = 0; i < numActiveLights; i++) {
                 const light = activeLights[i];
                 if (!light) continue;
                 
-                this._dirToLight.subVectors(light.position, receiverPosition).normalize();
-                const alignment = this._vecToCaster.dot(this._dirToLight);
+                const ldx = light.position.x - rx;
+                const ldy = light.position.y - ry;
+                const ldz = light.position.z - rz;
+                
+                const lDist = Math.sqrt(ldx*ldx + ldy*ldy + ldz*ldz);
+                const lnx = ldx / lDist;
+                const lny = ldy / lDist;
+                const lnz = ldz / lDist;
+                
+                const alignment = nx*lnx + ny*lny + nz*lnz;
                 if (alignment > maxAlignment) {
                     maxAlignment = alignment;
                 }
