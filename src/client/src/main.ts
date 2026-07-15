@@ -295,6 +295,7 @@ class NBodyClient {
                 VisualPresetRegistry.setPlayerPreset(LOCAL_PRESET_PLAYER, preset);
                 const current = VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER);
                 this.optionsPanel?.setPresetRenderScale(current.renderScale);
+                this.optionsPanel?.setPresetShadowQuality(current.shadowQuality);
             },
             (preset: VisualizationPresetName, patch: { renderScale?: number }) => {
                 VisualPresetRegistry.updatePreset(preset, patch);
@@ -352,6 +353,9 @@ class NBodyClient {
         );
         this.optionsPanel.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
+        );
+        this.optionsPanel.setPresetShadowQuality(
+            VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).shadowQuality
         );
         this.optionsPanel.setFreeCamSpeed(APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec);
         this.optionsPanel.setFreeCamSensitivity(APP_DEFAULTS.cameraDefaults.freeCamSensitivity);
@@ -593,6 +597,9 @@ class NBodyClient {
         this.optionsPanel?.setPreset(preset);
         this.optionsPanel?.setPresetRenderScale(
             VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).renderScale
+        );
+        this.optionsPanel?.setPresetShadowQuality(
+            VisualPresetRegistry.getPresetForPlayer(LOCAL_PRESET_PLAYER).shadowQuality
         );
     }
 

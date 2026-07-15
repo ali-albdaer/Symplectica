@@ -96,14 +96,14 @@ export function registerVisualPresetFeatures(): void {
     });
 
     VisualPresetRegistry.registerFeature('shadowRenderer', {
-        Low: { shadowQuality: 'Low' },
-        High: { shadowQuality: 'Medium' },
-        Ultra: { shadowQuality: 'High' },
+        Low: { shadowQuality: 'Off' },
+        High: { shadowQuality: 'Binary' },
+        Ultra: { shadowQuality: 'Penumbra' },
     });
 
     VisualPresetRegistry.registerFeatureHooks('shadowRenderer', {
         defaultParams: {
-            shadowQuality: 'Medium',
+            shadowQuality: 'Binary',
         },
         applyPreset: (params, preset) => ({
             ...params,

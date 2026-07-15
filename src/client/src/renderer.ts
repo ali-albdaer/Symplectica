@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { blackbodyToRGBNorm } from './blackbody';
 import { AU, L_SUN } from '../../shared/constants';
 import { LightSourceManager, LightSourceInfo } from './light-source-manager';
+import { ShadowCasterManager, ShadowCasterInfo } from './shadow-manager';
 
 // ── Star surface shader ────────────────────────────────────────────────
 // Implements blackbody coloring + quadratic limb-darkening:
@@ -163,6 +164,8 @@ uniform vec3 u_lightColor[MAX_LIGHTS];
 uniform float u_lightIntensity[MAX_LIGHTS];
 
 uniform vec3 u_planetCenter;
+uniform float u_planetRadius;
+uniform float u_atmoRadius;
 uniform float u_isInside;
 
 varying vec3 vWorldNormal;
@@ -207,7 +210,9 @@ void main() {
         float VdotL = dot(viewDir, lightDir);
         float NdotL = dot(normal, lightDir);
         
-        float sunInfluence = smoothstep(-0.2, 0.2, dot(zenithDir, lightDir));
+        float rRatio = min(1.0, u_planetRadius / u_atmoRadius);
+        float termCos = -sqrt(1.0 - rRatio * rRatio);
+        float sunInfluence = smoothstep(termCos - 0.05, termCos + 0.05, dot(zenithDir, lightDir));
         float attenuation = 1.0 / distSq;
         
         float rayleighPhase = 0.75 * (1.0 + VdotL * VdotL);
@@ -257,10 +262,17 @@ const RING_FRAGMENT = /* glsl */ `
 uniform sampler2D u_ringMap;
 
 #define MAX_LIGHTS 4
+#define MAX_CASTERS 4
 uniform int u_numLights;
 uniform vec3 u_lightPos[MAX_LIGHTS];
 uniform vec3 u_lightColor[MAX_LIGHTS];
 uniform float u_lightIntensity[MAX_LIGHTS];
+uniform float u_lightRadius[MAX_LIGHTS];
+
+uniform int u_numCasters;
+uniform vec3 u_casterPos[MAX_CASTERS];
+uniform float u_casterRadius[MAX_CASTERS];
+uniform int u_shadowQuality; // 0=Off, 1=Binary, 2=Penumbra
 
 uniform vec3 u_planetCenter;
 uniform float u_planetRadius;
@@ -278,6 +290,20 @@ varying vec2 vUv;
 float henyeyGreenstein(float cosTheta, float g) {
     float g2 = g * g;
     return (1.0 - g2) / (4.0 * 3.14159 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
+}
+
+float diskOverlapArea(float d, float r1, float r2) {
+    if (d >= r1 + r2) return 0.0;
+    if (d <= abs(r1 - r2)) {
+        float r = min(r1, r2);
+        return 3.14159265359 * r * r;
+    }
+    float r1sq = r1 * r1;
+    float r2sq = r2 * r2;
+    float dsq = d * d;
+    float a1 = acos(clamp((dsq + r1sq - r2sq) / (2.0 * d * r1), -1.0, 1.0));
+    float a2 = acos(clamp((dsq + r2sq - r1sq) / (2.0 * d * r2), -1.0, 1.0));
+    return r1sq * a1 + r2sq * a2 - 0.5 * sqrt(max(0.0, 4.0 * dsq * r1sq - pow(dsq + r1sq - r2sq, 2.0)));
 }
 
 void main() {
@@ -311,6 +337,37 @@ void main() {
         float c = dot(oc, oc) - u_planetRadius * u_planetRadius;
         float disc = b * b - c;
         float inShadow = (disc > 0.0 && b < 0.0) ? 0.05 : 1.0;
+
+        // 3. Eclipse Shadows
+        if (u_shadowQuality > 0) {
+            float lightAngularRadius = u_lightRadius[i] / sqrt(distSq);
+            float lightArea = 3.14159265359 * lightAngularRadius * lightAngularRadius;
+
+            for (int j = 0; j < MAX_CASTERS; j++) {
+                if (j >= u_numCasters) break;
+                
+                vec3 toCaster = u_casterPos[j] - vWorldPos;
+                float distCaster = length(toCaster);
+                
+                // Ignore casters behind the light
+                if (distCaster >= sqrt(distSq)) continue;
+                
+                vec3 casterDir = toCaster / distCaster;
+                float angularDist = length(lightDir - casterDir);
+                float casterAngularRadius = u_casterRadius[j] / distCaster;
+                
+                if (u_shadowQuality == 1) { // Binary
+                    if (angularDist < casterAngularRadius) {
+                        inShadow = 0.05;
+                    }
+                } else { // Penumbra
+                    float overlap = diskOverlapArea(angularDist, lightAngularRadius, casterAngularRadius);
+                    float occludedFrac = clamp(overlap / lightArea, 0.0, 1.0);
+                    // map occluded to 1.0->0.05
+                    inShadow = min(inShadow, mix(1.0, 0.05, occludedFrac));
+                }
+            }
+        }
 
         if (u_perfMode > 0.5) {
             finalColor += ring.rgb * inShadow * u_lightColor[i] * (u_lightIntensity[i] * attenuation);
@@ -1397,6 +1454,7 @@ export class BodyRenderer {
     public solarSystemRoot: THREE.Group;
     private bodies: Map<number, BodyMesh> = new Map();
     public lightSourceManager = new LightSourceManager();
+    public shadowCasterManager = new ShadowCasterManager();
 
     // Generic bodies instancing
     private instancedMesh: THREE.InstancedMesh | null = null;
@@ -1428,6 +1486,7 @@ export class BodyRenderer {
         flareQuality: 'Low',
     };
     private ringQuality: 'Performance' | 'HighQualityClose' | 'HighQualityAlways' = 'HighQualityClose';
+    private shadowQuality: 'Off' | 'Binary' | 'Penumbra' = 'Penumbra';
 
     // Orbit trails
     private maxTrailPoints = 100; // Default 100 points, configurable via setMaxTrailPoints
@@ -1654,6 +1713,12 @@ export class BodyRenderer {
             });
         }
 
+        this.shadowCasterManager.registerCaster(body.id, {
+            id: body.id,
+            position: new THREE.Vector3(),
+            radius: body.radius
+        });
+
         // Initialize orbit trail for non-stars
         if (body.type !== 'star') {
             const offset = this.nextTrailOffset++;
@@ -1767,6 +1832,7 @@ export class BodyRenderer {
             if (mesh.type === 'star') {
                 this.lightSourceManager.removeSource(id);
             }
+            this.shadowCasterManager.removeCaster(id);
             this.scene.remove(mesh.group);
             mesh.dispose();
             this.bodies.delete(id);
@@ -1819,16 +1885,17 @@ export class BodyRenderer {
             this.gridGroup.position.set(-origin.x, -origin.y, -origin.z);
         }
 
-        // Update light sources globally
+        // Update light sources and shadow casters globally
         let lIdx = 0;
         for (const [id, mesh] of this.bodies) {
-            if (mesh.type === 'star' && lIdx * 3 + 2 < positions.length) {
-                this.lightSourceManager.updatePosition(
-                    id,
-                    positions[lIdx * 3]     - origin.x,
-                    positions[lIdx * 3 + 1] - origin.y,
-                    positions[lIdx * 3 + 2] - origin.z
-                );
+            if (lIdx * 3 + 2 < positions.length) {
+                const posX = positions[lIdx * 3]     - origin.x;
+                const posY = positions[lIdx * 3 + 1] - origin.y;
+                const posZ = positions[lIdx * 3 + 2] - origin.z;
+                if (mesh.type === 'star') {
+                    this.lightSourceManager.updatePosition(id, posX, posY, posZ);
+                }
+                this.shadowCasterManager.updatePosition(id, posX, posY, posZ);
             }
             lIdx++;
         }
@@ -1965,7 +2032,15 @@ export class BodyRenderer {
         mesh.updateRingQuality(this.ringQuality, distanceToCamera, this.renderScale);
         
         const sigLights = manager.getSignificantSources(mesh.group.position, 4);
-        mesh.updateLighting(sigLights, manager.resultCount, mesh.group.position, camJ2000, this.renderScale);
+        
+        let sigCasters: readonly ShadowCasterInfo[] = [];
+        let numCasters = 0;
+        if (this.shadowQuality !== 'Off' && mesh.mesh) {
+            sigCasters = this.shadowCasterManager.getSignificantCasters(mesh.mesh.userData.bodyId, mesh.group.position, sigLights, manager.resultCount, 4);
+            numCasters = this.shadowCasterManager.resultCount;
+        }
+
+        mesh.updateLighting(sigLights, manager.resultCount, sigCasters, numCasters, this.shadowQuality, mesh.group.position, camJ2000, this.renderScale);
 
         // Dynamic Level of Detail (LOD) based on distance
         const actualVisRadius = scaleRadius(mesh.realRadius * this.renderScale);
@@ -2279,6 +2354,8 @@ export class BodyRenderer {
                         u_intensity: { value: 1.0 },
                         u_sunPos: { value: new THREE.Vector3(0, 0, 0) },
                         u_planetCenter: { value: new THREE.Vector3(0, 0, 0) },
+                        u_planetRadius: { value: 1.0 },
+                        u_atmoRadius: { value: 1.05 },
                         u_isInside: { value: 0.0 }
                     },
                     transparent: true,
@@ -2295,6 +2372,8 @@ export class BodyRenderer {
             const atmoHeight = params.atmosphereHeight ? params.atmosphereHeight * this.renderScale : visualRadius * 0.05;
             const outerRadius = visualRadius + atmoHeight;
             this.ghostAtmoMesh.scale.setScalar(outerRadius);
+            atmoMat.uniforms.u_planetRadius.value = visualRadius;
+            atmoMat.uniforms.u_atmoRadius.value = outerRadius;
             
             // Scale intensity by relative height
             const relHeight = atmoHeight / visualRadius;
@@ -2505,6 +2584,7 @@ export class BodyRenderer {
 }
 
 class BodyMesh {
+    private bodyData: BodyData;
     group: THREE.Group;
     public mesh!: THREE.Object3D;
     private geometry: THREE.SphereGeometry;
@@ -2548,6 +2628,11 @@ class BodyMesh {
         new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()
     ];
     private readonly _lightIntensityScratch = [0, 0, 0, 0];
+    private readonly _lightRadiusScratch = [0, 0, 0, 0];
+    private readonly _casterPosScratch = [
+        new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()
+    ];
+    private readonly _casterRadiusScratch = [0, 0, 0, 0];
 
     public createHeroMesh(): void {
         if (this.heroMesh || !this.baseColor) return;
@@ -2557,6 +2642,7 @@ class BodyMesh {
             roughness: 0.8,
             metalness: 0.1,
         });
+        this.setupShadowMaterial(mat);
         this.heroMesh = new THREE.Mesh(geom, mat);
         this.heroMesh.visible = false;
         // The hero mesh replaces the instanced mesh's base sphere, so we attach it to this.mesh (which rotates)
@@ -2571,6 +2657,7 @@ class BodyMesh {
         instancedMesh?: THREE.InstancedMesh,
         instanceId?: number
     ) {
+        this.bodyData = body;
         this.realRadius = body.radius;
         this.type = body.type;
         this.oblateness = body.oblateness ?? 0;
@@ -2665,110 +2752,7 @@ class BodyMesh {
                 this.material = standardMat;
 
             // Implement shadow cast BY rings onto the planet
-            if (body.rings) {
-                let ringNormal: THREE.Vector3;
-                if (body.poleRa !== undefined && body.poleDec !== undefined) {
-                    const pJ2000 = new THREE.Vector3(
-                        Math.cos(body.poleDec) * Math.cos(body.poleRa),
-                        Math.cos(body.poleDec) * Math.sin(body.poleRa),
-                        Math.sin(body.poleDec)
-                    );
-                    pJ2000.applyAxisAngle(new THREE.Vector3(1, 0, 0), -23.4392811 * Math.PI / 180);
-                    ringNormal = new THREE.Vector3(pJ2000.x, pJ2000.z, -pJ2000.y).normalize();
-                } else {
-                    const tilt = body.axialTilt ?? 0;
-                    ringNormal = new THREE.Vector3(0, Math.cos(tilt), Math.sin(tilt)).normalize();
-                }
-                
-                standardMat.userData.numLights = { value: 0 };
-                standardMat.userData.lightPos = { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] };
-                standardMat.userData.lightColor = { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] };
-                standardMat.userData.lightIntensity = { value: [0, 0, 0, 0] };
-                standardMat.userData.planetCenter = new THREE.Vector3();
-                standardMat.userData.planetRadius = { value: 1.0 };
-                standardMat.userData.innerRadius = { value: body.rings.innerRadiusMult };
-                standardMat.userData.outerRadius = { value: body.rings.outerRadiusMult };
-                standardMat.userData.ringMap = { value: null };
-                standardMat.userData.ringNormal = { value: ringNormal };
-                
-                standardMat.onBeforeCompile = (shader) => {
-                    // Add custom program cache key to prevent duplicate compiles
-                    standardMat.customProgramCacheKey = () => 'planet_ring_shadow_multi';
-                    
-                    shader.uniforms.u_numLightsPlanet = standardMat.userData.numLights;
-                    shader.uniforms.u_lightPosPlanet = standardMat.userData.lightPos;
-                    shader.uniforms.u_lightColorPlanet = standardMat.userData.lightColor;
-                    shader.uniforms.u_lightIntensityPlanet = standardMat.userData.lightIntensity;
-                    shader.uniforms.u_planetCenter = { value: standardMat.userData.planetCenter };
-                    shader.uniforms.u_planetRadius = standardMat.userData.planetRadius;
-                    shader.uniforms.u_innerRadius = standardMat.userData.innerRadius;
-                    shader.uniforms.u_outerRadius = standardMat.userData.outerRadius;
-                    shader.uniforms.u_ringMapPlanet = standardMat.userData.ringMap;
-                    shader.uniforms.u_ringNormal = standardMat.userData.ringNormal;
-
-                    shader.vertexShader = shader.vertexShader.replace(
-                        '#include <common>',
-                        `#include <common>
-                        varying vec3 vWorldPositionPlanet;`
-                    );
-                    shader.vertexShader = shader.vertexShader.replace(
-                        '#include <worldpos_vertex>',
-                        `#include <worldpos_vertex>
-                        vWorldPositionPlanet = (modelMatrix * vec4(transformed, 1.0)).xyz;`
-                    );
-
-                    shader.fragmentShader = shader.fragmentShader.replace(
-                        '#include <common>',
-                        `#include <common>
-                        varying vec3 vWorldPositionPlanet;
-                        #define MAX_LIGHTS 4
-                        uniform int u_numLightsPlanet;
-                        uniform vec3 u_lightPosPlanet[MAX_LIGHTS];
-                        uniform vec3 u_lightColorPlanet[MAX_LIGHTS];
-                        uniform float u_lightIntensityPlanet[MAX_LIGHTS];
-                        uniform vec3 u_planetCenter;
-                        uniform float u_planetRadius;
-                        uniform float u_innerRadius;
-                        uniform float u_outerRadius;
-                        uniform sampler2D u_ringMapPlanet;
-                        uniform vec3 u_ringNormal;`
-                    );
-                    shader.fragmentShader = shader.fragmentShader.replace(
-                        '#include <dithering_fragment>',
-                        `#include <dithering_fragment>
-                        vec3 finalShadowColorMultiplier = vec3(1.0);
-                        
-                        for (int i = 0; i < MAX_LIGHTS; i++) {
-                            if (i >= u_numLightsPlanet) break;
-                            
-                            vec3 lightDirR = normalize(u_lightPosPlanet[i] - u_planetCenter);
-                            float denom = dot(lightDirR, u_ringNormal);
-                            // Only cast shadow if the ray goes towards the sun
-                            if (abs(denom) > 0.0001) {
-                                float tR = -dot(vWorldPositionPlanet - u_planetCenter, u_ringNormal) / denom;
-                                if (tR > 0.0) {
-                                    vec3 P = vWorldPositionPlanet + tR * lightDirR;
-                                    float r = length(P - u_planetCenter);
-                                    float rNorm = r / u_planetRadius;
-                                    if (rNorm >= u_innerRadius && rNorm <= u_outerRadius) {
-                                        float vTex = (rNorm - u_innerRadius) / (u_outerRadius - u_innerRadius);
-                                        vec4 rTex = texture2D(u_ringMapPlanet, vec2(0.5, vTex));
-                                        // A simple multiplicative approach for multiple shadows: 
-                                        // The fragment is shadowed relative to light [i].
-                                        // However, standard shader already computed all light contributions. 
-                                        // Proper multi-light shadow requires modifying the lighting loop, which is complex in MeshStandardMaterial.
-                                        // For Phase 1 we will just darken the overall fragment based on the brightest light's shadow, 
-                                        // or iteratively darken.
-                                        finalShadowColorMultiplier *= (1.0 - rTex.a);
-                                    }
-                                }
-                            }
-                        }
-                        gl_FragColor.rgb *= finalShadowColorMultiplier;
-                        `
-                    );
-                };
-            }
+                this.setupShadowMaterial(standardMat);
             }
         }
 
@@ -2839,6 +2823,11 @@ class BodyMesh {
                     u_lightPos: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
                     u_lightColor: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
                     u_lightIntensity: { value: [0, 0, 0, 0] },
+                    u_lightRadius: { value: [0, 0, 0, 0] },
+                    u_numCasters: { value: 0 },
+                    u_casterPos: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
+                    u_casterRadius: { value: [0, 0, 0, 0] },
+                    u_shadowQuality: { value: 0 },
                     u_planetCenter: { value: new THREE.Vector3() },
                     u_planetRadius: { value: 1.0 },
                     u_g: { value: g },
@@ -2899,6 +2888,8 @@ class BodyMesh {
                 u_lightColor: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
                 u_lightIntensity: { value: [0, 0, 0, 0] },
                 u_planetCenter:  { value: new THREE.Vector3() },
+                u_planetRadius:  { value: 1.0 },
+                u_atmoRadius:    { value: 1.05 },
                 u_isInside:      { value: 0.0 },
             },
             transparent: true,
@@ -3105,7 +3096,7 @@ class BodyMesh {
         }
     }
 
-    updateLighting(lights: readonly LightSourceInfo[], numLights: number, planetPos: THREE.Vector3, cameraPos: THREE.Vector3, renderScale: number): void {
+    updateLighting(lights: readonly LightSourceInfo[], numLights: number, casters: readonly ShadowCasterInfo[], numCasters: number, shadowQuality: 'Off' | 'Binary' | 'Penumbra', planetPos: THREE.Vector3, cameraPos: THREE.Vector3, renderScale: number): void {
         const radius = scaleRadius(this.realRadius * renderScale);
         
         // Use pre-allocated scratch arrays to avoid per-frame Vector3 allocations
@@ -3113,9 +3104,12 @@ class BodyMesh {
         const lightColor = this._lightColorScratch;
         const lightIntensity = this._lightIntensityScratch;
         
+        const lightRadius = this._lightRadiusScratch;
+        
         for (let i = 0; i < numLights; i++) {
             lightPos[i].set(lights[i].position.x, lights[i].position.z, -lights[i].position.y);
             lightColor[i].set(lights[i].color.r, lights[i].color.g, lights[i].color.b);
+            lightRadius[i] = scaleRadius(lights[i].radius * renderScale);
             
             // Replicate the original intensity logic from addBody
             const lum = lights[i].luminosity;
@@ -3124,14 +3118,41 @@ class BodyMesh {
             lightIntensity[i] = baseIntensity * AU * AU;
         }
         
+        const casterPos = this._casterPosScratch;
+        const casterRadius = this._casterRadiusScratch;
+        
+        for (let i = 0; i < numCasters; i++) {
+            casterPos[i].set(casters[i].position.x, casters[i].position.z, -casters[i].position.y);
+            casterRadius[i] = scaleRadius(casters[i].radius * renderScale);
+        }
+        
         // Update Ring Shadow on planet
-        if (this.material && this.material.userData.numLights) {
-            this.material.userData.numLights.value = numLights;
-            for (let i = 0; i < numLights; i++) {
-                this.material.userData.lightPos.value[i].copy(lightPos[i]);
-                this.material.userData.lightColor.value[i].copy(lightColor[i]);
-                this.material.userData.lightIntensity.value[i] = lightIntensity[i];
+        const updateMat = (mat: THREE.Material) => {
+            if (mat instanceof THREE.MeshStandardMaterial && mat.userData.numLights) {
+                mat.userData.numLights.value = numLights;
+                for (let i = 0; i < numLights; i++) {
+                    mat.userData.lightPos.value[i].copy(lightPos[i]);
+                    mat.userData.lightColor.value[i].copy(lightColor[i]);
+                    mat.userData.lightIntensity.value[i] = lightIntensity[i];
+                    mat.userData.lightRadius.value[i] = lightRadius[i];
+                }
+                mat.userData.numCasters.value = numCasters;
+                for (let i = 0; i < numCasters; i++) {
+                    mat.userData.casterPos.value[i].copy(casterPos[i]);
+                    mat.userData.casterRadius.value[i] = casterRadius[i];
+                }
+                mat.userData.shadowQuality.value = shadowQuality === 'Off' ? 0 : shadowQuality === 'Binary' ? 1 : 2;
+                mat.userData.planetCenter.copy(planetPos);
+                mat.userData.planetRadius.value = radius;
             }
+        };
+
+        if (this.material) {
+            updateMat(this.material);
+        }
+        if (this.heroMesh && this.heroMesh.material) {
+            const mats = Array.isArray(this.heroMesh.material) ? this.heroMesh.material : [this.heroMesh.material];
+            mats.forEach(updateMat);
         }
 
         if (this.ringMesh && this.ringMesh.material instanceof THREE.ShaderMaterial) {
@@ -3141,7 +3162,14 @@ class BodyMesh {
                 mat.uniforms.u_lightPos.value[i].copy(lightPos[i]);
                 mat.uniforms.u_lightColor.value[i].copy(lightColor[i]);
                 mat.uniforms.u_lightIntensity.value[i] = lightIntensity[i];
+                mat.uniforms.u_lightRadius.value[i] = lightRadius[i];
             }
+            mat.uniforms.u_numCasters.value = numCasters;
+            for (let i = 0; i < numCasters; i++) {
+                mat.uniforms.u_casterPos.value[i].copy(casterPos[i]);
+                mat.uniforms.u_casterRadius.value[i] = casterRadius[i];
+            }
+            mat.uniforms.u_shadowQuality.value = shadowQuality === 'Off' ? 0 : shadowQuality === 'Binary' ? 1 : 2;
             mat.uniforms.u_planetCenter.value.set(planetPos.x, planetPos.z, -planetPos.y);
             mat.uniforms.u_planetRadius.value = radius;
         }
@@ -3163,6 +3191,8 @@ class BodyMesh {
             const atmoRadius = radius * atmoScale;
             if (mat.uniforms.u_isInside) {
                 mat.uniforms.u_isInside.value = (dist < atmoRadius) ? 1.0 : 0.0;
+                mat.uniforms.u_planetRadius.value = radius;
+                mat.uniforms.u_atmoRadius.value = atmoRadius;
             }
         }
 
@@ -3320,6 +3350,176 @@ class BodyMesh {
             this.atmosphereMesh.geometry.dispose();
             (this.atmosphereMesh.material as THREE.Material).dispose();
         }
+    }
+
+    private setupShadowMaterial(standardMat: THREE.MeshStandardMaterial): void {
+        const body = this.bodyData;
+        let ringNormal = new THREE.Vector3(0, 1, 0);
+        if (body.rings) {
+            if (body.poleRa !== undefined && body.poleDec !== undefined) {
+                const pJ2000 = new THREE.Vector3(
+                    Math.cos(body.poleDec) * Math.cos(body.poleRa),
+                    Math.cos(body.poleDec) * Math.sin(body.poleRa),
+                    Math.sin(body.poleDec)
+                );
+                pJ2000.applyAxisAngle(new THREE.Vector3(1, 0, 0), -23.4392811 * Math.PI / 180);
+                ringNormal = new THREE.Vector3(pJ2000.x, pJ2000.z, -pJ2000.y).normalize();
+            } else {
+                const tilt = body.axialTilt ?? 0;
+                ringNormal = new THREE.Vector3(0, Math.cos(tilt), Math.sin(tilt)).normalize();
+            }
+        }
+        
+        standardMat.userData.numLights = { value: 0 };
+        standardMat.userData.lightPos = { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] };
+        standardMat.userData.lightColor = { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] };
+        standardMat.userData.lightIntensity = { value: [0, 0, 0, 0] };
+        standardMat.userData.lightRadius = { value: [0, 0, 0, 0] };
+        standardMat.userData.planetCenter = new THREE.Vector3();
+        standardMat.userData.planetRadius = { value: 1.0 };
+        standardMat.userData.innerRadius = { value: body.rings ? body.rings.innerRadiusMult : 0.0 };
+        standardMat.userData.outerRadius = { value: body.rings ? body.rings.outerRadiusMult : 0.0 };
+        standardMat.userData.ringMap = { value: null };
+        standardMat.userData.ringNormal = { value: ringNormal };
+        standardMat.userData.numCasters = { value: 0 };
+        standardMat.userData.casterPos = { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] };
+        standardMat.userData.casterRadius = { value: [0, 0, 0, 0] };
+        standardMat.userData.shadowQuality = { value: 0 };
+        
+        standardMat.onBeforeCompile = (shader) => {
+            standardMat.customProgramCacheKey = () => 'planet_ring_shadow_multi';
+            
+            shader.uniforms.u_numLightsPlanet = standardMat.userData.numLights;
+            shader.uniforms.u_lightPosPlanet = standardMat.userData.lightPos;
+            shader.uniforms.u_lightColorPlanet = standardMat.userData.lightColor;
+            shader.uniforms.u_lightIntensityPlanet = standardMat.userData.lightIntensity;
+            shader.uniforms.u_lightRadiusPlanet = standardMat.userData.lightRadius;
+            shader.uniforms.u_planetCenter = { value: standardMat.userData.planetCenter };
+            shader.uniforms.u_planetRadius = standardMat.userData.planetRadius;
+            shader.uniforms.u_innerRadius = standardMat.userData.innerRadius;
+            shader.uniforms.u_outerRadius = standardMat.userData.outerRadius;
+            shader.uniforms.u_ringMapPlanet = standardMat.userData.ringMap;
+            shader.uniforms.u_ringNormal = standardMat.userData.ringNormal;
+            shader.uniforms.u_numCasters = standardMat.userData.numCasters;
+            shader.uniforms.u_casterPos = standardMat.userData.casterPos;
+            shader.uniforms.u_casterRadius = standardMat.userData.casterRadius;
+            shader.uniforms.u_shadowQuality = standardMat.userData.shadowQuality;
+
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <common>',
+                `#include <common>
+                varying vec3 vWorldPositionPlanet;`
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <worldpos_vertex>',
+                `#include <worldpos_vertex>
+                vWorldPositionPlanet = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+            );
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                `#include <common>
+                varying vec3 vWorldPositionPlanet;
+                #define MAX_LIGHTS 4
+                #define MAX_CASTERS 4
+                uniform int u_numLightsPlanet;
+                uniform vec3 u_lightPosPlanet[MAX_LIGHTS];
+                uniform vec3 u_lightColorPlanet[MAX_LIGHTS];
+                uniform float u_lightIntensityPlanet[MAX_LIGHTS];
+                uniform float u_lightRadiusPlanet[MAX_LIGHTS];
+                uniform vec3 u_planetCenter;
+                uniform float u_planetRadius;
+                uniform float u_innerRadius;
+                uniform float u_outerRadius;
+                uniform sampler2D u_ringMapPlanet;
+                uniform vec3 u_ringNormal;
+                uniform int u_numCasters;
+                uniform vec3 u_casterPos[MAX_CASTERS];
+                uniform float u_casterRadius[MAX_CASTERS];
+                uniform int u_shadowQuality;
+
+                float diskOverlapArea(float d, float r1, float r2) {
+                    if (d >= r1 + r2) return 0.0;
+                    if (d <= abs(r1 - r2)) {
+                        float r = min(r1, r2);
+                        return 3.14159265359 * r * r;
+                    }
+                    float r1sq = r1 * r1;
+                    float r2sq = r2 * r2;
+                    float dsq = d * d;
+                    float a1 = acos(clamp((dsq + r1sq - r2sq) / (2.0 * d * r1), -1.0, 1.0));
+                    float a2 = acos(clamp((dsq + r2sq - r1sq) / (2.0 * d * r2), -1.0, 1.0));
+                    float area = r1sq * a1 + r2sq * a2 - 0.5 * sqrt(max(0.0, 4.0 * dsq * r1sq - pow(dsq + r1sq - r2sq, 2.0)));
+                    return area;
+                }`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <dithering_fragment>',
+                `#include <dithering_fragment>
+                vec3 finalShadowColorMultiplier = vec3(1.0);
+                
+                for (int i = 0; i < MAX_LIGHTS; i++) {
+                    if (i >= u_numLightsPlanet) break;
+                    
+                    vec3 toLight = u_lightPosPlanet[i] - vWorldPositionPlanet;
+                    float distLight = length(toLight);
+                    vec3 lightDirR = toLight / distLight;
+                    
+                    float lightVisAmt = 1.0;
+
+                    // 1. Eclipse Shadows (Casters)
+                    if (u_shadowQuality > 0) {
+                        float lightAngularRadius = u_lightRadiusPlanet[i] / distLight;
+                        float lightArea = 3.14159265359 * lightAngularRadius * lightAngularRadius;
+
+                        for (int j = 0; j < MAX_CASTERS; j++) {
+                            if (j >= u_numCasters) break;
+                            
+                            vec3 toCaster = u_casterPos[j] - vWorldPositionPlanet;
+                            float distCaster = length(toCaster);
+                            
+                            // Ignore casters behind the light
+                            if (distCaster >= distLight) continue;
+                            
+                            vec3 casterDir = toCaster / distCaster;
+                            float angularDist = length(lightDirR - casterDir);
+                            float casterAngularRadius = u_casterRadius[j] / distCaster;
+                            
+                            if (u_shadowQuality == 1) { // Binary
+                                if (angularDist < casterAngularRadius) {
+                                    lightVisAmt = 0.0;
+                                }
+                            } else { // Penumbra
+                                float overlap = diskOverlapArea(angularDist, lightAngularRadius, casterAngularRadius);
+                                float occludedFrac = clamp(overlap / lightArea, 0.0, 1.0);
+                                lightVisAmt *= (1.0 - occludedFrac);
+                            }
+                        }
+                    }
+                    
+                    // 2. Ring Shadows
+                    float denom = dot(lightDirR, u_ringNormal);
+                    if (abs(denom) > 0.0001) {
+                        float tR = -dot(vWorldPositionPlanet - u_planetCenter, u_ringNormal) / denom;
+                        if (tR > 0.0) {
+                            vec3 P = vWorldPositionPlanet + tR * lightDirR;
+                            float r = length(P - u_planetCenter);
+                            float rNorm = r / u_planetRadius;
+                            if (rNorm >= u_innerRadius && rNorm <= u_outerRadius) {
+                                float vTex = (rNorm - u_innerRadius) / (u_outerRadius - u_innerRadius);
+                                vec4 rTex = texture2D(u_ringMapPlanet, vec2(0.5, vTex));
+                                lightVisAmt *= (1.0 - rTex.a);
+                            }
+                        }
+                    }
+                    
+                    finalShadowColorMultiplier = min(finalShadowColorMultiplier, vec3(lightVisAmt));
+                }
+                
+                gl_FragColor.rgb *= finalShadowColorMultiplier;
+                `
+            );
+        };
     }
 
     getPickMesh(): THREE.Object3D {

@@ -1,7 +1,7 @@
 export type PresetName = 'Low' | 'High' | 'Ultra';
 
 export type CloudQuality = 'Off' | 'Low' | 'High' | 'Volumetric';
-export type ShadowQuality = 'Off' | 'Low' | 'Medium' | 'High';
+export type ShadowQuality = 'Off' | 'Binary' | 'Penumbra';
 export type ReflectionMode = 'Off' | 'Cubemap' | 'SSR' | 'SSR+Fallback';
 export type FlareQuality = 'Off' | 'Low' | 'High' | 'Ultra';
 

@@ -48,7 +48,7 @@ export class OptionsPanel {
     // Callbacks
     private onChange: (options: VisualizationOptions) => void;
     private onPresetChange?: (preset: VisualizationPresetName) => void;
-    private onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number }) => void;
+    private onPresetEdit?: (preset: VisualizationPresetName, patch: { renderScale?: number, shadowQuality?: 'Off' | 'Binary' | 'Penumbra' }) => void;
     private onFreeCamSpeedChange?: (speed: number) => void;
     private onFreeCamSensitivityChange?: (sensitivity: number) => void;
     private onFreeCamRotationDampingChange?: (damping: number) => void;
@@ -64,6 +64,7 @@ export class OptionsPanel {
     // State
     private presetName: VisualizationPresetName;
     private presetRenderScale = 1;
+    private presetShadowQuality: 'Off' | 'Binary' | 'Penumbra' = 'Binary';
     private cameraFov = APP_DEFAULTS.cameraDefaults.cameraFov;
     private freeCamSpeed = APP_DEFAULTS.cameraDefaults.freeCamSpeedAuPerSec;
     private freeCamSensitivity = APP_DEFAULTS.cameraDefaults.freeCamSensitivity;
@@ -105,6 +106,7 @@ export class OptionsPanel {
     private presetSelect!: HTMLSelectElement;
     private presetRenderScaleInput!: HTMLInputElement;
     private presetRenderScaleValue!: HTMLElement;
+    private presetShadowQualitySelect!: HTMLSelectElement;
     private axisLinesCheckbox!: HTMLInputElement;
     private refPlaneCheckbox!: HTMLInputElement;
     private refLineCheckbox!: HTMLInputElement;
@@ -238,6 +240,14 @@ export class OptionsPanel {
                         <label>Render Scale</label>
                         <input type="range" id="opt-render-scale" min="0.1" max="100" step="0.05" value="1">
                         <span id="opt-render-scale-value">1.00x</span>
+                    </div>
+                    <div class="opt-field">
+                        <label>Shadow Quality</label>
+                        <select id="opt-shadow-quality">
+                            <option value="Off">Off</option>
+                            <option value="Binary">Binary</option>
+                            <option value="Penumbra">Penumbra</option>
+                        </select>
                     </div>
                 </section>
 
@@ -725,6 +735,7 @@ export class OptionsPanel {
         this.presetSelect = this.container.querySelector('#opt-preset')!;
         this.presetRenderScaleInput = this.container.querySelector('#opt-render-scale')!;
         this.presetRenderScaleValue = this.container.querySelector('#opt-render-scale-value')!;
+        this.presetShadowQualitySelect = this.container.querySelector('#opt-shadow-quality')!;
 
         this.axisLinesCheckbox = this.container.querySelector('#opt-axis-lines')!;
         this.refPlaneCheckbox = this.container.querySelector('#opt-ref-plane')!;
@@ -887,12 +898,16 @@ export class OptionsPanel {
             this.onPresetChange?.(value);
         });
 
-        this.presetRenderScaleInput.addEventListener('input', () => {
-            if (this.ignoreEvents) return;
-            const value = parseFloat(this.presetRenderScaleInput.value);
-            this.presetRenderScale = value;
-            this.presetRenderScaleValue.textContent = `${value.toFixed(2)}x`;
-            this.onPresetEdit?.(this.presetName, { renderScale: value });
+        this.presetRenderScaleInput.addEventListener('change', () => {
+            const v = parseFloat(this.presetRenderScaleInput.value);
+            this.presetRenderScale = v;
+            this.onPresetEdit?.(this.presetName, { renderScale: v });
+        });
+
+        this.presetShadowQualitySelect.addEventListener('change', () => {
+            const val = this.presetShadowQualitySelect.value as 'Off' | 'Binary' | 'Penumbra';
+            this.presetShadowQuality = val;
+            this.onPresetEdit?.(this.presetName, { shadowQuality: val });
         });
 
         // Camera events
@@ -1125,8 +1140,9 @@ export class OptionsPanel {
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
         this.presetSelect.value = this.presetName;
-        this.presetRenderScaleInput.value = String(this.presetRenderScale);
-        this.presetRenderScaleValue.textContent = `${this.presetRenderScale.toFixed(2)}x`;
+        this.presetRenderScaleInput.value = this.presetRenderScale.toString();
+        this.presetRenderScaleValue.textContent = this.presetRenderScale.toFixed(2) + 'x';
+        this.presetShadowQualitySelect.value = this.presetShadowQuality;
         this.freeCamSpeedInput.value = this.freeCamSpeed.toString();
         this.freeCamSpeedValue.textContent = `${this.freeCamSpeed.toFixed(3)} AU/s`;
         this.freeCamSensitivityInput.value = this.freeCamSensitivity.toString();
@@ -1202,11 +1218,13 @@ export class OptionsPanel {
     }
 
     setPresetRenderScale(scale: number): void {
-        this.ignoreEvents = true;
         this.presetRenderScale = scale;
-        this.presetRenderScaleInput.value = String(scale);
-        this.presetRenderScaleValue.textContent = `${scale.toFixed(2)}x`;
-        this.ignoreEvents = false;
+        if (!this.ignoreEvents) this.syncUIFromOptions();
+    }
+
+    setPresetShadowQuality(quality: 'Off' | 'Binary' | 'Penumbra'): void {
+        this.presetShadowQuality = quality;
+        if (!this.ignoreEvents) this.syncUIFromOptions();
     }
 
     // Can add setFreeCamSpeed/Sensitivity external control if needed
