@@ -297,8 +297,9 @@ class NBodyClient {
                 this.optionsPanel?.setPresetRenderScale(current.renderScale);
                 this.optionsPanel?.setPresetShadowQuality(current.shadowQuality);
             },
-            (preset: VisualizationPresetName, patch: { renderScale?: number }) => {
+            (preset: VisualizationPresetName, patch: { renderScale?: number, shadowQuality?: 'Off' | 'Binary' | 'Penumbra' }) => {
                 VisualPresetRegistry.updatePreset(preset, patch);
+                this.applyPresetToRenderer();
             },
             (speed) => {
                 this.freeCamSpeedAuPerSec = speed;
@@ -588,6 +589,13 @@ class NBodyClient {
             starspotsEnabled: starParams.flareQuality === 'Ultra',
             flareQuality: starParams.flareQuality ?? 'Off',
         });
+
+        const shadowParams = VisualPresetRegistry.resolveFeatureParams(LOCAL_PRESET_PLAYER, 'shadowRenderer') as {
+            shadowQuality?: 'Off' | 'Binary' | 'Penumbra';
+        };
+        if (shadowParams.shadowQuality) {
+            this.bodyRenderer.setShadowQuality(shadowParams.shadowQuality);
+        }
     }
 
     private ensureLocalPreset(preset: VisualizationPresetName): void {

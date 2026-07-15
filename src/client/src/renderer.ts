@@ -1598,6 +1598,10 @@ export class BodyRenderer {
         return this.renderScale;
     }
 
+    setShadowQuality(quality: 'Off' | 'Binary' | 'Penumbra'): void {
+        this.shadowQuality = quality;
+    }
+
     setStarRenderOptions(options: Partial<StarRenderOptions>): void {
         const nextGranulationEnabled =
             typeof options.granulationEnabled === 'boolean'

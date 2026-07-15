@@ -107,7 +107,7 @@ export function registerVisualPresetFeatures(): void {
         },
         applyPreset: (params, preset) => ({
             ...params,
-            shadowQuality: params.shadowQuality ?? preset.shadowQuality,
+            shadowQuality: preset.shadowQuality ?? params.shadowQuality,
         }),
     });
 
