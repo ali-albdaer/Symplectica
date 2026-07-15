@@ -16,6 +16,11 @@ export class ShadowCasterManager {
     private readonly _scratchScore = new Float64Array(4);
     private _resultCount = 0;
 
+    // Pre-allocated light directions for the current receiver
+    private readonly _lightDirX = new Float64Array(4);
+    private readonly _lightDirY = new Float64Array(4);
+    private readonly _lightDirZ = new Float64Array(4);
+
     registerCaster(id: number, info: ShadowCasterInfo): void {
         this.casters.set(id, info);
         this.casterArray.push(info);
@@ -57,6 +62,29 @@ export class ShadowCasterManager {
         const casters = this.casterArray;
         const len = casters.length;
 
+        // Hoist: The light positions are identical for all casters relative to this receiver.
+        // Pre-calculate normalized directions to lights to avoid doing this inside the caster loop.
+        for (let i = 0; i < numActiveLights; i++) {
+            const light = activeLights[i];
+            if (light) {
+                const ldx = light.position.x - rx;
+                const ldy = light.position.y - ry;
+                const ldz = light.position.z - rz;
+                const lDistSq = ldx*ldx + ldy*ldy + ldz*ldz;
+                
+                if (lDistSq > 1e-12) {
+                    const lDistInv = 1.0 / Math.sqrt(lDistSq);
+                    this._lightDirX[i] = ldx * lDistInv;
+                    this._lightDirY[i] = ldy * lDistInv;
+                    this._lightDirZ[i] = ldz * lDistInv;
+                } else {
+                    this._lightDirX[i] = 0;
+                    this._lightDirY[i] = 0;
+                    this._lightDirZ[i] = 0;
+                }
+            }
+        }
+
         for (let c = 0; c < len; c++) {
             const caster = casters[c];
             if (caster.id === receiverId) continue;
@@ -71,37 +99,25 @@ export class ShadowCasterManager {
             // If the body is too far / too small to matter at all, skip early before heavy math
             if (solidAngleScore < 1e-6) continue;
             
-            const dist = Math.sqrt(dSq);
-            const nx = dx / dist;
-            const ny = dy / dist;
-            const nz = dz / dist;
-            
-            let maxAlignment = 0;
+            let maxDot = 0;
             
             for (let i = 0; i < numActiveLights; i++) {
-                const light = activeLights[i];
-                if (!light) continue;
-                
-                const ldx = light.position.x - rx;
-                const ldy = light.position.y - ry;
-                const ldz = light.position.z - rz;
-                
-                const lDist = Math.sqrt(ldx*ldx + ldy*ldy + ldz*ldz);
-                const lnx = ldx / lDist;
-                const lny = ldy / lDist;
-                const lnz = ldz / lDist;
-                
-                const alignment = nx*lnx + ny*lny + nz*lnz;
-                if (alignment > maxAlignment) {
-                    maxAlignment = alignment;
+                if (!activeLights[i]) continue;
+                // Dot product with un-normalized caster vector
+                const dot = dx * this._lightDirX[i] + dy * this._lightDirY[i] + dz * this._lightDirZ[i];
+                if (dot > maxDot) {
+                    maxDot = dot;
                 }
             }
             
-            // Only care about bodies that are somewhat in front of a light (alignment > 0)
-            if (maxAlignment <= 0.0) continue;
+            // Only care about bodies that are somewhat in front of a light
+            if (maxDot <= 0.0) continue;
+            
+            // Delay division by distance until we absolutely know this body is a candidate
+            const maxAlignment = maxDot / Math.sqrt(dSq);
             
             // Score = solid angle * strong alignment penalty.
-            // Using a high power ensures that bodies perfectly eclipsing are prioritized over large bodies off to the side.
+            // Math.pow with a small integer power is intrinsically optimized by V8
             const score = solidAngleScore * Math.pow(maxAlignment, 16);
 
             // Linear insertion sort into a fixed-size buffer
