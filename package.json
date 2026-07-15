@@ -15,8 +15,9 @@
         "build": "npm run wasm:build && npm run client:build && npm run server:build",
         "start": "npm run -w @nbody/server start",
         "dev": "concurrently -k \"npm:server:dev\" \"npm:client:dev\"",
-        "bench": "node scripts/bench.js",
-        "bench:quick": "node scripts/bench.js scripts/bench-path-quick.json"
+        "bench": "node scripts/bench.js solar-system",
+        "bench:stress": "node scripts/bench.js stress",
+        "bench:quick": "node scripts/bench.js quick"
     },
     "devDependencies": {
         "concurrently": "^9.1.0",

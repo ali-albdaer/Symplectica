@@ -181,7 +181,7 @@ export class AdminPanel {
                         </div>
                         <div class="admin-field">
                             <label>Planets</label>
-                            <input type="number" id="stress-planets" min="0" max="2000" step="1" value="100">
+                            <input type="number" id="stress-planets" min="0" max="2000" step="1" value="1000">
                         </div>
                         <div class="admin-field">
                             <label>Asteroids</label>

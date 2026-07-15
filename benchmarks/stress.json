@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "description": "Stress test benchmark - 30 stars, 1000 planets",
+    "spikeThresholdMs": 5.0,
+    "outputDir": "local/perf"
+  },
+  "steps": [
+    { "type": "loadPreset",         "presetId": "stressTest", "waitMs": 15000, "note": "Load 30 stars, 1000 planets via admin UI" },
+    { "type": "wait",               "waitMs": 5000, "note": "Stabilization" },
+    { "type": "sample",             "label": "baseline_stress" },
+    { "type": "wait",               "waitMs": 2000 },
+
+    { "type": "orbitLeft",          "durationMs": 1000, "waitMs": 500, "note": "Move camera" },
+    { "type": "orbitRight",         "durationMs": 1000, "waitMs": 500 },
+    { "type": "orbitUp",            "durationMs": 1000, "waitMs": 500 },
+    { "type": "orbitDown",          "durationMs": 1000, "waitMs": 500 },
+    { "type": "sample",             "label": "orbit_stress_wide" },
+
+    { "type": "zoomIn",             "count": 3, "waitMs": 1500 },
+    { "type": "sample",             "label": "zoomed_in" },
+    { "type": "zoomOut",            "count": 3, "waitMs": 1000 },
+    { "type": "sample",             "label": "zoomed_out" },
+
+    { "type": "nextBody",           "waitMs": 500 },
+    { "type": "nextBody",           "waitMs": 500 },
+    { "type": "nextBody",           "waitMs": 500 },
+    { "type": "nextBody",           "waitMs": 500 },
+    { "type": "nextBody",           "waitMs": 500 },
+    { "type": "sample",             "label": "after_next_5" },
+
+    { "type": "prevBody",           "waitMs": 500 },
+    { "type": "prevBody",           "waitMs": 500 },
+    { "type": "prevBody",           "waitMs": 500 },
+    { "type": "prevBody",           "waitMs": 500 },
+    { "type": "prevBody",           "waitMs": 500 },
+    { "type": "sample",             "label": "after_prev_5" },
+
+    { "type": "togglePlanetLabels", "waitMs": 300 },
+    { "type": "toggleMoonLabels",   "waitMs": 300 },
+    { "type": "toggleStarLabels",   "waitMs": 500 },
+    { "type": "sample",             "label": "all_labels_on" },
+    { "type": "wait",               "waitMs": 2000 },
+
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "sample",             "label": "after_rapid_50" },
+
+    { "type": "zoomIn",             "count": 4, "waitMs": 1500 },
+    { "type": "sample",             "label": "zoom_stress_in" },
+    { "type": "zoomOut",            "count": 4, "waitMs": 1000 },
+    { "type": "orbitLeft",          "durationMs": 2000, "waitMs": 500 },
+    { "type": "orbitRight",         "durationMs": 2000, "waitMs": 500 },
+    { "type": "sample",             "label": "orbit_stress" },
+
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 }, { "type": "nextBody", "waitMs": 100 },
+    { "type": "sample",             "label": "after_rapid_100" },
+
+    { "type": "zoomIn",             "count": 3, "waitMs": 500 },
+    { "type": "orbitLeft",          "durationMs": 1000, "waitMs": 500 },
+    { "type": "zoomOut",            "count": 3, "waitMs": 500 },
+    { "type": "sample",             "label": "final_stress" }
+  ]
+}

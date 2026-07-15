@@ -19,7 +19,10 @@ const path = require('path');
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const BENCH_URL           = process.env.BENCH_URL  || 'http://localhost:3000/';
-const BENCH_PATH_FILE     = process.argv[2]         || path.join(__dirname, 'bench-path.json');
+const BENCH_PATH_ARG      = process.argv[2]        || 'solar-system';
+const BENCH_PATH_FILE     = path.extname(BENCH_PATH_ARG) 
+    ? path.resolve(BENCH_PATH_ARG) 
+    : path.resolve(__dirname, '..', 'benchmarks', `${BENCH_PATH_ARG}.json`);
 const APP_READY_TIMEOUT   = 30_000; // ms to wait for __metrics to appear
 
 // ─── Statistics helpers ────────────────────────────────────────────────────
@@ -68,6 +71,11 @@ async function executeStep(page, step) {
         // ── Navigation ──────────────────────────────────────────────────
         case 'nextBody':
             await page.keyboard.press('n');
+            if (step.waitMs) await wait(step.waitMs);
+            break;
+
+        case 'prevBody':
+            await page.keyboard.press('p');
             if (step.waitMs) await wait(step.waitMs);
             break;
 
@@ -125,8 +133,15 @@ async function executeStep(page, step) {
 
         // ── Simulation presets ───────────────────────────────────────────
         case 'loadPreset':
-            // Calls client.loadPresetFromAdmin via the window.__metrics.loadPreset shim.
-            await page.evaluate(id => window.__metrics.loadPreset(id), step.presetId);
+            // Load preset via admin panel UI interaction
+            await page.evaluate(id => {
+                const presetSelect = document.querySelector('#admin-preset');
+                if (presetSelect) {
+                    presetSelect.value = id;
+                    presetSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                document.querySelector('#admin-load-preset')?.click();
+            }, step.presetId);
             if (step.waitMs) await wait(step.waitMs);
             break;
 
@@ -192,12 +207,12 @@ async function executeStep(page, step) {
             break;
 
         case 'togglePerfMonitor':
-            await page.keyboard.press('p');
+            await page.keyboard.press('3');
             if (step.waitMs) await wait(step.waitMs);
             break;
 
         default:
-            console.warn(`  ⚠️  Unknown step type: "${step.type}" — skipped`);
+            console.warn(`  [WARN] Unknown step type: "${step.type}" — skipped`);
     }
 }
 
@@ -279,13 +294,13 @@ function buildReport(config, pollBuffer, spikeThresholdMs) {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 async function main() {
-    console.log('🚀 Symplectica Benchmark Runner');
+    console.log('[bench] Symplectica Benchmark Runner');
     console.log(`   Path file : ${BENCH_PATH_FILE}`);
     console.log(`   Target URL: ${BENCH_URL}`);
     console.log('');
 
     if (!fs.existsSync(BENCH_PATH_FILE)) {
-        console.error(`❌  bench-path.json not found: ${BENCH_PATH_FILE}`);
+        console.error(`[ERROR] bench path file not found: ${BENCH_PATH_FILE}`);
         process.exit(1);
     }
 
@@ -296,7 +311,7 @@ async function main() {
     // ── Launch browser ───────────────────────────────────────────────────
     // headless:false required — headless Chrome uses software rendering
     // which would produce invalid GPU timing measurements.
-    console.log('🌐 Launching Chrome (headless:false for real GPU rendering)...');
+    console.log('[bench] Launching Chrome (headless:false for real GPU rendering)...');
     const browser = await chromium.launch({
         headless: false,
         args: ['--start-maximized', '--disable-infobars'],
@@ -316,7 +331,7 @@ async function main() {
         });
         // Extra settle time so EMA averages are seeded
         await page.waitForTimeout(1500);
-        console.log('   ✅ App ready and metrics shim confirmed.');
+        console.log('   [bench] App ready and metrics shim confirmed.');
 
         // ── Click canvas to give keyboard focus to the app ───────────────
         // Click near centre of viewport, away from UI panels.
@@ -360,13 +375,13 @@ async function main() {
         });
 
         // ── Execute path steps ───────────────────────────────────────────
-        console.log(`\n📋 Running ${config.steps.length} path steps...\n`);
+        console.log(`\n[bench] Running ${config.steps.length} path steps...\n`);
         for (const step of config.steps) {
             await executeStep(page, step);
         }
 
         // ── Collect & stop poller ────────────────────────────────────────
-        console.log('\n📊 Collecting poll buffer...');
+        console.log('\n[bench] Collecting poll buffer...');
         const pollBuffer = await page.evaluate(() => {
             clearInterval(window.__benchPollInterval);
             return window.__benchPollBuffer;
@@ -385,17 +400,17 @@ async function main() {
         // ── Console summary ───────────────────────────────────────────────
         const bar = '─'.repeat(62);
         console.log('\n' + bar);
-        console.log('✅  BENCHMARK COMPLETE');
+        console.log('[bench] BENCHMARK COMPLETE');
         console.log(bar);
-        console.log(`📁  Report  : ${outFile}`);
-        console.log(`📊  Samples : ${report.meta.totalPollSamples} total  |  ${report.summary.totalSamples ?? 0} labeled`);
+        console.log(`  Report  : ${outFile}`);
+        console.log(`  Samples : ${report.meta.totalPollSamples} total  |  ${report.summary.totalSamples ?? 0} labeled`);
         if (report.summary.frameMs) {
-            console.log(`⏱️   Frame   : avg=${report.summary.frameMs.avg}ms  p95=${report.summary.frameMs.p95}ms  max=${report.summary.frameMs.max}ms`);
-            console.log(`🎨  Render  : avg=${report.summary.renderMs.avg}ms  p95=${report.summary.renderMs.p95}ms`);
-            console.log(`💾  Heap    : avg=${report.summary.heapMB.avg}MB  max=${report.summary.heapMB.max}MB`);
-            console.log(`🖼️   GPU     : ${report.summary.drawCalls} draw calls  |  ${report.summary.triangles.toLocaleString()} triangles`);
+            console.log(`  Frame   : avg=${report.summary.frameMs.avg}ms  p95=${report.summary.frameMs.p95}ms  max=${report.summary.frameMs.max}ms`);
+            console.log(`  Render  : avg=${report.summary.renderMs.avg}ms  p95=${report.summary.renderMs.p95}ms`);
+            console.log(`  Heap    : avg=${report.summary.heapMB.avg}MB  max=${report.summary.heapMB.max}MB`);
+            console.log(`  GPU     : ${report.summary.drawCalls} draw calls  |  ${report.summary.triangles.toLocaleString()} triangles`);
         }
-        console.log(`⚡  Spikes  : ${report.spikes.length} (threshold: >${report.meta.spikeThresholdMs}ms)`);
+        console.log(`  Spikes  : ${report.spikes.length} (threshold: >${report.meta.spikeThresholdMs}ms)`);
         if (report.spikes.length > 0 && report.spikes.length <= 20) {
             for (const s of report.spikes) {
                 console.log(`     t=${(s.elapsedMs / 1000).toFixed(1)}s  [${s.label}]  ${s.frameMs}ms  heap=${s.heapMB}MB`);
@@ -411,7 +426,7 @@ async function main() {
 }
 
 main().catch(err => {
-    console.error('\n❌  Benchmark failed:', err.message);
+    console.error('\n[ERROR] Benchmark failed:', err.message);
     if (err.message.includes('connect ECONNREFUSED') || err.message.includes('ERR_CONNECTION_REFUSED')) {
         console.error('   → Is "npm run dev" running?');
     }
