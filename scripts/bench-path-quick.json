@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "description": "Quick smoke test - ~20s, validates harness is working",
+    "spikeThresholdMs": 2.5,
+    "outputDir": "local/perf"
+  },
+  "steps": [
+    { "type": "wait",   "waitMs": 3000, "note": "Stabilization" },
+    { "type": "sample", "label": "baseline" },
+    { "type": "wait",   "waitMs": 2000 },
+    { "type": "nextBody", "waitMs": 2000, "note": "Focus body 1" },
+    { "type": "sample", "label": "body_1" },
+    { "type": "zoomIn", "count": 3, "waitMs": 1500 },
+    { "type": "sample", "label": "body_1_close" },
+    { "type": "zoomOut", "count": 3, "waitMs": 1000 },
+    { "type": "nextBody", "waitMs": 1500 },
+    { "type": "sample", "label": "body_2" }
+  ]
+}

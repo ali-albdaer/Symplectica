@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "description": "Standard regression benchmark - Full Solar System IV, Ultra quality",
+    "spikeThresholdMs": 2.5,
+    "outputDir": "local/perf"
+  },
+  "steps": [
+    { "type": "wait",               "waitMs": 5000, "note": "Stabilization - let EMA averages settle" },
+    { "type": "sample",             "label": "baseline_solar_wide" },
+    { "type": "wait",               "waitMs": 3000 },
+
+    { "type": "nextBody",           "waitMs": 2000, "note": "Mercury" },
+    { "type": "zoomIn",             "count": 4, "waitMs": 1000 },
+    { "type": "sample",             "label": "mercury_close" },
+    { "type": "wait",               "waitMs": 2000 },
+    { "type": "zoomOut",            "count": 4, "waitMs": 500 },
+
+    { "type": "nextBody",           "waitMs": 1000, "note": "Venus" },
+    { "type": "nextBody",           "waitMs": 1000, "note": "Earth" },
+    { "type": "zoomIn",             "count": 6, "waitMs": 1500 },
+    { "type": "sample",             "label": "earth_close" },
+    { "type": "wait",               "waitMs": 2000 },
+    { "type": "toggleAtmospheres",  "waitMs": 1500 },
+    { "type": "sample",             "label": "earth_no_atmosphere" },
+    { "type": "wait",               "waitMs": 1500 },
+    { "type": "toggleAtmospheres",  "waitMs": 500 },
+    { "type": "zoomOut",            "count": 6, "waitMs": 500 },
+
+    { "type": "nextBody",           "waitMs": 1000, "note": "Mars" },
+    { "type": "nextBody",           "waitMs": 1000, "note": "Jupiter" },
+    { "type": "zoomIn",             "count": 3, "waitMs": 2000 },
+    { "type": "sample",             "label": "jupiter_rings" },
+    { "type": "wait",               "waitMs": 2000 },
+    { "type": "setRingQuality",     "value": "HighQualityAlways", "waitMs": 1500 },
+    { "type": "sample",             "label": "jupiter_rings_hq_always" },
+    { "type": "wait",               "waitMs": 1500 },
+    { "type": "setRingQuality",     "value": "HighQualityClose", "waitMs": 500 },
+    { "type": "zoomOut",            "count": 3, "waitMs": 500 },
+
+    { "type": "togglePlanetLabels", "waitMs": 500 },
+    { "type": "toggleMoonLabels",   "waitMs": 1000 },
+    { "type": "sample",             "label": "labels_planet_moon_on" },
+    { "type": "wait",               "waitMs": 2000 },
+    { "type": "togglePlanetLabels", "waitMs": 300 },
+    { "type": "toggleMoonLabels",   "waitMs": 500 },
+
+    { "type": "setVisualPreset",    "value": "Low", "waitMs": 3000 },
+    { "type": "sample",             "label": "visual_preset_low" },
+    { "type": "wait",               "waitMs": 2000 },
+    { "type": "setVisualPreset",    "value": "Ultra", "waitMs": 3000 },
+    { "type": "sample",             "label": "visual_preset_ultra_restored" },
+    { "type": "wait",               "waitMs": 2000 },
+
+    { "type": "loadPreset",         "presetId": "alphaCentauri", "waitMs": 7000, "note": "Multi-star test" },
+    { "type": "sample",             "label": "alpha_centauri_wide" },
+    { "type": "wait",               "waitMs": 3000 },
+    { "type": "nextBody",           "waitMs": 2000 },
+    { "type": "zoomIn",             "count": 3, "waitMs": 2000 },
+    { "type": "sample",             "label": "alpha_centauri_close" },
+    { "type": "wait",               "waitMs": 2000 },
+    { "type": "orbitLeft",          "durationMs": 2000, "waitMs": 1000 },
+    { "type": "sample",             "label": "alpha_centauri_orbiting" }
+  ]
+}

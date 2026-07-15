@@ -2399,6 +2399,36 @@ client.init().then(() => {
     // Expose for browser console testing
     (window as any).physics = client.getPhysics();
     (window as any).timeController = client.getTimeController();
+
+    // Expose live metrics for automated benchmarking.
+    // ZERO overhead during normal use: getSnapshot() is never called unless
+    // the external bench runner (scripts/bench.js) polls it. This is a purely
+    // dormant function reference on window — no per-frame cost.
+    const c = client as any;
+    (window as any).__metrics = {
+        getSnapshot: () => ({
+            // Read from frameTiming (raw per-frame values, always updated) NOT
+            // frameTimingAvg — that only runs when the perf monitor is visible.
+            // The bench runner's own statistics layer handles averaging/p95/p99.
+            frameMs:    c.frameTiming.total,
+            renderMs:   c.frameTiming.render,
+            physicsMs:  c.frameTiming.physics,
+            uiMs:       c.frameTiming.ui,
+            fps:        c.fpsHistory.length > 0
+                            ? c.fpsHistory.reduce((a: number, b: number) => a + b, 0) / c.fpsHistory.length
+                            : 0,
+            drawCalls:  c.renderer.info.render.calls,
+            triangles:  c.renderer.info.render.triangles,
+            geometries: c.renderer.info.memory.geometries,
+            textures:   c.renderer.info.memory.textures,
+            heapMB:     ((performance as any).memory?.usedJSHeapSize ?? 0) / (1024 * 1024) || null,
+            bodyCount:  c.state.bodyCount,
+            timestamp:  performance.now(),
+        }),
+        // Allows bench runner to load simulation presets by ID without needing the admin panel UI.
+        loadPreset: (id: string) => c.loadPresetFromAdmin(id, id, false),
+    };
+
     logger.info('Space Simulator client initialized');
 }).catch((error) => {
     logger.error('Fatal initialization error:', error);
