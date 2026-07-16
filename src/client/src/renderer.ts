@@ -218,16 +218,19 @@ void main() {
         float rayleighPhase = 0.75 * (1.0 + VdotL * VdotL);
         vec3 rayleighScattering = u_rayleighColor * rayleighPhase;
         
-        float miePhase = henyeyGreenstein(VdotL, 0.76) + 0.1;
+        // Use -VdotL for forward scattering peak when light is behind the planet
+        float miePhase = henyeyGreenstein(-VdotL, 0.76) + 0.1;
         vec3 mieScattering = u_mieColor * miePhase;
         
         vec3 scatterColor = rayleighScattering + mieScattering;
         vec3 lightContrib = scatterColor * scatterIntegral;
         
-        finalColor += lightContrib * sunInfluence * (u_lightColor[i] * (u_lightIntensity[i] * attenuation)) * 1.5;
+        finalColor += lightContrib * sunInfluence * (u_lightColor[i] * (u_lightIntensity[i] * attenuation)) * 1.0;
     }
     
-    gl_FragColor = vec4(finalColor, 1.0);
+    // Calculate alpha based on brightness to allow NormalBlending
+    float alpha = clamp(max(finalColor.r, max(finalColor.g, finalColor.b)) * 1.2, 0.0, 1.0);
+    gl_FragColor = vec4(finalColor, alpha);
     #include <logdepthbuf_fragment>
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -2899,7 +2902,7 @@ class BodyMesh {
             transparent: true,
             side: THREE.DoubleSide,
             depthWrite: false,
-            blending: THREE.AdditiveBlending,
+            blending: THREE.NormalBlending,
             toneMapped: true,
         });
 
