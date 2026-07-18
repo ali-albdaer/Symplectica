@@ -38,6 +38,8 @@ interface PhysicsModule {
     createJupiterSystem?: (seed: bigint) => WasmSimulation;
     createSaturnSystem?: (seed: bigint) => WasmSimulation;
     createAlphaCentauri?: (seed: bigint) => WasmSimulation;
+    createSolarCentauriI?: (seed: bigint) => WasmSimulation;
+    createSolarCentauriIBarycentric?: (seed: bigint) => WasmSimulation;
     createTrappist1?: (seed: bigint) => WasmSimulation;
     createBinaryPulsar?: (seed: bigint) => WasmSimulation;
     createIntegratorTest1?: (seed: bigint) => WasmSimulation;
@@ -244,6 +246,14 @@ class SimulationServer {
                 this.simulation = this.physics.createFullSolarSystemIVBarycentric(CONFIG.seed);
             } else if (typeof this.physics.createFullSolarSystemIV === 'function') {
                 this.simulation = this.physics.createFullSolarSystemIV(CONFIG.seed);
+            } else {
+                this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
+            }
+        } else if (presetId === 'solarCentauriI') {
+            if (barycentric && typeof this.physics.createSolarCentauriIBarycentric === 'function') {
+                this.simulation = this.physics.createSolarCentauriIBarycentric(CONFIG.seed);
+            } else if (typeof this.physics.createSolarCentauriI === 'function') {
+                this.simulation = this.physics.createSolarCentauriI(CONFIG.seed);
             } else {
                 this.simulation = this.physics.createSunEarthMoon(CONFIG.seed);
             }

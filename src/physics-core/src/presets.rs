@@ -483,6 +483,8 @@ pub enum Preset {
     /// Full Solar System IV (2026) — strict HORIZONS SSB vectors at 2026-01-01
     /// 40 bodies ordered by heliocentric distance; barycentric by default
     FullSolarSystemIV,
+    /// Solar System + Alpha Centauri A/B/C true scale system
+    SolarCentauriI,
     /// Playable scaled solar system (all planets + Moon)
     PlayableSolarSystem,
     /// Jupiter and its 4 Galilean moons
@@ -521,6 +523,7 @@ impl Preset {
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, false),
             Preset::FullSolarSystemIII => create_full_solar_system_iii(seed, false),
             Preset::FullSolarSystemIV => create_full_solar_system_iv(seed, true),
+            Preset::SolarCentauriI => create_solar_centauri_i(seed, false),
             Preset::PlayableSolarSystem => create_playable_solar_system(seed),
             Preset::JupiterSystem => create_jupiter_system(seed),
             Preset::SaturnSystem => create_saturn_system(seed),
@@ -543,6 +546,7 @@ impl Preset {
             Preset::FullSolarSystemII => create_full_solar_system_ii(seed, true),
             Preset::FullSolarSystemIII => create_full_solar_system_iii(seed, true),
             Preset::FullSolarSystemIV => create_full_solar_system_iv(seed, true),
+            Preset::SolarCentauriI => create_solar_centauri_i(seed, true),
             Preset::AsteroidBelt => {
                 // AsteroidBelt delegates to FSSII(barycentric=true) internally,
                 // but we recenter again to include the asteroids
@@ -2614,6 +2618,225 @@ pub fn create_full_solar_system_iv(seed: u64, barycentric: bool) -> Simulation {
     reorder_by_heliocentric_distance(&sim, seed)
 }
 
+/// Solar System IV + Alpha Centauri AB + Proxima Centauri system (epoch 2026-01-01)
+pub fn create_solar_centauri_i(seed: u64, barycentric: bool) -> Simulation {
+    let mut sim = create_full_solar_system_iii(seed, false);
+
+    let ids_to_remove: Vec<u32> = sim
+        .bodies()
+        .iter()
+        .filter(|b| {
+            b.is_active
+                && (b.body_type == BodyType::Asteroid || b.body_type == BodyType::Comet)
+                && b.name != "1P/Halley"
+        })
+        .map(|b| b.id)
+        .collect();
+    for id in ids_to_remove {
+        sim.remove_body(id);
+    }
+
+    let m_a: f64 = 1.133 * M_SUN;
+    let m_b: f64 = 0.972 * M_SUN;
+    let r_a: f64 = 1.2234 * R_SUN;
+    let r_b: f64 = 0.8632 * R_SUN;
+    let total_ab = m_a + m_b;
+    let mu_ab = G * total_ab;
+    let frac_a = m_b / total_ab;
+    let frac_b = m_a / total_ab;
+
+    let ab_elements = OrbitalElements::from_degrees(
+        23.52 * AU,     // semi-major axis
+        0.5240,         // eccentricity
+        79.32,          // inclination
+        204.75,         // Ω
+        232.30,         // ω
+        316.89,         // M at 2026-01-01
+    );
+    let (rel_pos_ab, rel_vel_ab) = ab_elements.to_cartesian(mu_ab);
+
+    let m_proxima: f64 = 0.1221 * M_SUN;
+    let r_proxima: f64 = 0.1542 * R_SUN;
+    let mu_proxima_orbit = G * (total_ab + m_proxima);
+
+    let proxima_elements = OrbitalElements::from_degrees(
+        8700.0 * AU,
+        0.50,
+        107.6,
+        126.0,
+        72.3,
+        357.9,
+    );
+    let (prox_pos_in_ab, prox_vel_in_ab) = proxima_elements.to_cartesian(mu_proxima_orbit);
+
+    // Interstellar offsets (ecliptic J2000 coordinates relative to Sun)
+    // Sourced from RA=14h39m36.494s, Dec=-60°50'02.37", d=4.37 ly
+    let acen_pos = Vec3::new(
+        -1.5456654448284618e16,
+        -2.621855158423208e16,
+        -2.7981341315508704e16,
+    );
+    let acen_vel = Vec3::new(
+        -8668.801826218503,
+        29626.8254505799,
+        9977.215355440698,
+    );
+
+    // AB positions/velocities in heliocentric frame
+    let pos_a = acen_pos + rel_pos_ab * (-frac_a);
+    let vel_a = acen_vel + rel_vel_ab * (-frac_a);
+    let pos_b = acen_pos + rel_pos_ab * frac_b;
+    let vel_b = acen_vel + rel_vel_ab * frac_b;
+
+    // Proxima position/velocity in heliocentric frame
+    let pos_proxima = acen_pos + prox_pos_in_ab;
+    let vel_proxima = acen_vel + prox_vel_in_ab;
+
+    let mut star_a = Body::new(
+        0,
+        "Alpha Centauri A",
+        BodyType::Star,
+        m_a,
+        r_a,
+        pos_a,
+        vel_a,
+    );
+    star_a.color = hex_to_rgb(0xfff4e6);
+    star_a.luminosity = 1.519 * L_SUN;
+    star_a.effective_temperature = 5804.0;
+    star_a.rotation_rate = OMEGA_SUN * 0.9;
+    star_a.seed = seed.wrapping_add(80);
+    star_a.metallicity = 0.23;
+    star_a.age = 5.3e9 * SECONDS_PER_YEAR;
+    star_a.semi_major_axis = ab_elements.semi_major_axis * frac_a;
+    star_a.eccentricity = ab_elements.eccentricity;
+    star_a.softening_length = compute_softening(r_a);
+    star_a.compute_derived();
+
+    let mut star_b = Body::new(
+        0,
+        "Alpha Centauri B",
+        BodyType::Star,
+        m_b,
+        r_b,
+        pos_b,
+        vel_b,
+    );
+    star_b.color = hex_to_rgb(0xffd27f);
+    star_b.luminosity = 0.5002 * L_SUN;
+    star_b.effective_temperature = 5242.0;
+    star_b.rotation_rate = OMEGA_SUN * 0.7;
+    star_b.seed = seed.wrapping_add(81);
+    star_b.metallicity = 0.23;
+    star_b.age = 5.3e9 * SECONDS_PER_YEAR;
+    star_b.semi_major_axis = ab_elements.semi_major_axis * frac_b;
+    star_b.eccentricity = ab_elements.eccentricity;
+    star_b.softening_length = compute_softening(r_b);
+    star_b.compute_derived();
+
+    let mut star_c = Body::new(
+        0,
+        "Proxima Centauri",
+        BodyType::Star,
+        m_proxima,
+        r_proxima,
+        pos_proxima,
+        vel_proxima,
+    );
+    star_c.color = hex_to_rgb(0xff4444);
+    star_c.luminosity = 0.00157 * L_SUN;
+    star_c.effective_temperature = 3050.0;
+    star_c.rotation_rate = 8.82e-7;
+    star_c.seed = seed.wrapping_add(82);
+    star_c.metallicity = 0.20;
+    star_c.age = 4.85e9 * SECONDS_PER_YEAR;
+    star_c.softening_length = compute_softening(r_proxima);
+    star_c.compute_derived();
+
+    sim.add_body(star_a);
+    sim.add_body(star_b);
+    let proxima_id = sim.add_body(star_c);
+
+    let mut rng = Pcg32::new(seed.wrapping_add(83));
+    
+    let prox_b_elements = OrbitalElements {
+        semi_major_axis: 0.04856 * AU,
+        eccentricity: 0.06,
+        inclination: 0.0,
+        longitude_asc_node: 0.0,
+        arg_periapsis: 0.0,
+        mean_anomaly: rng.next_f64() * 2.0 * PI,
+    };
+    let (prox_b_rel_pos, prox_b_rel_vel) = prox_b_elements.to_cartesian(G * m_proxima);
+    let pos_prox_b = pos_proxima + prox_b_rel_pos;
+    let vel_prox_b = vel_proxima + prox_b_rel_vel;
+
+    let mut prox_b = Body::new(
+        0,
+        "Proxima Centauri b",
+        BodyType::Planet,
+        1.07 * M_EARTH,
+        1.03 * R_EARTH,
+        pos_prox_b,
+        vel_prox_b,
+    );
+    prox_b.parent_id = Some(proxima_id);
+    prox_b.color = hex_to_rgb(0x7090c0);
+    prox_b.composition = PlanetComposition::Rocky;
+    prox_b.albedo = 0.3;
+    prox_b.mean_surface_temperature = 234.0;
+    prox_b.rotation_rate = 2.0 * PI / (11.186 * SECONDS_PER_DAY);
+    prox_b.axial_tilt = 0.0;
+    prox_b.seed = seed.wrapping_add(84);
+    prox_b.semi_major_axis = 0.04856 * AU;
+    prox_b.eccentricity = 0.06;
+    prox_b.softening_length = compute_softening(1.03 * R_EARTH);
+    prox_b.compute_derived();
+    sim.add_body(prox_b);
+
+    let prox_c_elements = OrbitalElements {
+        semi_major_axis: 1.489 * AU,
+        eccentricity: 0.04,
+        inclination: 133.0 * PI / 180.0,
+        longitude_asc_node: 0.0,
+        arg_periapsis: 0.0,
+        mean_anomaly: rng.next_f64() * 2.0 * PI,
+    };
+    let (prox_c_rel_pos, prox_c_rel_vel) = prox_c_elements.to_cartesian(G * m_proxima);
+    let pos_prox_c = pos_proxima + prox_c_rel_pos;
+    let vel_prox_c = vel_proxima + prox_c_rel_vel;
+
+    let mut prox_c = Body::new(
+        0,
+        "Proxima Centauri c (candidate)",
+        BodyType::Planet,
+        7.0 * M_EARTH,
+        1.7 * R_EARTH,
+        pos_prox_c,
+        vel_prox_c,
+    );
+    prox_c.parent_id = Some(proxima_id);
+    prox_c.color = hex_to_rgb(0x4070a0);
+    prox_c.composition = PlanetComposition::IceGiant;
+    prox_c.albedo = 0.35;
+    prox_c.mean_surface_temperature = 39.0;
+    prox_c.rotation_rate = 2.0 * PI / (2.0 * SECONDS_PER_DAY);
+    prox_c.axial_tilt = 0.5;
+    prox_c.seed = seed.wrapping_add(85);
+    prox_c.semi_major_axis = 1.489 * AU;
+    prox_c.eccentricity = 0.04;
+    prox_c.softening_length = compute_softening(1.7 * R_EARTH);
+    prox_c.compute_derived();
+    sim.add_body(prox_c);
+
+    if barycentric {
+        recenter_to_barycenter(&mut sim);
+    }
+
+    sim.finalize_derived();
+    sim
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ASTEROID BELT PRESET
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3395,6 +3618,49 @@ mod tests {
         println!("✓ Star cluster preset validated");
         println!("  Total stars: {}", sim.body_count());
         println!("  COM offset: {:.3e} m", com_offset);
+        println!("  Energy: {:.3e} J", energy);
+    }
+
+    #[test]
+    fn test_solar_centauri_i_preset() {
+        let sim = create_solar_centauri_i(42, true);
+        
+        assert_eq!(sim.body_count(), 38, "Expected exactly 38 bodies, got {}", sim.body_count());
+        
+        let bodies = sim.bodies();
+        let sun = bodies.iter().find(|b| b.name == "Sun").unwrap();
+        let acen_a = bodies.iter().find(|b| b.name == "Alpha Centauri A").unwrap();
+        let earth = bodies.iter().find(|b| b.name == "Earth").unwrap();
+        let moon = bodies.iter().find(|b| b.name == "Moon").unwrap();
+        
+        // Verify Alpha Centauri A distance from Sun (approx 4.37 light years)
+        let dist_m = (acen_a.position - sun.position).length();
+        let dist_ly = dist_m / 9.4607304725808e15;
+        assert!((dist_ly - 4.37).abs() < 0.1, "Alpha Centauri A should be ~4.37 ly from Sun, got {} ly", dist_ly);
+        
+        // Verify Earth distance from Sun (approx 1 AU)
+        let earth_dist_m = (earth.position - sun.position).length();
+        let earth_dist_au = earth_dist_m / 1.49597870700e11;
+        assert!((earth_dist_au - 1.0).abs() < 0.05, "Earth should be ~1 AU from Sun, got {} AU", earth_dist_au);
+
+        // Verify Moon distance from Earth
+        let moon_dist_m = (moon.position - earth.position).length();
+        assert!((moon_dist_m - 3.844e8).abs() < 3e7, "Moon should be ~384,400 km from Earth, got {} m", moon_dist_m);
+        
+        // Verify Proxima planets exist and have correct parent
+        let proxima = bodies.iter().find(|b| b.name == "Proxima Centauri").unwrap();
+        let prox_b = bodies.iter().find(|b| b.name == "Proxima Centauri b").unwrap();
+        let prox_c = bodies.iter().find(|b| b.name == "Proxima Centauri c (candidate)").unwrap();
+        
+        assert_eq!(prox_b.parent_id, Some(proxima.id));
+        assert_eq!(prox_c.parent_id, Some(proxima.id));
+        
+        // Verify energy is positive (unbound interstellar system)
+        let energy = sim.total_energy();
+        assert!(energy > 0.0, "Sol-Centauri system should have positive energy due to interstellar velocity differences");
+        
+        println!("✓ Sol-Centauri System preset validated");
+        println!("  Total bodies: {}", sim.body_count());
         println!("  Energy: {:.3e} J", energy);
     }
 }

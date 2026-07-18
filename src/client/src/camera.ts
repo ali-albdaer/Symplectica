@@ -838,16 +838,23 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
 
     /**
      * Configure camera for different simulation scales.
-     * 'solar' = default solar system scale (~1000 AU max)
-     * 'galactic' = star cluster scale (~1000 parsecs max)
+     * 'solar'        = default solar system scale (~1000 AU max)
+     * 'interstellar' = nearest-star scale (~10 light-year max)
+     * 'galactic'     = star cluster scale (~1000 parsecs max)
      */
-    configureForScale(scale: 'solar' | 'galactic'): void {
+    configureForScale(scale: 'solar' | 'interstellar' | 'galactic'): void {
         const PARSEC = 3.086e16;  // meters
+        const LY = 9.461e15;      // meters
         
         if (scale === 'galactic') {
             // Star clusters can span hundreds of parsecs
             this.maxRadius = 1000 * PARSEC;  // 1000 parsecs
             this.far = 1e20;  // Render up to ~3000 parsecs
+            this.updateProjectionMatrix();
+        } else if (scale === 'interstellar') {
+            // Nearest-star presets (e.g. Sol-Centauri): span ~10 ly
+            this.maxRadius = 10 * LY;  // 10 light-years
+            this.far = 1.5e17;         // Matches sky sphere radius
             this.updateProjectionMatrix();
         } else {
             // Solar system scale

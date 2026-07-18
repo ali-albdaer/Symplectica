@@ -461,6 +461,18 @@ pub fn create_alpha_centauri(seed: u64) -> WasmSimulation {
     WasmSimulation { inner: presets::create_alpha_centauri(seed) }
 }
 
+/// Create Solar System IV + Alpha Centauri system (true-scale, epoch 2026-01-01)
+#[wasm_bindgen(js_name = createSolarCentauriI)]
+pub fn create_solar_centauri_i(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_solar_centauri_i(seed, false) }
+}
+
+/// Create Solar System IV + Alpha Centauri in barycentric frame
+#[wasm_bindgen(js_name = createSolarCentauriIBarycentric)]
+pub fn create_solar_centauri_i_barycentric(seed: u64) -> WasmSimulation {
+    WasmSimulation { inner: presets::create_solar_centauri_i(seed, true) }
+}
+
 /// Create TRAPPIST-1 exoplanet system (7 Earth-like planets)
 #[wasm_bindgen(js_name = createTrappist1)]
 pub fn create_trappist1(seed: u64) -> WasmSimulation {

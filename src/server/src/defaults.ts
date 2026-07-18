@@ -19,7 +19,8 @@ export type PresetId =
     | 'starCluster'
     | 'stressTest'
     | 'fullSolarSystemIII'
-    | 'fullSolarSystemIV';
+    | 'fullSolarSystemIV'
+    | 'solarCentauriI';
 
 export type ForceMethod = 'direct' | 'barnes-hut';
 export type SimMode = 'tick' | 'accumulator';

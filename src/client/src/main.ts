@@ -998,10 +998,18 @@ class NBodyClient {
         // Configure camera scale based on preset type
         if (presetId === 'starCluster') {
             this.camera.configureForScale('galactic');
+        } else if (presetId === 'solarCentauriI') {
+            this.camera.configureForScale('interstellar');
         } else if (presetId === 'stressTest') {
             this.camera.configureForScale('solar');
         } else if (presetId !== 'worldBuilder') {
             this.camera.configureForScale('solar');
+        }
+
+        if (presetId === 'solarCentauriI') {
+            this.skyRenderer.setOptions({ skyRadius: 1.5e17 });
+        } else {
+            this.skyRenderer.setOptions({ skyRadius: 5e14 });
         }
 
         if (presetId !== 'worldBuilder') {

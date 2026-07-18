@@ -127,7 +127,7 @@ export class OptionsPanel {
     // Grid Spacing Helpers (Logarithmic)
     private sliderToSpacing(t: number): number {
         const min = 0.001;
-        const max = 10;
+        const max = 100000;
         const minLog = Math.log10(min);
         const maxLog = Math.log10(max);
         const clamped = Math.max(0, Math.min(1, t));
@@ -136,10 +136,28 @@ export class OptionsPanel {
 
     private spacingToSlider(spacing: number): number {
         const min = 0.001;
-        const max = 10;
+        const max = 100000;
         const minLog = Math.log10(min);
         const maxLog = Math.log10(max);
         const clamped = Math.max(min, Math.min(max, spacing));
+        return (Math.log10(clamped) - minLog) / (maxLog - minLog);
+    }
+
+    private sliderToExtent(t: number): number {
+        const min = 1;
+        const max = 1000000;
+        const minLog = Math.log10(min);
+        const maxLog = Math.log10(max);
+        const clamped = Math.max(0, Math.min(1, t));
+        return Math.pow(10, minLog + (maxLog - minLog) * clamped);
+    }
+
+    private extentToSlider(extent: number): number {
+        const min = 1;
+        const max = 1000000;
+        const minLog = Math.log10(min);
+        const maxLog = Math.log10(max);
+        const clamped = Math.max(min, Math.min(max, extent));
         return (Math.log10(clamped) - minLog) / (maxLog - minLog);
     }
 
@@ -295,14 +313,14 @@ export class OptionsPanel {
                     </div>
 
                     <div class="opt-field">
-                        <label>Grid Spacing (AU)</label>
+                        <label>Grid Spacing</label>
                         <input type="range" id="opt-grid-spacing" min="0" max="1" step="0.001" value="0.5">
                         <span id="opt-grid-spacing-value">0.1 AU</span>
                     </div>
 
                     <div class="opt-field">
-                        <label>Grid Extent (AU)</label>
-                        <input type="range" id="opt-grid-size" min="1" max="5000" step="1" value="200">
+                        <label>Grid Extent</label>
+                        <input type="range" id="opt-grid-size" min="0" max="1" step="0.001" value="0.5">
                         <span id="opt-grid-size-value">200 AU</span>
                     </div>
                 </section>
@@ -835,27 +853,56 @@ export class OptionsPanel {
             const t = parseFloat(this.gridSpacingInput.value);
             const spacingAu = this.sliderToSpacing(t);
             this.options.gridSpacing = spacingAu * AU;
-            this.gridSpacingValue.textContent = `${spacingAu.toFixed(3)} AU`;
+            
+            if (spacingAu > 1000) {
+                this.gridSpacingValue.textContent = `${(spacingAu / 63241.077).toFixed(3)} ly`;
+            } else {
+                this.gridSpacingValue.textContent = `${spacingAu.toFixed(3)} AU`;
+            }
 
             // Adjust grid size (divisions) to keep extent constant
-            // extent = gridSize * 2 * spacing
-            // gridSize = extent / (2 * spacing)
-            // Clamp to avoid crashing rendering if spacing is tiny
-            const rawSize = this.gridExtent / (2 * spacingAu);
-            this.options.gridSize = Math.max(1, Math.min(5000, Math.round(rawSize)));
+            let rawSize = this.gridExtent / (2 * spacingAu);
+            if (rawSize > 5000) {
+                this.gridExtent = 5000 * 2 * spacingAu;
+                this.gridSizeInput.value = String(this.extentToSlider(this.gridExtent));
+                if (this.gridExtent > 1000) {
+                    this.gridSizeValue.textContent = `${(this.gridExtent / 63241.077).toFixed(2)} ly`;
+                } else {
+                    this.gridSizeValue.textContent = `${this.gridExtent.toFixed(0)} AU`;
+                }
+                rawSize = 5000;
+            }
+            this.options.gridSize = Math.max(1, Math.round(rawSize));
 
             this.emitChange();
         });
 
         this.gridSizeInput.addEventListener('input', () => {
             if (this.ignoreEvents) return;
-            const extentAu = parseFloat(this.gridSizeInput.value);
+            const t = parseFloat(this.gridSizeInput.value);
+            const extentAu = this.sliderToExtent(t);
             this.gridExtent = extentAu;
-            this.gridSizeValue.textContent = `${extentAu.toFixed(0)} AU`;
+            
+            if (extentAu > 1000) {
+                this.gridSizeValue.textContent = `${(extentAu / 63241.077).toFixed(2)} ly`;
+            } else {
+                this.gridSizeValue.textContent = `${extentAu.toFixed(0)} AU`;
+            }
 
-            const spacingAu = this.options.gridSpacing / AU;
-            const rawSize = this.gridExtent / (2 * spacingAu);
-            this.options.gridSize = Math.max(1, Math.min(5000, Math.round(rawSize)));
+            let spacingAu = this.options.gridSpacing / AU;
+            let rawSize = this.gridExtent / (2 * spacingAu);
+            if (rawSize > 5000) {
+                spacingAu = this.gridExtent / (2 * 5000);
+                this.options.gridSpacing = spacingAu * AU;
+                this.gridSpacingInput.value = String(this.spacingToSlider(spacingAu));
+                if (spacingAu > 1000) {
+                    this.gridSpacingValue.textContent = `${(spacingAu / 63241.077).toFixed(3)} ly`;
+                } else {
+                    this.gridSpacingValue.textContent = `${spacingAu.toFixed(3)} AU`;
+                }
+                rawSize = 5000;
+            }
+            this.options.gridSize = Math.max(1, Math.round(rawSize));
 
             this.emitChange();
         });
@@ -1130,13 +1177,22 @@ export class OptionsPanel {
         this.refLineCheckbox.checked = this.options.showRefLine;
         this.refPointCheckbox.checked = this.options.showRefPoint;
         this.gridSpacingInput.value = String(this.spacingToSlider(this.options.gridSpacing / AU));
-        this.gridSpacingValue.textContent = `${(this.options.gridSpacing / AU).toFixed(3)} AU`;
+        const spacingAu = this.options.gridSpacing / AU;
+        if (spacingAu > 1000) {
+            this.gridSpacingValue.textContent = `${(spacingAu / 63241.077).toFixed(3)} ly`;
+        } else {
+            this.gridSpacingValue.textContent = `${spacingAu.toFixed(3)} AU`;
+        }
 
         // Calculate extent
-        const currentExtent = this.options.gridSize * 2 * (this.options.gridSpacing / AU);
+        const currentExtent = this.options.gridSize * 2 * spacingAu;
         this.gridExtent = currentExtent;
-        this.gridSizeInput.value = String(currentExtent);
-        this.gridSizeValue.textContent = `${currentExtent.toFixed(0)} AU`;
+        this.gridSizeInput.value = String(this.extentToSlider(currentExtent));
+        if (currentExtent > 1000) {
+            this.gridSizeValue.textContent = `${(currentExtent / 63241.077).toFixed(2)} ly`;
+        } else {
+            this.gridSizeValue.textContent = `${currentExtent.toFixed(0)} AU`;
+        }
         this.trailSlider.value = String(this.options.orbitTrailLength);
         this.trailValue.textContent = String(this.options.orbitTrailLength);
         this.presetSelect.value = this.presetName;

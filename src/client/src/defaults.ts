@@ -19,6 +19,7 @@ export type PresetId =
     | 'asteroidBelt'
     | 'starCluster'
     | 'stressTest'
+    | 'solarCentauriI'
     | 'worldBuilder';
 
 export type ForceMethod = 'direct' | 'barnes-hut';

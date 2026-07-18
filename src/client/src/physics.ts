@@ -58,6 +58,8 @@ interface PhysicsModule {
     createFullSolarSystemIIIBarycentric: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIV: (seed: bigint) => WasmSimulation;
     createFullSolarSystemIVBarycentric: (seed: bigint) => WasmSimulation;
+    createSolarCentauriI: (seed: bigint) => WasmSimulation;
+    createSolarCentauriIBarycentric: (seed: bigint) => WasmSimulation;
     createPlayableSolarSystem: (seed: bigint) => WasmSimulation;
     createJupiterSystem: (seed: bigint) => WasmSimulation;
     createSaturnSystem: (seed: bigint) => WasmSimulation;
@@ -514,6 +516,17 @@ export class PhysicsClient {
                     this.simulation = this.module.createFullSolarSystemIV(seed);
                 } else {
                     logger.warn('Full Solar System IV preset unavailable. Falling back to Sun-Earth-Moon.');
+                    this.simulation = this.module.createSunEarthMoon(seed);
+                    loadedPreset = 'sunEarthMoon';
+                }
+                break;
+            case 'solarCentauriI':
+                if (barycentric && typeof this.module.createSolarCentauriIBarycentric === 'function') {
+                    this.simulation = this.module.createSolarCentauriIBarycentric(seed);
+                } else if (typeof this.module.createSolarCentauriI === 'function') {
+                    this.simulation = this.module.createSolarCentauriI(seed);
+                } else {
+                    logger.warn('Sol-Centauri System preset unavailable. Falling back to Sun-Earth-Moon.');
                     this.simulation = this.module.createSunEarthMoon(seed);
                     loadedPreset = 'sunEarthMoon';
                 }
