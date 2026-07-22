@@ -3267,7 +3267,7 @@ class BodyMesh {
                     mat.userData.casterRadius.value[i] = casterRadius[i];
                 }
                 mat.userData.shadowQuality.value = shadowQuality === 'Off' ? 0 : shadowQuality === 'Binary' ? 1 : 2;
-                mat.userData.planetCenter.copy(planetPos);
+                mat.userData.planetCenter.set(planetPos.x, planetPos.z, -planetPos.y);
                 mat.userData.planetRadius.value = radius;
             }
         };
@@ -3630,7 +3630,7 @@ class BodyMesh {
                     float denom = dot(lightDirR, u_ringNormal);
                     if (abs(denom) > 0.0001) {
                         float tR = -dot(vWorldPositionPlanet - u_planetCenter, u_ringNormal) / denom;
-                        if (tR > 0.0) {
+                        if (tR > 0.0 && tR < distLight) {
                             vec3 P = vWorldPositionPlanet + tR * lightDirR;
                             float r = length(P - u_planetCenter);
                             float rNorm = r / u_planetRadius;
