@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { blackbodyToRGBNorm } from './blackbody';
 import { AU, L_SUN } from '../../shared/constants';
+import * as LOD from '../../shared/lod_constants';
 import { LightSourceManager, LightSourceInfo } from './light-source-manager';
 import { ShadowCasterManager, ShadowCasterInfo } from './shadow-manager';
 
@@ -1460,7 +1461,8 @@ export class BodyRenderer {
     public shadowCasterManager = new ShadowCasterManager();
 
     // Generic bodies instancing
-    private instancedMesh: THREE.InstancedMesh | null = null;
+    private instancedMeshClose: THREE.InstancedMesh | null = null;
+    private instancedMeshFar: THREE.InstancedMesh | null = null;
     private genericBodyIds: number[] = [];
     private dummyMatrix = new THREE.Matrix4();
     private dummyColor = new THREE.Color();
@@ -1548,15 +1550,24 @@ export class BodyRenderer {
         this.labelContainer.style.zIndex = '10';
         document.getElementById('canvas-container')?.appendChild(this.labelContainer);
 
-        // Pre-allocate InstancedMesh for generic bodies
-        const geom = new THREE.IcosahedronGeometry(1, 2); // 320 triangles base LOD
+        // Pre-allocate InstancedMeshes for generic bodies (LOD)
         const mat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.1 });
-        this.instancedMesh = new THREE.InstancedMesh(geom, mat, 5000);
-        this.instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        if (this.instancedMesh.instanceColor) this.instancedMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
-        this.instancedMesh.count = 0;
-        this.instancedMesh.frustumCulled = false;
-        this.solarSystemRoot.add(this.instancedMesh);
+        
+        const geomClose = new THREE.IcosahedronGeometry(1, LOD.LOD_INSTANCED_DETAIL_CLOSE);
+        this.instancedMeshClose = new THREE.InstancedMesh(geomClose, mat, 5000);
+        this.instancedMeshClose.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        if (this.instancedMeshClose.instanceColor) this.instancedMeshClose.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        this.instancedMeshClose.count = 0;
+        this.instancedMeshClose.frustumCulled = false;
+        this.solarSystemRoot.add(this.instancedMeshClose);
+
+        const geomFar = new THREE.IcosahedronGeometry(1, LOD.LOD_INSTANCED_DETAIL_FAR);
+        this.instancedMeshFar = new THREE.InstancedMesh(geomFar, mat, 5000);
+        this.instancedMeshFar.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        if (this.instancedMeshFar.instanceColor) this.instancedMeshFar.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        this.instancedMeshFar.count = 0;
+        this.instancedMeshFar.frustumCulled = false;
+        this.solarSystemRoot.add(this.instancedMeshFar);
 
         // Pre-allocate global trail buffers (empty initially, resized dynamically)
         this.trailPositionsHigh = new Float32Array(0);
@@ -1674,13 +1685,12 @@ export class BodyRenderer {
 
     addBody(body: BodyData): void {
         let instanceId: number | undefined = undefined;
-        let genericInstancedMesh: THREE.InstancedMesh | undefined = undefined;
         
-        if (isGenericBody(body) && this.instancedMesh) {
-            genericInstancedMesh = this.instancedMesh;
+        if (isGenericBody(body) && this.instancedMeshClose && this.instancedMeshFar) {
             instanceId = this.genericBodyIds.length;
             this.genericBodyIds.push(body.id);
-            this.instancedMesh.count = this.genericBodyIds.length;
+            this.instancedMeshClose.count = this.genericBodyIds.length;
+            this.instancedMeshFar.count = this.genericBodyIds.length;
         }
 
         const mesh = new BodyMesh(
@@ -1688,9 +1698,17 @@ export class BodyRenderer {
             this.sphereSegments.width,
             this.sphereSegments.height,
             this.starRenderOptions,
-            genericInstancedMesh,
             instanceId
         );
+        mesh.applyRealisticTextures(this.realisticTexturesEnabled);
+        
+        if (instanceId !== undefined && this.instancedMeshClose && this.instancedMeshFar && mesh.baseColor) {
+            const instColor = new THREE.Color(mesh.baseColor);
+            this.instancedMeshClose.setColorAt(instanceId, instColor);
+            this.instancedMeshFar.setColorAt(instanceId, instColor);
+            if (this.instancedMeshClose.instanceColor) this.instancedMeshClose.instanceColor.needsUpdate = true;
+            if (this.instancedMeshFar.instanceColor) this.instancedMeshFar.instanceColor.needsUpdate = true;
+        }
         mesh.applyRealisticTextures(this.realisticTexturesEnabled);
         this.bodies.set(body.id, mesh);
         this.solarSystemRoot.add(mesh.group);
@@ -1832,11 +1850,13 @@ export class BodyRenderer {
     removeBody(id: number): void {
         const mesh = this.bodies.get(id);
         if (mesh) {
-            if (mesh.isInstanced && this.instancedMesh) {
+            if (mesh.isInstanced && this.instancedMeshClose && this.instancedMeshFar) {
                 // Shrink to 0 to hide it without breaking indices
                 this.dummyMatrix.makeScale(0, 0, 0);
-                this.instancedMesh.setMatrixAt(mesh.instanceId, this.dummyMatrix);
-                this.instancedMesh.instanceMatrix.needsUpdate = true;
+                this.instancedMeshClose.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+                this.instancedMeshClose.instanceMatrix.needsUpdate = true;
+                this.instancedMeshFar.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+                this.instancedMeshFar.instanceMatrix.needsUpdate = true;
             }
             if (mesh.type === 'star') {
                 this.lightSourceManager.removeSource(id);
@@ -1948,7 +1968,7 @@ export class BodyRenderer {
                 const dz = camJ2000Z - localZ;
                 const distanceToCamera = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-                if (mesh.isInstanced && this.instancedMesh) {
+                if (mesh.isInstanced && this.instancedMeshClose && this.instancedMeshFar) {
                     if (this.updateBodyMatrix(mesh, localX, localY, localZ, distanceToCamera)) {
                         instancedUpdated = true;
                     }
@@ -1961,8 +1981,9 @@ export class BodyRenderer {
             i++;
         }
 
-        if (instancedUpdated && this.instancedMesh) {
-            this.instancedMesh.instanceMatrix.needsUpdate = true;
+        if (instancedUpdated && this.instancedMeshClose && this.instancedMeshFar) {
+            this.instancedMeshClose.instanceMatrix.needsUpdate = true;
+            this.instancedMeshFar.instanceMatrix.needsUpdate = true;
         }
 
         if (shouldSample && this.currentNumTrails > 0) {
@@ -2027,25 +2048,42 @@ export class BodyRenderer {
     }
 
     private updateBodyMatrix(mesh: BodyMesh, localX: number, localY: number, localZ: number, distanceToCamera: number): boolean {
-        if (!this.instancedMesh) return false;
+        if (!this.instancedMeshClose || !this.instancedMeshFar) return false;
         const radius = scaleRadius(mesh.realRadius * this.renderScale);
-        const actualVisRadius = radius;
-        
-        // Hero Mesh logic
-        if (distanceToCamera < actualVisRadius * 20) {
-            this.dummyScale.set(0, 0, 0); // Hide instance
-            if (!mesh.heroMesh) mesh.createHeroMesh();
-            if (mesh.heroMesh) mesh.heroMesh.visible = true;
-        } else {
-            const meshAny = mesh as any;
-            this.dummyScale.set(radius, radius * (1 - meshAny.oblateness), radius);
-            if (mesh.heroMesh) mesh.heroMesh.visible = false;
-        }
         
         this.dummyQuaternion.copy(mesh.group.quaternion).multiply(mesh.mesh.quaternion);
         this.dummyPosition.set(localX, localY, localZ);
-        this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
-        this.instancedMesh.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+        const meshAny = mesh as any;
+        
+        if (distanceToCamera < radius * LOD.LOD_INSTANCED_HERO_DIST_MULT) {
+            if (!mesh.heroMesh) mesh.createHeroMesh();
+            if (mesh.heroMesh) mesh.heroMesh.visible = true;
+            
+            this.dummyScale.set(0, 0, 0);
+            this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
+            this.instancedMeshClose.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+            this.instancedMeshFar.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+        } else if (distanceToCamera < radius * LOD.LOD_INSTANCED_CLOSE_DIST_MULT) {
+            if (mesh.heroMesh) mesh.heroMesh.visible = false;
+            
+            this.dummyScale.set(radius, radius * (1 - meshAny.oblateness), radius);
+            this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
+            this.instancedMeshClose.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+            
+            this.dummyScale.set(0, 0, 0);
+            this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
+            this.instancedMeshFar.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+        } else {
+            if (mesh.heroMesh) mesh.heroMesh.visible = false;
+            
+            this.dummyScale.set(radius, radius * (1 - meshAny.oblateness), radius);
+            this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
+            this.instancedMeshFar.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+            
+            this.dummyScale.set(0, 0, 0);
+            this.dummyMatrix.compose(this.dummyPosition, this.dummyQuaternion, this.dummyScale);
+            this.instancedMeshClose.setMatrixAt(mesh.instanceId, this.dummyMatrix);
+        }
         return true;
     }
 
@@ -2066,12 +2104,40 @@ export class BodyRenderer {
 
         // Dynamic Level of Detail (LOD) based on distance
         const actualVisRadius = scaleRadius(mesh.realRadius * this.renderScale);
-        if (distanceToCamera < actualVisRadius * 20) {
-            mesh.setSegments(512, 256); // Ultra LOD when very close
-        } else if (distanceToCamera < actualVisRadius * 100) {
-            mesh.setSegments(128, 64); // Medium LOD
-        } else {
-            mesh.setSegments(this.sphereSegments.width, this.sphereSegments.height); // Base LOD
+        const distRatio = distanceToCamera / actualVisRadius;
+
+        let nextTier: 'ultra' | 'nearUltra' | 'medium' | 'base' = mesh.currentLodTier;
+
+        // Determine next tier with hysteresis
+        if (nextTier === 'ultra') {
+            if (distRatio > LOD.LOD_ULTRA_DIST_MULT * LOD.LOD_HYSTERESIS_FACTOR) nextTier = 'nearUltra';
+        } else if (nextTier === 'nearUltra') {
+            if (distRatio < LOD.LOD_ULTRA_DIST_MULT) nextTier = 'ultra';
+            else if (distRatio > LOD.LOD_NEAR_ULTRA_DIST_MULT * LOD.LOD_HYSTERESIS_FACTOR) nextTier = 'medium';
+        } else if (nextTier === 'medium') {
+            if (distRatio < LOD.LOD_NEAR_ULTRA_DIST_MULT) nextTier = 'nearUltra';
+            else if (distRatio > LOD.LOD_MEDIUM_DIST_MULT * LOD.LOD_HYSTERESIS_FACTOR) nextTier = 'base';
+        } else { // 'base'
+            if (distRatio < LOD.LOD_MEDIUM_DIST_MULT) nextTier = 'medium';
+        }
+
+        // Apply new segments if tier changed
+        if (nextTier !== mesh.currentLodTier) {
+            mesh.currentLodTier = nextTier;
+            switch (nextTier) {
+                case 'ultra':
+                    mesh.setSegments(LOD.LOD_ULTRA_SEGMENTS.w, LOD.LOD_ULTRA_SEGMENTS.h);
+                    break;
+                case 'nearUltra':
+                    mesh.setSegments(LOD.LOD_NEAR_ULTRA_SEGMENTS.w, LOD.LOD_NEAR_ULTRA_SEGMENTS.h);
+                    break;
+                case 'medium':
+                    mesh.setSegments(LOD.LOD_MEDIUM_SEGMENTS.w, LOD.LOD_MEDIUM_SEGMENTS.h);
+                    break;
+                case 'base':
+                    mesh.setSegments(this.sphereSegments.width, this.sphereSegments.height);
+                    break;
+            }
         }
     }
 
@@ -2662,6 +2728,7 @@ class BodyMesh {
     private ringData: { innerMult: number, outerMult: number } | null = null;
     
     public heroMesh: THREE.Mesh | null = null;
+    public currentLodTier: 'ultra' | 'nearUltra' | 'medium' | 'base' = 'base';
     public isInstanced = false;
     public instanceId = -1;
     private instancedMeshRef: THREE.InstancedMesh | null = null;
@@ -2700,7 +2767,7 @@ class BodyMesh {
 
     public createHeroMesh(): void {
         if (this.heroMesh || !this.baseColor) return;
-        const geom = new THREE.SphereGeometry(1, 256, 128);
+        const geom = new THREE.SphereGeometry(1, LOD.LOD_HERO_SEGMENTS_W, LOD.LOD_HERO_SEGMENTS_H);
         const mat = new THREE.MeshStandardMaterial({
             color: this.baseColor,
             roughness: 0.8,
@@ -2718,7 +2785,6 @@ class BodyMesh {
         segmentsWidth: number,
         segmentsHeight: number,
         starOptions: StarRenderOptions,
-        instancedMesh?: THREE.InstancedMesh,
         instanceId?: number
     ) {
         this.bodyData = body;
@@ -2790,9 +2856,8 @@ class BodyMesh {
                 starOptions.flareQuality,
             );
         } else {
-            if (instancedMesh && instanceId !== undefined) {
+            if (instanceId !== undefined) {
                 this.isInstanced = true;
-                this.instancedMeshRef = instancedMesh;
                 this.instanceId = instanceId;
                 
                 const color = body.color || BodyMesh.deriveColorFromPhysics(body);
@@ -2800,10 +2865,6 @@ class BodyMesh {
                 
                 this.mesh = new THREE.Group();
                 this.mesh.userData.bodyId = body.id;
-                
-                const instColor = new THREE.Color(color);
-                instancedMesh.setColorAt(instanceId, instColor);
-                if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
             } else {
                 // F4: Physics-derived planet surface color as fallback
                 const color = body.color || BodyMesh.deriveColorFromPhysics(body);
