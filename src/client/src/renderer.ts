@@ -525,35 +525,35 @@ export function getDefaultRingProfile(preset: string): RingProfile {
             { pos: 0.035, color: '#333333', alpha: 0.05 },
             { pos: 0.036, color: '#000000', alpha: 0.00 },
             // 6
-            { pos: 0.038, color: '#555555', alpha: 0.80 },
+            { pos: 0.038, color: '#555555', alpha: 0.45 },
             { pos: 0.039, color: '#000000', alpha: 0.00 },
             // 5
-            { pos: 0.045, color: '#555555', alpha: 0.80 },
+            { pos: 0.045, color: '#555555', alpha: 0.45 },
             { pos: 0.046, color: '#000000', alpha: 0.00 },
             // 4
-            { pos: 0.051, color: '#555555', alpha: 0.80 },
+            { pos: 0.051, color: '#555555', alpha: 0.45 },
             { pos: 0.052, color: '#000000', alpha: 0.00 },
             // Alpha
-            { pos: 0.087, color: '#555555', alpha: 0.80 },
+            { pos: 0.087, color: '#555555', alpha: 0.45 },
             { pos: 0.088, color: '#000000', alpha: 0.00 },
             // Beta
-            { pos: 0.103, color: '#555555', alpha: 0.80 },
+            { pos: 0.103, color: '#555555', alpha: 0.45 },
             { pos: 0.104, color: '#000000', alpha: 0.00 },
             // Eta
-            { pos: 0.128, color: '#555555', alpha: 0.80 },
+            { pos: 0.128, color: '#555555', alpha: 0.45 },
             { pos: 0.129, color: '#000000', alpha: 0.00 },
             // Gamma
-            { pos: 0.136, color: '#555555', alpha: 0.80 },
+            { pos: 0.136, color: '#555555', alpha: 0.45 },
             { pos: 0.137, color: '#000000', alpha: 0.00 },
             // Delta
-            { pos: 0.147, color: '#555555', alpha: 0.80 },
+            { pos: 0.147, color: '#555555', alpha: 0.45 },
             { pos: 0.148, color: '#000000', alpha: 0.00 },
             // Lambda
             { pos: 0.176, color: '#555555', alpha: 0.30 },
             { pos: 0.177, color: '#000000', alpha: 0.00 },
             // Epsilon
             { pos: 0.194, color: '#000000', alpha: 0.00 },
-            { pos: 0.195, color: '#888888', alpha: 1.00 },
+            { pos: 0.195, color: '#888888', alpha: 0.60 },
             { pos: 0.197, color: '#000000', alpha: 0.00 },
             // Nu
             { pos: 0.460, color: '#000000', alpha: 0.00 },
@@ -576,7 +576,7 @@ export function getDefaultRingProfile(preset: string): RingProfile {
             { pos: 0.097, color: '#000000', alpha: 0.00 },
             // Le Verrier (narrow)
             { pos: 0.510, color: '#000000', alpha: 0.00 },
-            { pos: 0.512, color: '#5a606a', alpha: 0.80 },
+            { pos: 0.512, color: '#5a606a', alpha: 0.50 },
             { pos: 0.514, color: '#000000', alpha: 0.00 },
             // Lassell (broad sheet)
             { pos: 0.600, color: '#000000', alpha: 0.00 },
@@ -588,7 +588,7 @@ export function getDefaultRingProfile(preset: string): RingProfile {
             { pos: 0.782, color: '#000000', alpha: 0.00 },
             // Adams (narrow, dense arcs)
             { pos: 0.949, color: '#000000', alpha: 0.00 },
-            { pos: 0.951, color: '#6a707a', alpha: 0.90 },
+            { pos: 0.951, color: '#6a707a', alpha: 0.60 },
             { pos: 0.953, color: '#000000', alpha: 0.00 },
             { pos: 1.000, color: '#000000', alpha: 0.00 },
         ];
@@ -596,8 +596,8 @@ export function getDefaultRingProfile(preset: string): RingProfile {
         scatteringG = 0.5;
         stops = [
             { pos: 0.00, color: '#000000', alpha: 0.0 },
-            { pos: 0.10, color: '#a08264', alpha: 0.08 },
-            { pos: 0.90, color: '#a08264', alpha: 0.02 },
+            { pos: 0.10, color: '#a08264', alpha: 0.0 },
+            { pos: 0.90, color: '#a08264', alpha: 0.0 },
             { pos: 1.00, color: '#000000', alpha: 0.0 },
         ];
     } else {

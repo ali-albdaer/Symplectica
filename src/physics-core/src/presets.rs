@@ -642,12 +642,6 @@ pub fn create_integrator_test2(seed: u64) -> Simulation {
     jupiter.semi_major_axis = 5.2044 * AU;
     jupiter.eccentricity = 0.0;
     jupiter.color = hex_to_rgb(0xd4a574);
-    jupiter.rings = Some(RingParameters {
-        inner_radius_mult: 1.29,
-        outer_radius_mult: 3.1,
-        texture_preset: "jupiter".to_string(),
-        base_opacity: 0.1,
-    });
     jupiter.composition = PlanetComposition::GasGiant;
     jupiter.albedo = 0.503;
     jupiter.softening_length = compute_softening(6.9911e7);
@@ -949,12 +943,6 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
         Vec3::ZERO, Vec3::ZERO,
     );
     jupiter.color = hex_to_rgb(0xd4a574);
-    jupiter.rings = Some(RingParameters {
-        inner_radius_mult: 1.29,
-        outer_radius_mult: 3.1,
-        texture_preset: "jupiter".to_string(),
-        base_opacity: 0.1,
-    });
     jupiter.rotation_rate = 1.7585e-4;
     jupiter.axial_tilt = 0.0546;
     jupiter.mean_surface_temperature = 165.0;
@@ -1511,12 +1499,6 @@ pub fn create_full_solar_system_ii(seed: u64, barycentric: bool) -> Simulation {
     jupiter.mean_anomaly = j2000::JUPITER.mean_anomaly;
     jupiter.parent_id = Some(sun_id);
     jupiter.color = hex_to_rgb(0xd4a574);
-    jupiter.rings = Some(RingParameters {
-        inner_radius_mult: 1.29,
-        outer_radius_mult: 3.1,
-        texture_preset: "jupiter".to_string(),
-        base_opacity: 0.1,
-    });
     jupiter.composition = PlanetComposition::GasGiant;
     jupiter.albedo = 0.503;
     jupiter.softening_length = compute_softening(6.9911e7);
@@ -1881,12 +1863,6 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     jupiter.mean_anomaly = 89.37724066060315 * deg;
     jupiter.parent_id = Some(sun_id);
     jupiter.color = hex_to_rgb(0xd4a574);
-    jupiter.rings = Some(RingParameters {
-        inner_radius_mult: 1.29,
-        outer_radius_mult: 3.1,
-        texture_preset: "jupiter".to_string(),
-        base_opacity: 0.1,
-    });
     jupiter.composition = PlanetComposition::GasGiant;
     jupiter.albedo = 0.503;
     jupiter.softening_length = compute_softening(6.9911e7);
