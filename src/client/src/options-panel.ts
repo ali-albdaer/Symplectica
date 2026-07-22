@@ -38,6 +38,12 @@ export interface ExperimentalOptions {
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
 
 import { AU } from '../../shared/constants';
+
+const AU_PER_LY          = 63_241.077;   // astronomical units per light-year
+const MAX_SPACING_AU     = 100_000;       // max grid spacing in AU
+const MAX_GRID_EXTENT_AU = 1_000_000;    // max grid extent in AU
+const MAX_GRID_DIVISIONS = 5_000;        // max grid line count per axis
+
 const DEFAULTS: VisualizationOptions = { ...APP_DEFAULTS.optionsDefaults };
 
 export class OptionsPanel {
@@ -127,7 +133,7 @@ export class OptionsPanel {
     // Grid Spacing Helpers (Logarithmic)
     private sliderToSpacing(t: number): number {
         const min = 0.001;
-        const max = 100000;
+        const max = MAX_SPACING_AU;
         const minLog = Math.log10(min);
         const maxLog = Math.log10(max);
         const clamped = Math.max(0, Math.min(1, t));
@@ -136,7 +142,7 @@ export class OptionsPanel {
 
     private spacingToSlider(spacing: number): number {
         const min = 0.001;
-        const max = 100000;
+        const max = MAX_SPACING_AU;
         const minLog = Math.log10(min);
         const maxLog = Math.log10(max);
         const clamped = Math.max(min, Math.min(max, spacing));
@@ -145,7 +151,7 @@ export class OptionsPanel {
 
     private sliderToExtent(t: number): number {
         const min = 1;
-        const max = 1000000;
+        const max = MAX_GRID_EXTENT_AU;
         const minLog = Math.log10(min);
         const maxLog = Math.log10(max);
         const clamped = Math.max(0, Math.min(1, t));
@@ -154,7 +160,7 @@ export class OptionsPanel {
 
     private extentToSlider(extent: number): number {
         const min = 1;
-        const max = 1000000;
+        const max = MAX_GRID_EXTENT_AU;
         const minLog = Math.log10(min);
         const maxLog = Math.log10(max);
         const clamped = Math.max(min, Math.min(max, extent));
@@ -854,23 +860,23 @@ export class OptionsPanel {
             const spacingAu = this.sliderToSpacing(t);
             this.options.gridSpacing = spacingAu * AU;
             
-            if (spacingAu > 1000) {
-                this.gridSpacingValue.textContent = `${(spacingAu / 63241.077).toFixed(3)} ly`;
+            if (spacingAu > AU_PER_LY) {
+                this.gridSpacingValue.textContent = `${(spacingAu / AU_PER_LY).toFixed(3)} ly`;
             } else {
                 this.gridSpacingValue.textContent = `${spacingAu.toFixed(3)} AU`;
             }
 
             // Adjust grid size (divisions) to keep extent constant
             let rawSize = this.gridExtent / (2 * spacingAu);
-            if (rawSize > 5000) {
-                this.gridExtent = 5000 * 2 * spacingAu;
+            if (rawSize > MAX_GRID_DIVISIONS) {
+                this.gridExtent = MAX_GRID_DIVISIONS * 2 * spacingAu;
                 this.gridSizeInput.value = String(this.extentToSlider(this.gridExtent));
-                if (this.gridExtent > 1000) {
-                    this.gridSizeValue.textContent = `${(this.gridExtent / 63241.077).toFixed(2)} ly`;
+                if (this.gridExtent > AU_PER_LY) {
+                    this.gridSizeValue.textContent = `${(this.gridExtent / AU_PER_LY).toFixed(2)} ly`;
                 } else {
                     this.gridSizeValue.textContent = `${this.gridExtent.toFixed(0)} AU`;
                 }
-                rawSize = 5000;
+                rawSize = MAX_GRID_DIVISIONS;
             }
             this.options.gridSize = Math.max(1, Math.round(rawSize));
 
@@ -883,24 +889,24 @@ export class OptionsPanel {
             const extentAu = this.sliderToExtent(t);
             this.gridExtent = extentAu;
             
-            if (extentAu > 1000) {
-                this.gridSizeValue.textContent = `${(extentAu / 63241.077).toFixed(2)} ly`;
+            if (extentAu > AU_PER_LY) {
+                this.gridSizeValue.textContent = `${(extentAu / AU_PER_LY).toFixed(2)} ly`;
             } else {
                 this.gridSizeValue.textContent = `${extentAu.toFixed(0)} AU`;
             }
 
             let spacingAu = this.options.gridSpacing / AU;
             let rawSize = this.gridExtent / (2 * spacingAu);
-            if (rawSize > 5000) {
-                spacingAu = this.gridExtent / (2 * 5000);
+            if (rawSize > MAX_GRID_DIVISIONS) {
+                spacingAu = this.gridExtent / (2 * MAX_GRID_DIVISIONS);
                 this.options.gridSpacing = spacingAu * AU;
                 this.gridSpacingInput.value = String(this.spacingToSlider(spacingAu));
-                if (spacingAu > 1000) {
-                    this.gridSpacingValue.textContent = `${(spacingAu / 63241.077).toFixed(3)} ly`;
+                if (spacingAu > AU_PER_LY) {
+                    this.gridSpacingValue.textContent = `${(spacingAu / AU_PER_LY).toFixed(3)} ly`;
                 } else {
                     this.gridSpacingValue.textContent = `${spacingAu.toFixed(3)} AU`;
                 }
-                rawSize = 5000;
+                rawSize = MAX_GRID_DIVISIONS;
             }
             this.options.gridSize = Math.max(1, Math.round(rawSize));
 
@@ -1178,8 +1184,8 @@ export class OptionsPanel {
         this.refPointCheckbox.checked = this.options.showRefPoint;
         this.gridSpacingInput.value = String(this.spacingToSlider(this.options.gridSpacing / AU));
         const spacingAu = this.options.gridSpacing / AU;
-        if (spacingAu > 1000) {
-            this.gridSpacingValue.textContent = `${(spacingAu / 63241.077).toFixed(3)} ly`;
+        if (spacingAu > AU_PER_LY) {
+            this.gridSpacingValue.textContent = `${(spacingAu / AU_PER_LY).toFixed(3)} ly`;
         } else {
             this.gridSpacingValue.textContent = `${spacingAu.toFixed(3)} AU`;
         }
@@ -1188,8 +1194,8 @@ export class OptionsPanel {
         const currentExtent = this.options.gridSize * 2 * spacingAu;
         this.gridExtent = currentExtent;
         this.gridSizeInput.value = String(this.extentToSlider(currentExtent));
-        if (currentExtent > 1000) {
-            this.gridSizeValue.textContent = `${(currentExtent / 63241.077).toFixed(2)} ly`;
+        if (currentExtent > AU_PER_LY) {
+            this.gridSizeValue.textContent = `${(currentExtent / AU_PER_LY).toFixed(2)} ly`;
         } else {
             this.gridSizeValue.textContent = `${currentExtent.toFixed(0)} AU`;
         }

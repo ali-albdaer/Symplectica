@@ -17,6 +17,18 @@ import {
     unwrapAngle,
 } from './camera-math';
 
+export type SimScale = 'solar' | 'interstellar' | 'galactic';
+
+const LY     = 9.461e15;   // meters per light-year
+const PARSEC = 3.086e16;   // meters per parsec
+
+/** Camera frustum and orbit-radius limits, keyed by simulation scale. */
+export const SCALE_PRESETS: Record<SimScale, { maxRadius: number; far: number }> = {
+    solar:        { maxRadius: 1e15,               far: 1e15  },
+    interstellar: { maxRadius: 10 * LY,            far: 1.5e17 },
+    galactic:     { maxRadius: 1000 * PARSEC,      far: 1e20  },
+};
+
 export class OrbitCamera extends THREE.PerspectiveCamera {
     // Orbital parameters
     private radius = 3 * AU;
@@ -842,26 +854,11 @@ export class OrbitCamera extends THREE.PerspectiveCamera {
      * 'interstellar' = nearest-star scale (~10 light-year max)
      * 'galactic'     = star cluster scale (~1000 parsecs max)
      */
-    configureForScale(scale: 'solar' | 'interstellar' | 'galactic'): void {
-        const PARSEC = 3.086e16;  // meters
-        const LY = 9.461e15;      // meters
-        
-        if (scale === 'galactic') {
-            // Star clusters can span hundreds of parsecs
-            this.maxRadius = 1000 * PARSEC;  // 1000 parsecs
-            this.far = 1e20;  // Render up to ~3000 parsecs
-            this.updateProjectionMatrix();
-        } else if (scale === 'interstellar') {
-            // Nearest-star presets (e.g. Sol-Centauri): span ~10 ly
-            this.maxRadius = 10 * LY;  // 10 light-years
-            this.far = 1.5e17;         // Matches sky sphere radius
-            this.updateProjectionMatrix();
-        } else {
-            // Solar system scale
-            this.maxRadius = 1e15;  // ~1000 AU
-            this.far = 1e15;
-            this.updateProjectionMatrix();
-        }
+    configureForScale(scale: SimScale): void {
+        const s = SCALE_PRESETS[scale];
+        this.maxRadius = s.maxRadius;
+        this.far = s.far;
+        this.updateProjectionMatrix();
     }
 
     /** Set initial camera distance, bypassing maxRadius clamp during initialization */

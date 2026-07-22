@@ -26,7 +26,7 @@ import { SkyRenderer } from './sky-renderer';
 import { TouchControls } from './touch-controls';
 import { BuildPanel, BuildBodyParams, BuildableBodyType, BodyListEntry } from './build-panel';
 import { DriftMonitor } from './drift-monitor';
-import { APP_DEFAULTS } from './defaults';
+import { APP_DEFAULTS, PRESET_SCENE_CONFIG, DEFAULT_SCENE_CONFIG } from './defaults';
 import { logger } from './logger';
 import { MediaCapture } from './recorder';
 
@@ -995,21 +995,11 @@ class NBodyClient {
             this.physics.createPreset(presetId, BigInt(Date.now()), barycentric, bodyCount, stressTestCounts);
         }
 
-        // Configure camera scale based on preset type
-        if (presetId === 'starCluster') {
-            this.camera.configureForScale('galactic');
-        } else if (presetId === 'solarCentauriI') {
-            this.camera.configureForScale('interstellar');
-        } else if (presetId === 'stressTest') {
-            this.camera.configureForScale('solar');
-        } else if (presetId !== 'worldBuilder') {
-            this.camera.configureForScale('solar');
-        }
-
-        if (presetId === 'solarCentauriI') {
-            this.skyRenderer.setOptions({ skyRadius: 1.5e17 });
-        } else {
-            this.skyRenderer.setOptions({ skyRadius: 5e14 });
+        // Apply rendering environment for this preset (camera scale + sky sphere)
+        const sceneConfig = PRESET_SCENE_CONFIG[presetId as keyof typeof PRESET_SCENE_CONFIG] ?? DEFAULT_SCENE_CONFIG;
+        if (presetId !== 'worldBuilder') {
+            this.camera.configureForScale(sceneConfig.scale);
+            this.skyRenderer.setOptions({ skyRadius: sceneConfig.skyRadius });
         }
 
         if (presetId !== 'worldBuilder') {
