@@ -288,47 +288,54 @@ export class OptionsPanel {
                             <span>Trails</span>
                         </label>
                     </div>
-                    <div class="opt-row">
-                        <label class="opt-toggle">
-                            <input type="checkbox" id="opt-star-labels">
-                            <span>Star</span>
-                        </label>
-                        <label class="opt-toggle">
-                            <input type="checkbox" id="opt-planet-labels">
-                            <span>Planet</span>
-                        </label>
-                        <label class="opt-toggle">
-                            <input type="checkbox" id="opt-moon-labels">
-                            <span>Moon</span>
-                        </label>
-                    </div>
 
-                    <div class="opt-row">
-                        <label class="opt-toggle">
-                            <input type="checkbox" id="opt-grid-xy">
-                            <span>XY</span>
-                        </label>
-                        <label class="opt-toggle">
-                            <input type="checkbox" id="opt-grid-xz">
-                            <span>XZ</span>
-                        </label>
-                        <label class="opt-toggle">
-                            <input type="checkbox" id="opt-grid-yz">
-                            <span>YZ</span>
-                        </label>
-                    </div>
+                    <details open style="margin-bottom: 8px;">
+                        <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 0.5px; outline: none; margin-bottom: 6px;">Labels</summary>
+                        <div class="opt-row" style="margin-top: 6px;">
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-star-labels">
+                                <span>Star</span>
+                            </label>
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-planet-labels">
+                                <span>Planet</span>
+                            </label>
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-moon-labels">
+                                <span>Moon</span>
+                            </label>
+                        </div>
+                    </details>
 
-                    <div class="opt-field">
-                        <label>Grid Spacing</label>
-                        <input type="range" id="opt-grid-spacing" min="0" max="1" step="0.001" value="0.5">
-                        <span id="opt-grid-spacing-value">0.1 AU</span>
-                    </div>
+                    <details open style="margin-bottom: 8px;">
+                        <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 0.5px; outline: none; margin-bottom: 6px;">Grids</summary>
+                        <div class="opt-row" style="margin-top: 6px;">
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-grid-xy">
+                                <span>XY</span>
+                            </label>
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-grid-xz">
+                                <span>XZ</span>
+                            </label>
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="opt-grid-yz">
+                                <span>YZ</span>
+                            </label>
+                        </div>
 
-                    <div class="opt-field">
-                        <label>Grid Extent</label>
-                        <input type="range" id="opt-grid-size" min="0" max="1" step="0.001" value="0.5">
-                        <span id="opt-grid-size-value">200 AU</span>
-                    </div>
+                        <div class="opt-field" style="margin-top: 6px;">
+                            <label>Grid Spacing</label>
+                            <input type="range" id="opt-grid-spacing" min="0" max="1" step="0.001" value="0.5">
+                            <span id="opt-grid-spacing-value">0.1 AU</span>
+                        </div>
+
+                        <div class="opt-field">
+                            <label>Grid Extent</label>
+                            <input type="range" id="opt-grid-size" min="0" max="1" step="0.001" value="0.5">
+                            <span id="opt-grid-size-value">200 AU</span>
+                        </div>
+                    </details>
                 </section>
 
                 <section class="opt-section">
@@ -394,91 +401,97 @@ export class OptionsPanel {
                     <div class="opt-field">
                         <label>Field of View</label>
                         <div class="opt-slider-row">
-                            <input type="range" id="opt-camera-fov" min="10" max="120" step="1" value="75">
-                            <span id="opt-camera-fov-value">75°</span>
+                            <input type="range" id="opt-camera-fov" min="10" max="120" step="1" value="53">
+                            <span id="opt-camera-fov-value">53°</span>
                         </div>
                     </div>
                 </section>
 
                 <section class="opt-section">
-                    <h3>Orbital Camera Settings</h3>
-                    <div class="opt-field">
-                        <label>Rotation Smoothing</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-orbital-rotation-damping" min="0.5" max="0.99" step="0.01" value="0.92">
-                            <span id="opt-orbital-rotation-damping-value">92%</span>
+                    <details>
+                        <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 0.5px; outline: none; margin-bottom: 6px;">Orbital Camera Settings</summary>
+                        <div class="opt-field" style="margin-top: 6px;">
+                            <label>Rotation Smoothing</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-orbital-rotation-damping" min="0.5" max="0.99" step="0.01" value="0.92">
+                                <span id="opt-orbital-rotation-damping-value">92%</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="opt-field">
-                        <label>Zoom Smoothing</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-orbital-zoom-damping" min="0.5" max="0.99" step="0.01" value="0.9">
-                            <span id="opt-orbital-zoom-damping-value">90%</span>
+                        <div class="opt-field">
+                            <label>Zoom Smoothing</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-orbital-zoom-damping" min="0.5" max="0.99" step="0.01" value="0.9">
+                                <span id="opt-orbital-zoom-damping-value">90%</span>
+                            </div>
                         </div>
-                    </div>
+                    </details>
                 </section>
 
                 <section class="opt-section">
-                    <h3>Free Camera Settings</h3>
-                    <div class="opt-field">
-                        <label>Rotation Smoothing</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-freecam-rotation-damping" min="0" max="0.99" step="0.01" value="0">
-                            <span id="opt-freecam-rotation-damping-value">0%</span>
+                    <details>
+                        <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 0.5px; outline: none; margin-bottom: 6px;">Free Camera Settings</summary>
+                        <div class="opt-field" style="margin-top: 6px;">
+                            <label>Rotation Smoothing</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-freecam-rotation-damping" min="0" max="0.99" step="0.01" value="0">
+                                <span id="opt-freecam-rotation-damping-value">0%</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="opt-field">
-                        <label>Speed (AU/s)</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-freecam-speed" min="0" max="100" step="0.1" value="0.1">
-                            <span id="opt-freecam-speed-value">0.100 AU/s</span>
+                        <div class="opt-field">
+                            <label>Speed (AU/s)</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-freecam-speed" min="0" max="100" step="0.1" value="0.1">
+                                <span id="opt-freecam-speed-value">0.100 AU/s</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="opt-field">
-                        <label>Sensitivity</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-freecam-sensitivity" min="0.1" max="2" step="0.1" value="0.3">
-                            <span id="opt-freecam-sensitivity-value">0.3x</span>
+                        <div class="opt-field">
+                            <label>Sensitivity</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-freecam-sensitivity" min="0.1" max="2" step="0.1" value="0.2">
+                                <span id="opt-freecam-sensitivity-value">0.2x</span>
+                            </div>
                         </div>
-                    </div>
+                    </details>
                 </section>
 
                 <section class="opt-section">
-                    <h3>Surface Camera Settings</h3>
-                    <div class="opt-field">
-                        <label>Rotation Smoothing</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-surface-rotation-damping" min="0" max="0.99" step="0.01" value="0">
-                            <span id="opt-surface-rotation-damping-value">0%</span>
+                    <details>
+                        <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 0.5px; outline: none; margin-bottom: 6px;">Surface Camera Settings</summary>
+                        <div class="opt-field" style="margin-top: 6px;">
+                            <label>Rotation Smoothing</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-surface-rotation-damping" min="0" max="0.99" step="0.01" value="0">
+                                <span id="opt-surface-rotation-damping-value">0%</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="opt-field">
-                        <label>Speed (m/s)</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-surface-speed" min="0" max="50" step="0.5" value="5">
-                            <span id="opt-surface-speed-value">5.0 m/s</span>
+                        <div class="opt-field">
+                            <label>Speed (m/s)</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-surface-speed" min="0" max="50" step="0.5" value="5">
+                                <span id="opt-surface-speed-value">5.0 m/s</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="opt-field">
-                        <label>Sensitivity</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-surface-sensitivity" min="0.1" max="2" step="0.1" value="0.3">
-                            <span id="opt-surface-sensitivity-value">0.3x</span>
+                        <div class="opt-field">
+                            <label>Sensitivity</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-surface-sensitivity" min="0.1" max="2" step="0.1" value="0.3">
+                                <span id="opt-surface-sensitivity-value">0.3x</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="opt-field">
-                        <label>Eye Height (m)</label>
-                        <div class="opt-slider-row">
-                            <input type="range" id="opt-surface-eye-height" min="0.5" max="5" step="0.1" value="1.7">
-                            <span id="opt-surface-eye-height-value">1.7 m</span>
+                        <div class="opt-field">
+                            <label>Eye Height (m)</label>
+                            <div class="opt-slider-row">
+                                <input type="range" id="opt-surface-eye-height" min="0.5" max="5" step="0.1" value="1.7">
+                                <span id="opt-surface-eye-height-value">1.7 m</span>
+                            </div>
                         </div>
-                    </div>
+                    </details>
                 </section>
             </div>
 

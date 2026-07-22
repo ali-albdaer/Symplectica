@@ -43,9 +43,9 @@
   },
   "visualPresetDefault": "Ultra",
   "cameraDefaults": {
-    "cameraFov": 75,
+    "cameraFov": 53,
     "freeCamSpeedAuPerSec": 0.01,
-    "freeCamSensitivity": 0.3,
+    "freeCamSensitivity": 0.2,
     "freeCamRotationDamping": 0.55,
     "surfaceSpeedMps": 5,
     "surfaceSensitivity": 0.3,
