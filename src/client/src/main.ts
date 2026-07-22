@@ -1458,6 +1458,7 @@ class NBodyClient {
 
     private followOrigin(): void {
         this.followBodyIndex = -1;
+        this.camera.setFocus(0, 0, 0);
         this.camera.setMinimumOrbitDistance(1);
         this.updateFollowUI();
     }

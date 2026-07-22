@@ -1472,6 +1472,8 @@ export class BodyRenderer {
     private gridXYVisible = false;
     private gridXZVisible = false;
     private gridYZVisible = false;
+    /** World-space origin at which the current grid geometry was built. */
+    private gridBuildOrigin = { x: 0, y: 0, z: 0 };
 
     // Scale settings
     private renderScale = 1;
@@ -1888,8 +1890,21 @@ export class BodyRenderer {
             this.globalTrailMaterial.userData.shader.uniforms.u_originLow.value.set(origin.x - hx, origin.y - hy, origin.z - hz);
         }
 
-        if (this.gridGroup) {
-            this.gridGroup.position.set(-origin.x, -origin.y, -origin.z);
+        // Rebuild grid if the camera origin has drifted too far from the build origin.
+        // This keeps the render-space vertices small to maintain fp32 precision.
+        if (this.gridGroup && this.gridSpacing > 0) {
+            const dx = origin.x - this.gridBuildOrigin.x;
+            const dy = origin.y - this.gridBuildOrigin.y;
+            const dz = origin.z - this.gridBuildOrigin.z;
+            
+            // 1e11 meters (~0.66 AU) drift gives worst-case ~10 km fp32 precision,
+            // which is sub-pixel at any reasonable viewing distance.
+            const maxDrift = 1e11;
+            if (Math.abs(dx) > maxDrift || Math.abs(dy) > maxDrift || Math.abs(dz) > maxDrift) {
+                this.rebuildGrid(origin);
+            } else {
+                this.gridGroup.position.set(-dx, -dy, -dz);
+            }
         }
 
         // Update light sources and shadow casters globally
@@ -2289,7 +2304,7 @@ export class BodyRenderer {
         this.gridYZVisible = showYZ;
         this.gridSpacing = Math.max(spacing, 1.0);
         this.gridSize = Math.max(1, Math.round(size));
-        this.rebuildGrid();
+        this.rebuildGrid(this.lastOrigin ?? { x: 0, y: 0, z: 0 });
     }
 
     pickBodyId(raycaster: THREE.Raycaster): number | null {
@@ -2532,7 +2547,7 @@ export class BodyRenderer {
         }
     }
 
-    private rebuildGrid(): void {
+    private rebuildGrid(origin: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 }): void {
         if (this.gridGroup) {
             this.scene.remove(this.gridGroup);
             this.disposeGrid(this.gridGroup);
@@ -2543,7 +2558,11 @@ export class BodyRenderer {
             return;
         }
 
+        this.gridBuildOrigin = { x: origin.x, y: origin.y, z: origin.z };
+
         this.gridGroup = new THREE.Group();
+        this.gridGroup.position.set(0, 0, 0);
+
         const material = new THREE.LineBasicMaterial({
             color: 0xffffff,
             transparent: true,
@@ -2551,29 +2570,67 @@ export class BodyRenderer {
         });
 
         const divisions = Math.max(2, this.gridSize * 2);
-        const size = divisions * this.gridSpacing;
+        const half = divisions / 2;
 
         if (this.gridXZVisible) {
-            const gridXZ = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);
-            gridXZ.material = material;
-            this.gridGroup.add(gridXZ);
+            this.gridGroup.add(this.buildGridPlane(divisions, half, this.gridSpacing, 'xz', material, this.gridBuildOrigin));
         }
 
         if (this.gridXYVisible) {
-            const gridXY = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);
-            gridXY.material = material;
-            gridXY.rotation.x = Math.PI / 2;
-            this.gridGroup.add(gridXY);
+            this.gridGroup.add(this.buildGridPlane(divisions, half, this.gridSpacing, 'xy', material, this.gridBuildOrigin));
         }
 
         if (this.gridYZVisible) {
-            const gridYZ = new THREE.GridHelper(size, divisions, 0xffffff, 0xffffff);
-            gridYZ.material = material;
-            gridYZ.rotation.z = Math.PI / 2;
-            this.gridGroup.add(gridYZ);
+            this.gridGroup.add(this.buildGridPlane(divisions, half, this.gridSpacing, 'yz', material, this.gridBuildOrigin));
         }
 
         this.scene.add(this.gridGroup);
+    }
+
+    private buildGridPlane(
+        divisions: number,
+        half: number,
+        spacing: number,
+        plane: 'xz' | 'xy' | 'yz',
+        material: THREE.LineBasicMaterial,
+        buildOrigin: { x: number; y: number; z: number }
+    ): THREE.LineSegments {
+        const totalLines = (divisions + 1) * 2; // lines along each axis
+        const vertices = new Float32Array(totalLines * 2 * 3); // 2 verts per line, 3 floats per vert
+        let vi = 0;
+
+        const extent = half * spacing;
+
+        for (let i = 0; i <= divisions; i++) {
+            const t = (i - half) * spacing; // ranges from -extent to +extent
+
+            if (plane === 'xz') {
+                // line along X at absolute Z = t, absolute Y = 0
+                vertices[vi++] = -extent - buildOrigin.x; vertices[vi++] = 0 - buildOrigin.y; vertices[vi++] = t - buildOrigin.z;
+                vertices[vi++] =  extent - buildOrigin.x; vertices[vi++] = 0 - buildOrigin.y; vertices[vi++] = t - buildOrigin.z;
+                // line along Z at absolute X = t, absolute Y = 0
+                vertices[vi++] = t - buildOrigin.x; vertices[vi++] = 0 - buildOrigin.y; vertices[vi++] = -extent - buildOrigin.z;
+                vertices[vi++] = t - buildOrigin.x; vertices[vi++] = 0 - buildOrigin.y; vertices[vi++] =  extent - buildOrigin.z;
+            } else if (plane === 'xy') {
+                // line along X at absolute Y = t, absolute Z = 0
+                vertices[vi++] = -extent - buildOrigin.x; vertices[vi++] = t - buildOrigin.y; vertices[vi++] = 0 - buildOrigin.z;
+                vertices[vi++] =  extent - buildOrigin.x; vertices[vi++] = t - buildOrigin.y; vertices[vi++] = 0 - buildOrigin.z;
+                // line along Y at absolute X = t, absolute Z = 0
+                vertices[vi++] = t - buildOrigin.x; vertices[vi++] = -extent - buildOrigin.y; vertices[vi++] = 0 - buildOrigin.z;
+                vertices[vi++] = t - buildOrigin.x; vertices[vi++] =  extent - buildOrigin.y; vertices[vi++] = 0 - buildOrigin.z;
+            } else {
+                // line along Y at absolute Z = t, absolute X = 0
+                vertices[vi++] = 0 - buildOrigin.x; vertices[vi++] = -extent - buildOrigin.y; vertices[vi++] = t - buildOrigin.z;
+                vertices[vi++] = 0 - buildOrigin.x; vertices[vi++] =  extent - buildOrigin.y; vertices[vi++] = t - buildOrigin.z;
+                // line along Z at absolute Y = t, absolute X = 0
+                vertices[vi++] = 0 - buildOrigin.x; vertices[vi++] = t - buildOrigin.y; vertices[vi++] = -extent - buildOrigin.z;
+                vertices[vi++] = 0 - buildOrigin.x; vertices[vi++] = t - buildOrigin.y; vertices[vi++] =  extent - buildOrigin.z;
+            }
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        return new THREE.LineSegments(geometry, material);
     }
 
     private disposeGrid(group: THREE.Group): void {
