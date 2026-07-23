@@ -1,21 +1,36 @@
 # Symplectica
 
-**Symplectica** is a high-fidelity, multiplayer, N-body space simulator focused on scientific accuracy. Built with **Rust + WebAssembly**, **TypeScript**, **Three.js**, and **Node.js**. Development in progress.
+**Symplectica** is a multiplayer N-body space simulator focusing on scientific accuracy, visual fidelity and realistic orbital mechanics. 
+
+Whether you're a physics enthusiast simulating star systems and astroid belts, a student learning about orbital mechanics and numerical methods, or a player exploring the universe with your friends, Symplectica handles it all.
+
+Built with **Rust + WebAssembly** on the backend and **TypeScript + Three.js** on the frontend.
 
 ## Visuals
 
 Soon.
 
-## Key Features 
-- Several accurate presets, including a Solar System preset with HORIZONS-based data for planets and major bodies, plus Proxima Centauri and TRAPPIST-1 system presets.
-- N-body gravity with `Pairwise`, `Barnes-Hut` and `FMM` solver options.
-- Hybrid integrator switching in close encounters:
-   - Default integrator: `Symplectic Velocity Verlet`
-   - Close-encounter: `Adaptive RK45` or `5th-Order Gauss-Radau` to avoid energy drift.
-- True distances and sizes with optional visualization-only size scaling.
+## Key Features
+
+Some of Symplectica's capabilities include:
+
+- Realistic physical properties for stars, planets and moons:
+   - Stars: surface temperature, luminosity, mass, and solar flares.
+   - Planets: axial tilt, oblateness, rings, and atmospheres.
+   - Moons: inclination, eccentricity, orbital resonances, and eclipses.
+- Atmospheric scattering with multi-light source, penumbra shadow effects.
+- Realistic system presets with **to-scale** distances and sizes:
+   - Our Solar System with real ephemeris data for planets, moons, and other major bodies (sourced from NASA JPL HORIZONS).
+   - The Proxima Centauri system.
+   - The TRAPPIST-1 system.
+- High-performance N-body simulation with `Pairwise`, `Barnes-Hut` and `FMM` force methods.
+- Hybrid integrator switching in close encounters to avoid energy drift:
+   - Default integrator: `Symplectic Velocity Verlet`.
+   - Close-encounter: `Adaptive RK45` or `5th-Order Gauss-Radau`.
+- Time-warp and teleportation options.
 - Multiplayer universe builder with real-time system editing.
 
-See [FEATURES.md](docs/FEATURES.md) for a comprehensive list of implemented, in progress, and planned features.
+See [FEATURES.md](docs/FEATURES.md) for a comprehensive list of implemented, in-progress, and planned features.
 
 ## Installation & Setup
 
