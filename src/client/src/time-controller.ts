@@ -144,9 +144,9 @@ export class TimeController {
     /** Get display label for current speed */
     getDisplayLabel(): string {
         if (this.paused) {
-            return '⏸ PAUSED';
+            return '|| PAUSED';
         }
-        return `⏱ ${SPEED_LEVELS[this.speedIndex].label}`;
+        return `${SPEED_LEVELS[this.speedIndex].label}`;
     }
 
     /** Set callback for speed changes */

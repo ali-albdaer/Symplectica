@@ -67,6 +67,8 @@ class NBodyClient {
     private lastTpsTick = 0;
     private serverTps = 0;
     private driftMonitor!: DriftMonitor;
+    private currentAdminState: AdminStatePayload | null = null;
+
 
     private state: SimState = {
         tick: 0,
@@ -511,6 +513,7 @@ class NBodyClient {
     }
 
     private applyAdminState(settings: AdminStatePayload): void {
+        this.currentAdminState = settings;
         // Validate critical settings to prevent crashes
         if (!Number.isFinite(settings.dt) || settings.dt <= 0) return;
         if (!Number.isFinite(settings.timeScale) || settings.timeScale <= 0) return;
@@ -1985,7 +1988,10 @@ class NBodyClient {
         if (now - this.lastUiDomUpdate < SIM_TAB_UPDATE_INTERVAL_MS) return;
         this.lastUiDomUpdate = now;
 
-        document.getElementById('sim-time')!.textContent = this.formatTime(this.state.time);
+        const epochDate = this.network.isConnected() ? this.currentAdminState?.baseEpoch : APP_DEFAULTS.adminDefaults.baseEpoch;
+        const dateStr = this.formatDate(epochDate || APP_DEFAULTS.adminDefaults.baseEpoch, this.state.time);
+        document.getElementById('sim-time')!.textContent = dateStr;
+        document.getElementById('time-warp')!.textContent = `${this.formatTime(this.state.time)} @ ${this.timeController.getDisplayLabel()}`;
         document.getElementById('sim-bodies')!.textContent = this.state.bodyCount.toString();
 
         // Compute total mass from cached bodies
@@ -1999,8 +2005,6 @@ class NBodyClient {
             document.getElementById('sim-mass')!.textContent = '0 kg';
         }
 
-        const avgFps = this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
-        document.getElementById('render-fps')!.textContent = avgFps.toFixed(0);
 
         const cameraDist = this.camera.getDistance();
         document.getElementById('camera-dist')!.textContent = (cameraDist / AU).toFixed(3) + ' AU';
@@ -2035,6 +2039,18 @@ class NBodyClient {
         if (seconds < 86400) return (seconds / 3600).toFixed(2) + ' hr';
         if (seconds < 31536000) return (seconds / 86400).toFixed(2) + ' days';
         return (seconds / 31536000).toFixed(4) + ' years';
+    }
+
+    private formatDate(baseEpoch: string, simSeconds: number): string {
+        const date = new Date(new Date(baseEpoch).getTime() + simSeconds * 1000);
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const yyyy = date.getUTCFullYear().toString();
+        const mm = pad(date.getUTCMonth() + 1);
+        const dd = pad(date.getUTCDate());
+        const hh = pad(date.getUTCHours());
+        const mins = pad(date.getUTCMinutes());
+        const ss = pad(date.getUTCSeconds());
+        return `${dd}-${mm}-${yyyy} ${hh}:${mins}:${ss}`;
     }
 
     private setLocalSimMode(mode: SimMode): void {

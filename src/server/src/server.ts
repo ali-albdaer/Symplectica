@@ -112,6 +112,7 @@ class SimulationServer {
     private lastSnapshotTick = 0n;
     private simAccumulator = 0;
     private adminState: AdminStatePayload = {
+        baseEpoch: APP_DEFAULTS.adminDefaults.baseEpoch,
         dt: APP_DEFAULTS.adminDefaults.dt,
         substeps: APP_DEFAULTS.adminDefaults.substeps,
         forceMethod: APP_DEFAULTS.adminDefaults.forceMethod,
@@ -203,6 +204,7 @@ class SimulationServer {
         logger.info('Creating simulation...');
 
         this.adminState = {
+            baseEpoch: APP_DEFAULTS.adminDefaults.baseEpoch,
             dt: APP_DEFAULTS.adminDefaults.dt,
             substeps: APP_DEFAULTS.adminDefaults.substeps,
             forceMethod: APP_DEFAULTS.adminDefaults.forceMethod,
@@ -518,6 +520,10 @@ class SimulationServer {
                 const timeScale = typeof payload.timeScale === 'number' && payload.timeScale > 0
                     ? payload.timeScale
                     : this.adminState.timeScale;
+                const baseEpoch = typeof payload.baseEpoch === 'string'
+                    ? payload.baseEpoch
+                    : this.adminState.baseEpoch;
+
 
                 if (timeScale !== this.adminState.timeScale) {
                     const label = getSpeedLabel(timeScale);
@@ -556,6 +562,7 @@ class SimulationServer {
                 );
 
                 this.adminState = {
+                    baseEpoch,
                     dt,
                     substeps,
                     forceMethod,

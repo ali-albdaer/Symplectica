@@ -28,6 +28,7 @@ export type CloseEncounterIntegrator = 'none' | 'rk45' | 'gauss-radau';
 export type VisualPresetName = 'Low' | 'High' | 'Ultra';
 
 export interface AdminDefaults {
+    baseEpoch: string;
     tickRate: number;
     dt: number;
     substeps: number;

@@ -92,6 +92,7 @@ export class AdminPanel {
     private defaultAdminState(): AdminStatePayload {
         const defaults = APP_DEFAULTS.adminDefaults;
         return {
+            baseEpoch: defaults.baseEpoch,
             dt: defaults.dt,
             substeps: defaults.substeps,
             forceMethod: defaults.forceMethod,
@@ -200,6 +201,11 @@ export class AdminPanel {
                         <select id="admin-time-warp">
                             <!-- Populated by JS -->
                         </select>
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Base Epoch (UTC)</label>
+                        <input type="text" id="admin-base-epoch" value="${APP_DEFAULTS.adminDefaults.baseEpoch}">
                     </div>
 
                     <div class="admin-field">
@@ -768,6 +774,7 @@ export class AdminPanel {
     }
 
     private applySettings(): void {
+        const baseEpoch = (document.getElementById('admin-base-epoch') as HTMLInputElement).value;
         const dt = parseFloat((document.getElementById('admin-dt') as HTMLInputElement).value);
         const substeps = parseInt((document.getElementById('admin-substeps') as HTMLInputElement).value);
         const forceMethod = (document.getElementById('admin-force-method') as HTMLSelectElement).value;
@@ -789,6 +796,7 @@ export class AdminPanel {
 
         if (this.network?.isConnected()) {
             this.network.sendAdminSettings({
+                baseEpoch,
                 dt,
                 substeps,
                 forceMethod: forceMethod === 'barnes-hut' ? 'barnes-hut' : 'direct',

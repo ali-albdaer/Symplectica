@@ -9,6 +9,7 @@
 // ── Admin State ──────────────────────────────────────────────
 
 export interface AdminStatePayload {
+    baseEpoch: string;
     dt: number;
     substeps: number;
     forceMethod: 'direct' | 'barnes-hut';
