@@ -183,9 +183,9 @@ void main() {
     vec3 normal = normalize(vWorldNormal);
     vec3 viewDir = normalize(cameraPosition - vWorldPos);
     
-    // For optical depth, we want the angle between the view ray and the surface normal.
-    // If we are outside, NdotV is positive at center, 0 at edges.
-    // If we are inside, we use BackSide, so NdotV would be negative. Let's use abs(dot).
+    // For optical depth, calculate the angle between the view ray and surface normal.
+    // When exterior, NdotV is positive at the center and 0 at the edges.
+    // When interior (BackSide rendered), NdotV is negative, requiring the absolute value.
     float NdotV = abs(dot(normal, viewDir));
     
     vec3 zenithDir = normalize(vWorldPos - u_planetCenter);
@@ -2531,7 +2531,7 @@ export class BodyRenderer {
             if (!visible) {
                 this.ghostAtmoMesh.visible = false;
             } else {
-                // If the user checked it, `setGhostPreview` should have set it visible earlier, but let's just make it visible
+                // Ensure the ghost atmosphere visibility matches the user's configuration parameter.
                 this.ghostAtmoMesh.visible = this.showAtmospheres;
             }
         }

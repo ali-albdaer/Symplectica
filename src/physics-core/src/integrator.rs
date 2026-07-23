@@ -833,7 +833,7 @@ mod tests {
             total_time += config.dt;
             let y_after = bodies[1].position.y;
 
-            // First, wait for Earth to move into y<0 region
+            // Initial condition: Confirm Earth transitions into the y < 0 region.
             if y_after < 0.0 {
                 crossed_y_negative = true;
             }
