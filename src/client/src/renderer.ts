@@ -3253,7 +3253,7 @@ class BodyMesh {
         
         // Update Ring Shadow on planet
         const updateMat = (mat: THREE.Material) => {
-            if (mat instanceof THREE.MeshStandardMaterial && mat.userData.numLights) {
+            if ((mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshLambertMaterial) && mat.userData.numLights) {
                 mat.userData.numLights.value = numLights;
                 for (let i = 0; i < numLights; i++) {
                     mat.userData.lightPos.value[i].copy(lightPos[i]);
@@ -3277,6 +3277,10 @@ class BodyMesh {
         }
         if (this.heroMesh && this.heroMesh.material) {
             const mats = Array.isArray(this.heroMesh.material) ? this.heroMesh.material : [this.heroMesh.material];
+            mats.forEach(updateMat);
+        }
+        if (this.cloudMesh && this.cloudMesh.material) {
+            const mats = Array.isArray(this.cloudMesh.material) ? this.cloudMesh.material : [this.cloudMesh.material];
             mats.forEach(updateMat);
         }
 
@@ -3415,6 +3419,7 @@ class BodyMesh {
                     depthWrite: false
                 });
                 this.cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+                this.setupShadowMaterial(cloudMat);
                 // Ensure clouds rotate slightly over time relative to the planet's surface
                 this.cloudMesh.userData.rotationSpeed = 1.5e-6; 
                 this.mesh.add(this.cloudMesh); // Add as child of Earth mesh so it inherits orientation
@@ -3477,7 +3482,7 @@ class BodyMesh {
         }
     }
 
-    private setupShadowMaterial(standardMat: THREE.MeshStandardMaterial): void {
+    private setupShadowMaterial(standardMat: THREE.Material): void {
         const body = this.bodyData;
         let ringNormal = new THREE.Vector3(0, 1, 0);
         if (body.rings) {
