@@ -282,7 +282,7 @@ void main() {
         finalColor += lightContrib * sunInfluence * (u_lightColor[i] * (u_lightIntensity[i] * attenuation));
 
         // Reduce bright star contribution (temporary)
-        finalColor *= 0.3;
+        finalColor *= 0.5;
     }
     
     // Alpha computation
@@ -3418,7 +3418,7 @@ class BodyMesh {
                 mat.uniforms.u_lightIntensity.value[i] = lightIntensity[i];
             }
             if (mat.uniforms.u_planetCenter) {
-                mat.uniforms.u_planetCenter.value.copy(planetPos);
+                mat.uniforms.u_planetCenter.value.set(planetPos.x, planetPos.z, -planetPos.y);
             }
             
             const dist = planetPos.length(); // In floating origin, camera is at (0,0,0), so dist is planetPos magnitude
