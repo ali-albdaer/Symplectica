@@ -154,8 +154,8 @@ void main() {
 const ATMO_FRAGMENT = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_fragment>
-uniform vec3 u_rayleighColor;
-uniform vec3 u_mieColor;
+uniform vec3 u_rayleighColor;   // Rayleigh scattering coefficients
+uniform vec3 u_mieColor;        // Mie scattering coefficients
 uniform float u_intensity;
 
 #define MAX_LIGHTS 4
@@ -168,6 +168,7 @@ uniform vec3 u_planetCenter;
 uniform float u_planetRadius;
 uniform float u_atmoRadius;
 uniform float u_isInside;
+uniform float u_scaleHeight;    // Scale height ratio: H / atmosphereThickness (dimensionless)
 
 varying vec3 vWorldNormal;
 varying vec3 vWorldPos;
@@ -175,30 +176,63 @@ varying vec3 vWorldPos;
 // Henyey-Greenstein phase function for Mie scattering
 float henyeyGreenstein(float cosTheta, float g) {
     float g2 = g * g;
-    return (1.0 - g2) / (4.0 * 3.14159 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
+    return (1.0 - g2) / (4.0 * 3.14159 * pow(max(1.0 + g2 - 2.0 * g * cosTheta, 1e-4), 1.5));
+}
+
+// Ray-sphere intersection: returns (tNear, tFar) or (-1,-1) if no hit
+vec2 raySphereIntersect(vec3 ro, vec3 rd, vec3 sc, float sr) {
+    vec3 oc = ro - sc;
+    float b = dot(oc, rd);
+    float c = dot(oc, oc) - sr * sr;
+    float disc = b * b - c;
+    if (disc < 0.0) return vec2(-1.0);
+    float sq = sqrt(disc);
+    return vec2(-b - sq, -b + sq);
 }
 
 void main() {
-    // If inside, vWorldNormal points outward, but we are looking from inside, so flip it or just use viewDir
     vec3 normal = normalize(vWorldNormal);
-    vec3 viewDir = normalize(cameraPosition - vWorldPos);
-    
-    // For optical depth, calculate the angle between the view ray and surface normal.
-    // When exterior, NdotV is positive at the center and 0 at the edges.
-    // When interior (BackSide rendered), NdotV is negative, requiring the absolute value.
-    float NdotV = abs(dot(normal, viewDir));
-    
+    // Standard viewDir: vector FROM camera TO fragment
+    vec3 viewDir = normalize(vWorldPos - cameraPosition);
     vec3 zenithDir = normalize(vWorldPos - u_planetCenter);
-    
-    // Optical depth approximation: thicker at the edges (limb darkening/brightening)
-    float opticalDepth = pow(1.0 - NdotV, 4.0);
+
+    float shellThickness = max(u_atmoRadius - u_planetRadius, 1e-5);
+    float fragAlt = max(length(vWorldPos - u_planetCenter) - u_planetRadius, 0.0);
+    float altFrac = clamp(fragAlt / shellThickness, 0.0, 1.0);
+
+    // ── Optical depth via ray-sphere chord length ──
+    vec3 camToFrag = viewDir;
+    vec2 outerHit = raySphereIntersect(cameraPosition, camToFrag, u_planetCenter, u_atmoRadius);
+    vec2 innerHit = raySphereIntersect(cameraPosition, camToFrag, u_planetCenter, u_planetRadius);
+
+    float pathLength = 0.0;
+
     if (u_isInside > 0.5) {
-        opticalDepth = mix(1.0, 3.0, pow(1.0 - NdotV, 2.0)); // Brighter near horizon
+        // ── Interior view (surface camera) ──
+        // cosZenith = dot(zenithDir, viewDir): +1.0 overhead at zenith, 0.0 at horizon
+        float cosZenith = dot(zenithDir, viewDir);
+        float airmass = 1.0 / max(cosZenith, 0.035); // Smooth airmass from 1.0 (zenith) to ~28.5 (horizon)
+        pathLength = airmass;
+    } else {
+        // ── Exterior view (orbital camera) ──
+        float enterT = max(outerHit.x, 0.0);
+        float exitT = outerHit.y;
+        if (innerHit.x > 0.0) {
+            exitT = innerHit.x;
+        }
+        float chord = max(exitT - enterT, 0.0);
+        pathLength = chord / shellThickness;
+        float densityWeight = exp(-altFrac / max(u_scaleHeight, 0.01));
+        pathLength *= densityWeight;
     }
-    
-    vec3 totalDensity = u_rayleighColor + u_mieColor;
-    vec3 safeDensity = max(totalDensity, vec3(1e-6));
-    vec3 scatterIntegral = (1.0 - exp(-totalDensity * opticalDepth * 2.0)) / safeDensity;
+
+    // Safe optical depth calculation to prevent numerical underflow in exp()
+    vec3 safeRayleigh = clamp(u_rayleighColor, vec3(0.0), vec3(4.0));
+    vec3 safeMie = clamp(u_mieColor, vec3(0.0), vec3(4.0));
+    vec3 opticalDepth = (safeRayleigh + safeMie) * pathLength;
+    vec3 transmittance = exp(-opticalDepth);
+    vec3 safeDensity = max(safeRayleigh + safeMie, vec3(1e-4));
+    vec3 scatterIntegral = (1.0 - transmittance) / safeDensity;
 
     vec3 finalColor = vec3(0.0);
 
@@ -208,29 +242,58 @@ void main() {
         vec3 lightVec = u_lightPos[i] - vWorldPos;
         float distSq = max(dot(lightVec, lightVec), 1.0);
         vec3 lightDir = lightVec * inversesqrt(max(distSq, 1e-12));
-        float VdotL = dot(viewDir, lightDir);
-        float NdotL = dot(normal, lightDir);
         
+        // Phase angle between view ray and light direction
+        float cosTheta = dot(viewDir, lightDir);
+        
+        // ── Terminator / twilight transition ──
         float rRatio = min(1.0, u_planetRadius / u_atmoRadius);
-        float termCos = -sqrt(1.0 - rRatio * rRatio);
-        float sunInfluence = smoothstep(termCos - 0.05, termCos + 0.05, dot(zenithDir, lightDir));
+        float termCos = -sqrt(max(1.0 - rRatio * rRatio, 0.0));
+        float sunDotZenith = dot(zenithDir, lightDir);
+        float termWidth = (u_isInside > 0.5) ? 0.40 : 0.25;
+        float sunInfluence = smoothstep(termCos - termWidth, termCos + 0.15, sunDotZenith);
+        
+        if (u_isInside > 0.5) {
+            float twilightExtend = smoothstep(termCos - 0.50, termCos - 0.10, sunDotZenith) * 0.20;
+            sunInfluence = max(sunInfluence, twilightExtend);
+        }
+        
         float attenuation = 1.0 / distSq;
         
-        float rayleighPhase = 0.75 * (1.0 + VdotL * VdotL);
-        vec3 rayleighScattering = u_rayleighColor * rayleighPhase;
+        // Rayleigh Phase Function
+        float rayleighPhase = 0.75 * (1.0 + cosTheta * cosTheta);
+        vec3 rayleighScattering = safeRayleigh * rayleighPhase;
         
-        // Use -VdotL for forward scattering peak when light is behind the planet
-        float miePhase = henyeyGreenstein(-VdotL, 0.76) + 0.1;
-        vec3 mieScattering = u_mieColor * miePhase;
+        // Mie Phase Function: high g parameter (0.86) for crisp solar aureole
+        float miePhase = henyeyGreenstein(cosTheta, 0.86) + 0.02;
+        vec3 mieScattering = safeMie * miePhase;
         
         vec3 scatterColor = rayleighScattering + mieScattering;
         vec3 lightContrib = scatterColor * scatterIntegral;
         
-        finalColor += lightContrib * sunInfluence * (u_lightColor[i] * (u_lightIntensity[i] * attenuation)) * 1.0;
+        // Extinction of direct sunlight for surface camera
+        if (u_isInside > 0.5) {
+            float sunCosZenith = max(sunDotZenith, 0.025);
+            float sunAirmass = 1.0 / sunCosZenith;
+            vec3 sunTransmittance = exp(-safeRayleigh * sunAirmass * 0.4);
+            lightContrib *= sunTransmittance;
+        }
+        
+        finalColor += lightContrib * sunInfluence * (u_lightColor[i] * (u_lightIntensity[i] * attenuation));
+
+        // Reduce bright star contribution (temporary)
+        finalColor *= 0.3;
     }
     
-    // Calculate alpha based on brightness to allow NormalBlending
-    float alpha = clamp(max(finalColor.r, max(finalColor.g, finalColor.b)) * 1.2, 0.0, 1.0);
+    // Alpha computation
+    float lum = max(finalColor.r, max(finalColor.g, finalColor.b));
+    float alpha;
+    if (u_isInside > 0.5) {
+        alpha = clamp(lum * 2.5 + 0.05, 0.0, 1.0);
+    } else {
+        alpha = clamp(lum * 1.5, 0.0, 1.0);
+    }
+    
     gl_FragColor = vec4(finalColor, alpha);
     #include <logdepthbuf_fragment>
     #include <tonemapping_fragment>
@@ -2440,11 +2503,15 @@ export class BodyRenderer {
                         u_rayleighColor: { value: new THREE.Vector3() },
                         u_mieColor: { value: new THREE.Vector3() },
                         u_intensity: { value: 1.0 },
-                        u_sunPos: { value: new THREE.Vector3(0, 0, 0) },
+                        u_numLights: { value: 0 },
+                        u_lightPos: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
+                        u_lightColor: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] },
+                        u_lightIntensity: { value: [0, 0, 0, 0] },
                         u_planetCenter: { value: new THREE.Vector3(0, 0, 0) },
                         u_planetRadius: { value: 1.0 },
                         u_atmoRadius: { value: 1.05 },
-                        u_isInside: { value: 0.0 }
+                        u_isInside: { value: 0.0 },
+                        u_scaleHeight: { value: 0.085 }
                     },
                     transparent: true,
                     depthWrite: false,
@@ -2467,7 +2534,12 @@ export class BodyRenderer {
             const relHeight = atmoHeight / visualRadius;
             atmoMat.uniforms.u_intensity.value = Math.min(1.0, 0.4 + relHeight * 2.0);
             
-            const visualScale = 1e5;
+            // Physically-calibrated visualScale (same approach as addAtmosphereShell)
+            // Estimate scaleHeight as ~8.5% of atmosphere height (Earth-like default)
+            const estimatedScaleHeight = (params.atmosphereHeight ?? 60000) * 0.085;
+            const visualTuning = 3.0;
+            const visualScale = estimatedScaleHeight * visualTuning;
+
             const rcR = params.atmosphereRayleighR ?? 0.005;
             const rcG = params.atmosphereRayleighG ?? 0.012;
             const rcB = params.atmosphereRayleighB ?? 0.030;
@@ -2481,6 +2553,10 @@ export class BodyRenderer {
                 (((mieHex >> 8) & 255) / 255) * mieDensityScale,
                 ((mieHex & 255) / 255) * mieDensityScale
             );
+
+            // Scale height ratio for the shader
+            atmoMat.uniforms.u_scaleHeight.value = estimatedScaleHeight / Math.max(params.atmosphereHeight ?? 60000, 1);
+            
             this.ghostAtmoMesh.visible = this.ghostMesh.visible;
         } else if (this.ghostAtmoMesh) {
             this.ghostAtmoMesh.visible = false;
@@ -2498,16 +2574,20 @@ export class BodyRenderer {
         if (this.ghostAtmoMesh) {
             this.ghostAtmoMesh.position.set(localX, localY, localZ);
             
-            // update sun pos for atmosphere lighting
-            let sunPos = new THREE.Vector3(0, 0, 0);
+            // Update light sources for atmosphere — support multiple stars
+            const atmoMat = this.ghostAtmoMesh.material as THREE.ShaderMaterial;
+            let lightIdx = 0;
             for (const mesh of this.bodies.values()) {
-                if (mesh.type === 'star') {
-                    sunPos.copy(mesh.group.position);
-                    break;
+                if (mesh.type === 'star' && lightIdx < 4) {
+                    const pos = mesh.group.position;
+                    atmoMat.uniforms.u_lightPos.value[lightIdx].set(pos.x, pos.z, -pos.y);
+                    atmoMat.uniforms.u_lightColor.value[lightIdx].set(1, 1, 1);
+                    atmoMat.uniforms.u_lightIntensity.value[lightIdx] = 1.0;
+                    lightIdx++;
                 }
             }
-            const atmoMat = this.ghostAtmoMesh.material as THREE.ShaderMaterial;
-            atmoMat.uniforms.u_sunPos.value.set(sunPos.x, sunPos.z, -sunPos.y);
+            atmoMat.uniforms.u_numLights.value = lightIdx;
+            
             atmoMat.uniforms.u_planetCenter.value.set(localX, localZ, -localY);
             
             const camJ2000 = new THREE.Vector3(cameraPos.x, -cameraPos.z, cameraPos.y);
@@ -2985,20 +3065,45 @@ class BodyMesh {
     private addAtmosphereShell(body: BodyData, segW: number, segH: number): void {
         const atm = body.atmosphere!;
 
-        const visualScale = 1e5;
-
-        // Rayleigh coefficients
+        // ── Physically-motivated scattering coefficient scaling ──
+        // The Rayleigh/Mie coefficients from physics are in inverse meters (e.g., Earth blue = 22.4e-6 /m).
+        // The real optical depth at zenith is: τ = σ × H (scaleHeight in meters).
+        //   Earth blue: 22.4e-6 × 8500 = 0.19 (physically correct)
+        //   Earth red:  5.5e-6 × 8500  = 0.047
+        //
+        // But our atmosphere shell geometry is in render-space units (not meters).
+        // We need to scale σ so that: σ_render × pathLength_render ≈ σ_physical × pathLength_physical
+        //
+        // pathLength_physical = H (scale height) for zenith view
+        // pathLength_render = ~1.0 for zenith view through the shell (normalized chord)
+        //
+        // So: σ_render = σ_physical × H (gives us the optical depth directly)
+        // Then multiply by an artist-tunable factor for visual intensity.
+        const H = atm.scaleHeight; // in meters (Earth: 8500, Mars: 11100, Venus: 15900)
+        // Rayleigh & Mie coefficient scaling tuned for rich rendering without underflow/overflow
+        const scale = 7.5e4;
         const rc = atm.rayleighCoefficients;
-        const rayleighColor = new THREE.Vector3(rc[0] * visualScale, rc[1] * visualScale, rc[2] * visualScale);
+        const rayleighColor = new THREE.Vector3(
+            Math.min(rc[0] * scale, 2.5),
+            Math.min(rc[1] * scale, 2.5),
+            Math.min(rc[2] * scale, 2.5)
+        );
 
         // Mie scattering color from dust/haze composition
         const mc = atm.mieColor ?? [1, 1, 1];
-        const mieDensityScale = atm.mieCoefficient * visualScale;
-        const mieColor = new THREE.Vector3(mc[0] * mieDensityScale, mc[1] * mieDensityScale, mc[2] * mieDensityScale);
+        const mieWeight = Math.min(atm.mieCoefficient * scale, 2.0);
+        const mieColor = new THREE.Vector3(
+            mc[0] * mieWeight,
+            mc[1] * mieWeight,
+            mc[2] * mieWeight
+        );
 
         // Intensity based on atmosphere thickness relative to body size
         const relHeight = atm.height / body.radius;
         const intensity = Math.min(1.0, 0.4 + relHeight * 2.0);
+
+        // Scale height as fraction of atmosphere shell thickness
+        const scaleHeightRatio = H / Math.max(atm.height, 1);
 
         const atmoGeo = new THREE.SphereGeometry(1, segW, segH);
         const atmoMat = new THREE.ShaderMaterial({
@@ -3016,6 +3121,7 @@ class BodyMesh {
                 u_planetRadius:  { value: 1.0 },
                 u_atmoRadius:    { value: 1.05 },
                 u_isInside:      { value: 0.0 },
+                u_scaleHeight:   { value: scaleHeightRatio },
             },
             transparent: true,
             side: THREE.DoubleSide,
@@ -3312,16 +3418,17 @@ class BodyMesh {
                 mat.uniforms.u_lightIntensity.value[i] = lightIntensity[i];
             }
             if (mat.uniforms.u_planetCenter) {
-                mat.uniforms.u_planetCenter.value.set(planetPos.x, planetPos.z, -planetPos.y);
+                mat.uniforms.u_planetCenter.value.copy(planetPos);
             }
             
-            const dist = cameraPos.distanceTo(planetPos);
+            const dist = planetPos.length(); // In floating origin, camera is at (0,0,0), so dist is planetPos magnitude
             const atmoScale = (this.atmosphereMesh.userData.atmosphereScale as number) || 1.0;
             const atmoRadius = radius * atmoScale;
+            
+            if (mat.uniforms.u_planetRadius) mat.uniforms.u_planetRadius.value = radius;
+            if (mat.uniforms.u_atmoRadius) mat.uniforms.u_atmoRadius.value = atmoRadius;
             if (mat.uniforms.u_isInside) {
                 mat.uniforms.u_isInside.value = (dist < atmoRadius) ? 1.0 : 0.0;
-                mat.uniforms.u_planetRadius.value = radius;
-                mat.uniforms.u_atmoRadius.value = atmoRadius;
             }
         }
 
