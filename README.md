@@ -1,14 +1,55 @@
 # Symplectica
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/86532da5-f282-427e-90d0-d809cf237f57" width="100%" alt="Symplectica Hero Image" />
+</p>
+
 **Symplectica** is a multiplayer N-body space simulator focused on scientific accuracy, visual fidelity and realistic orbital mechanics. 
 
 Whether you're a physics enthusiast simulating star systems and astroid belts, a student learning about orbital mechanics and numerical methods, or a player exploring the universe with your friends, Symplectica handles it all.
 
 Built with **Rust + WebAssembly** on the backend and **TypeScript + Three.js** on the frontend.
 
-## Visuals
+## Gallery
 
-Soon.
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/c396ef78-e906-4afb-85f4-84d3ade03d47" muted loop controls width="100%"></video>
+  <br>
+  <em>Traveling between the inner solar system bodies.</em>
+</p>
+
+<table width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <video src="https://github.com/user-attachments/assets/35984a84-3a3d-46a3-816d-26c91ef00402" muted loop controls width="100%"></video>
+      <br><em>Earth and other bodies at various time warp rates.</em>
+    </td>
+    <td width="50%" align="center">
+      <video src="https://github.com/user-attachments/assets/e0573bec-6aa8-46f4-9f2b-62bc433a4868" muted loop controls width="100%"></video>
+      <br><em>Jupiter and Io as seen from Ganymede's surface</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/user-attachments/assets/89b2b119-bb31-4f45-9198-786b4dd16a3b" width="100%" alt="Symplectica Showcase Image" />
+      <br><em>A wide closeup of Jupiter with its storm.</em>
+    </td>
+    <td width="50%" align="center">
+      <video src="https://github.com/user-attachments/assets/f8a4c924-1030-4e3b-b301-b2862ac6c114" muted loop controls width="100%"></video>
+      <br><em>Zooming out of Mimas into Saturn's rings.</em>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://github.com/user-attachments/assets/4c99e1ac-bfe9-42fb-b9aa-3b633eec3fe6" width="100%" alt="Showcase Image 1" />
+      <br><em>A close up of Earth showing Africa in the center.</em>
+    </td>
+    <td width="50%" align="center">
+      <img src="https://github.com/user-attachments/assets/b6177517-243c-4296-8f6c-cbb7f2e993e7" width="100%" alt="Showcase Image 2" />
+      <br><em>A close up of Earth showing atmospheric glow.</em>
+    </td>
+  </tr>
+</table>
 
 ## Key Features
 
