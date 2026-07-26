@@ -2441,6 +2441,10 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     ceres.color = hex_to_rgb(0x8a8a7a);
     ceres.composition = PlanetComposition::Dwarf;
     ceres.albedo = 0.09;
+    ceres.rotation_rate = 1.923e-4;
+    ceres.axial_tilt = 4.0 * deg;
+    ceres.pole_ra = Some(291.0 * deg);
+    ceres.pole_dec = Some(66.0 * deg);
     ceres.softening_length = compute_softening(4.73e5);
     ceres.compute_derived();
     sim.add_body(ceres);
@@ -2465,6 +2469,10 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     pallas.color = hex_to_rgb(0x909080);
     pallas.composition = PlanetComposition::Dwarf;
     pallas.albedo = 0.16;
+    pallas.rotation_rate = 2.234e-4;
+    pallas.axial_tilt = 34.0 * deg;
+    pallas.pole_ra = Some(33.0 * deg);
+    pallas.pole_dec = Some(-1.0 * deg);
     pallas.softening_length = compute_softening(2.56e5);
     pallas.compute_derived();
     sim.add_body(pallas);
@@ -2489,6 +2497,10 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     vesta.color = hex_to_rgb(0xb0a890);
     vesta.composition = PlanetComposition::Dwarf;
     vesta.albedo = 0.42;
+    vesta.rotation_rate = 3.267e-4;
+    vesta.axial_tilt = 29.0 * deg;
+    vesta.pole_ra = Some(309.0 * deg);
+    vesta.pole_dec = Some(42.0 * deg);
     vesta.softening_length = compute_softening(2.627e5);
     vesta.compute_derived();
     sim.add_body(vesta);
@@ -2511,6 +2523,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     halley.parent_id = Some(sun_id);
     halley.color = hex_to_rgb(0x505050);
     halley.albedo = 0.04;
+    halley.rotation_rate = 3.305e-5;
+    halley.axial_tilt = 0.0 * deg;
     halley.softening_length = compute_softening(5.5e3);
     halley.compute_derived();
     sim.add_body(halley);
@@ -2533,6 +2547,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     encke.parent_id = Some(sun_id);
     encke.color = hex_to_rgb(0x484848);
     encke.albedo = 0.05;
+    encke.rotation_rate = 1.163e-4;
+    encke.axial_tilt = 0.0 * deg;
     encke.softening_length = compute_softening(2.4e3);
     encke.compute_derived();
     sim.add_body(encke);
@@ -2555,6 +2571,10 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     cg67p.parent_id = Some(sun_id);
     cg67p.color = hex_to_rgb(0x404040);
     cg67p.albedo = 0.06;
+    cg67p.rotation_rate = 1.407e-4;
+    cg67p.axial_tilt = 52.0 * deg;
+    cg67p.pole_ra = Some(69.0 * deg);
+    cg67p.pole_dec = Some(64.0 * deg);
     cg67p.softening_length = compute_softening(2.0e3);
     cg67p.compute_derived();
     sim.add_body(cg67p);
@@ -2577,6 +2597,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     hale_bopp.parent_id = Some(sun_id);
     hale_bopp.color = hex_to_rgb(0x585858);
     hale_bopp.albedo = 0.04;
+    hale_bopp.rotation_rate = 1.531e-4;
+    hale_bopp.axial_tilt = 0.0 * deg;
     hale_bopp.softening_length = compute_softening(3.0e4);
     hale_bopp.compute_derived();
     sim.add_body(hale_bopp);
@@ -2599,6 +2621,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     swift_tuttle.parent_id = Some(sun_id);
     swift_tuttle.color = hex_to_rgb(0x505050);
     swift_tuttle.albedo = 0.04;
+    swift_tuttle.rotation_rate = 2.624e-5;
+    swift_tuttle.axial_tilt = 0.0 * deg;
     swift_tuttle.softening_length = compute_softening(1.3e4);
     swift_tuttle.compute_derived();
     sim.add_body(swift_tuttle);
