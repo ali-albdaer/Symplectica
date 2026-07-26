@@ -970,6 +970,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
     io.composition = PlanetComposition::Rocky;
     io.albedo = 0.63;
     io.softening_length = compute_softening(1.8216e6);
+    io.pole_ra = Some(268.05_f64.to_radians());
+    io.pole_dec = Some(64.5_f64.to_radians());
     io.compute_derived();
     sim.add_body(io);
     
@@ -989,6 +991,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
     europa.composition = PlanetComposition::Rocky;
     europa.albedo = 0.67;
     europa.softening_length = compute_softening(1.5608e6);
+    europa.pole_ra = Some(268.08_f64.to_radians());
+    europa.pole_dec = Some(64.51_f64.to_radians());
     europa.compute_derived();
     sim.add_body(europa);
     
@@ -1008,6 +1012,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
     ganymede.composition = PlanetComposition::Rocky;
     ganymede.albedo = 0.43;
     ganymede.softening_length = compute_softening(2.6341e6);
+    ganymede.pole_ra = Some(268.2_f64.to_radians());
+    ganymede.pole_dec = Some(64.57_f64.to_radians());
     ganymede.compute_derived();
     sim.add_body(ganymede);
     
@@ -1027,6 +1033,8 @@ pub fn create_jupiter_system(seed: u64) -> Simulation {
     callisto.composition = PlanetComposition::Rocky;
     callisto.albedo = 0.17;
     callisto.softening_length = compute_softening(2.4103e6);
+    callisto.pole_ra = Some(268.72_f64.to_radians());
+    callisto.pole_dec = Some(64.83_f64.to_radians());
     callisto.compute_derived();
     sim.add_body(callisto);
     
@@ -1086,6 +1094,8 @@ pub fn create_saturn_system(seed: u64) -> Simulation {
         height: 600_000.0,                            // ~600 km effective atmosphere
         mie_color: [0.85, 0.55, 0.2],                 // Tholin haze — deep orange-brown
     });
+    titan.pole_ra = Some(39.4827_f64.to_radians());
+    titan.pole_dec = Some(83.4279_f64.to_radians());
     titan.compute_derived();
     sim.add_body(titan);
     
@@ -1819,6 +1829,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     phobos.composition = PlanetComposition::Rocky;
     phobos.albedo = 0.071;
     phobos.softening_length = compute_softening(1.31e4);
+    phobos.pole_ra = Some(317.67_f64.to_radians());
+    phobos.pole_dec = Some(52.9_f64.to_radians());
     phobos.compute_derived();
     sim.add_body(phobos);
 
@@ -1838,6 +1850,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     deimos.composition = PlanetComposition::Rocky;
     deimos.albedo = 0.068;
     deimos.softening_length = compute_softening(7.8e3);
+    deimos.pole_ra = Some(316.65_f64.to_radians());
+    deimos.pole_dec = Some(53.52_f64.to_radians());
     deimos.compute_derived();
     sim.add_body(deimos);
 
@@ -1885,6 +1899,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     io.composition = PlanetComposition::Rocky;
     io.albedo = 0.63;
     io.softening_length = compute_softening(1.82149e6);
+    io.pole_ra = Some(268.05_f64.to_radians());
+    io.pole_dec = Some(64.5_f64.to_radians());
     io.compute_derived();
     sim.add_body(io);
 
@@ -1904,6 +1920,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     europa.composition = PlanetComposition::Rocky;
     europa.albedo = 0.67;
     europa.softening_length = compute_softening(1.5608e6);
+    europa.pole_ra = Some(268.08_f64.to_radians());
+    europa.pole_dec = Some(64.51_f64.to_radians());
     europa.compute_derived();
     sim.add_body(europa);
 
@@ -1923,6 +1941,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     ganymede.composition = PlanetComposition::Rocky;
     ganymede.albedo = 0.43;
     ganymede.softening_length = compute_softening(2.6312e6);
+    ganymede.pole_ra = Some(268.2_f64.to_radians());
+    ganymede.pole_dec = Some(64.57_f64.to_radians());
     ganymede.compute_derived();
     sim.add_body(ganymede);
 
@@ -1942,6 +1962,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     callisto.composition = PlanetComposition::Rocky;
     callisto.albedo = 0.22;
     callisto.softening_length = compute_softening(2.4103e6);
+    callisto.pole_ra = Some(268.72_f64.to_radians());
+    callisto.pole_dec = Some(64.83_f64.to_radians());
     callisto.compute_derived();
     sim.add_body(callisto);
 
@@ -1995,6 +2017,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     mimas.composition = PlanetComposition::Rocky;
     mimas.albedo = 0.962;
     mimas.softening_length = compute_softening(1.988e5);
+    mimas.pole_ra = Some(40.66_f64.to_radians());
+    mimas.pole_dec = Some(83.52_f64.to_radians());
     mimas.compute_derived();
     sim.add_body(mimas);
 
@@ -2014,6 +2038,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     enceladus.composition = PlanetComposition::Rocky;
     enceladus.albedo = 0.99;
     enceladus.softening_length = compute_softening(2.523e5);
+    enceladus.pole_ra = Some(40.66_f64.to_radians());
+    enceladus.pole_dec = Some(83.52_f64.to_radians());
     enceladus.compute_derived();
     sim.add_body(enceladus);
 
@@ -2033,6 +2059,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     tethys.composition = PlanetComposition::Rocky;
     tethys.albedo = 0.80;
     tethys.softening_length = compute_softening(5.363e5);
+    tethys.pole_ra = Some(40.66_f64.to_radians());
+    tethys.pole_dec = Some(83.52_f64.to_radians());
     tethys.compute_derived();
     sim.add_body(tethys);
 
@@ -2052,6 +2080,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     dione.composition = PlanetComposition::Rocky;
     dione.albedo = 0.998;
     dione.softening_length = compute_softening(5.625e5);
+    dione.pole_ra = Some(40.66_f64.to_radians());
+    dione.pole_dec = Some(83.52_f64.to_radians());
     dione.compute_derived();
     sim.add_body(dione);
 
@@ -2071,6 +2101,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     rhea.composition = PlanetComposition::Rocky;
     rhea.albedo = 0.949;
     rhea.softening_length = compute_softening(7.645e5);
+    rhea.pole_ra = Some(40.38_f64.to_radians());
+    rhea.pole_dec = Some(83.55_f64.to_radians());
     rhea.compute_derived();
     sim.add_body(rhea);
 
@@ -2100,6 +2132,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
         mie_color: [0.9, 0.7, 0.3],
     });
     titan.softening_length = compute_softening(2.5755e6);
+    titan.pole_ra = Some(39.4827_f64.to_radians());
+    titan.pole_dec = Some(83.4279_f64.to_radians());
     titan.compute_derived();
     sim.add_body(titan);
 
@@ -2119,6 +2153,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     iapetus.composition = PlanetComposition::Rocky;
     iapetus.albedo = 0.20;
     iapetus.softening_length = compute_softening(7.345e5);
+    iapetus.pole_ra = Some(318.16_f64.to_radians());
+    iapetus.pole_dec = Some(75.03_f64.to_radians());
     iapetus.compute_derived();
     sim.add_body(iapetus);
 
@@ -2172,6 +2208,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     miranda.composition = PlanetComposition::Rocky;
     miranda.albedo = 0.32;
     miranda.softening_length = compute_softening(2.40e5);
+    miranda.pole_ra = Some(257.43_f64.to_radians());
+    miranda.pole_dec = Some(-15.08_f64.to_radians());
     miranda.compute_derived();
     sim.add_body(miranda);
 
@@ -2191,6 +2229,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     ariel.composition = PlanetComposition::Rocky;
     ariel.albedo = 0.53;
     ariel.softening_length = compute_softening(5.811e5);
+    ariel.pole_ra = Some(257.43_f64.to_radians());
+    ariel.pole_dec = Some(-15.1_f64.to_radians());
     ariel.compute_derived();
     sim.add_body(ariel);
 
@@ -2210,6 +2250,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     umbriel.composition = PlanetComposition::Rocky;
     umbriel.albedo = 0.26;
     umbriel.softening_length = compute_softening(5.847e5);
+    umbriel.pole_ra = Some(257.43_f64.to_radians());
+    umbriel.pole_dec = Some(-15.1_f64.to_radians());
     umbriel.compute_derived();
     sim.add_body(umbriel);
 
@@ -2229,6 +2271,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     titania.composition = PlanetComposition::Rocky;
     titania.albedo = 0.35;
     titania.softening_length = compute_softening(7.889e5);
+    titania.pole_ra = Some(257.43_f64.to_radians());
+    titania.pole_dec = Some(-15.1_f64.to_radians());
     titania.compute_derived();
     sim.add_body(titania);
 
@@ -2248,6 +2292,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     oberon.composition = PlanetComposition::Rocky;
     oberon.albedo = 0.31;
     oberon.softening_length = compute_softening(7.614e5);
+    oberon.pole_ra = Some(257.43_f64.to_radians());
+    oberon.pole_dec = Some(-15.1_f64.to_radians());
     oberon.compute_derived();
     sim.add_body(oberon);
 
@@ -2262,7 +2308,7 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     neptune.rotation_rate = 1.08338e-4;
     neptune.axial_tilt = 0.4943;
     neptune.pole_ra = Some(299.36_f64.to_radians());
-    neptune.pole_dec = Some(42.95_f64.to_radians());
+    neptune.pole_dec = Some(43.46_f64.to_radians());
     neptune.mean_surface_temperature = 72.0;
     neptune.seed = seed.wrapping_add(40);
     neptune.semi_major_axis = 4497806205857.0625;
@@ -2301,6 +2347,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     triton.composition = PlanetComposition::Rocky;
     triton.albedo = 0.76;
     triton.softening_length = compute_softening(1.3526e6);
+    triton.pole_ra = Some(299.36_f64.to_radians());
+    triton.pole_dec = Some(41.17_f64.to_radians());
     triton.compute_derived();
     sim.add_body(triton);
 
@@ -2319,6 +2367,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     nereid.composition = PlanetComposition::Rocky;
     nereid.albedo = 0.155;
     nereid.softening_length = compute_softening(1.70e5);
+    nereid.pole_ra = Some(299.36_f64.to_radians());
+    nereid.pole_dec = Some(43.46_f64.to_radians());
     nereid.compute_derived();
     sim.add_body(nereid);
 
@@ -2366,6 +2416,8 @@ pub fn create_full_solar_system_iii(seed: u64, barycentric: bool) -> Simulation 
     charon.composition = PlanetComposition::Dwarf;
     charon.albedo = 0.35;
     charon.softening_length = compute_softening(6.06e5);
+    charon.pole_ra = Some(132.993_f64.to_radians());
+    charon.pole_dec = Some(-6.163_f64.to_radians());
     charon.compute_derived();
     sim.add_body(charon);
 

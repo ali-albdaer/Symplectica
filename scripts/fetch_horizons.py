@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 JPL HORIZONS Solar System Ephemeris Fetcher for Symplectica
 ============================================================
