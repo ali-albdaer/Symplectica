@@ -83,12 +83,12 @@ export class OptionsPanel {
     private orbitalZoomDamping = APP_DEFAULTS.cameraDefaults.orbitalZoomDamping;
     private ignoreEvents = false;
     private experimentalOptions: ExperimentalOptions = {
-        flareFrequencyMode: 'scaled',
+        flareFrequencyMode: 'fixed',
         flareBrightness: 1.0,
         flaresVisible: true,
         fixedFlareRate: 2.0,
         ringQuality: 'HighQualityClose',
-        useRealisticTextures: false,
+        useRealisticTextures: true,
         globalIllumination: 0,
         earthshineEnabled: true,
     };
@@ -307,7 +307,7 @@ export class OptionsPanel {
                         </div>
                     </details>
 
-                    <details open style="margin-bottom: 8px;">
+                    <details style="margin-bottom: 8px;">
                         <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.5); text-transform: uppercase; letter-spacing: 0.5px; outline: none; margin-bottom: 6px;">Grids</summary>
                         <div class="opt-row" style="margin-top: 6px;">
                             <label class="opt-toggle">
@@ -377,7 +377,7 @@ export class OptionsPanel {
                     <h3>Realistic Textures</h3>
                     <div class="opt-row">
                         <label class="opt-toggle">
-                            <input type="checkbox" id="opt-realistic-textures">
+                            <input type="checkbox" id="opt-realistic-textures" checked>
                             <span>Use High-Res Textures</span>
                         </label>
                     </div>
@@ -508,10 +508,10 @@ export class OptionsPanel {
                         <label>Frequency Mode</label>
                         <select id="opt-flare-frequency">
                             <option value="scaled">Scale with Time</option>
-                            <option value="fixed">Fixed Rate</option>
+                            <option value="fixed" selected>Fixed Rate</option>
                         </select>
                     </div>
-                    <div class="opt-field" id="opt-fixed-rate-field" style="display: none;">
+                    <div class="opt-field" id="opt-fixed-rate-field">
                         <label>Fixed Rate (per 100s)</label>
                         <div class="opt-slider-row">
                             <input type="range" id="opt-fixed-flare-rate" min="0.2" max="10" step="0.1" value="2">

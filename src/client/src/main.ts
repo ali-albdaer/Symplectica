@@ -170,12 +170,12 @@ class NBodyClient {
 
     // Additional Tracking for Phase 2
     private currentExperimentalOptions: ExperimentalOptions = {
-        flareFrequencyMode: 'scaled',
+        flareFrequencyMode: 'fixed',
         flareBrightness: 1.0,
         flaresVisible: true,
         fixedFlareRate: 2.0,
         ringQuality: 'HighQualityClose',
-        useRealisticTextures: false,
+        useRealisticTextures: true,
         globalIllumination: 0,
         earthshineEnabled: true
     };

@@ -26,7 +26,7 @@
     "closeEncounterGaussRadauTol": 0.000000001
   },
   "optionsDefaults": {
-    "showAtmospheres": true,
+    "showAtmospheres": false,
     "showOrbitTrails": false,
     "showStarLabels": false,
     "showPlanetLabels": false,

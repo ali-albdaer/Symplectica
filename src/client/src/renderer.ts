@@ -1720,7 +1720,7 @@ export class BodyRenderer {
             mesh.setFlareFrequencyMode(mode);
         }
     }
-    private realisticTexturesEnabled = false;
+    private realisticTexturesEnabled = true;
 
     setRealisticTexturesEnabled(enabled: boolean): void {
         this.realisticTexturesEnabled = enabled;
@@ -2283,7 +2283,7 @@ export class BodyRenderer {
     }
 
     // Visualization options
-    private showAtmospheres = true;
+    private showAtmospheres = false;
     private showOrbitTrails = true;
     private showStarLabels = false;
     private showPlanetLabels = false;
