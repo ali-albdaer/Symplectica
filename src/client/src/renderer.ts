@@ -2209,7 +2209,7 @@ export class BodyRenderer {
         if (label && label.visible) {
             const bodyMesh = this.bodies.get(id);
             const bodyVisRadius = bodyMesh ? scaleRadius(bodyMesh.realRadius * this.renderScale) : AU * 0.01;
-            const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.002);
+            const labelOffset = Math.max(bodyVisRadius * 1.5, AU * 0.0001);
             
             // Manually map J2000 local position to World space (solarSystemRoot applies -90 on X)
             this.dummyProjectVec.set(localX, localZ, -localY);
