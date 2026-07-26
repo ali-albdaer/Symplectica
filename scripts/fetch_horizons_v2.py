@@ -1,5 +1,5 @@
 """
-JPL HORIZONS Solar System Ephemeris Fetcher for Symplectica
+JPL HORIZONS Solar System Ephemeris Fetcher for Symplectica (v2.1 - Merged Pole Data)
 ============================================================
 
 Fetches state vectors, orbital elements, and physical data from JPL HORIZONS
@@ -131,7 +131,7 @@ KM_TO_M = 1000.0
 API_DELAY = 0.3   # seconds between requests (rate limiting)
 
 SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": "symplectica-horizons-fetcher/2.0"})
+SESSION.headers.update({"User-Agent": "symplectica-horizons-fetcher/2.1"})
 
 # ═══════════════════════════════════════════════════════════════════════════
 # EPOCH HANDLING
@@ -282,6 +282,64 @@ def parse_orbital_elements(text: str) -> Optional[dict]:
     return result if result else None
 
 
+
+def parse_pole_data(text: str) -> dict:
+    import re
+    result = {
+        "pole_ra_deg": None,
+        "pole_dec_deg": None,
+        "obliquity_deg": None,
+        "rotation_rate_rad_s": None,
+    }
+
+    ra_patterns = [
+        r"[Pp]ole\s*(?:of\s+rotation\s*)?(?:\(IAU[^)]*\)\s*)?(?:direction\s+)?R\.?A\.?\s*(?:\(deg\)|\(degrees\))?\s*[:=]\s*([+-]?\d+\.?\d*)",
+        r"R\.?A\.?\s*,?\s*deg\s*,?\s*IAU[^:]*:\s*([+-]?\d+\.?\d*)",
+        r"[Nn]orth\s+[Pp]ole\s*(?:\(IAU\)\s*)?R\.?A\.?\s*[:=]\s*([+-]?\d+\.?\d*)",
+        r"R\.?A\.?\s*\(?deg\)?\s*[:=]\s*([+-]?\d+\.?\d*)",
+        r"pole_ra\s*[:=]\s*([+-]?\d+\.?\d*)",
+    ]
+    for pat in ra_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            result["pole_ra_deg"] = float(m.group(1))
+            break
+
+    dec_patterns = [
+        r"[Pp]ole\s*(?:of\s+rotation\s*)?(?:\(IAU[^)]*\)\s*)?(?:direction\s+)?[Dd]ec\.?\s*(?:\(deg\)|\(degrees\))?\s*[:=]\s*([+-]?\d+\.?\d*)",
+        r"[Dd]ec\.?\s*,?\s*deg\s*,?\s*IAU[^:]*:\s*([+-]?\d+\.?\d*)",
+        r"[Nn]orth\s+[Pp]ole\s*(?:\(IAU\)\s*)?[Dd]ec\.?\s*[:=]\s*([+-]?\d+\.?\d*)",
+        r"[Dd]ec\.?\s*\(?deg\)?\s*[:=]\s*([+-]?\d+\.?\d*)",
+        r"pole_dec\s*[:=]\s*([+-]?\d+\.?\d*)",
+    ]
+    for pat in dec_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            result["pole_dec_deg"] = float(m.group(1))
+            break
+
+    obl_patterns = [
+        r"[Oo]bliquity\s+to\s+orbit\s*[:=]\s*([+-]?\d+\.?\d*)",
+        r"[Oo]bliquity\s*\(deg\)\s*[:=]\s*([+-]?\d+\.?\d*)",
+    ]
+    for pat in obl_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            result["obliquity_deg"] = float(m.group(1))
+            break
+
+    rot_patterns = [
+        r"[Ss]id\.?\s*rot\.?\s*(?:period|rate)\s*\(?rad/s\)?\s*[:=]\s*([+-]?\d+\.?\d*(?:[Ee][+-]?\d+)?)",
+        r"[Rr]ot\.?\s*[Rr]ate\s*\(rad/s\)\s*[:=]\s*([+-]?\d+\.?\d*(?:[Ee][+-]?\d+)?)",
+    ]
+    for pat in rot_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            result["rotation_rate_rad_s"] = float(m.group(1))
+            break
+
+    return result
+
 def parse_physical_data(text: str) -> dict:
     """Parse physical data (GM, mass, radius) from OBJ_DATA in the response."""
     result = {"gm_km3_s2": None, "mass_kg": None, "radius_m": None, "notes": []}
@@ -332,6 +390,7 @@ def parse_physical_data(text: str) -> dict:
             result["radius_m"] = float(m.group(1)) * KM_TO_M
             result["notes"].append(f"radius from single value: {m.group(1)} km")
 
+    result.update(parse_pole_data(text))
     return result
 
 
@@ -491,7 +550,7 @@ Examples:
 
     # Determine output directory
     script_dir = Path(__file__).parent
-    out_dir = script_dir / "fetched"
+    out_dir = script_dir.parent / "local" / "fetched_v2"
     out_dir.mkdir(exist_ok=True)
 
     epoch_label = args.epoch.replace(":", "-").replace("T", "_")
@@ -537,7 +596,7 @@ Examples:
             "stop_time": stop_time,
             "center": CENTER,
             "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-            "generator": "symplectica-horizons-fetcher-v2.0",
+            "generator": "symplectica-horizons-fetcher-v2.1",
         },
         "bodies": {},
         "summary": {"total": 0, "ok": 0, "warning": 0, "error": 0, "partial": 0},
