@@ -21,17 +21,17 @@ export const UI_COLORS = {
 
     /** Surface & Container Backgrounds / Glassmorphism */
     surface: {
-        panelBg: 'rgba(33, 39, 49, 0.95)',
-        headerBg: 'rgba(57, 62, 70, 0.5)',
-        inputBg: 'rgba(57, 62, 70, 0.6)',
-        inputBgAlt: 'rgba(57, 62, 70, 0.8)',
+        panelBg: 'rgba(33, 39, 49, 0.78)',
+        headerBg: 'rgba(57, 62, 70, 0.35)',
+        inputBg: 'rgba(57, 62, 70, 0.5)',
+        inputBgAlt: 'rgba(57, 62, 70, 0.75)',
         selectOptionBg: '#212731',
-        buttonBg: 'rgba(57, 62, 70, 0.4)',
-        buttonHoverBg: 'rgba(57, 62, 70, 0.7)',
-        cardBorder: 'rgba(237, 237, 237, 0.12)',
-        cardBorderSubtle: 'rgba(237, 237, 237, 0.06)',
-        inputBorder: 'rgba(237, 237, 237, 0.18)',
-        panelShadow: 'rgba(0, 0, 0, 0.5)',
+        buttonBg: 'rgba(57, 62, 70, 0.35)',
+        buttonHoverBg: 'rgba(57, 62, 70, 0.65)',
+        cardBorder: 'rgba(237, 237, 237, 0.16)',
+        cardBorderSubtle: 'rgba(237, 237, 237, 0.08)',
+        inputBorder: 'rgba(237, 237, 237, 0.2)',
+        panelShadow: '0 12px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.15)',
     },
 
     /** Typography & Text Colors */

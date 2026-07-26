@@ -11,7 +11,7 @@ describe('UI Colors System', () => {
     it('provides valid accent, surface, text, status, and label color palettes', () => {
         expect(UI_COLORS.accent.primary).toBe('#18e7ec');
         expect(UI_COLORS.accent.secondary).toBe('#55CCCC');
-        expect(UI_COLORS.surface.panelBg).toBe('rgba(33, 39, 49, 0.95)');
+        expect(UI_COLORS.surface.panelBg).toBe('rgba(33, 39, 49, 0.78)');
         expect(UI_COLORS.text.primary).toBe('#ededed');
         expect(UI_COLORS.status.good).toBe('#4caf50');
         expect(UI_COLORS.labels.star).toBe('#fff8e7');
@@ -25,7 +25,7 @@ describe('UI Colors System', () => {
 
     it('defines CSS variable mappings for runtime stylesheet injection', () => {
         expect(UI_CSS_VARIABLES['--ui-accent-primary']).toBe('#18e7ec');
-        expect(UI_CSS_VARIABLES['--ui-panel-bg']).toBe('rgba(33, 39, 49, 0.95)');
+        expect(UI_CSS_VARIABLES['--ui-panel-bg']).toBe('rgba(33, 39, 49, 0.78)');
         expect(UI_CSS_VARIABLES['--ui-text-primary']).toBe('#ededed');
         expect(UI_CSS_VARIABLES['--ui-status-good']).toBe('#4caf50');
     });

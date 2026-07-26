@@ -72,8 +72,10 @@ export class Chat {
                 left: 16px;
                 width: 300px;
                 background: ${UI_COLORS.surface.panelBg};
-                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(16px) saturate(180%);
+                backdrop-filter: blur(16px) saturate(180%);
                 border: 1px solid ${UI_COLORS.surface.cardBorder};
+                box-shadow: ${UI_COLORS.surface.panelShadow};
                 border-radius: 12px;
                 color: ${UI_COLORS.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;

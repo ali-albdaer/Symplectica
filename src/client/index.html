@@ -13,10 +13,11 @@
       --ui-accent-primary-muted: rgba(24, 231, 236, 0.6);
       --ui-accent-secondary: #55CCCC;
       --ui-accent-link: #18e7ec;
-      --ui-panel-bg: rgba(33, 39, 49, 0.95);
-      --ui-header-bg: rgba(57, 62, 70, 0.5);
-      --ui-card-border: rgba(237, 237, 237, 0.12);
-      --ui-card-border-subtle: rgba(237, 237, 237, 0.06);
+      --ui-panel-bg: rgba(33, 39, 49, 0.78);
+      --ui-header-bg: rgba(57, 62, 70, 0.35);
+      --ui-card-border: rgba(237, 237, 237, 0.16);
+      --ui-card-border-subtle: rgba(237, 237, 237, 0.08);
+      --ui-panel-shadow: 0 12px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
       --ui-text-primary: #ededed;
       --ui-text-high-contrast: #ffffff;
       --ui-text-secondary: rgba(237, 237, 237, 0.85);
@@ -87,10 +88,12 @@
 
     .stats-card {
       background: var(--ui-panel-bg);
-      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      backdrop-filter: blur(16px) saturate(180%);
       padding: 15px 20px;
       border-radius: 12px;
       border: 1px solid var(--ui-card-border);
+      box-shadow: var(--ui-panel-shadow);
     }
 
     #stats .stat-row {
@@ -114,10 +117,12 @@
       right: 20px;
       bottom: 20px;
       background: var(--ui-panel-bg);
-      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      backdrop-filter: blur(16px) saturate(180%);
       padding: 15px 20px;
       border-radius: 12px;
       border: 1px solid var(--ui-card-border);
+      box-shadow: var(--ui-panel-shadow);
       max-width: 320px;
       display: block;
     }
@@ -301,10 +306,12 @@
 
     #perf-overlay .stats-card {
       background: var(--ui-panel-bg);
-      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      backdrop-filter: blur(16px) saturate(180%);
       padding: 12px 16px;
       border-radius: 12px;
       border: 1px solid var(--ui-card-border);
+      box-shadow: var(--ui-panel-shadow);
       min-width: 220px;
     }
 
