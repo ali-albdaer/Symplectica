@@ -38,6 +38,8 @@ export interface AdminDefaults {
     timeScale: number;
     paused: boolean;
     simMode: SimMode;
+    hybridMaxSteps: number;
+    hybridBudgeted: boolean;
     closeEncounterIntegrator: CloseEncounterIntegrator;
     closeEncounterHillFactor: number;
     closeEncounterTidalRatio: number;

@@ -1761,10 +1761,15 @@ class NBodyClient {
                     }
                     stepsThisFrame = steps;
                 } else if (this.localSimMode === 'hybrid') {
-                    const { steps, dt } = this.timeController.updateHybrid(delta);
-                    if (steps > 0) {
+                    const maxSteps = this.adminPanel.getHybridMaxSteps();
+                    const budgeted = this.adminPanel.isHybridBudgeted();
+                    
+                    const steps = this.timeController.updateHybrid(delta, maxSteps, budgeted, (dt, s) => {
                         this.physics.setTimeStep(dt);
-                        this.physics.stepN(steps);
+                        this.physics.stepN(s);
+                    });
+                    
+                    if (steps > 0) {
                         // Restore base timestep for future pure accumulator steps
                         this.physics.setTimeStep(this.timeController.getPhysicsTimestep());
                     }

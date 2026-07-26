@@ -14,6 +14,8 @@
     "timeScale": 1,
     "paused": false,
     "simMode": "tick",
+    "hybridMaxSteps": 50,
+    "hybridBudgeted": false,
     "closeEncounterIntegrator": "none",
     "closeEncounterHillFactor": 3,
     "closeEncounterTidalRatio": 0.001,
