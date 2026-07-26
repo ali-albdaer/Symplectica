@@ -13,7 +13,7 @@ Built with **Rust + WebAssembly** on the backend and **TypeScript + Three.js** o
 ## Gallery
 
 <p align="center">
-  <video src="https://github.com/user-attachments/assets/c396ef78-e906-4afb-85f4-84d3ade03d47" muted loop controls width="100%"></video>
+  <video src="https://github.com/user-attachments/assets/c396ef78-e906-4afb-85f4-84d3ade03d47#t=0.001" muted loop controls width="100%"></video>
   <br>
   <em>Traveling between the inner solar system bodies.</em>
 </p>
@@ -21,11 +21,11 @@ Built with **Rust + WebAssembly** on the backend and **TypeScript + Three.js** o
 <table width="100%">
   <tr>
     <td width="50%" align="center">
-      <video src="https://github.com/user-attachments/assets/35984a84-3a3d-46a3-816d-26c91ef00402" muted loop controls width="100%"></video>
+      <video src="https://github.com/user-attachments/assets/35984a84-3a3d-46a3-816d-26c91ef00402#t=0.001" muted loop controls width="100%"></video>
       <br><em>Earth and other bodies at various time warp rates.</em>
     </td>
     <td width="50%" align="center">
-      <video src="https://github.com/user-attachments/assets/e0573bec-6aa8-46f4-9f2b-62bc433a4868" muted loop controls width="100%"></video>
+      <video src="https://github.com/user-attachments/assets/e0573bec-6aa8-46f4-9f2b-62bc433a4868#t=0.001" muted loop controls width="100%"></video>
       <br><em>Jupiter and Io as seen from Ganymede's surface</em>
     </td>
   </tr>
@@ -35,7 +35,7 @@ Built with **Rust + WebAssembly** on the backend and **TypeScript + Three.js** o
       <br><em>A wide closeup of Jupiter with its storm.</em>
     </td>
     <td width="50%" align="center">
-      <video src="https://github.com/user-attachments/assets/f8a4c924-1030-4e3b-b301-b2862ac6c114" muted loop controls width="100%"></video>
+      <video src="https://github.com/user-attachments/assets/f8a4c924-1030-4e3b-b301-b2862ac6c114#t=0.001" muted loop controls width="100%"></video>
       <br><em>Zooming out of Mimas into Saturn's rings.</em>
     </td>
   </tr>
