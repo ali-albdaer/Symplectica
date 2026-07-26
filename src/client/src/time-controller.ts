@@ -52,9 +52,9 @@ export class TimeController {
 
     /**
      * Update the time accumulator for hybrid mode.
-     * Guarantees max budget of 10 steps per frame, scaling dt to cover the rest.
+     * Guarantees maxSteps per frame, scaling dt uniformly to cover the rest, preserving accuracy.
      */
-    updateHybrid(realDeltaSeconds: number, maxSteps: number, budgeted: boolean, stepFn: (dt: number, steps: number) => void): number {
+    updateHybrid(realDeltaSeconds: number, maxSteps: number, _budgeted: boolean, stepFn: (dt: number, steps: number) => void): number {
         if (this.paused) return 0;
 
         const speed = SPEED_LEVELS[this.speedIndex].sim;
@@ -62,45 +62,18 @@ export class TimeController {
         let totalStepsTaken = 0;
         let currentDt = this.physicsTimestep;
 
-        if (budgeted) {
-            const budgetMs = 5; // Client budget is tighter than server to allow WebGL rendering
-            const start = performance.now();
-            
-            // Batch in 10s
-            while (this.accumulator >= currentDt * 10 && performance.now() - start < budgetMs) {
-                stepFn(currentDt, 10);
-                this.accumulator -= currentDt * 10;
-                totalStepsTaken += 10;
-            }
-            
-            // Cleanup remaining
-            while (this.accumulator >= currentDt && performance.now() - start < budgetMs) {
-                stepFn(currentDt, 1);
-                this.accumulator -= currentDt;
-                totalStepsTaken++;
-            }
-            
-            // Consume remaining if budget exceeded
-            if (this.accumulator >= currentDt) {
-                const scaledDt = this.accumulator;
-                stepFn(scaledDt, 1);
-                this.accumulator = 0;
-                totalStepsTaken++;
-            }
+        let steps = Math.floor(this.accumulator / currentDt);
+        if (steps > maxSteps) {
+            currentDt = this.accumulator / maxSteps;
+            steps = maxSteps;
+            this.accumulator = 0;
         } else {
-            let steps = Math.floor(this.accumulator / currentDt);
-            if (steps > maxSteps) {
-                currentDt = this.accumulator / maxSteps;
-                steps = maxSteps;
-                this.accumulator = 0;
-            } else {
-                this.accumulator -= steps * this.physicsTimestep;
-            }
-            
-            if (steps > 0) {
-                stepFn(currentDt, steps);
-                totalStepsTaken = steps;
-            }
+            this.accumulator -= steps * this.physicsTimestep;
+        }
+        
+        if (steps > 0) {
+            stepFn(currentDt, steps);
+            totalStepsTaken = steps;
         }
 
         return totalStepsTaken;

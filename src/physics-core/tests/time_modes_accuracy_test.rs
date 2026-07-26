@@ -53,23 +53,28 @@ fn test_time_modes_accuracy_1_year() {
     }
     
     // ---------------------------------------------------------
-    // 3.5. Hybrid Mode (Budgeted - assuming max 500 steps per tick)
-    // Simulates a powerful server achieving 500 steps in 10ms
+    // 3.5. Flawed Budgeted Hybrid Mode (Old Client Behavior)
+    // Simulates exhausting a budget and dumping the rest into 1 massive step
     // ---------------------------------------------------------
     let mut sim_hybrid_budgeted = create_full_solar_system_iv(42, true);
-    let max_budgeted_steps = 500_u64;
-    
-    let mut budgeted_steps = (time_per_tick / base_dt).floor() as u64;
-    let mut budgeted_dt = base_dt;
-    
-    if budgeted_steps > max_budgeted_steps {
-        budgeted_dt = time_per_tick / (max_budgeted_steps as f64);
-        budgeted_steps = max_budgeted_steps;
-    }
+    let budget_steps_limit = 50_u64;
     
     for _ in 0..ticks {
-        sim_hybrid_budgeted.set_dt(budgeted_dt);
-        sim_hybrid_budgeted.step_n(budgeted_steps);
+        let mut accumulator = time_per_tick;
+        let mut steps_taken = 0;
+        
+        while accumulator >= base_dt && steps_taken < budget_steps_limit {
+            sim_hybrid_budgeted.set_dt(base_dt);
+            sim_hybrid_budgeted.step_n(1);
+            accumulator -= base_dt;
+            steps_taken += 1;
+        }
+        
+        // Dump the remainder in one step if we ran out of budget
+        if accumulator > 0.0 {
+            sim_hybrid_budgeted.set_dt(accumulator);
+            sim_hybrid_budgeted.step_n(1);
+        }
     }
     
     // ---------------------------------------------------------
@@ -127,12 +132,12 @@ fn test_time_modes_accuracy_1_year() {
     println!("--- ACCURACY RESULTS ---");
     println!("Earth Error (Tick-Scaled):   {:.2} meters", err_earth_tick);
     println!("Earth Error (Hybrid 50):     {:.2} meters", err_earth_hybrid);
-    println!("Earth Error (Hybrid Budg):   {:.2} meters (Simulated 500 steps/tick)", err_earth_budgeted);
+    println!("Earth Error (Flawed Budg):   {:.2} meters (Dumped remainder into 1 step)", err_earth_budgeted);
     println!("Earth Error (Accumulator):   {:.2} meters (Maxed out / Missing time)", err_earth_acc);
     println!("------------------------");
     println!("Moon Error (Tick-Scaled):    {:.2} meters", err_moon_tick);
     println!("Moon Error (Hybrid 50):      {:.2} meters", err_moon_hybrid);
-    println!("Moon Error (Hybrid Budg):    {:.2} meters (Simulated 500 steps/tick)", err_moon_budgeted);
+    println!("Moon Error (Flawed Budg):    {:.2} meters (Dumped remainder into 1 step)", err_moon_budgeted);
     println!("Moon Error (Accumulator):    {:.2} meters (Maxed out / Missing time)", err_moon_acc);
     println!("------------------------");
 
@@ -145,13 +150,14 @@ fn test_time_modes_accuracy_1_year() {
         err_moon_hybrid < err_moon_tick / 10.0,
         "Moon hybrid error ({}) not significantly better than tick error ({})", err_moon_hybrid, err_moon_tick
     );
+    // The flawed budgeted mode causes a massive error spike because the remainder was dumped into one step
     assert!(
-        err_earth_budgeted < err_earth_hybrid / 5.0,
-        "Earth budgeted error ({}) should be significantly better than fixed hybrid error ({})", err_earth_budgeted, err_earth_hybrid
+        err_earth_budgeted > err_earth_hybrid * 10.0,
+        "Earth flawed budgeted error ({}) should be much worse than fixed hybrid error ({}) due to dumping remainder", err_earth_budgeted, err_earth_hybrid
     );
     assert!(
-        err_moon_budgeted < err_moon_hybrid / 5.0,
-        "Moon budgeted error ({}) should be significantly better than fixed hybrid error ({})", err_moon_budgeted, err_moon_hybrid
+        err_moon_budgeted > err_moon_hybrid * 10.0,
+        "Moon flawed budgeted error ({}) should be much worse than fixed hybrid error ({}) due to dumping remainder", err_moon_budgeted, err_moon_hybrid
     );
     
     // Accumulator has massive error because it simply simulated way less time (capped)
