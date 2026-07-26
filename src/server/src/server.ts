@@ -121,6 +121,8 @@ class SimulationServer {
         timeScale: APP_DEFAULTS.adminDefaults.timeScale,
         paused: APP_DEFAULTS.adminDefaults.paused,
         simMode: APP_DEFAULTS.adminDefaults.simMode,
+        hybridMaxSteps: APP_DEFAULTS.adminDefaults.hybridMaxSteps,
+        hybridBudgeted: APP_DEFAULTS.adminDefaults.hybridBudgeted,
         closeEncounterIntegrator: APP_DEFAULTS.adminDefaults.closeEncounterIntegrator,
         closeEncounterHillFactor: APP_DEFAULTS.adminDefaults.closeEncounterHillFactor,
         closeEncounterTidalRatio: APP_DEFAULTS.adminDefaults.closeEncounterTidalRatio,
@@ -213,6 +215,8 @@ class SimulationServer {
             timeScale: APP_DEFAULTS.adminDefaults.timeScale,
             paused: APP_DEFAULTS.adminDefaults.paused,
             simMode: APP_DEFAULTS.adminDefaults.simMode,
+            hybridMaxSteps: APP_DEFAULTS.adminDefaults.hybridMaxSteps,
+            hybridBudgeted: APP_DEFAULTS.adminDefaults.hybridBudgeted,
             closeEncounterIntegrator: APP_DEFAULTS.adminDefaults.closeEncounterIntegrator,
             closeEncounterHillFactor: APP_DEFAULTS.adminDefaults.closeEncounterHillFactor,
             closeEncounterTidalRatio: APP_DEFAULTS.adminDefaults.closeEncounterTidalRatio,
@@ -480,6 +484,8 @@ class SimulationServer {
                 const forceMethod = payload.forceMethod === 'barnes-hut' ? 'barnes-hut' : 'direct';
                 const theta = typeof payload.theta === 'number' && payload.theta > 0 ? payload.theta : this.adminState.theta;
                 const simMode = payload.simMode === 'accumulator' ? 'accumulator' : (payload.simMode === 'hybrid' ? 'hybrid' : 'tick');
+                const hybridMaxSteps = typeof payload.hybridMaxSteps === 'number' && payload.hybridMaxSteps > 0 ? payload.hybridMaxSteps : this.adminState.hybridMaxSteps;
+                const hybridBudgeted = typeof payload.hybridBudgeted === 'boolean' ? payload.hybridBudgeted : this.adminState.hybridBudgeted;
                 const closeIntegrator = payload.closeEncounterIntegrator === 'rk45' || payload.closeEncounterIntegrator === 'gauss-radau'
                     ? payload.closeEncounterIntegrator
                     : 'none';
@@ -563,6 +569,8 @@ class SimulationServer {
                     timeScale,
                     paused: this.adminState.paused,
                     simMode,
+                    hybridMaxSteps,
+                    hybridBudgeted,
                     closeEncounterIntegrator: closeIntegrator,
                     closeEncounterHillFactor,
                     closeEncounterTidalRatio,
@@ -700,24 +708,53 @@ class SimulationServer {
                     }
                 } else if (this.adminState.simMode === 'hybrid') {
                     this.simAccumulator += (delta / 1000) * this.adminState.timeScale;
-                    const maxSteps = 50; // Server has more headroom
-                    let steps = Math.floor(this.simAccumulator / this.adminState.dt);
+                    const maxSteps = this.adminState.hybridMaxSteps || 50;
                     let currentDt = this.adminState.dt;
                     
-                    if (steps > maxSteps) {
-                        currentDt = this.simAccumulator / maxSteps;
-                        steps = maxSteps;
-                        this.simAccumulator = 0; // Consume everything
-                    } else {
-                        this.simAccumulator -= steps * this.adminState.dt;
-                    }
-                    
-                    if (steps > 0) {
-                        this.simulation.setDt(currentDt);
-                        this.simulation.stepN(BigInt(steps));
+                    if (this.adminState.hybridBudgeted) {
+                        const budgetMs = 10;
+                        const start = performance.now();
                         
-                        // Restore base timestep
-                        this.simulation.setDt(this.adminState.dt);
+                        this.simulation.setDt(currentDt);
+                        // Batch in 10s to minimize boundary crossing overhead
+                        while (this.simAccumulator >= currentDt * 10 && performance.now() - start < budgetMs) {
+                            this.simulation.stepN(10n);
+                            this.simAccumulator -= currentDt * 10;
+                        }
+                        // Clean up remaining steps
+                        while (this.simAccumulator >= currentDt && performance.now() - start < budgetMs) {
+                            this.simulation.stepN(1n);
+                            this.simAccumulator -= currentDt;
+                        }
+                        
+                        // If budget was exceeded and we STILL have accumulated time, we must scale dt 
+                        // and take one massive step to stay in sync with real-time warp speed.
+                        if (this.simAccumulator >= currentDt) {
+                            const scaledDt = this.simAccumulator;
+                            this.simulation.setDt(scaledDt);
+                            this.simulation.stepN(1n);
+                            this.simAccumulator = 0;
+                            
+                            // Restore base timestep
+                            this.simulation.setDt(this.adminState.dt);
+                        }
+                    } else {
+                        let steps = Math.floor(this.simAccumulator / this.adminState.dt);
+                        if (steps > maxSteps) {
+                            currentDt = this.simAccumulator / maxSteps;
+                            steps = maxSteps;
+                            this.simAccumulator = 0; // Consume everything
+                        } else {
+                            this.simAccumulator -= steps * this.adminState.dt;
+                        }
+                        
+                        if (steps > 0) {
+                            this.simulation.setDt(currentDt);
+                            this.simulation.stepN(BigInt(steps));
+                            
+                            // Restore base timestep
+                            this.simulation.setDt(this.adminState.dt);
+                        }
                     }
                 } else {
                     // Tick-Scaled mode

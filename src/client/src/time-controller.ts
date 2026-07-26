@@ -54,31 +54,56 @@ export class TimeController {
      * Update the time accumulator for hybrid mode.
      * Guarantees max budget of 10 steps per frame, scaling dt to cover the rest.
      */
-    updateHybrid(realDeltaSeconds: number): { steps: number, dt: number } {
-        if (this.paused) return { steps: 0, dt: this.physicsTimestep };
+    updateHybrid(realDeltaSeconds: number, maxSteps: number, budgeted: boolean, stepFn: (dt: number, steps: number) => void): number {
+        if (this.paused) return 0;
 
         const speed = SPEED_LEVELS[this.speedIndex].sim;
         this.accumulator += realDeltaSeconds * speed;
+        let totalStepsTaken = 0;
+        let currentDt = this.physicsTimestep;
 
-        let steps = 0;
-        while (this.accumulator >= this.physicsTimestep) {
-            this.accumulator -= this.physicsTimestep;
-            steps++;
+        if (budgeted) {
+            const budgetMs = 5; // Client budget is tighter than server to allow WebGL rendering
+            const start = performance.now();
+            
+            // Batch in 10s
+            while (this.accumulator >= currentDt * 10 && performance.now() - start < budgetMs) {
+                stepFn(currentDt, 10);
+                this.accumulator -= currentDt * 10;
+                totalStepsTaken += 10;
+            }
+            
+            // Cleanup remaining
+            while (this.accumulator >= currentDt && performance.now() - start < budgetMs) {
+                stepFn(currentDt, 1);
+                this.accumulator -= currentDt;
+                totalStepsTaken++;
+            }
+            
+            // Consume remaining if budget exceeded
+            if (this.accumulator >= currentDt) {
+                const scaledDt = this.accumulator;
+                stepFn(scaledDt, 1);
+                this.accumulator = 0;
+                totalStepsTaken++;
+            }
+        } else {
+            let steps = Math.floor(this.accumulator / currentDt);
+            if (steps > maxSteps) {
+                currentDt = this.accumulator / maxSteps;
+                steps = maxSteps;
+                this.accumulator = 0;
+            } else {
+                this.accumulator -= steps * this.physicsTimestep;
+            }
+            
+            if (steps > 0) {
+                stepFn(currentDt, steps);
+                totalStepsTaken = steps;
+            }
         }
 
-        const maxSteps = 10;
-        let dt = this.physicsTimestep;
-
-        if (steps > maxSteps) {
-            // Calculate total time we were supposed to simulate
-            const totalTime = (steps * this.physicsTimestep) + this.accumulator;
-            // Scale dt to cover that entire time in exactly maxSteps
-            dt = totalTime / maxSteps;
-            steps = maxSteps;
-            this.accumulator = 0; // we consumed all available time
-        }
-
-        return { steps, dt };
+        return totalStepsTaken;
     }
 
     /** Get the physics timestep (simulation seconds per physics step) */

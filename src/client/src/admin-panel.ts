@@ -24,6 +24,8 @@ interface ServerConfig {
     substeps: number;
     timeScale: number;
     simMode: 'tick' | 'accumulator' | 'hybrid';
+    hybridMaxSteps: number;
+    hybridBudgeted: boolean;
     closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
     closeEncounterHillFactor: number;
     closeEncounterTidalRatio: number;
@@ -54,8 +56,10 @@ export class AdminPanel {
         forceMethod: APP_DEFAULTS.adminDefaults.forceMethod,
         theta: APP_DEFAULTS.adminDefaults.theta,
         substeps: APP_DEFAULTS.adminDefaults.substeps,
-        simMode: APP_DEFAULTS.adminDefaults.simMode,
-        closeEncounterIntegrator: APP_DEFAULTS.adminDefaults.closeEncounterIntegrator,
+        simMode: APP_DEFAULTS.adminDefaults.simMode as SimMode,
+        hybridMaxSteps: APP_DEFAULTS.adminDefaults.hybridMaxSteps,
+        hybridBudgeted: APP_DEFAULTS.adminDefaults.hybridBudgeted,
+        closeEncounterIntegrator: APP_DEFAULTS.adminDefaults.closeEncounterIntegrator as 'none' | 'rk45' | 'gauss-radau',
         closeEncounterHillFactor: APP_DEFAULTS.adminDefaults.closeEncounterHillFactor,
         closeEncounterTidalRatio: APP_DEFAULTS.adminDefaults.closeEncounterTidalRatio,
         closeEncounterJerkNorm: APP_DEFAULTS.adminDefaults.closeEncounterJerkNorm,
@@ -103,6 +107,8 @@ export class AdminPanel {
             timeScale: defaults.timeScale,
             paused: defaults.paused,
             simMode: defaults.simMode,
+            hybridMaxSteps: defaults.hybridMaxSteps,
+            hybridBudgeted: defaults.hybridBudgeted,
             closeEncounterIntegrator: defaults.closeEncounterIntegrator,
             closeEncounterHillFactor: defaults.closeEncounterHillFactor,
             closeEncounterTidalRatio: defaults.closeEncounterTidalRatio,
@@ -123,6 +129,14 @@ export class AdminPanel {
             btn.textContent = paused ? 'Resume Simulation' : 'Pause Simulation';
             btn.classList.toggle('admin-btn-warning', paused);
         }
+    }
+
+    getHybridMaxSteps(): number {
+        return this.config.hybridMaxSteps;
+    }
+
+    isHybridBudgeted(): boolean {
+        return this.config.hybridBudgeted;
     }
 
     private createUI(): HTMLElement {
@@ -223,6 +237,19 @@ export class AdminPanel {
                             <option value="accumulator">Fixed-Delta (Accurate)</option>
                             <option value="hybrid">Hybrid (Balanced)</option>
                         </select>
+                    </div>
+
+                    <div id="hybrid-settings" style="display: none;">
+                        <div class="admin-field">
+                            <label>Max Substeps</label>
+                            <input type="number" id="admin-hybrid-max-steps" value="${APP_DEFAULTS.adminDefaults.hybridMaxSteps}" min="1" step="1">
+                        </div>
+                        <div class="admin-field">
+                            <label class="opt-toggle">
+                                <input type="checkbox" id="admin-hybrid-budgeted" ${APP_DEFAULTS.adminDefaults.hybridBudgeted ? 'checked' : ''}>
+                                <span>Budgeted (Target Frame Rate)</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="admin-field">
@@ -625,6 +652,15 @@ export class AdminPanel {
             thetaField.classList.toggle('visible', forceMethodSelect.value === 'barnes-hut');
         });
 
+        // Sim mode change
+        const simModeSelect = container.querySelector('#admin-sim-mode') as HTMLSelectElement;
+        const hybridSettings = container.querySelector('#hybrid-settings') as HTMLElement;
+        simModeSelect?.addEventListener('change', () => {
+            if (hybridSettings) {
+                hybridSettings.style.display = simModeSelect.value === 'hybrid' ? 'block' : 'none';
+            }
+        });
+
         // Apply button
         container.querySelector('#admin-apply')?.addEventListener('click', () => {
             this.applySettings();
@@ -785,7 +821,9 @@ export class AdminPanel {
         const substeps = parseInt((document.getElementById('admin-substeps') as HTMLInputElement).value);
         const forceMethod = (document.getElementById('admin-force-method') as HTMLSelectElement).value;
         const theta = parseFloat((document.getElementById('admin-theta') as HTMLInputElement).value);
-        const simMode = (document.getElementById('admin-sim-mode') as HTMLSelectElement).value as 'tick' | 'accumulator' | 'hybrid';
+        const simMode = (document.getElementById('admin-sim-mode') as HTMLSelectElement).value as SimMode;
+        const hybridMaxSteps = parseInt((document.getElementById('admin-hybrid-max-steps') as HTMLInputElement).value, 10);
+        const hybridBudgeted = (document.getElementById('admin-hybrid-budgeted') as HTMLInputElement).checked;
         const closeIntegrator = (document.getElementById('admin-close-encounter') as HTMLSelectElement).value as 'none' | 'rk45' | 'gauss-radau';
         const closeHill = parseFloat((document.getElementById('admin-close-hill') as HTMLInputElement).value);
         const closeTidal = parseFloat((document.getElementById('admin-close-tidal') as HTMLInputElement).value);
@@ -809,6 +847,8 @@ export class AdminPanel {
                 theta,
                 timeScale,
                 simMode,
+                hybridMaxSteps,
+                hybridBudgeted,
                 closeEncounterIntegrator: closeIntegrator,
                 closeEncounterHillFactor: closeHill,
                 closeEncounterTidalRatio: closeTidal,
@@ -821,6 +861,10 @@ export class AdminPanel {
                 closeEncounterGaussRadauTol: closeGrTol,
             } as AdminStatePayload);
         }
+
+        // Apply local config state
+        this.config.hybridMaxSteps = hybridMaxSteps;
+        this.config.hybridBudgeted = hybridBudgeted;
 
         // Apply timestep to both physics and TimeController
         this.physics.setTimeStep(dt);
@@ -890,6 +934,9 @@ export class AdminPanel {
         const thetaInput = document.getElementById('admin-theta') as HTMLInputElement | null;
         const thetaField = document.getElementById('theta-field') as HTMLElement | null;
         const simModeSelect = document.getElementById('admin-sim-mode') as HTMLSelectElement | null;
+        const hybridSettings = document.getElementById('hybrid-settings') as HTMLElement | null;
+        const hybridMaxStepsInput = document.getElementById('admin-hybrid-max-steps') as HTMLInputElement | null;
+        const hybridBudgetedInput = document.getElementById('admin-hybrid-budgeted') as HTMLInputElement | null;
         const warpSelect = document.getElementById('admin-time-warp') as HTMLSelectElement | null;
         const closeIntegratorSelect = document.getElementById('admin-close-encounter') as HTMLSelectElement | null;
         const closeHillInput = document.getElementById('admin-close-hill') as HTMLInputElement | null;
@@ -907,7 +954,14 @@ export class AdminPanel {
         if (forceMethodSelect) forceMethodSelect.value = settings.forceMethod;
         if (thetaInput) thetaInput.value = settings.theta.toString();
         if (thetaField) thetaField.classList.toggle('visible', settings.forceMethod === 'barnes-hut');
-        if (simModeSelect) simModeSelect.value = settings.simMode;
+        if (simModeSelect) {
+            simModeSelect.value = settings.simMode;
+            if (hybridSettings) {
+                hybridSettings.style.display = settings.simMode === 'hybrid' ? 'block' : 'none';
+            }
+        }
+        if (hybridMaxStepsInput) hybridMaxStepsInput.value = (settings.hybridMaxSteps || APP_DEFAULTS.adminDefaults.hybridMaxSteps).toString();
+        if (hybridBudgetedInput) hybridBudgetedInput.checked = settings.hybridBudgeted || false;
         if (warpSelect) {
             const target = settings.timeScale.toString();
             if (Array.from(warpSelect.options).some(option => option.value === target)) {

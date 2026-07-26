@@ -17,6 +17,8 @@ export interface AdminStatePayload {
     timeScale: number;
     paused: boolean;
     simMode: 'tick' | 'accumulator' | 'hybrid';
+    hybridMaxSteps: number;
+    hybridBudgeted: boolean;
     closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
     closeEncounterHillFactor: number;
     closeEncounterTidalRatio: number;

@@ -53,6 +53,26 @@ fn test_time_modes_accuracy_1_year() {
     }
     
     // ---------------------------------------------------------
+    // 3.5. Hybrid Mode (Budgeted - assuming max 500 steps per tick)
+    // Simulates a powerful server achieving 500 steps in 10ms
+    // ---------------------------------------------------------
+    let mut sim_hybrid_budgeted = create_full_solar_system_iv(42, true);
+    let max_budgeted_steps = 500_u64;
+    
+    let mut budgeted_steps = (time_per_tick / base_dt).floor() as u64;
+    let mut budgeted_dt = base_dt;
+    
+    if budgeted_steps > max_budgeted_steps {
+        budgeted_dt = time_per_tick / (max_budgeted_steps as f64);
+        budgeted_steps = max_budgeted_steps;
+    }
+    
+    for _ in 0..ticks {
+        sim_hybrid_budgeted.set_dt(budgeted_dt);
+        sim_hybrid_budgeted.step_n(budgeted_steps);
+    }
+    
+    // ---------------------------------------------------------
     // 4. Accumulator Mode
     // Caps steps per tick at 100, dropping the rest of the time.
     // ---------------------------------------------------------
@@ -86,6 +106,9 @@ fn test_time_modes_accuracy_1_year() {
     let earth_hybrid = find_body(&sim_hybrid, "Earth");
     let moon_hybrid = find_body(&sim_hybrid, "Moon");
     
+    let earth_budgeted = find_body(&sim_hybrid_budgeted, "Earth");
+    let moon_budgeted = find_body(&sim_hybrid_budgeted, "Moon");
+    
     let earth_acc = find_body(&sim_acc, "Earth");
     let moon_acc = find_body(&sim_acc, "Moon");
 
@@ -95,16 +118,21 @@ fn test_time_modes_accuracy_1_year() {
     let err_earth_hybrid = earth_truth.distance(earth_hybrid);
     let err_moon_hybrid = moon_truth.distance(moon_hybrid);
     
+    let err_earth_budgeted = earth_truth.distance(earth_budgeted);
+    let err_moon_budgeted = moon_truth.distance(moon_budgeted);
+    
     let err_earth_acc = earth_truth.distance(earth_acc);
     let err_moon_acc = moon_truth.distance(moon_acc);
 
     println!("--- ACCURACY RESULTS ---");
     println!("Earth Error (Tick-Scaled):   {:.2} meters", err_earth_tick);
-    println!("Earth Error (Hybrid):        {:.2} meters", err_earth_hybrid);
+    println!("Earth Error (Hybrid 50):     {:.2} meters", err_earth_hybrid);
+    println!("Earth Error (Hybrid Budg):   {:.2} meters (Simulated 500 steps/tick)", err_earth_budgeted);
     println!("Earth Error (Accumulator):   {:.2} meters (Maxed out / Missing time)", err_earth_acc);
     println!("------------------------");
     println!("Moon Error (Tick-Scaled):    {:.2} meters", err_moon_tick);
-    println!("Moon Error (Hybrid):         {:.2} meters", err_moon_hybrid);
+    println!("Moon Error (Hybrid 50):      {:.2} meters", err_moon_hybrid);
+    println!("Moon Error (Hybrid Budg):    {:.2} meters (Simulated 500 steps/tick)", err_moon_budgeted);
     println!("Moon Error (Accumulator):    {:.2} meters (Maxed out / Missing time)", err_moon_acc);
     println!("------------------------");
 
@@ -116,6 +144,14 @@ fn test_time_modes_accuracy_1_year() {
     assert!(
         err_moon_hybrid < err_moon_tick / 10.0,
         "Moon hybrid error ({}) not significantly better than tick error ({})", err_moon_hybrid, err_moon_tick
+    );
+    assert!(
+        err_earth_budgeted < err_earth_hybrid / 5.0,
+        "Earth budgeted error ({}) should be significantly better than fixed hybrid error ({})", err_earth_budgeted, err_earth_hybrid
+    );
+    assert!(
+        err_moon_budgeted < err_moon_hybrid / 5.0,
+        "Moon budgeted error ({}) should be significantly better than fixed hybrid error ({})", err_moon_budgeted, err_moon_hybrid
     );
     
     // Accumulator has massive error because it simply simulated way less time (capped)
