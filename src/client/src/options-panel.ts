@@ -1135,9 +1135,6 @@ export class OptionsPanel {
     }
 
     private setupDrag(): void {
-        const header = this.container.querySelector('.opt-header') as HTMLElement | null;
-        if (!header) return;
-
         let startX = 0;
         let startY = 0;
         let startLeft = 0;
@@ -1158,8 +1155,13 @@ export class OptionsPanel {
             document.removeEventListener('mouseup', onMouseUp);
         };
 
-        header.addEventListener('mousedown', (event) => {
-            if ((event.target as HTMLElement).closest('button')) return;
+        this.container.addEventListener('mousedown', (event) => {
+            const target = event.target as HTMLElement;
+            if (target.closest('input, select, button, textarea, label, summary, a, option, [contenteditable], .opt-tab-btn, .tab-btn')) {
+                return;
+            }
+            if (event.button !== 0) return;
+
             const rect = this.container.getBoundingClientRect();
             startX = event.clientX;
             startY = event.clientY;
