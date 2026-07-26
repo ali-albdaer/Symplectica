@@ -7,7 +7,7 @@ use crate::body::{Body, BodyId};
 use crate::constants::G;
 use crate::force::{
     compute_accelerations_direct, compute_angular_momentum, compute_center_of_mass,
-    compute_kinetic_energy, compute_potential_energy, compute_total_energy,
+    compute_kinetic_energy, compute_potential_energy,
     compute_total_momentum,
 };
 use crate::integrator::{

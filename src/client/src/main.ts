@@ -26,7 +26,7 @@ import { SkyRenderer } from './sky-renderer';
 import { TouchControls } from './touch-controls';
 import { BuildPanel, BuildBodyParams, BuildableBodyType, BodyListEntry } from './build-panel';
 import { DriftMonitor } from './drift-monitor';
-import { APP_DEFAULTS, PRESET_SCENE_CONFIG, DEFAULT_SCENE_CONFIG } from './defaults';
+import { APP_DEFAULTS, PRESET_SCENE_CONFIG, DEFAULT_SCENE_CONFIG, SimMode } from './defaults';
 import { logger } from './logger';
 import { MediaCapture } from './recorder';
 
@@ -34,7 +34,7 @@ import { AU, G, M_SUN, L_SUN, UI_UPDATE_INTERVAL_MS, SIM_TAB_UPDATE_INTERVAL_MS,
 const LOCAL_TICK_RATE = APP_DEFAULTS.adminDefaults.tickRate;
 const LOCAL_PRESET_PLAYER = 'local';
 
-type SimMode = 'tick' | 'accumulator';
+
 
 interface SimState {
     tick: number;
@@ -1756,27 +1756,40 @@ class NBodyClient {
             if (!wasPaused) {
                 if (this.localSimMode === 'accumulator') {
                     const steps = this.timeController.update(delta);
-                    for (let i = 0; i < steps; i++) {
-                        this.physics.step();
+                    if (steps > 0) {
+                        this.physics.stepN(steps);
+                    }
+                    stepsThisFrame = steps;
+                } else if (this.localSimMode === 'hybrid') {
+                    const { steps, dt } = this.timeController.updateHybrid(delta);
+                    if (steps > 0) {
+                        this.physics.setTimeStep(dt);
+                        this.physics.stepN(steps);
+                        // Restore base timestep for future pure accumulator steps
+                        this.physics.setTimeStep(this.timeController.getPhysicsTimestep());
                     }
                     stepsThisFrame = steps;
                 } else {
                     const tickInterval = 1 / LOCAL_TICK_RATE;
                     this.localTickAccumulator += delta;
 
-                    let steps = 0;
-                    const maxSteps = 1000;
-                    while (this.localTickAccumulator >= tickInterval && steps < maxSteps) {
+                    const maxSteps = 10;
+                    let steps = Math.floor(this.localTickAccumulator / tickInterval);
+                    
+                    if (steps > maxSteps) {
+                        steps = maxSteps;
+                        this.localTickAccumulator = Math.min(this.localTickAccumulator, maxSteps * tickInterval);
+                    }
+
+                    if (steps > 0) {
                         const simRate = this.timeController.getCurrentSpeed().sim;
                         const dt = simRate / LOCAL_TICK_RATE;
                         this.physics.setTimeStep(dt);
-                        this.physics.step();
-                        this.localTickAccumulator -= tickInterval;
-                        steps++;
-                    }
-
-                    if (steps >= maxSteps) {
-                        this.localTickAccumulator = Math.min(this.localTickAccumulator, maxSteps * tickInterval);
+                        this.physics.stepN(steps);
+                        this.localTickAccumulator -= steps * tickInterval;
+                        
+                        // Restore base timestep for future pure accumulator steps
+                        this.physics.setTimeStep(this.timeController.getPhysicsTimestep());
                     }
                     stepsThisFrame = steps;
                 }

@@ -13,7 +13,7 @@ export interface AdminStatePayload {
     theta: number;
     timeScale: number;
     paused: boolean;
-    simMode: 'tick' | 'accumulator';
+    simMode: 'tick' | 'accumulator' | 'hybrid';
     closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
     closeEncounterHillFactor: number;
     closeEncounterTidalRatio: number;

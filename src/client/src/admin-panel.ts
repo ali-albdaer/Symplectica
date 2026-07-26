@@ -13,7 +13,7 @@ import { RingProfile } from './renderer';
 import { PhysicsClient } from './physics';
 import { TimeController } from './time-controller';
 import { AdminStatePayload, NetworkClient } from './network';
-import { APP_DEFAULTS } from './defaults';
+import { APP_DEFAULTS, SimMode } from './defaults';
 import { logger } from './logger';
 import { UI_COLORS } from '../../shared/constants';
 
@@ -22,7 +22,8 @@ interface ServerConfig {
     forceMethod: 'direct' | 'barnes-hut';
     theta: number;
     substeps: number;
-    simMode: 'tick' | 'accumulator';
+    timeScale: number;
+    simMode: 'tick' | 'accumulator' | 'hybrid';
     closeEncounterIntegrator: 'none' | 'rk45' | 'gauss-radau';
     closeEncounterHillFactor: number;
     closeEncounterTidalRatio: number;
@@ -41,13 +42,14 @@ export class AdminPanel {
     private timeController: TimeController;
     private network?: NetworkClient;
     private onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }) => void;
-    private onSimModeChange?: (mode: 'tick' | 'accumulator') => void;
+    private onSimModeChange?: (mode: SimMode) => void;
     private onRingGeneratorLoadRequest?: () => void;
     private onRingGeneratorApply?: (profile: RingProfile) => void;
     private onRingGeneratorExport?: (profile: RingProfile) => void;
     private currentRingProfile: RingProfile = { stops: [], baseOpacity: 1.0, scatteringG: 0.3 };
     private isOpen = false;
     private config: ServerConfig = {
+        timeScale: APP_DEFAULTS.adminDefaults.timeScale,
         tickRate: APP_DEFAULTS.adminDefaults.tickRate,
         forceMethod: APP_DEFAULTS.adminDefaults.forceMethod,
         theta: APP_DEFAULTS.adminDefaults.theta,
@@ -70,7 +72,7 @@ export class AdminPanel {
         timeController: TimeController,
         network?: NetworkClient,
         onPresetChange?: (presetId: string, name: string, barycentric: boolean, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }) => void,
-        onSimModeChange?: (mode: 'tick' | 'accumulator') => void,
+        onSimModeChange?: (mode: SimMode) => void,
         onRingGeneratorLoadRequest?: () => void,
         onRingGeneratorApply?: (profile: RingProfile) => void,
         onRingGeneratorExport?: (profile: RingProfile) => void
@@ -219,6 +221,7 @@ export class AdminPanel {
                         <select id="admin-sim-mode">
                             <option value="tick">Tick-Scaled (Lightweight)</option>
                             <option value="accumulator">Fixed-Delta (Accurate)</option>
+                            <option value="hybrid">Hybrid (Balanced)</option>
                         </select>
                     </div>
 
@@ -782,7 +785,7 @@ export class AdminPanel {
         const substeps = parseInt((document.getElementById('admin-substeps') as HTMLInputElement).value);
         const forceMethod = (document.getElementById('admin-force-method') as HTMLSelectElement).value;
         const theta = parseFloat((document.getElementById('admin-theta') as HTMLInputElement).value);
-        const simMode = (document.getElementById('admin-sim-mode') as HTMLSelectElement).value as 'tick' | 'accumulator';
+        const simMode = (document.getElementById('admin-sim-mode') as HTMLSelectElement).value as 'tick' | 'accumulator' | 'hybrid';
         const closeIntegrator = (document.getElementById('admin-close-encounter') as HTMLSelectElement).value as 'none' | 'rk45' | 'gauss-radau';
         const closeHill = parseFloat((document.getElementById('admin-close-hill') as HTMLInputElement).value);
         const closeTidal = parseFloat((document.getElementById('admin-close-tidal') as HTMLInputElement).value);
@@ -837,7 +840,7 @@ export class AdminPanel {
         this.timeController.setSpeedBySimRate(timeScale);
         this.onSimModeChange?.(simMode);
 
-        logger.info(`Applied settings: dt=${dt}s, substeps=${substeps}, method=${forceMethod}, θ=${theta}`);
+        logger.info(`Applied settings: dt=${dt}s, substeps=${substeps}, method=${forceMethod}, θ=${theta}, mode=${simMode}`);
 
         // this.close();
     }

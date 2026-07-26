@@ -41,13 +41,44 @@ export class TimeController {
             steps++;
         }
 
-        const maxSteps = 1000;
+        const maxSteps = 100;
         if (steps > maxSteps) {
             this.accumulator = Math.min(this.accumulator, maxSteps * this.physicsTimestep);
             return maxSteps;
         }
 
         return steps;
+    }
+
+    /**
+     * Update the time accumulator for hybrid mode.
+     * Guarantees max budget of 10 steps per frame, scaling dt to cover the rest.
+     */
+    updateHybrid(realDeltaSeconds: number): { steps: number, dt: number } {
+        if (this.paused) return { steps: 0, dt: this.physicsTimestep };
+
+        const speed = SPEED_LEVELS[this.speedIndex].sim;
+        this.accumulator += realDeltaSeconds * speed;
+
+        let steps = 0;
+        while (this.accumulator >= this.physicsTimestep) {
+            this.accumulator -= this.physicsTimestep;
+            steps++;
+        }
+
+        const maxSteps = 10;
+        let dt = this.physicsTimestep;
+
+        if (steps > maxSteps) {
+            // Calculate total time we were supposed to simulate
+            const totalTime = (steps * this.physicsTimestep) + this.accumulator;
+            // Scale dt to cover that entire time in exactly maxSteps
+            dt = totalTime / maxSteps;
+            steps = maxSteps;
+            this.accumulator = 0; // we consumed all available time
+        }
+
+        return { steps, dt };
     }
 
     /** Get the physics timestep (simulation seconds per physics step) */

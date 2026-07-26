@@ -111,6 +111,7 @@ class SimulationServer {
     private running = false;
     private lastSnapshotTick = 0n;
     private simAccumulator = 0;
+    private tickAccumulator = 0;
     private adminState: AdminStatePayload = {
         baseEpoch: APP_DEFAULTS.adminDefaults.baseEpoch,
         dt: APP_DEFAULTS.adminDefaults.dt,
@@ -462,14 +463,6 @@ class SimulationServer {
                     ...this.adminState,
                     timeScale: scale,
                 };
-                if (this.adminState.simMode === 'tick') {
-                    const dt = scale / CONFIG.tickRate;
-                    this.simulation.setDt(dt);
-                    this.adminState = {
-                        ...this.adminState,
-                        dt,
-                    };
-                }
                 this.broadcastAdminState();
                 break;
             }
@@ -486,7 +479,7 @@ class SimulationServer {
                 const substeps = typeof payload.substeps === 'number' && payload.substeps > 0 ? payload.substeps : this.adminState.substeps;
                 const forceMethod = payload.forceMethod === 'barnes-hut' ? 'barnes-hut' : 'direct';
                 const theta = typeof payload.theta === 'number' && payload.theta > 0 ? payload.theta : this.adminState.theta;
-                const simMode = payload.simMode === 'accumulator' ? 'accumulator' : 'tick';
+                const simMode = payload.simMode === 'accumulator' ? 'accumulator' : (payload.simMode === 'hybrid' ? 'hybrid' : 'tick');
                 const closeIntegrator = payload.closeEncounterIntegrator === 'rk45' || payload.closeEncounterIntegrator === 'gauss-radau'
                     ? payload.closeEncounterIntegrator
                     : 'none';
@@ -583,15 +576,7 @@ class SimulationServer {
                 };
 
                 this.simAccumulator = 0;
-
-                if (this.adminState.simMode === 'tick') {
-                    const tickDt = this.adminState.timeScale / CONFIG.tickRate;
-                    this.simulation.setDt(tickDt);
-                    this.adminState = {
-                        ...this.adminState,
-                        dt: tickDt,
-                    };
-                }
+                this.tickAccumulator = 0;
                 this.broadcastAdminState();
                 break;
             }
@@ -700,19 +685,62 @@ class SimulationServer {
             if (!this.adminState.paused) {
                 if (this.adminState.simMode === 'accumulator') {
                     this.simAccumulator += (delta / 1000) * this.adminState.timeScale;
-                    let steps = 0;
-                    const maxSteps = 1000;
-                    while (this.simAccumulator >= this.adminState.dt && steps < maxSteps) {
-                        this.simulation.step();
-                        this.simAccumulator -= this.adminState.dt;
-                        steps++;
-                    }
-                    if (steps >= maxSteps) {
+                    const maxSteps = 100;
+                    let steps = Math.floor(this.simAccumulator / this.adminState.dt);
+                    
+                    if (steps > maxSteps) {
                         logger.warn(`Accumulator overflow: clamped to ${maxSteps} steps (${this.simAccumulator.toFixed(4)}s remaining)`);
+                        steps = maxSteps;
                         this.simAccumulator = Math.min(this.simAccumulator, maxSteps * this.adminState.dt);
                     }
+                    
+                    if (steps > 0) {
+                        this.simulation.stepN(BigInt(steps));
+                        this.simAccumulator -= steps * this.adminState.dt;
+                    }
+                } else if (this.adminState.simMode === 'hybrid') {
+                    this.simAccumulator += (delta / 1000) * this.adminState.timeScale;
+                    const maxSteps = 50; // Server has more headroom
+                    let steps = Math.floor(this.simAccumulator / this.adminState.dt);
+                    let currentDt = this.adminState.dt;
+                    
+                    if (steps > maxSteps) {
+                        currentDt = this.simAccumulator / maxSteps;
+                        steps = maxSteps;
+                        this.simAccumulator = 0; // Consume everything
+                    } else {
+                        this.simAccumulator -= steps * this.adminState.dt;
+                    }
+                    
+                    if (steps > 0) {
+                        this.simulation.setDt(currentDt);
+                        this.simulation.stepN(BigInt(steps));
+                        
+                        // Restore base timestep
+                        this.simulation.setDt(this.adminState.dt);
+                    }
                 } else {
-                    this.simulation.step();
+                    // Tick-Scaled mode
+                    const tickInterval = 1 / CONFIG.tickRate;
+                    this.tickAccumulator += (delta / 1000);
+                    
+                    const maxSteps = 10;
+                    let steps = Math.floor(this.tickAccumulator / tickInterval);
+                    
+                    if (steps > maxSteps) {
+                        steps = maxSteps;
+                        this.tickAccumulator = Math.min(this.tickAccumulator, maxSteps * tickInterval);
+                    }
+                    
+                    if (steps > 0) {
+                        const tickDt = this.adminState.timeScale / CONFIG.tickRate;
+                        this.simulation.setDt(tickDt);
+                        this.simulation.stepN(BigInt(steps));
+                        this.tickAccumulator -= steps * tickInterval;
+                        
+                        // Restore base timestep
+                        this.simulation.setDt(this.adminState.dt);
+                    }
                 }
             }
 

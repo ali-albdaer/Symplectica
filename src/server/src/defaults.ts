@@ -23,7 +23,7 @@ export type PresetId =
     | 'solarCentauriI';
 
 export type ForceMethod = 'direct' | 'barnes-hut';
-export type SimMode = 'tick' | 'accumulator';
+export type SimMode = 'tick' | 'accumulator' | 'hybrid';
 export type CloseEncounterIntegrator = 'none' | 'rk45' | 'gauss-radau';
 export type VisualPresetName = 'Low' | 'High' | 'Ultra';
 
