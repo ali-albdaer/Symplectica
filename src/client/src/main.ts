@@ -102,7 +102,7 @@ class NBodyClient {
     private timeController = new TimeController();
     private uiHidden = false;
     private timeScaleKeyMultiplier = 1;
-    
+
     // Interactive Placement (World-Builder)
     private buildRaycaster = new THREE.Raycaster();
     private buildMouse = new THREE.Vector2();
@@ -276,7 +276,7 @@ class NBodyClient {
                     out += `    { pos: ${s.pos.toFixed(2)}, color: '${s.color}', alpha: ${s.alpha.toFixed(2)} },\n`;
                 }
                 out += `  ]\n}`;
-                
+
                 // Copy to clipboard
                 navigator.clipboard.writeText(out).then(() => {
                     console.log("Ring profile copied to clipboard:\n" + out);
@@ -631,7 +631,7 @@ class NBodyClient {
         this.state.bodyCount = newBodyCount;
         this.updateUIBodyCount();
         this.timeController.resetAccumulator();
-        
+
         this.initializeFollowTarget();
     }
 
@@ -725,15 +725,15 @@ class NBodyClient {
 
         // Invalidate caches
         this.cachedBodyMasses = null;
-        
+
         // Add all bodies from physics and cache them
         const bodies = this.physics.getBodies();
         this.cachedBodies = bodies; // Cache for use elsewhere this frame
         this.cachedBodyMasses = bodies.map(b => b.mass); // Also cache masses
-        
+
         const positions = this.physics.getPositions();
         const velocities = this.physics.getVelocities();
-        
+
         // Cache initial state
         this.state.positions = positions;
         this.state.velocities = velocities;
@@ -878,7 +878,7 @@ class NBodyClient {
                 if (this.isMiddleDragging) {
                     const deltaY = e.clientY - this.lastMiddleDragY;
                     this.lastMiddleDragY = e.clientY;
-                    
+
                     const params = this.buildPanel.getParams();
                     // Sensitivity reduced from 0.01 to 0.002 AU per pixel
                     const newZ = params.z - deltaY * 0.002 * AU;
@@ -889,18 +889,18 @@ class NBodyClient {
                 // Otherwise, update plane intersection
                 const params = this.buildPanel.getParams();
                 const cameraOrigin = this.resolveCameraOrigin(!this.freeCamera && !this.surfaceCamera);
-                
+
                 // The raycast is in rendering coordinates, so the plane must be defined in rendering space.
                 // Physics Z is vertical, which corresponds to WebGL Y.
                 const renderingHeight = params.z - cameraOrigin.z;
-                this.buildPlane.constant = -renderingHeight; 
-                
+                this.buildPlane.constant = -renderingHeight;
+
                 const rect = this.renderer.domElement.getBoundingClientRect();
                 this.buildMouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
                 this.buildMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-                
+
                 this.buildRaycaster.setFromCamera(this.buildMouse, this.camera);
-                
+
                 const target = new THREE.Vector3();
                 if (this.buildRaycaster.ray.intersectPlane(this.buildPlane, target)) {
                     // Convert intersected target back to world coordinates
@@ -973,14 +973,14 @@ class NBodyClient {
             this.buildPanel.setBuildMode(true);
             this.buildPanel.reset();
             this.buildPanel.open();
-            
+
             // Enable all 3 grids by default in build mode
             this.currentVizOptions.showGridXY = true;
             this.currentVizOptions.showGridXZ = true;
             this.currentVizOptions.showGridYZ = true;
             this.applyVisualizationToRenderer(this.currentVizOptions);
             this.optionsPanel?.applyOptions(this.currentVizOptions);
-            
+
             // Set camera to origin-focused view
             this.camera.configureForScale('solar');
             this.camera.setFocus(0, 0, 0);
@@ -1074,7 +1074,7 @@ class NBodyClient {
             const bodyIndex = this.surfaceBodyIndex;
             const cameraWorld = this.camera.getCameraWorldPosition();
             const target = this.getFollowTargetPosition(bodyIndex);
-            
+
             let offset = this.preSurfaceOffset;
             if (!offset) {
                 offset = {
@@ -1105,7 +1105,7 @@ class NBodyClient {
 
         const target = this.getFollowTargetPosition(index);
         const cameraWorld = this.camera.getCameraWorldPosition();
-        
+
         this.preSurfaceOffset = {
             x: cameraWorld.x - target.x,
             y: cameraWorld.y - target.y,
@@ -1315,7 +1315,7 @@ class NBodyClient {
             const targetFps = Math.round(1000 / this.dynamicBudgetMs);
             actualFpsEl.textContent = `${avgFps.toFixed(0)} / ${targetFps}`;
         }
-        
+
         const serverTpsEl = document.getElementById('perf-server-tps');
         if (serverTpsEl) {
             serverTpsEl.textContent = `${this.serverTps.toFixed(0)} / ${LOCAL_TICK_RATE}`;
@@ -1752,7 +1752,7 @@ class NBodyClient {
             this.state.bodyCount = Math.floor(this.lastServerPositions.length / 3);
         } else {
             const wasPaused = this.timeController.isPaused();
-            
+
             if (!wasPaused) {
                 if (this.localSimMode === 'accumulator') {
                     const steps = this.timeController.update(delta);
@@ -1761,14 +1761,23 @@ class NBodyClient {
                     }
                     stepsThisFrame = steps;
                 } else if (this.localSimMode === 'hybrid') {
-                    const maxSteps = this.adminPanel.getHybridMaxSteps();
+                    let maxSteps = this.adminPanel.getHybridMaxSteps();
                     const budgeted = this.adminPanel.isHybridBudgeted();
-                    
+
+                    if (budgeted) {
+                        // Dynamically adjust maxSteps to fit a 5ms budget (unverified!)
+                        const costPerStep = this.frameTimingAvg.stepsThisFrame > 0
+                            ? this.frameTimingAvg.physics / this.frameTimingAvg.stepsThisFrame
+                            : 0.5; // Default estimate
+                        const dynamicMaxSteps = Math.max(1, Math.floor(5.0 / costPerStep));
+                        maxSteps = Math.min(maxSteps, dynamicMaxSteps);
+                    }
+
                     const steps = this.timeController.updateHybrid(delta, maxSteps, budgeted, (dt, s) => {
                         this.physics.setTimeStep(dt);
                         this.physics.stepN(s);
                     });
-                    
+
                     if (steps > 0) {
                         // Restore base timestep for future pure accumulator steps
                         this.physics.setTimeStep(this.timeController.getPhysicsTimestep());
@@ -1780,7 +1789,7 @@ class NBodyClient {
 
                     const maxSteps = 10;
                     let steps = Math.floor(this.localTickAccumulator / tickInterval);
-                    
+
                     if (steps > maxSteps) {
                         steps = maxSteps;
                         this.localTickAccumulator = Math.min(this.localTickAccumulator, maxSteps * tickInterval);
@@ -1792,7 +1801,7 @@ class NBodyClient {
                         this.physics.setTimeStep(dt);
                         this.physics.stepN(steps);
                         this.localTickAccumulator -= steps * tickInterval;
-                        
+
                         // Restore base timestep for future pure accumulator steps
                         this.physics.setTimeStep(this.timeController.getPhysicsTimestep());
                     }
@@ -1807,12 +1816,12 @@ class NBodyClient {
                 this.state.positions = this.physics.getPositions();
                 this.state.velocities = this.physics.getVelocities();
             }
-            
+
             // Throttle energy calculation - O(N²) is expensive for large body counts
             const now = performance.now();
-            const shouldRecalcEnergy = stepsThisFrame > 0 || 
+            const shouldRecalcEnergy = stepsThisFrame > 0 ||
                 (now - this.lastEnergyCalcTime > this.ENERGY_CALC_INTERVAL_MS);
-            
+
             if (shouldRecalcEnergy) {
                 this.state.energy = this.physics.totalEnergy();
                 this.lastEnergyCalcTime = now;
@@ -1963,14 +1972,14 @@ class NBodyClient {
             }
 
             const clampedExposure = Math.min(1000, Math.max(0.6, targetExposure));
-            
+
             // Asymmetric EMA (Exponential Moving Average) adaptation:
             // Fast adaptation when going brighter (pupil constriction: smaller exposure value)
             // Slow adaptation when going darker (dark adaptation: larger exposure value)
             const goingBrighter = clampedExposure < this.renderer.toneMappingExposure;
             const tau = goingBrighter ? 0.15 : 2.0; // 150ms for bright, 2s for dark
             const alpha = 1.0 - Math.exp(-delta / tau);
-            
+
             this.renderer.toneMappingExposure = THREE.MathUtils.lerp(
                 this.renderer.toneMappingExposure,
                 clampedExposure,
@@ -2297,7 +2306,7 @@ class NBodyClient {
         if (this.buildMode && this.buildPanel.isVisible()) {
             this.bodyRenderer.setGhostPreview(params);
             this.bodyRenderer.setGhostVisible(true);
-            
+
             // Position ghost at world coordinates (convert to camera-local using floating origin)
             const origin = this.camera.getWorldOrigin();
             const localX = params.x - origin.x;
@@ -2336,7 +2345,7 @@ class NBodyClient {
         if (success) {
             // Refresh the body list and renderer
             this.refreshBodies();
-            
+
             // Update network if connected
             if (this.network?.isConnected()) {
                 const snapshot = this.physics.getSnapshot();
@@ -2418,7 +2427,7 @@ class NBodyClient {
 
         // Refresh the body list and renderer
         this.refreshBodies();
-        
+
         // Update network if connected
         if (this.network?.isConnected()) {
             const snapshot = this.physics.getSnapshot();
@@ -2458,20 +2467,20 @@ client.init().then(() => {
             // Read from frameTiming (raw per-frame values, always updated) NOT
             // frameTimingAvg — that only runs when the perf monitor is visible.
             // The bench runner's own statistics layer handles averaging/p95/p99.
-            frameMs:    c.frameTiming.total,
-            renderMs:   c.frameTiming.render,
-            physicsMs:  c.frameTiming.physics,
-            uiMs:       c.frameTiming.ui,
-            fps:        c.fpsHistory.length > 0
-                            ? c.fpsHistory.reduce((a: number, b: number) => a + b, 0) / c.fpsHistory.length
-                            : 0,
-            drawCalls:  c.renderer.info.render.calls,
-            triangles:  c.renderer.info.render.triangles,
+            frameMs: c.frameTiming.total,
+            renderMs: c.frameTiming.render,
+            physicsMs: c.frameTiming.physics,
+            uiMs: c.frameTiming.ui,
+            fps: c.fpsHistory.length > 0
+                ? c.fpsHistory.reduce((a: number, b: number) => a + b, 0) / c.fpsHistory.length
+                : 0,
+            drawCalls: c.renderer.info.render.calls,
+            triangles: c.renderer.info.render.triangles,
             geometries: c.renderer.info.memory.geometries,
-            textures:   c.renderer.info.memory.textures,
-            heapMB:     ((performance as any).memory?.usedJSHeapSize ?? 0) / (1024 * 1024) || null,
-            bodyCount:  c.state.bodyCount,
-            timestamp:  performance.now(),
+            textures: c.renderer.info.memory.textures,
+            heapMB: ((performance as any).memory?.usedJSHeapSize ?? 0) / (1024 * 1024) || null,
+            bodyCount: c.state.bodyCount,
+            timestamp: performance.now(),
         }),
         // Allows bench runner to load simulation presets by ID without needing the admin panel UI.
         loadPreset: (id: string) => c.loadPresetFromAdmin(id, id, false),
