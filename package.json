@@ -1,5 +1,5 @@
 {
-    "name": "space-simulator",
+    "name": "symplectica",
     "private": true,
     "workspaces": [
         "src/client",

@@ -2459,7 +2459,7 @@ client.init().then(() => {
         loadPreset: (id: string) => c.loadPresetFromAdmin(id, id, false),
     };
 
-    logger.info('Space Simulator client initialized');
+    logger.info('Symplectica client initialized');
 }).catch((error) => {
     logger.error('Fatal initialization error:', error);
     client.showError(`Failed to initialize: ${error.message || 'Unknown error'}`);

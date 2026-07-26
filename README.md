@@ -1,6 +1,6 @@
 # Symplectica
 
-**Symplectica** is a multiplayer N-body space simulator focusing on scientific accuracy, visual fidelity and realistic orbital mechanics. 
+**Symplectica** is a multiplayer N-body space simulator focused on scientific accuracy, visual fidelity and realistic orbital mechanics. 
 
 Whether you're a physics enthusiast simulating star systems and astroid belts, a student learning about orbital mechanics and numerical methods, or a player exploring the universe with your friends, Symplectica handles it all.
 
