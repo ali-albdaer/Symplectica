@@ -154,26 +154,26 @@ export class Chat {
                 overflow-y: auto;
                 padding: 8px 10px;
                 scrollbar-width: thin;
-                scrollbar-color: rgba(120, 170, 255, 0.6) rgba(0, 0, 0, 0.2);
+                scrollbar-color: ${UI_COLORS.accent.primaryMuted} rgba(0, 0, 0, 0.2);
             }
 
             .chat-messages::-webkit-scrollbar {
-                width: 8px;
+                width: 6px;
             }
 
             .chat-messages::-webkit-scrollbar-track {
-                background: rgba(0, 0, 0, 0.25);
-                border-radius: 999px;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 4px;
             }
 
             .chat-messages::-webkit-scrollbar-thumb {
-                background: linear-gradient(180deg, rgba(120, 170, 255, 0.8), rgba(80, 120, 200, 0.7));
-                border-radius: 999px;
-                border: 1px solid rgba(10, 15, 30, 0.6);
+                background: ${UI_COLORS.accent.primaryMuted};
+                border-radius: 4px;
+                border: 1px solid rgba(0, 0, 0, 0.3);
             }
 
             .chat-messages::-webkit-scrollbar-thumb:hover {
-                background: linear-gradient(180deg, rgba(150, 200, 255, 0.9), rgba(95, 140, 220, 0.85));
+                background: ${UI_COLORS.accent.primary};
             }
             
             .chat-message {
