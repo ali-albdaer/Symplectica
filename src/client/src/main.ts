@@ -30,7 +30,7 @@ import { APP_DEFAULTS, PRESET_SCENE_CONFIG, DEFAULT_SCENE_CONFIG } from './defau
 import { logger } from './logger';
 import { MediaCapture } from './recorder';
 
-import { AU, G, M_SUN, L_SUN, UI_UPDATE_INTERVAL_MS, SIM_TAB_UPDATE_INTERVAL_MS } from '../../shared/constants';
+import { AU, G, M_SUN, L_SUN, UI_UPDATE_INTERVAL_MS, SIM_TAB_UPDATE_INTERVAL_MS, UI_COLORS } from '../../shared/constants';
 const LOCAL_TICK_RATE = APP_DEFAULTS.adminDefaults.tickRate;
 const LOCAL_PRESET_PLAYER = 'local';
 
@@ -1396,13 +1396,13 @@ class NBodyClient {
             if (useServer) {
                 // Show server mode with pause indicator
                 statusEl.textContent = isPaused ? 'SERVER ⏸' : 'SERVER ▶';
-                statusEl.style.color = isPaused ? '#ff9800' : '#4fc3f7';
+                statusEl.style.color = isPaused ? UI_COLORS.status.paused : UI_COLORS.accent.primary;
             } else if (isPaused) {
                 statusEl.textContent = 'LOCAL ⏸';
-                statusEl.style.color = '#ff9800';
+                statusEl.style.color = UI_COLORS.status.paused;
             } else {
                 statusEl.textContent = 'LOCAL ▶';
-                statusEl.style.color = '#4caf50';
+                statusEl.style.color = UI_COLORS.status.good;
             }
         }
 
@@ -2168,15 +2168,15 @@ class NBodyClient {
             }
 
             .mobile-prompt-content {
-                background: linear-gradient(160deg, rgba(15, 25, 45, 0.95), rgba(20, 35, 60, 0.95));
-                border: 1px solid rgba(120, 160, 240, 0.3);
+                background: linear-gradient(160deg, ${UI_COLORS.mobile.promptBgStart}, ${UI_COLORS.mobile.promptBgEnd});
+                border: 1px solid ${UI_COLORS.mobile.promptBorder};
                 border-radius: 16px;
                 padding: 32px 24px;
                 max-width: 480px;
                 width: 100%;
-                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                box-shadow: 0 12px 40px ${UI_COLORS.surface.panelShadow}, inset 0 1px 0 rgba(255, 255, 255, 0.1);
                 text-align: center;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;
             }
 
@@ -2184,14 +2184,14 @@ class NBodyClient {
                 margin: 0 0 16px 0;
                 font-size: 24px;
                 font-weight: 600;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
             }
 
             .mobile-prompt-content p {
                 margin: 0 0 24px 0;
                 font-size: 16px;
                 line-height: 1.5;
-                color: rgba(255, 255, 255, 0.85);
+                color: ${UI_COLORS.text.secondary};
             }
 
             .mobile-prompt-buttons {
@@ -2213,8 +2213,8 @@ class NBodyClient {
             }
 
             .mobile-prompt-btn.primary {
-                background: linear-gradient(135deg, #4a90e2, #357abd);
-                color: #fff;
+                background: linear-gradient(135deg, ${UI_COLORS.mobile.primaryBtnStart}, ${UI_COLORS.mobile.primaryBtnEnd});
+                color: ${UI_COLORS.text.primary};
                 box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
             }
 
@@ -2224,29 +2224,29 @@ class NBodyClient {
             }
 
             .mobile-prompt-btn.secondary {
-                background: rgba(255, 255, 255, 0.1);
-                color: rgba(255, 255, 255, 0.7);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                background: ${UI_COLORS.mobile.secondaryBtnBg};
+                color: ${UI_COLORS.text.muted};
+                border: 1px solid ${UI_COLORS.mobile.secondaryBtnBorder};
             }
 
             .mobile-prompt-btn.secondary:active {
-                background: rgba(255, 255, 255, 0.15);
+                background: ${UI_COLORS.mobile.secondaryBtnActiveBg};
             }
 
             .mobile-prompt-content small {
                 display: block;
                 font-size: 13px;
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 line-height: 1.4;
             }
 
             .mobile-prompt-content code {
-                background: rgba(255, 255, 255, 0.15);
+                background: ${UI_COLORS.mobile.secondaryBtnActiveBg};
                 padding: 2px 6px;
                 border-radius: 4px;
                 font-family: 'Consolas', 'Monaco', monospace;
                 font-size: 12px;
-                color: #6eb5ff;
+                color: ${UI_COLORS.accent.link};
             }
 
             @media (min-width: 500px) {

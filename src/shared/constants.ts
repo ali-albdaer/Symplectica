@@ -1,5 +1,7 @@
 export * from './physics_constants';
 export * from './lod_constants';
+export * from './ui_colors';
+
 
 /** Speed levels for time warp UI */
 export interface SpeedLevel {

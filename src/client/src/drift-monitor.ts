@@ -8,7 +8,7 @@
  */
 
 import { PhysicsClient } from './physics';
-import { SIM_TAB_UPDATE_INTERVAL_MS } from '../../shared/constants';
+import { SIM_TAB_UPDATE_INTERVAL_MS, UI_COLORS } from '../../shared/constants';
 
 /** Snapshot of conserved quantities at a reference point in time. */
 interface ConservationSnapshot {
@@ -177,13 +177,13 @@ export class DriftMonitor {
         el.textContent = drift.toExponential(2);
 
         if (abs < 1e-10) {
-            el.style.color = '#4caf50'; // green — machine precision
+            el.style.color = UI_COLORS.status.good; // green — machine precision
         } else if (abs < 1e-6) {
-            el.style.color = '#8bc34a'; // light green — excellent
+            el.style.color = UI_COLORS.status.excellent; // light green — excellent
         } else if (abs < 1e-3) {
-            el.style.color = '#ff9800'; // orange — acceptable
+            el.style.color = UI_COLORS.status.paused; // orange — acceptable
         } else {
-            el.style.color = '#f44336'; // red — significant drift
+            el.style.color = UI_COLORS.status.critical; // red — significant drift
         }
     }
 }

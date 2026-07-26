@@ -5,6 +5,8 @@
  * Enabled with /mobile command in chat.
  */
 
+import { UI_COLORS } from '../../shared/constants';
+
 export interface TouchControlCallbacks {
     onSpeedIncrease: () => void;
     onSpeedDecrease: () => void;
@@ -140,13 +142,13 @@ export class TouchControls {
                 height: 48px;
                 border: none;
                 border-radius: 50%;
-                background: linear-gradient(160deg, rgba(20, 40, 80, 0.85), rgba(30, 60, 100, 0.85));
+                background: linear-gradient(160deg, ${UI_COLORS.touch.btnGradientStart}, ${UI_COLORS.touch.btnGradientEnd});
                 backdrop-filter: blur(8px);
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 font-size: 20px;
                 cursor: pointer;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-                border: 1px solid rgba(120, 160, 240, 0.3);
+                box-shadow: 0 4px 12px ${UI_COLORS.touch.btnShadow}, inset 0 1px 0 rgba(255, 255, 255, 0.15);
+                border: 1px solid ${UI_COLORS.touch.btnBorder};
                 transition: all 0.2s ease;
                 display: flex;
                 align-items: center;
@@ -158,12 +160,12 @@ export class TouchControls {
 
             .touch-btn:active {
                 transform: scale(0.95);
-                background: linear-gradient(160deg, rgba(40, 80, 140, 0.9), rgba(50, 100, 160, 0.9));
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                background: linear-gradient(160deg, ${UI_COLORS.touch.btnGradientActiveStart}, ${UI_COLORS.touch.btnGradientActiveEnd});
+                box-shadow: 0 2px 8px ${UI_COLORS.surface.panelShadow}, inset 0 1px 0 rgba(255, 255, 255, 0.2);
             }
 
             .touch-btn:hover {
-                background: linear-gradient(160deg, rgba(30, 60, 120, 0.9), rgba(40, 80, 140, 0.9));
+                background: linear-gradient(160deg, ${UI_COLORS.touch.btnGradientHoverStart}, ${UI_COLORS.touch.btnGradientHoverEnd});
             }
 
             @media (max-width: 768px) {

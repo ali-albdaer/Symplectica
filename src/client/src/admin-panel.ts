@@ -15,6 +15,7 @@ import { TimeController } from './time-controller';
 import { AdminStatePayload, NetworkClient } from './network';
 import { APP_DEFAULTS } from './defaults';
 import { logger } from './logger';
+import { UI_COLORS } from '../../shared/constants';
 
 interface ServerConfig {
     tickRate: number;
@@ -360,11 +361,11 @@ export class AdminPanel {
                 top: 80px;
                 right: 40px;
                 width: 248px;
-                background: rgba(10, 15, 30, 0.95);
+                background: ${UI_COLORS.surface.panelBg};
                 backdrop-filter: blur(20px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 12px;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;
                 font-size: 12px;
                 z-index: 300;
@@ -382,8 +383,8 @@ export class AdminPanel {
                 justify-content: space-between;
                 align-items: center;
                 padding: 10px 12px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                background: rgba(0, 0, 0, 0.3);
+                border-bottom: 1px solid ${UI_COLORS.surface.cardBorder};
+                background: ${UI_COLORS.surface.headerBg};
                 cursor: move;
                 user-select: none;
             }
@@ -392,13 +393,13 @@ export class AdminPanel {
                 font-size: 13px;
                 font-weight: 600;
                 margin: 0;
-                color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
             }
             
             .admin-close {
                 background: none;
                 border: none;
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 font-size: 20px;
                 cursor: pointer;
                 padding: 0 5px;
@@ -406,7 +407,7 @@ export class AdminPanel {
             }
             
             .admin-close:hover {
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
             }
             
             .admin-content {
@@ -416,14 +417,14 @@ export class AdminPanel {
             .opt-tabs {
                 display: flex;
                 background: rgba(0, 0, 0, 0.2);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                border-bottom: 1px solid ${UI_COLORS.surface.cardBorder};
             }
 
             .opt-tab {
                 flex: 1;
                 background: none;
                 border: none;
-                color: rgba(255, 255, 255, 0.6);
+                color: ${UI_COLORS.text.subtle};
                 padding: 8px 0;
                 font-size: 11px;
                 font-weight: 600;
@@ -433,13 +434,13 @@ export class AdminPanel {
             }
 
             .opt-tab:hover {
-                color: #fff;
-                background: rgba(255, 255, 255, 0.05);
+                color: ${UI_COLORS.text.primary};
+                background: ${UI_COLORS.surface.buttonBg};
             }
 
             .opt-tab.active {
-                color: #4fc3f7;
-                border-bottom-color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
+                border-bottom-color: ${UI_COLORS.accent.primary};
             }
 
             .opt-content { 
@@ -460,7 +461,7 @@ export class AdminPanel {
             .admin-section h3 {
                 font-size: 9px;
                 font-weight: 600;
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 margin: 0 0 8px 0;
@@ -473,17 +474,17 @@ export class AdminPanel {
             .admin-field label {
                 display: block;
                 font-size: 10px;
-                color: rgba(255, 255, 255, 0.6);
+                color: ${UI_COLORS.text.subtle};
                 margin-bottom: 4px;
             }
             
             .admin-field input,
             .admin-field select {
                 width: 100%;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: ${UI_COLORS.surface.inputBg};
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 4px;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 padding: 5px 6px;
                 font-size: 11px;
             }
@@ -491,7 +492,7 @@ export class AdminPanel {
             .admin-field input[type="range"] {
                 padding: 0;
                 height: 4px;
-                accent-color: #4fc3f7;
+                accent-color: ${UI_COLORS.accent.primary};
             }
 
             .opt-toggle {
@@ -505,13 +506,13 @@ export class AdminPanel {
             .opt-toggle input[type="checkbox"] {
                 width: 14px;
                 height: 14px;
-                accent-color: #4fc3f7;
+                accent-color: ${UI_COLORS.accent.primary};
                 margin: 0;
             }
 
             .opt-toggle span {
                 font-size: 11px;
-                color: rgba(255, 255, 255, 0.9);
+                color: ${UI_COLORS.text.secondary};
             }
 
             .admin-slider-row {
@@ -525,29 +526,29 @@ export class AdminPanel {
                 min-width: 70px;
                 text-align: right;
                 font-size: 11px;
-                color: rgba(255, 255, 255, 0.7);
+                color: ${UI_COLORS.text.muted};
                 font-variant-numeric: tabular-nums;
             }
 
             .admin-hint {
                 margin-top: 4px;
                 font-size: 11px;
-                color: rgba(255, 255, 255, 0.6);
+                color: ${UI_COLORS.text.subtle};
                 font-variant-numeric: tabular-nums;
             }
             
             .admin-field input:focus,
             .admin-field select:focus {
                 outline: none;
-                border-color: #4fc3f7;
+                border-color: ${UI_COLORS.accent.primary};
             }
             
             .admin-btn {
                 width: 100%;
                 background: rgba(79, 195, 247, 0.2);
-                border: 1px solid rgba(79, 195, 247, 0.6);
+                border: 1px solid ${UI_COLORS.accent.primaryMuted};
                 border-radius: 6px;
-                color: #dff3ff;
+                color: ${UI_COLORS.text.highContrast};
                 padding: 8px;
                 font-size: 11px;
                 font-weight: 600;
@@ -562,9 +563,9 @@ export class AdminPanel {
             }
             
             .admin-btn-warning {
-                background: rgba(255, 107, 107, 0.2);
-                border-color: rgba(255, 107, 107, 0.6);
-                color: #ffe6e6;
+                background: ${UI_COLORS.status.dangerBg};
+                border-color: ${UI_COLORS.status.dangerBorder};
+                color: ${UI_COLORS.status.dangerText};
             }
 
             .admin-grid-two {

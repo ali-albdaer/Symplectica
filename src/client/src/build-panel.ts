@@ -9,7 +9,7 @@
  * - Physics contribution toggle
  */
 
-import { AU, G, M_SUN, M_EARTH, M_MOON, R_SUN, R_EARTH, R_MOON } from '../../shared/constants';
+import { AU, G, M_SUN, M_EARTH, M_MOON, R_SUN, R_EARTH, R_MOON, UI_COLORS } from '../../shared/constants';
 import { logger } from './logger';
 
 export type BuildableBodyType = 'star' | 'planet' | 'moon' | 'asteroid' | 'comet' | 'spacecraft';
@@ -393,11 +393,11 @@ export class BuildPanel {
                 top: 20px;
                 left: 20px;
                 width: 260px;
-                background: rgba(10, 15, 30, 0.95);
+                background: ${UI_COLORS.surface.panelBg};
                 backdrop-filter: blur(20px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 12px;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;
                 font-size: 13px;
                 z-index: 200;
@@ -413,8 +413,8 @@ export class BuildPanel {
                 justify-content: space-between;
                 align-items: center;
                 padding: 10px 12px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                background: rgba(0, 0, 0, 0.3);
+                border-bottom: 1px solid ${UI_COLORS.surface.cardBorder};
+                background: ${UI_COLORS.surface.headerBg};
                 cursor: move;
                 user-select: none;
             }
@@ -423,32 +423,32 @@ export class BuildPanel {
                 font-size: 14px;
                 font-weight: 600;
                 margin: 0;
-                color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
             }
             
             .build-close {
                 background: none;
                 border: none;
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 font-size: 20px;
                 cursor: pointer;
                 padding: 0 5px;
                 line-height: 1;
             }
             
-            .build-close:hover { color: #fff; }
+            .build-close:hover { color: ${UI_COLORS.text.primary}; }
 
             .build-tabs {
                 display: flex;
                 background: rgba(0, 0, 0, 0.2);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                border-bottom: 1px solid ${UI_COLORS.surface.cardBorder};
             }
 
             .build-tab {
                 flex: 1;
                 background: none;
                 border: none;
-                color: rgba(255, 255, 255, 0.6);
+                color: ${UI_COLORS.text.subtle};
                 padding: 8px 0;
                 font-size: 11px;
                 font-weight: 600;
@@ -458,13 +458,13 @@ export class BuildPanel {
             }
 
             .build-tab:hover {
-                color: #fff;
-                background: rgba(255, 255, 255, 0.05);
+                color: ${UI_COLORS.text.primary};
+                background: ${UI_COLORS.surface.buttonBg};
             }
 
             .build-tab.active {
-                color: #4fc3f7;
-                border-bottom-color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
+                border-bottom-color: ${UI_COLORS.accent.primary};
             }
             
             .build-content { 
@@ -484,7 +484,7 @@ export class BuildPanel {
             .build-section h3 {
                 font-size: 10px;
                 font-weight: 600;
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 margin: 0 0 6px 0;
@@ -498,8 +498,8 @@ export class BuildPanel {
             
             .build-type-btn {
                 padding: 5px 2px;
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: ${UI_COLORS.surface.buttonBg};
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 4px;
                 color: #ccc;
                 font-size: 10px;
@@ -508,14 +508,14 @@ export class BuildPanel {
             }
             
             .build-type-btn:hover {
-                background: rgba(255, 255, 255, 0.1);
-                border-color: rgba(255, 255, 255, 0.2);
+                background: ${UI_COLORS.surface.buttonHoverBg};
+                border-color: ${UI_COLORS.surface.inputBorder};
             }
             
             .build-type-btn.active {
                 background: rgba(79, 195, 247, 0.2);
-                border-color: rgba(79, 195, 247, 0.6);
-                color: #4fc3f7;
+                border-color: ${UI_COLORS.accent.primaryMuted};
+                color: ${UI_COLORS.accent.primary};
             }
 
             .build-row {
@@ -540,13 +540,13 @@ export class BuildPanel {
             .build-toggle input[type="checkbox"] {
                 width: 14px;
                 height: 14px;
-                accent-color: #4fc3f7;
+                accent-color: ${UI_COLORS.accent.primary};
                 margin: 0;
             }
 
             .build-toggle span {
                 font-size: 11px;
-                color: rgba(255, 255, 255, 0.9);
+                color: ${UI_COLORS.text.secondary};
             }
             
             .build-field {
@@ -567,7 +567,7 @@ export class BuildPanel {
             .build-field-col label {
                 display: block;
                 font-size: 10px;
-                color: rgba(255, 255, 255, 0.6);
+                color: ${UI_COLORS.text.subtle};
                 margin-bottom: 3px;
             }
             
@@ -577,10 +577,10 @@ export class BuildPanel {
             .build-field select {
                 width: 100%;
                 padding: 5px 6px;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: ${UI_COLORS.surface.inputBg};
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 4px;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 font-size: 11px;
                 box-sizing: border-box;
             }
@@ -590,8 +590,8 @@ export class BuildPanel {
                 width: 100%;
                 height: 26px;
                 padding: 2px;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: ${UI_COLORS.surface.inputBg};
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 4px;
                 cursor: pointer;
             }
@@ -599,7 +599,7 @@ export class BuildPanel {
             .build-field input:focus,
             .build-field-col input:focus {
                 outline: none;
-                border-color: rgba(79, 195, 247, 0.5);
+                border-color: ${UI_COLORS.accent.primaryMuted};
             }
 
             .build-btn-small {
@@ -607,9 +607,9 @@ export class BuildPanel {
                 padding: 6px;
                 margin-top: 6px;
                 background: rgba(79, 195, 247, 0.1);
-                border: 1px solid rgba(79, 195, 247, 0.3);
+                border: 1px solid ${UI_COLORS.accent.primaryMuted};
                 border-radius: 4px;
-                color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
                 font-size: 10px;
                 cursor: pointer;
                 transition: all 0.15s;
@@ -622,7 +622,7 @@ export class BuildPanel {
 
             .build-footer {
                 padding: 10px 12px;
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                border-top: 1px solid ${UI_COLORS.surface.cardBorder};
                 background: rgba(0, 0, 0, 0.2);
             }
             
@@ -630,9 +630,9 @@ export class BuildPanel {
                 width: 100%;
                 padding: 10px;
                 background: linear-gradient(135deg, rgba(79, 195, 247, 0.3), rgba(79, 195, 247, 0.1));
-                border: 1px solid rgba(79, 195, 247, 0.5);
+                border: 1px solid ${UI_COLORS.accent.primaryMuted};
                 border-radius: 6px;
-                color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
                 font-size: 12px;
                 font-weight: 600;
                 cursor: pointer;
@@ -642,7 +642,7 @@ export class BuildPanel {
             
             .build-btn-spawn:hover {
                 background: linear-gradient(135deg, rgba(79, 195, 247, 0.4), rgba(79, 195, 247, 0.2));
-                border-color: rgba(79, 195, 247, 0.8);
+                border-color: ${UI_COLORS.accent.primary};
             }
 
             #build-star-section.hidden { display: none; }

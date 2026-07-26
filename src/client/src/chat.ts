@@ -11,6 +11,7 @@
 
 import { NetworkClient } from './network';
 import { logger } from './logger';
+import { UI_COLORS } from '../../shared/constants';
 
 interface ChatMessage {
     id: number;
@@ -70,11 +71,11 @@ export class Chat {
                 bottom: 16px;
                 left: 16px;
                 width: 300px;
-                background: rgba(10, 15, 30, 0.95);
+                background: ${UI_COLORS.surface.panelBg};
                 backdrop-filter: blur(20px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 12px;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;
                 font-size: 13px;
                 z-index: 150;
@@ -99,8 +100,8 @@ export class Chat {
                 align-items: center;
                 padding: 7px 10px;
                 gap: 8px;
-                background: rgba(0, 0, 0, 0.26);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                background: ${UI_COLORS.surface.headerBg};
+                border-bottom: 1px solid ${UI_COLORS.surface.cardBorder};
                 font-weight: 500;
                 cursor: pointer;
             }
@@ -119,12 +120,12 @@ export class Chat {
                 height: 18px;
                 padding: 0 6px;
                 border-radius: 999px;
-                background: rgba(110, 165, 255, 0.9);
+                background: ${UI_COLORS.accent.primaryMuted};
                 color: #04121f;
                 font-size: 11px;
                 font-weight: 700;
                 letter-spacing: 0.2px;
-                box-shadow: 0 0 0 1px rgba(4, 18, 31, 0.35), 0 6px 12px rgba(0, 0, 0, 0.3);
+                box-shadow: 0 0 0 1px rgba(4, 18, 31, 0.35), 0 6px 12px ${UI_COLORS.surface.panelShadow};
             }
 
             .chat-unread.is-visible {
@@ -134,7 +135,7 @@ export class Chat {
             .chat-toggle {
                 background: none;
                 border: none;
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 font-size: 16px;
                 cursor: pointer;
                 padding: 0 5px;
@@ -143,7 +144,7 @@ export class Chat {
             }
             
             .chat-toggle:hover {
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
             }
             
             .chat-messages {
@@ -181,59 +182,59 @@ export class Chat {
             
             .chat-message .sender {
                 font-weight: 600;
-                color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
             }
             
             .chat-message.system {
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 font-style: italic;
             }
             
             .chat-message.system .sender {
-                color: #ab47bc;
+                color: ${UI_COLORS.accent.secondary};
             }
 
             .chat-message.admin {
-                color: rgba(255, 255, 255, 0.9);
+                color: ${UI_COLORS.text.secondary};
             }
 
             .chat-message.admin .sender {
-                color: #ff5252;
+                color: ${UI_COLORS.status.error};
                 font-weight: 700;
             }
             
             .chat-message .text {
-                color: rgba(255, 255, 255, 0.9);
+                color: ${UI_COLORS.text.secondary};
             }
             
             .chat-message .time {
                 font-size: 10px;
-                color: rgba(255, 255, 255, 0.3);
+                color: ${UI_COLORS.text.hint};
                 margin-left: 8px;
             }
             
             .chat-input-container {
                 padding: 6px 10px 8px;
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                border-top: 1px solid ${UI_COLORS.surface.cardBorder};
             }
             
             #chat-input {
                 width: 100%;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: ${UI_COLORS.surface.inputBg};
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 5px;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 padding: 4px 8px;
                 font-size: 13px;
             }
             
             #chat-input:focus {
                 outline: none;
-                border-color: #4fc3f7;
+                border-color: ${UI_COLORS.accent.primary};
             }
             
             #chat-input::placeholder {
-                color: rgba(255, 255, 255, 0.3);
+                color: ${UI_COLORS.text.hint};
             }
         `;
         document.head.appendChild(style);

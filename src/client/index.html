@@ -7,6 +7,34 @@
   <title>Space Simulator</title>
   <meta name="description" content="Multiplayer N-body space simulator">
   <style>
+    :root {
+      --ui-accent-primary: #18e7ec;
+      --ui-accent-primary-hover: #47eff3;
+      --ui-accent-primary-muted: rgba(24, 231, 236, 0.6);
+      --ui-accent-secondary: #55CCCC;
+      --ui-accent-link: #18e7ec;
+      --ui-panel-bg: rgba(33, 39, 49, 0.95);
+      --ui-header-bg: rgba(57, 62, 70, 0.5);
+      --ui-card-border: rgba(237, 237, 237, 0.12);
+      --ui-card-border-subtle: rgba(237, 237, 237, 0.06);
+      --ui-text-primary: #ededed;
+      --ui-text-high-contrast: #ffffff;
+      --ui-text-secondary: rgba(237, 237, 237, 0.85);
+      --ui-text-muted: rgba(237, 237, 237, 0.7);
+      --ui-text-subtle: rgba(237, 237, 237, 0.6);
+      --ui-text-disabled: rgba(237, 237, 237, 0.5);
+      --ui-text-hint: rgba(237, 237, 237, 0.4);
+      --ui-status-good: #4caf50;
+      --ui-status-excellent: #8bc34a;
+      --ui-status-warn: #ffeb3b;
+      --ui-status-paused: #ff9800;
+      --ui-status-critical: #f44336;
+      --ui-status-error: #ff5252;
+      --ui-label-default: #ededed;
+      --ui-label-star: #fff8e7;
+      --ui-label-moon: #b0c4de;
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -36,7 +64,7 @@
       top: 20px;
       left: 20px;
       z-index: 100;
-      color: #fff;
+      color: var(--ui-text-primary);
       font-size: 14px;
       pointer-events: none;
     }
@@ -54,15 +82,15 @@
       letter-spacing: 0;
       text-transform: none;
       margin: 0 0 6px;
-      color: #4fc3f7;
+      color: var(--ui-accent-primary);
     }
 
     .stats-card {
-      background: rgba(10, 15, 30, 0.95);
+      background: var(--ui-panel-bg);
       backdrop-filter: blur(20px);
       padding: 15px 20px;
       border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--ui-card-border);
     }
 
     #stats .stat-row {
@@ -73,11 +101,11 @@
     }
 
     #stats .label {
-      color: rgba(255, 255, 255, 0.7);
+      color: var(--ui-text-muted);
     }
 
     #stats .value {
-      color: #fff;
+      color: var(--ui-text-primary);
       font-variant-numeric: tabular-nums;
     }
 
@@ -85,11 +113,11 @@
       position: fixed;
       right: 20px;
       bottom: 20px;
-      background: rgba(10, 15, 30, 0.95);
+      background: var(--ui-panel-bg);
       backdrop-filter: blur(20px);
       padding: 15px 20px;
       border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--ui-card-border);
       max-width: 320px;
       display: block;
     }
@@ -101,7 +129,7 @@
     #sim-monitor-section .monitor-group {
       margin-top: 6px;
       padding-top: 4px;
-      border-top: 1px solid rgba(255,255,255,0.06);
+      border-top: 1px solid var(--ui-card-border-subtle);
     }
 
     #sim-monitor-section .monitor-group:first-of-type {
@@ -114,7 +142,7 @@
       font-size: 9px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: rgba(79,195,247,0.6);
+      color: var(--ui-accent-primary-muted);
       margin-bottom: 2px;
     }
 
@@ -132,7 +160,7 @@
     #follow-section .follow-group {
       margin-top: 6px;
       padding-top: 4px;
-      border-top: 1px solid rgba(255,255,255,0.06);
+      border-top: 1px solid var(--ui-card-border-subtle);
     }
 
     #follow-section .follow-group:first-of-type {
@@ -145,7 +173,7 @@
       font-size: 9px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: rgba(79,195,247,0.6);
+      color: var(--ui-accent-primary-muted);
       margin-bottom: 2px;
     }
 
@@ -156,11 +184,11 @@
       display: grid;
       gap: 6px;
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.8);
+      color: var(--ui-text-secondary);
     }
 
     #hints-panel li span {
-      color: #fff;
+      color: var(--ui-text-primary);
       font-weight: 600;
       margin-right: 6px;
     }
@@ -185,8 +213,8 @@
     .spinner {
       width: 60px;
       height: 60px;
-      border: 3px solid rgba(255, 255, 255, 0.1);
-      border-top-color: #4fc3f7;
+      border: 3px solid var(--ui-card-border);
+      border-top-color: var(--ui-accent-primary);
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
@@ -201,7 +229,7 @@
       margin-top: 20px;
       font-size: 24px;
       font-weight: 300;
-      background: linear-gradient(90deg, #4fc3f7, #ab47bc);
+      background: linear-gradient(90deg, var(--ui-accent-primary), var(--ui-accent-secondary));
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -209,11 +237,11 @@
 
     #loading p {
       margin-top: 10px;
-      color: rgba(255, 255, 255, 0.5);
+      color: var(--ui-text-disabled);
     }
 
     #loading p.error {
-      color: #ff5252;
+      color: var(--ui-status-error);
       font-weight: 600;
       background: rgba(255, 0, 0, 0.1);
       padding: 8px 16px;
@@ -239,7 +267,7 @@
     #freecam-crosshair::after {
       content: "";
       position: absolute;
-      background: rgba(255, 255, 255, 0.8);
+      background: var(--ui-text-secondary);
     }
 
     #freecam-crosshair::before {
@@ -265,18 +293,18 @@
       top: 20px;
       right: 20px;
       z-index: 100;
-      color: #fff;
+      color: var(--ui-text-primary);
       font-size: 12px;
       pointer-events: none;
       font-family: 'Consolas', 'Monaco', monospace;
     }
 
     #perf-overlay .stats-card {
-      background: rgba(10, 15, 30, 0.95);
+      background: var(--ui-panel-bg);
       backdrop-filter: blur(20px);
       padding: 12px 16px;
       border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--ui-card-border);
       min-width: 220px;
     }
 
@@ -286,7 +314,7 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin: 0 0 8px;
-      color: #4fc3f7;
+      color: var(--ui-accent-primary);
     }
 
     #perf-overlay .perf-row {
@@ -297,11 +325,11 @@
     }
 
     #perf-overlay .label {
-      color: rgba(255, 255, 255, 0.6);
+      color: var(--ui-text-subtle);
     }
 
     #perf-overlay .value {
-      color: #fff;
+      color: var(--ui-text-primary);
       font-variant-numeric: tabular-nums;
       text-align: right;
       min-width: 100px;
@@ -309,7 +337,7 @@
 
     #perf-overlay .perf-bar {
       height: 4px;
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--ui-card-border);
       border-radius: 2px;
       margin-top: 8px;
       overflow: hidden;
@@ -317,19 +345,19 @@
 
     #perf-overlay .perf-bar-inner {
       height: 100%;
-      background: linear-gradient(90deg, #4fc3f7, #ab47bc);
+      background: linear-gradient(90deg, var(--ui-accent-primary), var(--ui-accent-secondary));
       border-radius: 2px;
       transition: width 0.1s linear;
     }
 
-    #perf-overlay .perf-good { color: #4caf50 !important; }
-    #perf-overlay .perf-warn { color: #ffeb3b !important; }
-    #perf-overlay .perf-critical { color: #f44336 !important; }
+    #perf-overlay .perf-good { color: var(--ui-status-good) !important; }
+    #perf-overlay .perf-warn { color: var(--ui-status-warn) !important; }
+    #perf-overlay .perf-critical { color: var(--ui-status-critical) !important; }
 
     #perf-overlay .perf-section {
       margin-top: 8px;
       padding-top: 8px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      border-top: 1px solid var(--ui-card-border);
     }
 
     #perf-overlay .perf-section:first-child {
@@ -341,7 +369,7 @@
     /* Body Labels */
     .body-label {
       position: absolute;
-      color: #ffffff;
+      color: var(--ui-label-default);
       font-family: 'Segoe UI', system-ui, sans-serif;
       font-weight: 600;
       font-size: 14px;
@@ -353,12 +381,12 @@
     
     .label-star {
       font-size: 16px;
-      color: #fff8e7;
+      color: var(--ui-label-star);
     }
     
     .label-moon {
       font-size: 12px;
-      color: #b0c4de;
+      color: var(--ui-label-moon);
       font-weight: 500;
     }
 

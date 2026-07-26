@@ -37,7 +37,7 @@ export interface ExperimentalOptions {
 
 export type VisualizationPresetName = 'Low' | 'High' | 'Ultra';
 
-import { AU } from '../../shared/constants';
+import { AU, UI_COLORS } from '../../shared/constants';
 
 const AU_PER_LY          = 63_241.077;   // astronomical units per light-year
 const MAX_SPACING_AU     = 100_000;       // max grid spacing in AU
@@ -552,11 +552,11 @@ export class OptionsPanel {
                 top: 20px;
                 right: 300px;
                 width: 260px;
-                background: rgba(10, 15, 30, 0.95);
+                background: ${UI_COLORS.surface.panelBg};
                 backdrop-filter: blur(20px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 12px;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;
                 font-size: 13px;
                 z-index: 200;
@@ -572,8 +572,8 @@ export class OptionsPanel {
                 justify-content: space-between;
                 align-items: center;
                 padding: 12px 15px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                background: rgba(0, 0, 0, 0.3);
+                border-bottom: 1px solid ${UI_COLORS.surface.cardBorder};
+                background: ${UI_COLORS.surface.headerBg};
                 cursor: move;
                 user-select: none;
             }
@@ -582,32 +582,32 @@ export class OptionsPanel {
                 font-size: 14px;
                 font-weight: 600;
                 margin: 0;
-                color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
             }
 
             .opt-close {
                 background: none;
                 border: none;
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 font-size: 20px;
                 cursor: pointer;
                 padding: 0 5px;
                 line-height: 1;
             }
 
-            .opt-close:hover { color: #fff; }
+            .opt-close:hover { color: ${UI_COLORS.text.primary}; }
 
             .opt-tabs {
                 display: flex;
                 background: rgba(0, 0, 0, 0.2);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                border-bottom: 1px solid ${UI_COLORS.surface.cardBorder};
             }
 
             .opt-tab {
                 flex: 1;
                 background: none;
                 border: none;
-                color: rgba(255, 255, 255, 0.6);
+                color: ${UI_COLORS.text.subtle};
                 padding: 10px 0;
                 font-size: 12px;
                 font-weight: 600;
@@ -617,13 +617,13 @@ export class OptionsPanel {
             }
 
             .opt-tab:hover {
-                color: #fff;
-                background: rgba(255, 255, 255, 0.05);
+                color: ${UI_COLORS.text.primary};
+                background: ${UI_COLORS.surface.buttonBg};
             }
 
             .opt-tab.active {
-                color: #4fc3f7;
-                border-bottom-color: #4fc3f7;
+                color: ${UI_COLORS.accent.primary};
+                border-bottom-color: ${UI_COLORS.accent.primary};
             }
 
             .opt-content { 
@@ -642,7 +642,7 @@ export class OptionsPanel {
             .opt-section h3 {
                 font-size: 10px;
                 font-weight: 600;
-                color: rgba(255, 255, 255, 0.5);
+                color: ${UI_COLORS.text.disabled};
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 margin: 0 0 8px 0;
@@ -666,13 +666,13 @@ export class OptionsPanel {
             .opt-toggle input[type="checkbox"] {
                 width: 16px;
                 height: 16px;
-                accent-color: #4fc3f7;
+                accent-color: ${UI_COLORS.accent.primary};
                 margin: 0;
             }
 
             .opt-toggle span {
                 font-size: 13px;
-                color: rgba(255, 255, 255, 0.9);
+                color: ${UI_COLORS.text.secondary};
             }
 
             .opt-field {
@@ -682,29 +682,29 @@ export class OptionsPanel {
             .opt-field label {
                 display: block;
                 font-size: 11px;
-                color: rgba(255, 255, 255, 0.6);
+                color: ${UI_COLORS.text.subtle};
                 margin-bottom: 6px;
             }
 
             .opt-field select {
                 width: 100%;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: ${UI_COLORS.surface.inputBg};
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
                 border-radius: 4px;
-                color: #fff;
+                color: ${UI_COLORS.text.primary};
                 padding: 6px 8px;
                 font-size: 12px;
             }
 
             .opt-field input[type="range"] {
                 width: 100%;
-                accent-color: #4fc3f7;
+                accent-color: ${UI_COLORS.accent.primary};
                 height: 4px;
             }
 
             .opt-field span {
                 font-size: 11px;
-                color: rgba(255, 255, 255, 0.6);
+                color: ${UI_COLORS.text.subtle};
             }
 
             .opt-slider-row {
@@ -716,7 +716,7 @@ export class OptionsPanel {
 
             .opt-slider-row input[type="range"] {
                 flex: 1;
-                accent-color: #4fc3f7;
+                accent-color: ${UI_COLORS.accent.primary};
                 height: 4px;
             }
 
@@ -724,7 +724,7 @@ export class OptionsPanel {
                 min-width: 60px;
                 text-align: right;
                 font-size: 12px;
-                color: rgba(255, 255, 255, 0.7);
+                color: ${UI_COLORS.text.muted};
                 font-variant-numeric: tabular-nums;
             }
 
@@ -735,9 +735,9 @@ export class OptionsPanel {
             .opt-btn {
                 width: 100%;
                 background: rgba(79, 195, 247, 0.2);
-                border: 1px solid rgba(79, 195, 247, 0.6);
+                border: 1px solid ${UI_COLORS.accent.primaryMuted};
                 border-radius: 6px;
-                color: #dff3ff;
+                color: ${UI_COLORS.text.highContrast};
                 padding: 8px;
                 font-size: 11px;
                 font-weight: 600;
