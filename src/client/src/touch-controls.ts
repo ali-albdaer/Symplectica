@@ -11,7 +11,6 @@ export interface TouchControlCallbacks {
     onFollowNext: () => void;
     onFollowPrevious: () => void;
     onToggleUI: () => void;
-    onToggleHints: () => void;
     onToggleSim: () => void;
     onToggleFollow: () => void;
     onToggleFreeCamera: () => void;
@@ -84,6 +83,7 @@ export class TouchControls {
 
         container.innerHTML = `
             <div class="touch-controls-panel top-right">
+                <button class="touch-btn" data-action="admin" title="Admin Panel (\`)">${svgAdmin}</button>
                 <button class="touch-btn" data-action="options" title="Options (O)">${svgOptions}</button>
             </div>
             <div class="touch-controls-panel bottom-right">
@@ -98,8 +98,6 @@ export class TouchControls {
             <div class="touch-controls-panel left-center">
                 <button class="touch-btn" data-action="free-camera" title="Free Camera (C)">${svgCam}</button>
                 ${chatButtonHTML}
-                <button class="touch-btn" data-action="admin" title="Admin Panel (\`)">${svgAdmin}</button>
-                <button class="touch-btn" data-action="hints" title="Toggle Hints (K)">${svgHelp}</button>
             </div>
         `;
 
@@ -114,6 +112,10 @@ export class TouchControls {
                 height: 100%;
                 pointer-events: none;
                 z-index: 200;
+            }
+
+            #touch-controls.ui-hidden .touch-btn:not([data-action="toggle-ui"]) {
+                display: none;
             }
 
             .touch-controls-panel {
@@ -242,9 +244,6 @@ export class TouchControls {
             case 'toggle-ui':
                 this.callbacks.onToggleUI();
                 break;
-            case 'hints':
-                this.callbacks.onToggleHints();
-                break;
             case 'toggle-sim':
                 this.callbacks.onToggleSim();
                 break;
@@ -367,5 +366,10 @@ export class TouchControls {
             bubbles: true
         });
         canvas.dispatchEvent(wheelEvent);
+    }
+
+    public setUIVisibility(visible: boolean): void {
+        if (!this.container) return;
+        this.container.classList.toggle('ui-hidden', !visible);
     }
 }

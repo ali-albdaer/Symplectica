@@ -112,8 +112,8 @@ class NBodyClient {
     private lastMiddleDragY = 0;
 
     private hintsVisible = true;
-    private showSimulationParams = false;
-    private showFollowingDetails = true;
+    private showSimulationParams = true;
+    private showFollowingDetails = false;
     private showPerfMonitor = false; // Performance monitor hidden by default
 
     // Performance timing (in milliseconds)
@@ -390,7 +390,6 @@ class NBodyClient {
             onFollowNext: () => this.followNextBody(),
             onFollowPrevious: () => this.followPreviousBody(),
             onToggleUI: () => this.toggleUIVisibility(),
-            onToggleHints: () => this.toggleHints(),
             onToggleSim: () => this.toggleSimulationSection('sim'),
             onToggleFollow: () => this.toggleSimulationSection('follow'),
             onToggleFreeCamera: () => this.toggleFreeCamera(),
@@ -952,6 +951,12 @@ class NBodyClient {
 
     private toggleUIVisibility(): void {
         this.uiHidden = !this.uiHidden;
+        const uiContainer = document.getElementById('ui-layer');
+        if (uiContainer) {
+            uiContainer.style.display = this.uiHidden ? 'none' : 'block';
+        }
+        this.touchControls?.setUIVisibility(!this.uiHidden);
+        
         // Toggle main UI elements
         const uiElements = document.querySelectorAll('#ui-overlay, #chat-panel, #admin-panel, #opt-panel');
         uiElements.forEach(el => {
@@ -2203,7 +2208,7 @@ class NBodyClient {
         promptContainer.innerHTML = `
             <div class="mobile-prompt-overlay">
                 <div class="mobile-prompt-content">
-                    <h2>📱 Mobile Device Detected</h2>
+                    <h2>Mobile Device Detected</h2>
                     <p>Would you like to enable touch controls for easier navigation?</p>
                     <div class="mobile-prompt-buttons">
                         <button class="mobile-prompt-btn primary" id="enable-touch">Enable Touch Controls</button>
