@@ -387,7 +387,6 @@ class NBodyClient {
 
         // Initialize Touch Controls (disabled by default, enabled with /mobile command)
         this.touchControls = new TouchControls({
-            onPauseToggle: () => this.timeController.togglePause(),
             onFollowNext: () => this.followNextBody(),
             onFollowPrevious: () => this.followPreviousBody(),
             onToggleUI: () => this.toggleUIVisibility(),
@@ -396,6 +395,8 @@ class NBodyClient {
             onToggleFollow: () => this.toggleSimulationSection('follow'),
             onToggleFreeCamera: () => this.toggleFreeCamera(),
             onOpenChat: () => this.chat?.openForInput(),
+            onOpenOptions: () => this.optionsPanel?.toggle(),
+            onOpenAdmin: () => this.adminPanel?.toggle(),
         });
 
         // Wire up /mobile command in chat to toggle touch controls
