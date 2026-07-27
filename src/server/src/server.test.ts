@@ -41,7 +41,7 @@ describe('getSpeedLabel', () => {
     });
 
     it('formats weeks for values < 31536000', () => {
-        expect(getSpeedLabel(1209600)).toBe('2.0wk/s');
+        expect(getSpeedLabel(907200)).toBe('1.5wk/s');
     });
 
     it('formats years for large values', () => {

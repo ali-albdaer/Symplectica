@@ -8,8 +8,6 @@
 import { UI_COLORS } from '../../shared/constants';
 
 export interface TouchControlCallbacks {
-    onSpeedIncrease: () => void;
-    onSpeedDecrease: () => void;
     onPauseToggle: () => void;
     onFollowNext: () => void;
     onFollowPrevious: () => void;
@@ -73,8 +71,6 @@ export class TouchControls {
         container.innerHTML = `
             <div class="touch-controls-panel top-right">
                 <button class="touch-btn" data-action="pause" title="Pause/Resume">⏯</button>
-                <button class="touch-btn" data-action="speed-up" title="Speed Up">&gt;</button>
-                <button class="touch-btn" data-action="speed-down" title="Speed Down">&lt;</button>
             </div>
             <div class="touch-controls-panel bottom-right">
                 <button class="touch-btn" data-action="follow-next" title="Follow Next (N)">⏭</button>
@@ -221,12 +217,6 @@ export class TouchControls {
         switch (action) {
             case 'pause':
                 this.callbacks.onPauseToggle();
-                break;
-            case 'speed-up':
-                this.callbacks.onSpeedIncrease();
-                break;
-            case 'speed-down':
-                this.callbacks.onSpeedDecrease();
                 break;
             case 'follow-next':
                 this.callbacks.onFollowNext();

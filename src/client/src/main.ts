@@ -379,8 +379,6 @@ class NBodyClient {
 
         // Initialize Touch Controls (disabled by default, enabled with /mobile command)
         this.touchControls = new TouchControls({
-            onSpeedIncrease: () => this.timeController.increaseSpeed(),
-            onSpeedDecrease: () => this.timeController.decreaseSpeed(),
             onPauseToggle: () => this.timeController.togglePause(),
             onFollowNext: () => this.followNextBody(),
             onFollowPrevious: () => this.followPreviousBody(),

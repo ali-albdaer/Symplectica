@@ -106,26 +106,6 @@ export class TimeController {
         return this.speedIndex;
     }
 
-    /** Increase speed (> key) */
-    increaseSpeed(): boolean {
-        if (this.speedIndex < SPEED_LEVELS.length - 1) {
-            this.speedIndex++;
-            this.onSpeedChange?.(this.getCurrentSpeed());
-            return true;
-        }
-        return false;
-    }
-
-    /** Decrease speed (< key) */
-    decreaseSpeed(): boolean {
-        if (this.speedIndex > 0) {
-            this.speedIndex--;
-            this.onSpeedChange?.(this.getCurrentSpeed());
-            return true;
-        }
-        return false;
-    }
-
     /** Set speed by index */
     setSpeedIndex(index: number): void {
         if (index >= 0 && index < SPEED_LEVELS.length) {
