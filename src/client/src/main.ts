@@ -14,6 +14,7 @@ import { BodyRenderer } from './renderer';
 import { AdminStatePayload, NetworkClient } from './network';
 import { StatePayload } from '../../shared/protocol';
 import { PhysicsClient, BodyInfo } from './physics';
+import { WorkerBridge } from './worker-bridge';
 import { Chat } from './chat';
 import { AdminPanel } from './admin-panel';
 import { OptionsPanel, VisualizationOptions, VisualizationPresetName, ExperimentalOptions } from './options-panel';
@@ -53,7 +54,7 @@ class NBodyClient {
     private camera!: OrbitCamera;
     private bodyRenderer!: BodyRenderer;
     private network!: NetworkClient;
-    private physics!: PhysicsClient;
+    private physics!: PhysicsClient | WorkerBridge;
     private chat?: Chat;
     private adminPanel!: AdminPanel;
     private optionsPanel!: OptionsPanel;
@@ -247,7 +248,7 @@ class NBodyClient {
 
         // Initialize Admin Panel
         this.adminPanel = new AdminPanel(
-            this.physics,
+            this.physics as PhysicsClient,
             this.timeController,
             this.network,
             (presetId, name, barycentric, bodyCount, stressTestCounts) => {
@@ -695,7 +696,23 @@ class NBodyClient {
     }
 
     private async initPhysics(): Promise<void> {
-        this.physics = new PhysicsClient();
+        if (import.meta.env.VITE_DEMO_MODE) {
+            const bridge = new WorkerBridge();
+            bridge.onBodiesUpdate = () => {
+                this.onBodiesLoaded();
+            };
+            this.physics = bridge;
+
+            // Forward time scale and pause state to worker
+            this.timeController.setOnSpeedChange((speed) => {
+                (this.physics as WorkerBridge).updateAdminState({ timeScale: speed.sim });
+            });
+            this.timeController.setOnPauseChange((paused) => {
+                (this.physics as WorkerBridge).updateAdminState({ paused });
+            });
+        } else {
+            this.physics = new PhysicsClient();
+        }
         await this.physics.init();
 
         // Use global default preset
@@ -708,18 +725,21 @@ class NBodyClient {
 
         // TimeController manages simulation speed; physics dt is set by createPreset
 
+        // Initialize body meshes and follow targets synchronously in dev mode
+        if (!import.meta.env.VITE_DEMO_MODE) {
+            this.onBodiesLoaded();
+        }
+    }
+
+    private onBodiesLoaded(): void {
         this.state.bodyCount = this.physics.bodyCount();
         this.updateUIBodyCount();
-
-        // Initialize body meshes
         this.refreshBodies();
-
-        // Set initial follow target (first body if available, else origin)
         this.initializeFollowTarget();
         this.applyInitialFollowCamera();
-
-        // Capture initial conservation reference after first preset load
-        this.driftMonitor?.reset(this.physics, this.physics.tick());
+        if (this.driftMonitor) {
+            this.driftMonitor.reset(this.physics as PhysicsClient, Number(this.physics.tick()));
+        }
     }
 
     private refreshBodies(): void {
@@ -1016,17 +1036,21 @@ class NBodyClient {
             this.lastFollowBodyIndex = 0;
         }
 
-        this.refreshBodies();
         this.timeController.resetAccumulator();
 
-        this.initializeFollowTarget();
-        this.applyInitialFollowCamera();
+        if (!import.meta.env.VITE_DEMO_MODE) {
+            this.refreshBodies();
+            this.initializeFollowTarget();
+            this.applyInitialFollowCamera();
+            
+            // Reset drift monitor reference snapshot for the new preset
+            if (this.driftMonitor) {
+                this.driftMonitor.reset(this.physics as PhysicsClient, Number(this.physics.tick()));
+            }
+        }
 
-        // Reset drift monitor reference snapshot for the new preset
-        this.driftMonitor.reset(this.physics, this.physics.tick());
-
-        if (this.network?.isConnected()) {
-            const snapshot = this.physics.getSnapshot();
+        if (this.network?.isConnected() && !import.meta.env.VITE_DEMO_MODE) {
+            const snapshot = (this.physics as PhysicsClient).getSnapshot();
             this.network.sendSnapshot(snapshot, name);
         }
     }
@@ -1758,7 +1782,7 @@ class NBodyClient {
         } else {
             const wasPaused = this.timeController.isPaused();
 
-            if (!wasPaused) {
+            if (!wasPaused && !import.meta.env.VITE_DEMO_MODE) {
                 if (this.localSimMode === 'accumulator') {
                     const steps = this.timeController.update(delta);
                     if (steps > 0) {
@@ -1814,22 +1838,37 @@ class NBodyClient {
                 }
             }
 
-            // Only update positions/velocities if simulation advanced or first frame
-            if (stepsThisFrame > 0 || this.state.positions.length === 0) {
-                this.state.tick = this.physics.tick();
-                this.state.time = this.physics.time();
-                this.state.positions = this.physics.getPositions();
-                this.state.velocities = this.physics.getVelocities();
-            }
+            // In demo mode, the worker automatically ticks and calculates energy
+            // In dev mode, we need to do it here
+            if (import.meta.env.VITE_DEMO_MODE) {
+                // If the worker has taken steps (tick advanced), we update
+                const currentTick = this.physics.tick();
+                if (currentTick > this.state.tick || this.state.positions.length === 0) {
+                    this.state.tick = currentTick;
+                    this.state.time = this.physics.time();
+                    this.state.positions = this.physics.getPositions();
+                    this.state.velocities = this.physics.getVelocities();
+                    this.state.energy = this.physics.totalEnergy();
+                    stepsThisFrame = 1; // dummy value to indicate update
+                }
+            } else {
+                // Only update positions/velocities if simulation advanced or first frame
+                if (stepsThisFrame > 0 || this.state.positions.length === 0) {
+                    this.state.tick = this.physics.tick();
+                    this.state.time = this.physics.time();
+                    this.state.positions = this.physics.getPositions();
+                    this.state.velocities = this.physics.getVelocities();
+                }
 
-            // Throttle energy calculation - O(N²) is expensive for large body counts
-            const now = performance.now();
-            const shouldRecalcEnergy = stepsThisFrame > 0 ||
-                (now - this.lastEnergyCalcTime > this.ENERGY_CALC_INTERVAL_MS);
+                // Throttle energy calculation - O(N²) is expensive for large body counts
+                const now = performance.now();
+                const shouldRecalcEnergy = stepsThisFrame > 0 ||
+                    (now - this.lastEnergyCalcTime > this.ENERGY_CALC_INTERVAL_MS);
 
-            if (shouldRecalcEnergy) {
-                this.state.energy = this.physics.totalEnergy();
-                this.lastEnergyCalcTime = now;
+                if (shouldRecalcEnergy) {
+                    this.state.energy = this.physics.totalEnergy();
+                    this.lastEnergyCalcTime = now;
+                }
             }
         }
 
@@ -2012,7 +2051,7 @@ class NBodyClient {
         this.updatePerfMonitor();
 
         // Update conservation / drift monitor (reads from local WASM sim)
-        this.driftMonitor.update(this.physics, this.state.tick);
+        this.driftMonitor.update(this.physics as PhysicsClient, Number(this.state.tick));
     };
 
     private updateUI(): void {
@@ -2089,6 +2128,9 @@ class NBodyClient {
         this.localSimMode = mode;
         this.localTickAccumulator = 0;
         this.timeController.resetAccumulator();
+        if (import.meta.env.VITE_DEMO_MODE) {
+            (this.physics as WorkerBridge).updateAdminState({ simMode: mode });
+        }
     }
 
     private formatMass(kg: number): string {
@@ -2428,13 +2470,19 @@ class NBodyClient {
         };
 
         // Add body via JSON to support complex fields like atmosphere
-        (this.physics as any).simulation.addBodyFromJson(JSON.stringify(bodyJson));
+        if (import.meta.env.VITE_DEMO_MODE) {
+            (this.physics as WorkerBridge).addBodyFromJson(JSON.stringify(bodyJson));
+        } else {
+            (this.physics as any).simulation.addBodyFromJson(JSON.stringify(bodyJson));
+        }
 
         // Refresh the body list and renderer
-        this.refreshBodies();
+        if (!import.meta.env.VITE_DEMO_MODE) {
+            this.refreshBodies();
+        }
 
         // Update network if connected
-        if (this.network?.isConnected()) {
+        if (this.network?.isConnected() && !import.meta.env.VITE_DEMO_MODE) {
             const snapshot = this.physics.getSnapshot();
             this.network.sendSnapshot(snapshot, 'World Builder');
         }

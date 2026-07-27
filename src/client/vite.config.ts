@@ -23,4 +23,7 @@ export default defineConfig({
     optimizeDeps: {
         exclude: ['../physics-core/pkg/physics_core.js'],
     },
+    worker: {
+        format: 'es',
+    }
 });
