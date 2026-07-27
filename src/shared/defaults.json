@@ -13,7 +13,7 @@
     "theta": 0.5,
     "timeScale": 1,
     "paused": false,
-    "simMode": "tick",
+    "simMode": "hybrid",
     "hybridMaxSteps": 50,
     "hybridBudgeted": false,
     "closeEncounterIntegrator": "none",

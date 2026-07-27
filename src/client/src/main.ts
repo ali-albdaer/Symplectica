@@ -54,7 +54,7 @@ class NBodyClient {
     private bodyRenderer!: BodyRenderer;
     private network!: NetworkClient;
     private physics!: PhysicsClient;
-    private chat!: Chat;
+    private chat?: Chat;
     private adminPanel!: AdminPanel;
     private optionsPanel!: OptionsPanel;
     private touchControls!: TouchControls;
@@ -227,14 +227,21 @@ class NBodyClient {
         this.updateLoadingStatus('Connecting to server...');
         await this.initNetwork();
 
-        // Initialize Chat
-        this.chat = new Chat(this.network);
-        this.setupNetworkHandlers();
+        // In demo mode, bypass multiplayer connection entirely
+        if (!import.meta.env.VITE_DEMO_MODE) {
+            // Initialize Chat
+            this.chat = new Chat(this.network);
+            this.setupNetworkHandlers();
 
-        try {
-            await this.network.connect();
-        } catch (error) {
-            logger.warn('Multiplayer server unavailable, running in local mode.', error);
+            try {
+                await this.network.connect();
+            } catch (error) {
+                logger.warn('Multiplayer server unavailable, running in local mode.', error);
+                this.ensureLocalPreset(APP_DEFAULTS.visualPresetDefault);
+            }
+        } else {
+            logger.info('Demo Mode: Running locally. Bypassing network & chat.');
+            this.setupNetworkHandlers();
             this.ensureLocalPreset(APP_DEFAULTS.visualPresetDefault);
         }
 
@@ -387,11 +394,11 @@ class NBodyClient {
             onToggleSim: () => this.toggleSimulationSection('sim'),
             onToggleFollow: () => this.toggleSimulationSection('follow'),
             onToggleFreeCamera: () => this.toggleFreeCamera(),
-            onOpenChat: () => this.chat.openForInput(),
+            onOpenChat: () => this.chat?.openForInput(),
         });
 
         // Wire up /mobile command in chat to toggle touch controls
-        this.chat.setTouchControlsCallback(() => {
+        this.chat?.setTouchControlsCallback(() => {
             this.toggleTouchControls();
             const enabled = this.isTouchControlsEnabled();
             return {
@@ -467,10 +474,10 @@ class NBodyClient {
                 this.applySnapshot(payload.snapshot);
             }
             if (payload?.displayName) {
-                this.chat.setLocalName(payload.displayName);
+                this.chat?.setLocalName(payload.displayName);
             }
             if (payload?.players) {
-                this.chat.setPlayersList(payload.players);
+                this.chat?.setPlayersList(payload.players);
             }
             if (payload?.config?.adminState) {
                 this.applyAdminState(payload.config.adminState);
@@ -497,7 +504,7 @@ class NBodyClient {
         this.network.on('chat', (message) => {
             const payload = message.payload as { sender: string; text: string };
             if (payload?.sender && payload?.text) {
-                this.chat.onServerMessage(payload.sender, payload.text);
+                this.chat?.onServerMessage(payload.sender, payload.text);
             }
         });
 
@@ -2287,12 +2294,12 @@ class NBodyClient {
         // Handle button clicks
         document.getElementById('enable-touch')?.addEventListener('click', () => {
             this.enableTouchControls();
-            this.chat.addSystemMessage('Touch controls enabled! Buttons are now visible on screen.');
+            this.chat?.addSystemMessage('Touch controls enabled! Buttons are now visible on screen.');
             promptContainer.remove();
         });
 
         document.getElementById('dismiss-touch')?.addEventListener('click', () => {
-            this.chat.addSystemMessage('Touch controls not enabled. Type /mobile in chat to enable them later.');
+            this.chat?.addSystemMessage('Touch controls not enabled. Type /mobile in chat to enable them later.');
             promptContainer.remove();
         });
     }
@@ -2355,7 +2362,7 @@ class NBodyClient {
     }
 
     private onBuildModeRequired(): void {
-        this.chat.addSystemMessage('Switch to World Builder mode to use the Build panel (Admin Panel → World Builder).');
+        this.chat?.addSystemMessage('Switch to World Builder mode to use the Build panel (Admin Panel → World Builder).');
     }
 
     private onBuildSpawn(params: BuildBodyParams): void {

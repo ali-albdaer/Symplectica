@@ -3496,7 +3496,7 @@ class BodyMesh {
         else if (name === 'neptune') textureName = '2k_neptune.jpg';
 
         if (textureName) {
-            const url = `/local/textures/planets/${textureName}`;
+            const url = `${import.meta.env.BASE_URL}local/textures/planets/${textureName}`;
             if (BodyMesh.textureCache.has(url)) {
                 mat.map = BodyMesh.textureCache.get(url)!;
                 mat.color.set(0xffffff);
@@ -3533,7 +3533,7 @@ class BodyMesh {
             }
             this.cloudMesh.visible = true;
 
-            const cloudUrl = '/local/textures/planets/2k_earth_clouds.jpg';
+            const cloudUrl = `${import.meta.env.BASE_URL}local/textures/planets/2k_earth_clouds.jpg`;
             if (BodyMesh.textureCache.has(cloudUrl)) {
                 (this.cloudMesh.material as THREE.MeshLambertMaterial).alphaMap = BodyMesh.textureCache.get(cloudUrl)!;
                 (this.cloudMesh.material as THREE.MeshLambertMaterial).needsUpdate = true;
@@ -3551,7 +3551,7 @@ class BodyMesh {
         // Saturn Rings
         if (name === 'saturn' && this.ringMesh && this.ringMesh.material instanceof THREE.ShaderMaterial) {
             const ringMat = this.ringMesh.material;
-            const ringUrl = '/local/textures/planets/2k_saturn_ring_alpha.png';
+            const ringUrl = `${import.meta.env.BASE_URL}local/textures/planets/2k_saturn_ring_alpha.png`;
             
             const inner = this.ringData?.innerMult || 1.11;
             const outer = this.ringData?.outerMult || 7.96;

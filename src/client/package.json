@@ -6,7 +6,9 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
+        "build:demo": "vite build --mode demo --base=/Symplectica/",
         "preview": "vite preview",
+        "preview:demo": "vite preview --base=/Symplectica/",
         "test": "vitest run"
     },
     "dependencies": {
