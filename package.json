@@ -13,6 +13,7 @@
         "client:build": "npm run -w @nbody/client build",
         "build:demo": "npm run wasm:build && npm run -w @nbody/client build:demo",
         "preview:demo": "npm run -w @nbody/client preview:demo",
+        "deploy:demo": "npm run -w @nbody/client deploy:demo",
         "server:build": "npm run -w @nbody/server build",
         "build": "npm run wasm:build && npm run client:build && npm run server:build",
         "start": "npm run -w @nbody/server start",
