@@ -4,6 +4,12 @@
   <img src="https://github.com/user-attachments/assets/86532da5-f282-427e-90d0-d809cf237f57" width="100%" alt="Symplectica Hero Image" />
 </p>
 
+<p align="center">
+  <a href="https://ali-albdaer.github.io/Symplectica/">
+    <img src="https://img.shields.io/badge/%20Live%20Demo-GitHub%20Pages-2563eb?style=for-the-badge&logo=github" alt="Live Demo" />
+  </a>
+</p>
+
 **Symplectica** is a multiplayer N-body space simulator focused on scientific accuracy, visual fidelity and realistic orbital mechanics. 
 
 Whether you're a physics enthusiast simulating star systems and astroid belts, a student learning about orbital mechanics and numerical methods, or a player exploring the universe with your friends, Symplectica handles it all.
