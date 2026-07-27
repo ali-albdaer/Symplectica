@@ -4827,11 +4827,25 @@ attribute vec3 positionLow;
                 border-radius: 12px;
                 color: ${G.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;
-                font-size: 12px;
-                z-index: 300;
+                font-size: 13px;
+                z-index: 200;
                 display: none;
                 flex-direction: column;
                 overflow: hidden;
+            }
+
+            @media (max-width: 768px) {
+                #admin-panel {
+                    top: 50% !important;
+                    left: 50% !important;
+                    right: auto !important;
+                    bottom: auto !important;
+                    transform: translate(-50%, -50%) !important;
+                    width: 90% !important;
+                    max-width: 400px;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                }
             }
             
             #admin-panel.open {
@@ -5377,6 +5391,20 @@ attribute vec3 positionLow;
                 overflow: hidden;
             }
 
+            @media (max-width: 768px) {
+                #opt-panel {
+                    top: 50% !important;
+                    left: 50% !important;
+                    right: auto !important;
+                    bottom: auto !important;
+                    transform: translate(-50%, -50%) !important;
+                    width: 90% !important;
+                    max-width: 400px;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                }
+            }
+
             #opt-panel.open { display: flex; }
 
             .opt-header {
@@ -5613,9 +5641,9 @@ void main() {
                 <button class="touch-btn" data-action="follow-prev" title="Follow Previous (P)">${r}</button>
             </div>
             <div class="touch-controls-panel bottom-left">
-                <button class="touch-btn" data-action="toggle-ui" title="Toggle UI (H)">${a}</button>
-                <button class="touch-btn" data-action="toggle-sim" title="Toggle Sim Params (1)">${o}</button>
                 <button class="touch-btn" data-action="toggle-follow" title="Toggle Follow Section (2)">${l}</button>
+                <button class="touch-btn" data-action="toggle-sim" title="Toggle Sim Params (1)">${o}</button>
+                <button class="touch-btn" data-action="toggle-ui" title="Toggle UI (H)">${a}</button>
             </div>
             <div class="touch-controls-panel left-center">
                 <button class="touch-btn" data-action="free-camera" title="Free Camera (C)">${c}</button>
