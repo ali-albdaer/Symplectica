@@ -1,0 +1,15 @@
+node_modules/
+**/build/
+**/target/
+**/dist/
+**/local/
+.vite/
+src/physics-core/pkg/
+*.local.*
+## NOTE: Unignoring lock files for consistent development and production builds.
+# Cargo.lock
+# package-lock.json
+.env
+# Temporarily ignore .github
+.github/
+.vscode/

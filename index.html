@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symplectica</title>
+  <meta name="description" content="Multiplayer N-body space simulator">
+  <link rel="icon" type="image/png" href="/Symplectica/favicon.png">
+  <style>
+    :root {
+      --ui-accent-primary: #18e7ec;
+      --ui-accent-primary-hover: #47eff3;
+      --ui-accent-primary-muted: rgba(24, 231, 236, 0.6);
+      --ui-accent-secondary: #55CCCC;
+      --ui-accent-link: #18e7ec;
+      --ui-panel-bg: rgba(33, 39, 49, 0.78);
+      --ui-header-bg: rgba(57, 62, 70, 0.35);
+      --ui-card-border: rgba(237, 237, 237, 0.16);
+      --ui-card-border-subtle: rgba(237, 237, 237, 0.08);
+      --ui-panel-shadow: 0 12px 32px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+      --ui-text-primary: #ededed;
+      --ui-text-high-contrast: #ffffff;
+      --ui-text-secondary: rgba(237, 237, 237, 0.85);
+      --ui-text-muted: rgba(237, 237, 237, 0.7);
+      --ui-text-subtle: rgba(237, 237, 237, 0.6);
+      --ui-text-disabled: rgba(237, 237, 237, 0.5);
+      --ui-text-hint: rgba(237, 237, 237, 0.4);
+      --ui-status-good: #4caf50;
+      --ui-status-excellent: #8bc34a;
+      --ui-status-warn: #ffeb3b;
+      --ui-status-paused: #ff9800;
+      --ui-status-critical: #f44336;
+      --ui-status-error: #ff5252;
+      --ui-label-default: #ededed;
+      --ui-label-star: #fff8e7;
+      --ui-label-moon: #b0c4de;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: var(--ui-accent-primary-muted) rgba(0, 0, 0, 0.2);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    input,
+    textarea,
+    select,
+    [contenteditable="true"] {
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--ui-accent-primary-muted);
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.3);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--ui-accent-primary);
+    }
+
+    ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #ui-overlay {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      color: var(--ui-text-primary);
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    #stats {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #stats h3,
+    #hints-panel h3 {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      margin: 0 0 6px;
+      color: var(--ui-accent-primary);
+    }
+
+    .stats-card {
+      background: var(--ui-panel-bg);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      backdrop-filter: blur(16px) saturate(180%);
+      padding: 15px 20px;
+      border-radius: 12px;
+      border: 1px solid var(--ui-card-border);
+      box-shadow: var(--ui-panel-shadow);
+    }
+
+    #stats .stat-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      margin: 5px 0;
+    }
+
+    #stats .label {
+      color: var(--ui-text-muted);
+    }
+
+    #stats .value {
+      color: var(--ui-text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    #hints-panel {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: var(--ui-panel-bg);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      backdrop-filter: blur(16px) saturate(180%);
+      padding: 15px 20px;
+      border-radius: 12px;
+      border: 1px solid var(--ui-card-border);
+      box-shadow: var(--ui-panel-shadow);
+      max-width: 320px;
+      display: block;
+    }
+
+    #sim-monitor-section {
+      display: none;
+    }
+
+    #sim-monitor-section .monitor-group {
+      margin-top: 6px;
+      padding-top: 4px;
+      border-top: 1px solid var(--ui-card-border-subtle);
+    }
+
+    #sim-monitor-section .monitor-group:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    #sim-monitor-section .group-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-accent-primary-muted);
+      margin-bottom: 2px;
+    }
+
+    #follow-section {
+      /* No scroll — fully visible */
+      padding: 10px 14px;
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    #follow-section .stat-row {
+      margin: 3px 0;
+    }
+
+    #follow-section .follow-group {
+      margin-top: 6px;
+      padding-top: 4px;
+      border-top: 1px solid var(--ui-card-border-subtle);
+    }
+
+    #follow-section .follow-group:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    #follow-section .group-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-accent-primary-muted);
+      margin-bottom: 2px;
+    }
+
+    #hints-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--ui-text-secondary);
+    }
+
+    #hints-panel li span {
+      color: var(--ui-text-primary);
+      font-weight: 600;
+      margin-right: 6px;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 100%);
+      z-index: 1000;
+      transition: opacity 0.5s ease;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 3px solid var(--ui-card-border);
+      border-top-color: var(--ui-accent-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #loading h1 {
+      margin-top: 20px;
+      font-size: 24px;
+      font-weight: 300;
+      background: linear-gradient(90deg, var(--ui-accent-primary), var(--ui-accent-secondary));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    #loading p {
+      margin-top: 10px;
+      color: var(--ui-text-disabled);
+    }
+
+    #loading p.error {
+      color: var(--ui-status-error);
+      font-weight: 600;
+      background: rgba(255, 0, 0, 0.1);
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 82, 82, 0.3);
+      max-width: 80%;
+      text-align: center;
+    }
+
+    #freecam-crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 12px;
+      height: 12px;
+      transform: translate(-50%, -50%);
+      z-index: 120;
+      pointer-events: none;
+      display: none;
+    }
+
+    #freecam-crosshair::before,
+    #freecam-crosshair::after {
+      content: "";
+      position: absolute;
+      background: var(--ui-text-secondary);
+    }
+
+    #freecam-crosshair::before {
+      width: 12px;
+      height: 1px;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    #freecam-crosshair::after {
+      width: 1px;
+      height: 12px;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    /* Performance Monitor Overlay */
+    #perf-overlay {
+      position: fixed;
+      display: none;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      color: var(--ui-text-primary);
+      font-size: 12px;
+      pointer-events: none;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    #perf-overlay .stats-card {
+      background: var(--ui-panel-bg);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      backdrop-filter: blur(16px) saturate(180%);
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--ui-card-border);
+      box-shadow: var(--ui-panel-shadow);
+      min-width: 220px;
+    }
+
+    #perf-overlay h3 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0 0 8px;
+      color: var(--ui-accent-primary);
+    }
+
+    #perf-overlay .perf-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 4px 0;
+    }
+
+    #perf-overlay .label {
+      color: var(--ui-text-subtle);
+    }
+
+    #perf-overlay .value {
+      color: var(--ui-text-primary);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      min-width: 100px;
+    }
+
+    #perf-overlay .perf-bar {
+      height: 4px;
+      background: var(--ui-card-border);
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    #perf-overlay .perf-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, var(--ui-accent-primary), var(--ui-accent-secondary));
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+
+    #perf-overlay .perf-good { color: var(--ui-status-good) !important; }
+    #perf-overlay .perf-warn { color: var(--ui-status-warn) !important; }
+    #perf-overlay .perf-critical { color: var(--ui-status-critical) !important; }
+
+    #perf-overlay .perf-section {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--ui-card-border);
+    }
+
+    #perf-overlay .perf-section:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    /* Body Labels */
+    .body-label {
+      position: absolute;
+      color: var(--ui-label-default);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      text-shadow: 1px 1px 3px rgba(0, 0, 0, 1.0), -1px -1px 3px rgba(0, 0, 0, 1.0), 0px 0px 4px rgba(0,0,0,0.8);
+      pointer-events: none;
+      white-space: nowrap;
+      letter-spacing: 0.5px;
+    }
+    
+    .label-star {
+      font-size: 16px;
+      color: var(--ui-label-star);
+    }
+    
+    .label-moon {
+      font-size: 12px;
+      color: var(--ui-label-moon);
+      font-weight: 500;
+    }
+
+  </style>
+  <script type="module" crossorigin src="/Symplectica/assets/index-suaejYTS.js"></script>
+</head>
+
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <h1>Symplectica</h1>
+    <p id="loading-status">Initializing...</p>
+  </div>
+
+  <div id="canvas-container"></div>
+  <div id="freecam-crosshair"></div>
+
+  <div id="ui-overlay">
+    <div id="stats">
+      <div id="sim-monitor-section" class="stats-card">
+        <h3>Simulation</h3>
+        <div class="monitor-group">
+          <div class="stat-row">
+            <span class="label">Time</span>
+            <span class="value" id="sim-time">0.00 s</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Warp</span>
+            <span class="value" id="time-warp">1x</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Bodies</span>
+            <span class="value" id="sim-bodies">0</span>
+          </div>
+
+          <div class="stat-row">
+            <span class="label">Total Mass</span>
+            <span class="value" id="sim-mass">0 kg</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Steps</span>
+            <span class="value" id="drift-steps">0</span>
+          </div>
+        </div>
+        <div class="monitor-group">
+          <div class="group-label">Physics Stability</div>
+          <div class="stat-row">
+            <span class="label">ΔE / |E₀|</span>
+            <span class="value" id="drift-energy">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Δp / p_char</span>
+            <span class="value" id="drift-momentum">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">ΔL / |L₀|</span>
+            <span class="value" id="drift-angular">---</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">CoM shift</span>
+            <span class="value" id="drift-com">---</span>
+          </div>
+        </div>
+      </div>
+      <div id="follow-section" class="stats-card">
+        <h3>Following</h3>
+        <!-- Identity -->
+        <div class="follow-group">
+          <div class="stat-row">
+            <span class="label">Target</span>
+            <span class="value" id="follow-target">Origin</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Type</span>
+            <span class="value" id="follow-type">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-spectral" style="display:none">
+            <span class="label">Spectral</span>
+            <span class="value" id="follow-spectral">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-composition" style="display:none">
+            <span class="label">Composition</span>
+            <span class="value" id="follow-composition">—</span>
+          </div>
+        </div>
+        <!-- Camera -->
+        <div class="follow-group">
+          <div class="group-label">Camera</div>
+          <div class="stat-row">
+            <span class="label">Distance</span>
+            <span class="value" id="camera-dist">0 AU</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">X</span>
+            <span class="value" id="sim-x">0.000 AU</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Y</span>
+            <span class="value" id="sim-y">0.000 AU</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Z</span>
+            <span class="value" id="sim-z">0.000 AU</span>
+          </div>
+        </div>
+        <!-- Bulk properties -->
+        <div class="follow-group">
+          <div class="group-label">Physical</div>
+          <div class="stat-row">
+            <span class="label">Mass</span>
+            <span class="value" id="follow-mass">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Radius</span>
+            <span class="value" id="follow-radius">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Density</span>
+            <span class="value" id="follow-density">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Surf. Gravity</span>
+            <span class="value" id="follow-gravity">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Esc. Velocity</span>
+            <span class="value" id="follow-vesc">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-rotation" style="display:none">
+            <span class="label">Rot. Period</span>
+            <span class="value" id="follow-rotation">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-tilt" style="display:none">
+            <span class="label">Axial Tilt</span>
+            <span class="value" id="follow-tilt">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-oblateness" style="display:none">
+            <span class="label">Oblateness</span>
+            <span class="value" id="follow-oblateness">—</span>
+          </div>
+        </div>
+        <!-- Orbital -->
+        <div class="follow-group" id="follow-grp-orbital" style="display:none">
+          <div class="group-label">Orbital</div>
+          <div class="stat-row">
+            <span class="label">Semi-major</span>
+            <span class="value" id="follow-sma">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Eccentricity</span>
+            <span class="value" id="follow-ecc">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Albedo</span>
+            <span class="value" id="follow-albedo">—</span>
+          </div>
+        </div>
+        <!-- Thermal -->
+        <div class="follow-group" id="follow-grp-thermal" style="display:none">
+          <div class="group-label">Thermal</div>
+          <div class="stat-row" id="follow-row-teff">
+            <span class="label">T<sub>eff</sub></span>
+            <span class="value" id="follow-teff">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-tsurf" style="display:none">
+            <span class="label">T<sub>surf</sub></span>
+            <span class="value" id="follow-tsurf">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-teq" style="display:none">
+            <span class="label">T<sub>eq</sub></span>
+            <span class="value" id="follow-teq">—</span>
+          </div>
+        </div>
+        <!-- Star-specific -->
+        <div class="follow-group" id="follow-grp-star" style="display:none">
+          <div class="group-label">Star</div>
+          <div class="stat-row">
+            <span class="label">Luminosity</span>
+            <span class="value" id="follow-luminosity">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Metallicity</span>
+            <span class="value" id="follow-metallicity">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Age</span>
+            <span class="value" id="follow-age">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Lifetime</span>
+            <span class="value" id="follow-lifetime">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Flare Rate</span>
+            <span class="value" id="follow-flare">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">Spot Frac.</span>
+            <span class="value" id="follow-spot">—</span>
+          </div>
+        </div>
+        <!-- Planet/Moon-specific -->
+        <div class="follow-group" id="follow-grp-planet" style="display:none">
+          <div class="group-label">Atmosphere</div>
+          <div class="stat-row">
+            <span class="label">Scale Height</span>
+            <span class="value" id="follow-scaleheight">—</span>
+          </div>
+          <div class="stat-row" id="follow-row-atm" style="display:none">
+            <span class="label">Atm. Height</span>
+            <span class="value" id="follow-atmheight">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="hints-panel">
+      <h3>Keybinds</h3>
+      <ul>
+        <li><span>1</span>Simulation Monitor</li>
+        <li><span>2</span>Following Stats</li>
+        <li><span>3</span>Performance Monitor</li>
+        <li><span>H</span>Hide UI</li>
+        <li><span>K</span>Keybinds</li>
+        <li><span>O</span>Options</li>
+        <li><span>C</span>Free Camera</li>
+        <li><span>V</span>Surface Camera</li>
+        <li><span>P</span>Previous Body</li>
+        <li><span>N</span>Next Body</li>
+        <li><span>WASD</span>Orbit / Move</li>
+        <li><span>Q / E</span>Roll CCW / CW</li>
+        <li><span>Space / Shift</span>Zoom In / Out</li>
+        <li><span>8</span>Screenshot</li>
+        <li><span>9</span>Record WebM</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Performance Monitor Overlay -->
+  <div id="perf-overlay">
+    <div class="stats-card">
+      <h3>Performance</h3>
+      <div class="perf-section">
+        <div class="perf-row">
+          <span class="label">Frame</span>
+          <span class="value" id="perf-frame-time">0.0 ms</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Physics</span>
+          <span class="value" id="perf-physics-time">0.0 ms</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Render</span>
+          <span class="value" id="perf-render-time">0.0 ms</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">UI</span>
+          <span class="value" id="perf-ui-time">0.0 ms</span>
+        </div>
+        <div class="perf-bar">
+          <div class="perf-bar-inner" id="perf-bar-fill" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="perf-section">
+        <div class="perf-row">
+          <span class="label">Steps/Frame</span>
+          <span class="value" id="perf-steps">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Bodies</span>
+          <span class="value" id="perf-bodies">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Render FPS</span>
+          <span class="value"><span id="perf-actual-fps">0</span></span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Physics FPS</span>
+          <span class="value" id="perf-server-tps">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Status</span>
+          <span class="value" id="perf-status">---</span>
+        </div>
+      </div>
+      <div class="perf-section">
+        <div class="perf-row">
+          <span class="label">Draw Calls</span>
+          <span class="value" id="perf-draw-calls">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Triangles</span>
+          <span class="value" id="perf-triangles">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Geometries</span>
+          <span class="value" id="perf-geometries">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Textures</span>
+          <span class="value" id="perf-textures">0</span>
+        </div>
+      </div>
+      <div class="perf-section">
+        <div class="perf-row">
+          <span class="label">Line Primitives</span>
+          <span class="value" id="perf-line-prims">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Line Vertices</span>
+          <span class="value" id="perf-line-verts">0</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Latency</span>
+          <span class="value" id="perf-latency">---</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">JS Heap</span>
+          <span class="value" id="perf-memory">---</span>
+        </div>
+      </div>
+      <div class="perf-section">
+        <div class="perf-row">
+          <span class="label">Bottleneck</span>
+          <span class="value" id="perf-bottleneck">None</span>
+        </div>
+        <div class="perf-row">
+          <span class="label">Contributors</span>
+          <span class="value" id="perf-contributors" style="text-align: right; max-width: 140px; word-wrap: break-word;">---</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>
