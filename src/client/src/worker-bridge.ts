@@ -14,6 +14,11 @@ export class WorkerBridge {
     private _positions: Float64Array = new Float64Array(0);
     private _velocities: Float64Array = new Float64Array(0);
     private _energy: number = 0;
+    private _kineticEnergy: number = 0;
+    private _potentialEnergy: number = 0;
+    private _totalMomentum: Float64Array = new Float64Array(3);
+    private _angularMomentum: Float64Array = new Float64Array(3);
+    private _centerOfMass: Float64Array = new Float64Array(3);
     private _bodyCount: number = 0;
 
     // We maintain a similar body cache structure to PhysicsClient
@@ -68,6 +73,11 @@ export class WorkerBridge {
                         this._positions = state.positions;
                         this._velocities = state.velocities;
                         this._energy = state.energy;
+                        this._kineticEnergy = state.kineticEnergy;
+                        this._potentialEnergy = state.potentialEnergy;
+                        this._totalMomentum = state.totalMomentum;
+                        this._angularMomentum = state.angularMomentum;
+                        this._centerOfMass = state.centerOfMass;
                         this._bodyCount = state.bodyCount;
                     } else if (data.type === 'bodies') {
                         const bodiesData = data as WorkerBodiesPayload;
@@ -112,11 +122,11 @@ export class WorkerBridge {
         return this._energy;
     }
 
-    kineticEnergy(): number { return 0; } // We don't really need this for worker right now, drift monitor gets disabled in demo mode or we pass it
-    potentialEnergy(): number { return 0; }
-    totalMomentum(): Float64Array { return new Float64Array(3); }
-    centerOfMass(): Float64Array { return new Float64Array(3); }
-    angularMomentum(): Float64Array { return new Float64Array(3); }
+    kineticEnergy(): number { return this._kineticEnergy; }
+    potentialEnergy(): number { return this._potentialEnergy; }
+    totalMomentum(): Float64Array { return this._totalMomentum; }
+    centerOfMass(): Float64Array { return this._centerOfMass; }
+    angularMomentum(): Float64Array { return this._angularMomentum; }
 
     bodyCount(): number {
         return this._bodyCount;
@@ -213,6 +223,7 @@ export class WorkerBridge {
 
     createPreset(preset: string, seed: bigint, barycentric: boolean = false, bodyCount?: number, stressTestCounts?: { stars: number; planets: number; asteroids: number }): void {
         if (!this.initialized) return;
+        this._tick = -1n;
         this.worker.postMessage({
             type: 'loadPreset', preset, seed, barycentric, bodyCount, stressTestCounts
         } as WorkerMessage);
@@ -293,6 +304,7 @@ export class WorkerBridge {
     getSnapshot(): string { return ''; }
     createNew(seed?: bigint): void {
         if (!this.initialized) return;
+        this._tick = -1n;
         this.worker.postMessage({ type: 'createEmpty', seed: seed ?? BigInt(Date.now()) } as WorkerMessage);
     }
     createSunEarthMoon(): void { this.createPreset('sunEarthMoon', BigInt(Date.now())); }

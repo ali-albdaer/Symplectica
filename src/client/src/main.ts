@@ -1037,6 +1037,7 @@ class NBodyClient {
         }
 
         this.timeController.resetAccumulator();
+        this.state.tick = -1;
 
         if (!import.meta.env.VITE_DEMO_MODE) {
             this.refreshBodies();

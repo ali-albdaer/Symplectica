@@ -84,6 +84,7 @@ let lastTime = 0;
 let simAccumulator = 0;
 let tickAccumulator = 0;
 let lastEnergyCalcTime = 0;
+let lastCalculatedEnergy = 0;
 
 let adminState = { ...APP_DEFAULTS.adminDefaults };
 
@@ -95,6 +96,11 @@ export type WorkerStatePayload = {
     positions: Float64Array;
     velocities: Float64Array;
     energy: number;
+    kineticEnergy: number;
+    potentialEnergy: number;
+    totalMomentum: Float64Array;
+    angularMomentum: Float64Array;
+    centerOfMass: Float64Array;
     bodyCount: number;
 };
 
@@ -130,6 +136,11 @@ async function initWasm() {
 function startTickLoop() {
     if (tickInterval) clearInterval(tickInterval);
     lastTime = performance.now();
+    
+    // Force initial energy calculation
+    if (simulation) {
+        lastCalculatedEnergy = simulation.totalEnergy();
+    }
     lastEnergyCalcTime = lastTime;
 
     tickInterval = setInterval(() => {
@@ -242,10 +253,9 @@ function startTickLoop() {
 function broadcastState() {
     if (!simulation) return;
 
-    let energy = 0;
     const now = performance.now();
     if (now - lastEnergyCalcTime > ENERGY_CALC_INTERVAL) {
-        energy = simulation.totalEnergy();
+        lastCalculatedEnergy = simulation.totalEnergy();
         lastEnergyCalcTime = now;
     }
 
@@ -256,17 +266,36 @@ function broadcastState() {
     const posCopy = new Float64Array(positions);
     const velCopy = new Float64Array(velocities);
 
+    // Always compute ke, pe, mom, angMom, com
+    // They are relatively cheap compared to energy O(N^2)
+    const ke = simulation.kineticEnergy();
+    const pe = simulation.potentialEnergy();
+    const mom = simulation.totalMomentum();
+    const angMom = simulation.angularMomentum();
+    const com = simulation.centerOfMass();
+
     const payload: WorkerStatePayload = {
         type: 'state',
         tick: simulation.tick(),
         time: simulation.time(),
         positions: posCopy,
         velocities: velCopy,
-        energy: energy,
+        energy: lastCalculatedEnergy,
+        kineticEnergy: ke,
+        potentialEnergy: pe,
+        totalMomentum: new Float64Array(mom),
+        angularMomentum: new Float64Array(angMom),
+        centerOfMass: new Float64Array(com),
         bodyCount: simulation.bodyCount()
     };
 
-    self.postMessage(payload, [posCopy.buffer, velCopy.buffer]);
+    self.postMessage(payload, [
+        posCopy.buffer, 
+        velCopy.buffer,
+        payload.totalMomentum.buffer,
+        payload.angularMomentum.buffer,
+        payload.centerOfMass.buffer
+    ]);
 }
 
 function broadcastBodies() {
