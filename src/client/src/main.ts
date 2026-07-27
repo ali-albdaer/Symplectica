@@ -2198,6 +2198,8 @@ class NBodyClient {
     private showMobileTouchPrompt(): void {
         const promptContainer = document.createElement('div');
         promptContainer.id = 'mobile-prompt';
+        const mobileHintHTML = import.meta.env.VITE_DEMO_MODE ? '' : '<small>You can enable/disable touch controls anytime by typing <code>/mobile</code> in chat</small>';
+
         promptContainer.innerHTML = `
             <div class="mobile-prompt-overlay">
                 <div class="mobile-prompt-content">
@@ -2207,7 +2209,7 @@ class NBodyClient {
                         <button class="mobile-prompt-btn primary" id="enable-touch">Enable Touch Controls</button>
                         <button class="mobile-prompt-btn secondary" id="dismiss-touch">No Thanks</button>
                     </div>
-                    <small>You can enable/disable touch controls anytime by typing <code>/mobile</code> in chat</small>
+                    ${mobileHintHTML}
                 </div>
             </div>
         `;
@@ -2244,13 +2246,15 @@ class NBodyClient {
             }
 
             .mobile-prompt-content {
-                background: linear-gradient(160deg, ${UI_COLORS.mobile.promptBgStart}, ${UI_COLORS.mobile.promptBgEnd});
-                border: 1px solid ${UI_COLORS.mobile.promptBorder};
-                border-radius: 16px;
+                background: ${UI_COLORS.surface.panelBg};
+                -webkit-backdrop-filter: blur(16px) saturate(180%);
+                backdrop-filter: blur(16px) saturate(180%);
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
+                border-radius: 12px;
                 padding: 32px 24px;
                 max-width: 480px;
                 width: 100%;
-                box-shadow: 0 12px 40px ${UI_COLORS.surface.panelShadow}, inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                box-shadow: ${UI_COLORS.surface.panelShadow};
                 text-align: center;
                 color: ${UI_COLORS.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;
@@ -2260,7 +2264,7 @@ class NBodyClient {
                 margin: 0 0 16px 0;
                 font-size: 24px;
                 font-weight: 600;
-                color: ${UI_COLORS.text.primary};
+                color: ${UI_COLORS.accent.primary};
             }
 
             .mobile-prompt-content p {
@@ -2279,34 +2283,35 @@ class NBodyClient {
 
             .mobile-prompt-btn {
                 padding: 14px 24px;
-                border: none;
                 border-radius: 8px;
                 font-size: 16px;
-                font-weight: 500;
+                font-weight: 600;
                 cursor: pointer;
                 transition: all 0.2s ease;
                 -webkit-tap-highlight-color: transparent;
+                box-sizing: border-box;
             }
 
             .mobile-prompt-btn.primary {
-                background: linear-gradient(135deg, ${UI_COLORS.mobile.primaryBtnStart}, ${UI_COLORS.mobile.primaryBtnEnd});
-                color: ${UI_COLORS.text.primary};
-                box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+                background: rgba(24, 231, 236, 0.2);
+                border: 1px solid ${UI_COLORS.accent.primaryMuted};
+                color: ${UI_COLORS.text.highContrast};
             }
 
-            .mobile-prompt-btn.primary:active {
+            .mobile-prompt-btn.primary:active, .mobile-prompt-btn.primary:hover {
+                background: rgba(24, 231, 236, 0.3);
                 transform: scale(0.98);
-                box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4);
             }
 
             .mobile-prompt-btn.secondary {
-                background: ${UI_COLORS.mobile.secondaryBtnBg};
+                background: ${UI_COLORS.surface.buttonBg};
                 color: ${UI_COLORS.text.muted};
-                border: 1px solid ${UI_COLORS.mobile.secondaryBtnBorder};
+                border: 1px solid ${UI_COLORS.surface.cardBorder};
             }
 
-            .mobile-prompt-btn.secondary:active {
-                background: ${UI_COLORS.mobile.secondaryBtnActiveBg};
+            .mobile-prompt-btn.secondary:active, .mobile-prompt-btn.secondary:hover {
+                background: ${UI_COLORS.surface.buttonHoverBg};
+                color: ${UI_COLORS.text.primary};
             }
 
             .mobile-prompt-content small {
