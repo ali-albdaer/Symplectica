@@ -399,11 +399,25 @@ export class AdminPanel {
                 border-radius: 12px;
                 color: ${UI_COLORS.text.primary};
                 font-family: 'Segoe UI', system-ui, sans-serif;
-                font-size: 12px;
-                z-index: 300;
+                font-size: 13px;
+                z-index: 200;
                 display: none;
                 flex-direction: column;
                 overflow: hidden;
+            }
+
+            @media (max-width: 768px) {
+                #admin-panel {
+                    top: 50% !important;
+                    left: 50% !important;
+                    right: auto !important;
+                    bottom: auto !important;
+                    transform: translate(-50%, -50%) !important;
+                    width: 90% !important;
+                    max-width: 400px;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                }
             }
             
             #admin-panel.open {

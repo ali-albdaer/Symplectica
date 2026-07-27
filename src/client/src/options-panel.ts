@@ -567,6 +567,20 @@ export class OptionsPanel {
                 overflow: hidden;
             }
 
+            @media (max-width: 768px) {
+                #opt-panel {
+                    top: 50% !important;
+                    left: 50% !important;
+                    right: auto !important;
+                    bottom: auto !important;
+                    transform: translate(-50%, -50%) !important;
+                    width: 90% !important;
+                    max-width: 400px;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                }
+            }
+
             #opt-panel.open { display: flex; }
 
             .opt-header {

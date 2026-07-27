@@ -91,9 +91,9 @@ export class TouchControls {
                 <button class="touch-btn" data-action="follow-prev" title="Follow Previous (P)">${svgPrev}</button>
             </div>
             <div class="touch-controls-panel bottom-left">
-                <button class="touch-btn" data-action="toggle-ui" title="Toggle UI (H)">${svgUi}</button>
-                <button class="touch-btn" data-action="toggle-sim" title="Toggle Sim Params (1)">${svgSim}</button>
                 <button class="touch-btn" data-action="toggle-follow" title="Toggle Follow Section (2)">${svgTarget}</button>
+                <button class="touch-btn" data-action="toggle-sim" title="Toggle Sim Params (1)">${svgSim}</button>
+                <button class="touch-btn" data-action="toggle-ui" title="Toggle UI (H)">${svgUi}</button>
             </div>
             <div class="touch-controls-panel left-center">
                 <button class="touch-btn" data-action="free-camera" title="Free Camera (C)">${svgCam}</button>
