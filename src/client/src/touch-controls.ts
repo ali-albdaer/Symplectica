@@ -68,23 +68,33 @@ export class TouchControls {
     private createUI(): void {
         const container = document.createElement('div');
         container.id = 'touch-controls';
+        const svgPause = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+        const svgNext = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>';
+        const svgPrev = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z"/></svg>';
+        const svgUi = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
+        const svgSim = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>';
+        const svgTarget = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M19.5 11c-.26-3.85-3.32-6.91-7.18-7.18V1h-1.64v2.82C6.82 4.09 3.76 7.15 3.5 11H1v1.64h2.5c.26 3.85 3.32 6.91 7.18 7.18V22h1.64v-2.18c3.86-.27 6.92-3.33 7.18-7.18H22v-1.64h-2.5zm-7.5 7C8.14 18 5 14.86 5 11s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7zm0-10c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
+        const svgCam = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M15 8v8H5V8h10m1-2H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4V7c0-.55-.45-1-1-1z"/></svg>';
+        const svgChat = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
+        const svgHelp = '<svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>';
+
         container.innerHTML = `
             <div class="touch-controls-panel top-right">
-                <button class="touch-btn" data-action="pause" title="Pause/Resume">⏯</button>
+                <button class="touch-btn" data-action="pause" title="Pause/Resume">${svgPause}</button>
             </div>
             <div class="touch-controls-panel bottom-right">
-                <button class="touch-btn" data-action="follow-next" title="Follow Next (N)">⏭</button>
-                <button class="touch-btn" data-action="follow-prev" title="Follow Previous (P)">⏮</button>
+                <button class="touch-btn" data-action="follow-next" title="Follow Next (N)">${svgNext}</button>
+                <button class="touch-btn" data-action="follow-prev" title="Follow Previous (P)">${svgPrev}</button>
             </div>
             <div class="touch-controls-panel bottom-left">
-                <button class="touch-btn" data-action="toggle-ui" title="Toggle UI (H)">👁</button>
-                <button class="touch-btn" data-action="toggle-sim" title="Toggle Sim Params (1)">📊</button>
-                <button class="touch-btn" data-action="toggle-follow" title="Toggle Follow Section (2)">🎯</button>
+                <button class="touch-btn" data-action="toggle-ui" title="Toggle UI (H)">${svgUi}</button>
+                <button class="touch-btn" data-action="toggle-sim" title="Toggle Sim Params (1)">${svgSim}</button>
+                <button class="touch-btn" data-action="toggle-follow" title="Toggle Follow Section (2)">${svgTarget}</button>
             </div>
             <div class="touch-controls-panel left-center">
-                <button class="touch-btn" data-action="free-camera" title="Free Camera (C)">🎥</button>
-                <button class="touch-btn" data-action="chat" title="Open Chat (T)">💬</button>
-                <button class="touch-btn" data-action="hints" title="Toggle Hints (K)">❓</button>
+                <button class="touch-btn" data-action="free-camera" title="Free Camera (C)">${svgCam}</button>
+                <button class="touch-btn" data-action="chat" title="Open Chat (T)">${svgChat}</button>
+                <button class="touch-btn" data-action="hints" title="Toggle Hints (K)">${svgHelp}</button>
             </div>
         `;
 
