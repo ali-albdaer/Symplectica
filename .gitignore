@@ -2,8 +2,11 @@ node_modules/
 **/build/
 **/target/
 **/dist/
+**/dist-demo/
+**/dist-ghpages/
 **/local/
 .vite/
+.wrangler/
 src/physics-core/pkg/
 *.local.*
 ## NOTE: Unignoring lock files for consistent development and production builds.

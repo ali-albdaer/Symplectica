@@ -6,11 +6,12 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "build:demo": "vite build --mode demo --base=/Symplectica/",
+        "build:demo": "vite build --mode demo",
+        "build:ghpages": "vite build --mode ghpages --base=/Symplectica/",
         "preview": "vite preview",
-        "preview:demo": "vite preview --base=/Symplectica/",
+        "preview:demo": "vite preview",
         "test": "vitest run",
-        "deploy:demo": "gh-pages -d dist -b gh-pages"
+        "deploy:ghpages": "gh-pages -d dist-ghpages -b gh-pages"
     },
     "dependencies": {
         "three": "^0.172.0"
