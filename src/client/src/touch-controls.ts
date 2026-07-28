@@ -96,7 +96,8 @@ export class TouchControls {
                 <button class="touch-btn" data-action="toggle-ui" title="Toggle UI (H)">${svgUi}</button>
             </div>
             <div class="touch-controls-panel left-center">
-                <button class="touch-btn" data-action="free-camera" title="Free Camera (C)">${svgCam}</button>
+                <!-- Free camera button removed from mobile UI (not yet optimized for touch) -->
+                <!-- <button class="touch-btn" data-action="free-camera" title="Free Camera (C)">${svgCam}</button> -->
                 ${chatButtonHTML}
             </div>
         `;

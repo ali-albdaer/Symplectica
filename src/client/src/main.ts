@@ -2179,6 +2179,19 @@ class NBodyClient {
     /** Enable/disable touch controls (called by /mobile command) */
     enableTouchControls(): void {
         this.touchControls.enable();
+        this.applyMobileDefaults();
+    }
+
+    private applyMobileDefaults(): void {
+        // Hide Simulation Params section by default on mobile
+        this.showSimulationParams = false;
+        this.showFollowingDetails = false;
+        this.updateSimulationSections();
+
+        // Hide Keybinds/Hints panel by default on mobile
+        this.hintsVisible = false;
+        const hintsPanel = document.getElementById('hints-panel');
+        if (hintsPanel) hintsPanel.style.display = 'none';
     }
 
     disableTouchControls(): void {
@@ -2203,18 +2216,16 @@ class NBodyClient {
     private showMobileTouchPrompt(): void {
         const promptContainer = document.createElement('div');
         promptContainer.id = 'mobile-prompt';
-        const mobileHintHTML = import.meta.env.VITE_DEMO_MODE ? '' : '<small>You can enable/disable touch controls anytime by typing <code>/mobile</code> in chat</small>';
-
         promptContainer.innerHTML = `
             <div class="mobile-prompt-overlay">
                 <div class="mobile-prompt-content">
                     <h2>Mobile Device Detected</h2>
-                    <p>Would you like to enable touch controls for easier navigation?</p>
+                    <p>Would you like to enable touch controls?</p>
+                    <p class="mobile-prompt-note">Symplectica is designed for desktop and is not yet optimized for phones. For the best experience, use a PC.</p>
                     <div class="mobile-prompt-buttons">
                         <button class="mobile-prompt-btn primary" id="enable-touch">Enable Touch Controls</button>
                         <button class="mobile-prompt-btn secondary" id="dismiss-touch">No Thanks</button>
                     </div>
-                    ${mobileHintHTML}
                 </div>
             </div>
         `;
@@ -2273,24 +2284,35 @@ class NBodyClient {
             }
 
             .mobile-prompt-content p {
-                margin: 0 0 24px 0;
+                margin: 0 0 16px 0;
                 font-size: 16px;
                 line-height: 1.5;
                 color: ${UI_COLORS.text.secondary};
             }
 
+            .mobile-prompt-note {
+                font-size: 13px;
+                color: ${UI_COLORS.text.subtle};
+                background: ${UI_COLORS.surface.headerBg};
+                border: 1px solid ${UI_COLORS.surface.cardBorderSubtle};
+                border-radius: 6px;
+                padding: 8px 12px;
+                margin: 0 0 16px 0;
+                line-height: 1.5;
+                text-align: left;
+            }
+
             .mobile-prompt-buttons {
                 display: flex;
                 flex-direction: column;
-                gap: 12px;
-                margin-bottom: 16px;
+                gap: 10px;
             }
 
             .mobile-prompt-btn {
-                padding: 14px 24px;
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: 600;
+                padding: 10px 20px;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: 500;
                 cursor: pointer;
                 transition: all 0.2s ease;
                 -webkit-tap-highlight-color: transparent;
@@ -2298,14 +2320,13 @@ class NBodyClient {
             }
 
             .mobile-prompt-btn.primary {
-                background: rgba(24, 231, 236, 0.2);
+                background: rgba(79, 195, 247, 0.2);
                 border: 1px solid ${UI_COLORS.accent.primaryMuted};
                 color: ${UI_COLORS.text.highContrast};
             }
 
             .mobile-prompt-btn.primary:active, .mobile-prompt-btn.primary:hover {
-                background: rgba(24, 231, 236, 0.3);
-                transform: scale(0.98);
+                background: rgba(79, 195, 247, 0.3);
             }
 
             .mobile-prompt-btn.secondary {
@@ -2317,22 +2338,6 @@ class NBodyClient {
             .mobile-prompt-btn.secondary:active, .mobile-prompt-btn.secondary:hover {
                 background: ${UI_COLORS.surface.buttonHoverBg};
                 color: ${UI_COLORS.text.primary};
-            }
-
-            .mobile-prompt-content small {
-                display: block;
-                font-size: 13px;
-                color: ${UI_COLORS.text.disabled};
-                line-height: 1.4;
-            }
-
-            .mobile-prompt-content code {
-                background: ${UI_COLORS.mobile.secondaryBtnActiveBg};
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 12px;
-                color: ${UI_COLORS.accent.link};
             }
 
             @media (min-width: 500px) {
