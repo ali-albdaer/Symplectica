@@ -10,6 +10,7 @@
         "build:ghpages": "vite build --mode ghpages --base=/Symplectica/",
         "preview": "vite preview",
         "preview:demo": "vite preview",
+        "preview:ghpages": "vite preview",
         "test": "vitest run",
         "deploy:ghpages": "gh-pages -d dist-ghpages -b gh-pages"
     },
