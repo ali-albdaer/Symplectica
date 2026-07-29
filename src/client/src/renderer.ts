@@ -946,6 +946,8 @@ class StarFlareSystem {
 
         this.arcMaterial = new THREE.ShaderMaterial({
             vertexShader: `
+#include <common>
+#include <logdepthbuf_pars_vertex>
 attribute vec3 a_anchor;
 attribute vec4 a_timing;
 attribute vec4 a_shape;
@@ -1000,6 +1002,7 @@ void main() {
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
+    #include <logdepthbuf_vertex>
 
     vec4 mvCenter = modelViewMatrix * vec4(center, 1.0);
     vec3 viewN = normalize(mat3(modelViewMatrix) * n);
@@ -1013,6 +1016,8 @@ void main() {
 }
 `,
             fragmentShader: `
+#include <common>
+#include <logdepthbuf_pars_fragment>
 varying vec2 vUv;
 varying float vLife;
 varying float vEnergy;
@@ -1025,6 +1030,7 @@ uniform float u_animStrength;
 uniform float u_brightness;
 
 void main() {
+    #include <logdepthbuf_fragment>
     float edge = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
     float y = abs(vUv.y - 0.5) * 2.0;
     float core = exp(-6.0 * y * y);
@@ -1081,6 +1087,8 @@ void main() {
 
         this.glowMaterial = new THREE.ShaderMaterial({
             vertexShader: `
+#include <common>
+#include <logdepthbuf_pars_vertex>
 attribute vec3 a_anchor;
 attribute vec4 a_timing;
 attribute vec4 a_shape;
@@ -1130,6 +1138,8 @@ void main() {
 }
 `,
             fragmentShader: `
+#include <common>
+#include <logdepthbuf_pars_fragment>
 varying vec2 vUv;
 varying float vLife;
 varying float vEnergy;
@@ -1142,6 +1152,7 @@ uniform float u_animStrength;
 uniform float u_brightness;
 
 void main() {
+    #include <logdepthbuf_fragment>
     vec2 p = vUv - 0.5;
     float r = length(p) * 2.0;
     float core = exp(-8.0 * r * r);
@@ -1199,6 +1210,8 @@ void main() {
 
         this.sparkMaterial = new THREE.ShaderMaterial({
             vertexShader: `
+#include <common>
+#include <logdepthbuf_pars_vertex>
 attribute vec3 a_anchor;
 attribute vec4 a_timing;
 attribute vec3 a_velocity;
@@ -1232,6 +1245,7 @@ void main() {
     float size = a_size * (1.0 - age) * (0.4 + 0.8 * a_timing.z);
     mvCenter.xy += position.xy * size;
     gl_Position = projectionMatrix * mvCenter;
+    #include <logdepthbuf_vertex>
 
     vec3 viewN = normalize(mat3(modelViewMatrix) * n);
     vec3 viewDir = normalize(-mvCenter.xyz);
@@ -1243,6 +1257,8 @@ void main() {
 }
 `,
             fragmentShader: `
+#include <common>
+#include <logdepthbuf_pars_fragment>
 varying vec2 vUv;
 varying float vLife;
 varying float vEnergy;
@@ -1250,6 +1266,7 @@ varying float vFacing;
 uniform vec3 u_coreColor;
 
 void main() {
+    #include <logdepthbuf_fragment>
     vec2 p = vUv - 0.5;
     float r = length(p) * 2.0;
     float core = exp(-10.0 * r * r);
