@@ -72,20 +72,28 @@ vec3 rotateY(vec3 v, float a) {
     return vec3(v.x * c - v.z * s, v.y, v.x * s + v.z * c);
 }
 
-float sampleGranulation(vec3 n, float scale, vec2 drift) {
+float sampleGranulation(vec3 n, float scale, vec2 drift, float phase) {
     vec3 an = abs(n);
-    vec3 w = pow(an, vec3(5.0));
-    float sum = w.x + w.y + w.z + 1e-6;
-    w /= sum;
+    vec3 w = pow(an, vec3(10.0));
+    w /= dot(w, vec3(1.0));
 
-    vec2 uvX = fract(n.yz * scale + drift);
-    vec2 uvY = fract(n.zx * scale + drift * vec2(0.73, 1.21));
-    vec2 uvZ = fract(n.xy * scale + drift * vec2(1.37, 0.59));
+    vec2 pX = n.yz * scale;
+    vec2 pY = n.zx * scale;
+    vec2 pZ = n.xy * scale;
 
-    float sx = texture2D(u_granulationMap, uvX).r;
-    float sy = texture2D(u_granulationMap, uvY).r;
-    float sz = texture2D(u_granulationMap, uvZ).r;
-    return sx * w.x + sy * w.y + sz * w.z;
+    float sx1 = texture2D(u_granulationMap, pX + drift).r;
+    float sy1 = texture2D(u_granulationMap, pY + drift * vec2(1.0, 2.0)).r;
+    float sz1 = texture2D(u_granulationMap, pZ + drift * vec2(2.0, -1.0)).r;
+    float baseTex = sx1 * w.x + sy1 * w.y + sz1 * w.z;
+    
+    float sx2 = texture2D(u_granulationMap, pX * 2.13 - drift).r;
+    float sy2 = texture2D(u_granulationMap, pY * 2.13 - drift * vec2(-1.0, 1.0)).r;
+    float sz2 = texture2D(u_granulationMap, pZ * 2.13 - drift * vec2(1.0, -2.0)).r;
+    float detailTex = sx2 * w.x + sy2 * w.y + sz2 * w.z;
+
+    float pulse = sin(phase * 40.0 + baseTex * 10.0) * 0.05;
+    float gran = baseTex * 0.7 + detailTex * 0.3 + pulse;
+    return smoothstep(0.15, 0.85, gran);
 }
 
 void main() {
@@ -93,7 +101,7 @@ void main() {
     float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
     vec3 objN = normalize(vObjNormal);
     vec2 drift = u_drift;
-    float granTex = sampleGranulation(objN, 5.8, drift);
+    float granTex = sampleGranulation(objN, 5.8, drift, u_spotPhase);
     float granulation = mix(1.0, 0.84 + 0.34 * granTex, u_granulationStrength);
 
     // D6: Seeded starspots (Ultra) with slow drift
@@ -985,7 +993,9 @@ void main() {
     float twist = sin(x * 3.14159 * 2.0 + a_phase * 6.28) * 0.03 * arcHeight;
 
     vec3 center = n * (1.015 + 0.01 * life);
-    vec3 p = center + tR * (x * arcLen) + bR * (y * thickness + twist) + n * (curve * arcHeight);
+    float tubeN = cos(y * 3.14159);
+    float tubeB = sin(y * 3.14159);
+    vec3 p = center + tR * (x * arcLen) + bR * (tubeB * thickness + twist) + n * ((curve * arcHeight) + tubeN * thickness * 0.8);
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
@@ -1021,7 +1031,9 @@ void main() {
     float turb = 0.5 + 0.5 * sin(vUv.x * 34.0 + u_time * (0.02 + 0.07 * u_animStrength) + vSeed * 5.3)
                       * cos(vUv.y * 19.0 - u_time * (0.02 + 0.05 * u_animStrength) + vSeed * 2.1);
     float intensity = (3.0 + 14.0 * vEnergy) * vLife * (0.72 + 0.28 * turb);
+    vec3 tint = mix(vec3(1.0, 0.2, 0.1), vec3(0.8, 0.9, 1.0), fract(vSeed * 3.7));
     vec3 col = mix(u_glowColor, u_coreColor, core);
+    col = mix(col, tint, 0.4 + 0.4 * vEnergy);
     float front = smoothstep(-0.18, 0.06, vFacing);
     float alpha = edge * vLife * (0.25 * outer + 0.85 * core) * front;
     gl_FragColor = vec4(col * intensity * u_brightness, alpha * u_brightness);
@@ -1132,7 +1144,9 @@ void main() {
     float plasma = 0.5 + 0.5 * sin(24.0 * p.x + u_time * (0.02 + 0.09 * u_animStrength) + vSeed * 1.7)
                         * cos(18.0 * p.y - u_time * (0.02 + 0.07 * u_animStrength) + vSeed * 2.3);
     float intensity = (1.8 + 8.0 * vEnergy) * vLife * (0.8 + 0.2 * plasma);
+    vec3 tint = mix(vec3(1.0, 0.2, 0.1), vec3(0.8, 0.9, 1.0), fract(vSeed * 3.7));
     vec3 col = mix(u_glowColor, u_coreColor, core);
+    col = mix(col, tint, 0.4 + 0.4 * vEnergy);
     float front = smoothstep(-0.18, 0.06, vFacing);
     float alpha = vLife * (0.4 * halo + 0.8 * core) * (1.0 - smoothstep(0.85, 1.0, r)) * front;
     gl_FragColor = vec4(col * intensity * u_brightness, alpha * u_brightness);
@@ -1232,7 +1246,8 @@ void main() {
     float core = exp(-10.0 * r * r);
     float front = smoothstep(-0.18, 0.06, vFacing);
     float alpha = vLife * core * (1.0 - smoothstep(0.85, 1.0, r)) * front;
-    vec3 col = u_coreColor * (2.2 + 4.5 * vEnergy);
+    vec3 tint = mix(vec3(1.0, 0.2, 0.1), vec3(0.8, 0.9, 1.0), fract(vEnergy * 3.7));
+    vec3 col = mix(u_coreColor, tint, 0.5) * (2.2 + 4.5 * vEnergy);
     gl_FragColor = vec4(col, alpha);
 }
 `,
@@ -1284,7 +1299,12 @@ void main() {
     }
 
     setFixedFlareRate(rate: number): void {
-        this.fixedFlareRate = rate;
+        if (this.fixedFlareRate !== rate) {
+            this.fixedFlareRate = rate;
+            if (this.frequencyMode === 'fixed') {
+                this.scheduleNextEvent(this.currentVisualTime);
+            }
+        }
     }
 
     /** Brightness multiplier for flares (0 = hidden, 1 = default, 2 = bright) */
