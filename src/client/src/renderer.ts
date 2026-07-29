@@ -42,7 +42,8 @@ uniform float u_limbA;
 uniform float u_limbB;
 uniform sampler2D u_granulationMap;
 uniform float u_granulationStrength;
-uniform float u_time;
+uniform vec2 u_drift;
+uniform float u_spotPhase;
 uniform float u_spotFraction;
 uniform float u_spotEnabled;
 uniform float u_spotSeed;
@@ -91,7 +92,7 @@ void main() {
     float mu = max(dot(normalize(vNormal), normalize(vViewDir)), 0.0);
     float limb = 1.0 - u_limbA * (1.0 - mu) - u_limbB * (1.0 - mu) * (1.0 - mu);
     vec3 objN = normalize(vObjNormal);
-    vec2 drift = vec2(u_time * 0.0016, u_time * 0.0011);
+    vec2 drift = u_drift;
     float granTex = sampleGranulation(objN, 5.8, drift);
     float granulation = mix(1.0, 0.84 + 0.34 * granTex, u_granulationStrength);
 
@@ -112,7 +113,7 @@ void main() {
         center = normalize(center);
 
         // Slow longitudinal drift (seeded)
-        float driftAngle = 0.07 * sin(u_time * 0.00001 + fi * 1.7 + u_spotSeed * 0.01);
+        float driftAngle = 0.07 * sin(u_spotPhase + fi * 1.7 + u_spotSeed * 0.01);
         center = normalize(rotateY(center, driftAngle));
 
         float radius = mix(0.035, 0.095, hash11(fi * 11.3 + u_spotSeed * 0.7));
@@ -1271,6 +1272,8 @@ void main() {
     }
 
 
+    private fixedFlareRate: number = 2.0;
+
     /** Flare frequency mode: 'fixed' = constant visual rate, 'scaled' = scales with sim time */
     setFrequencyMode(mode: 'fixed' | 'scaled'): void {
         this.frequencyMode = mode;
@@ -1278,6 +1281,10 @@ void main() {
 
     getFrequencyMode(): 'fixed' | 'scaled' {
         return this.frequencyMode;
+    }
+
+    setFixedFlareRate(rate: number): void {
+        this.fixedFlareRate = rate;
     }
 
     /** Brightness multiplier for flares (0 = hidden, 1 = default, 2 = bright) */
@@ -1296,23 +1303,39 @@ void main() {
         this.flareRate = Math.max(0, rate);
     }
 
-    update(simTime: number): void {
-        this.arcMaterial.uniforms.u_time.value = simTime;
-        this.glowMaterial.uniforms.u_time.value = simTime;
-        this.sparkMaterial.uniforms.u_time.value = simTime;
+    private currentVisualTime = 0;
+    private lastSimTime = 0;
+
+    update(simTime: number, realDeltaTime: number): void {
+        const simDelta = simTime - this.lastSimTime;
+        this.lastSimTime = simTime;
+
+        let dt = 0;
+        if (this.frequencyMode === 'fixed') {
+            dt = realDeltaTime;
+        } else {
+            dt = Math.max(0, simDelta);
+            if (dt > 3153600000) dt = 0;
+        }
+        
+        this.currentVisualTime += dt;
+
+        this.arcMaterial.uniforms.u_time.value = this.currentVisualTime;
+        this.glowMaterial.uniforms.u_time.value = this.currentVisualTime;
+        this.sparkMaterial.uniforms.u_time.value = this.currentVisualTime;
 
         if (this.flareQuality === 'Off') {
             return;
         }
 
         let guard = 0;
-        while (simTime >= this.nextEventTime && guard < 6) {
+        while (this.currentVisualTime >= this.nextEventTime && guard < 6) {
             this.spawnEvent(this.nextEventTime);
             guard++;
         }
 
         const before = this.events.length;
-        this.events = this.events.filter((e) => simTime <= e.start + e.duration);
+        this.events = this.events.filter((e) => this.currentVisualTime <= e.start + e.duration);
         if (this.events.length !== before) {
             this.syncBuffers();
         }
@@ -1337,18 +1360,14 @@ void main() {
 
     private effectiveRate(): number {
         if (this.flareQuality === 'Off') return 0;
-        const baseline = this.flareQuality === 'Low'
-            ? 1 / 260
-            : this.flareQuality === 'High'
-                ? 1 / 150
-                : 1 / 95;
-        // Physics flareRate is ~1e-5 /s for the Sun.
-        // Scale so the Sun produces ~1 visual flare per 60-120s of sim time.
-        // In 'fixed' mode, ignore physics rate and use only baseline.
-        const physicsContribution = this.frequencyMode === 'fixed'
-            ? 0
-            : this.flareRate * 5000.0;
-        return Math.min(0.5, baseline + physicsContribution);
+        if (this.frequencyMode === 'fixed') {
+            // User UI rate is flares per 100s
+            // To prevent dividing by zero or getting infinites, cap at a sensible lower bound if not zero
+            if (this.fixedFlareRate <= 0) return 0;
+            return this.fixedFlareRate / 100.0;
+        } else {
+            return Math.max(this.flareRate, 1e-6);
+        }
     }
 
     private spawnEvent(startTime: number): void {
@@ -1361,7 +1380,7 @@ void main() {
         const eventId = this.nextEventId++;
         const energy = 0.45 + 1.85 * Math.pow(hashUnit(this.seed, eventId, 1), 1.35);
         const durationBase = this.flareQuality === 'Low' ? 42 : this.flareQuality === 'High' ? 34 : 28;
-        const duration = durationBase * (0.65 + 0.9 * hashUnit(this.seed, eventId, 2));
+        const duration = (this.frequencyMode === 'fixed' ? durationBase : 3600) * (0.65 + 0.9 * hashUnit(this.seed, eventId, 2));
 
         const lat = (hashUnit(this.seed, eventId, 3) * 2 - 1) * 0.9;
         const lon = hashUnit(this.seed, eventId, 4) * Math.PI * 2;
@@ -1718,6 +1737,12 @@ export class BodyRenderer {
     setFlareFrequencyMode(mode: 'fixed' | 'scaled'): void {
         for (const mesh of this.bodies.values()) {
             mesh.setFlareFrequencyMode(mode);
+        }
+    }
+
+    setFixedFlareRate(rate: number): void {
+        for (const mesh of this.bodies.values()) {
+            mesh.setFixedFlareRate(rate);
         }
     }
     private realisticTexturesEnabled = true;
@@ -2450,9 +2475,9 @@ export class BodyRenderer {
     }
 
     /** Update body rotations based on simulation time */
-    updateBodies(simTime: number): void {
+    updateBodies(simTime: number, realDeltaTime: number): void {
         for (const mesh of this.bodies.values()) {
-            mesh.updateRotation(simTime);
+            mesh.updateRotation(simTime, realDeltaTime);
         }
     }
 
@@ -2828,6 +2853,11 @@ class BodyMesh {
     // Body rotation
     private rotationRate = 0;
     
+    // Animation clocks
+    private starDrift = new THREE.Vector2();
+    private starSpotPhase = 0;
+    private lastSimTime = 0;
+
     // Geometry state for LOD
     private currentSegments = { width: 0, height: 0 };
 
@@ -2919,7 +2949,8 @@ class BodyMesh {
                     u_limbB: { value: limbB },
                     u_granulationMap: { value: this.granulationTexture },
                     u_granulationStrength: { value: starOptions.granulationEnabled ? 1.0 : 0.0 },
-                    u_time: { value: 0.0 },
+                    u_drift: { value: new THREE.Vector2() },
+                    u_spotPhase: { value: 0.0 },
                     u_spotFraction: { value: spotFraction },
                     u_spotEnabled: { value: starOptions.starspotsEnabled ? 1.0 : 0.0 },
                     u_spotSeed: { value: seed === 0 ? 1 : seed },
@@ -3169,12 +3200,26 @@ class BodyMesh {
     }
 
     /** Rotate entire body group (mesh + overlays) based on cumulative simulation time (D4) */
-    updateRotation(simTime: number): void {
-        if (this.starMaterial?.uniforms.u_time) {
-            this.starMaterial.uniforms.u_time.value = simTime;
+    updateRotation(simTime: number, realDeltaTime: number): void {
+        let simDelta = simTime - this.lastSimTime;
+        if (Math.abs(simDelta) > 3153600000) simDelta = 0;
+        this.lastSimTime = simTime;
+
+        if (this.starMaterial?.uniforms.u_drift) {
+            this.starDrift.x = (this.starDrift.x + simDelta * 0.0016) % 1.0;
+            if (this.starDrift.x < 0) this.starDrift.x += 1.0;
+            
+            this.starDrift.y = (this.starDrift.y + simDelta * 0.0011) % 1.0;
+            if (this.starDrift.y < 0) this.starDrift.y += 1.0;
+            
+            this.starSpotPhase = (this.starSpotPhase + simDelta * 0.00001) % (Math.PI * 2);
+            if (this.starSpotPhase < 0) this.starSpotPhase += Math.PI * 2;
+
+            this.starMaterial.uniforms.u_drift.value.copy(this.starDrift);
+            this.starMaterial.uniforms.u_spotPhase.value = this.starSpotPhase;
         }
 
-        this.flareSystem?.update(simTime);
+        this.flareSystem?.update(simTime, realDeltaTime);
 
         if (this.rotationRate === 0) return;
         const angle = this.rotationRate * simTime;
@@ -3207,6 +3252,10 @@ class BodyMesh {
 
     setFlareFrequencyMode(mode: 'fixed' | 'scaled'): void {
         this.flareSystem?.setFrequencyMode(mode);
+    }
+
+    setFixedFlareRate(rate: number): void {
+        this.flareSystem?.setFixedFlareRate(rate);
     }
 
     setFlareBrightness(brightness: number): void {

@@ -354,6 +354,7 @@ class NBodyClient {
                     experimental.flaresVisible ? experimental.flareBrightness : 0
                 );
                 this.bodyRenderer.setFlareFrequencyMode(experimental.flareFrequencyMode);
+                this.bodyRenderer.setFixedFlareRate(experimental.fixedFlareRate);
                 this.bodyRenderer.setRingQuality(experimental.ringQuality);
                 this.bodyRenderer.setRealisticTexturesEnabled(experimental.useRealisticTextures);
                 this.currentExperimentalOptions = experimental;
@@ -1999,7 +2000,7 @@ class NBodyClient {
         }
 
         // Update star rotations from simulation time
-        this.bodyRenderer.updateBodies(this.state.time);
+        this.bodyRenderer.updateBodies(this.state.time, delta);
 
         // --- Phase 2: Dynamic Auto-Exposure ---
         // Sum apparent irradiance: L / d^2 for each source (zero-allocation iteration)

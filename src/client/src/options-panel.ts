@@ -507,14 +507,14 @@ export class OptionsPanel {
                     <div class="opt-field">
                         <label>Frequency Mode</label>
                         <select id="opt-flare-frequency">
-                            <option value="scaled">Scale with Time</option>
+                            <option value="scaled">Scale with Time Warp</option>
                             <option value="fixed" selected>Fixed Rate</option>
                         </select>
                     </div>
                     <div class="opt-field" id="opt-fixed-rate-field">
                         <label>Fixed Rate (per 100s)</label>
                         <div class="opt-slider-row">
-                            <input type="range" id="opt-fixed-flare-rate" min="0.2" max="10" step="0.1" value="2">
+                            <input type="range" id="opt-fixed-flare-rate" min="0.2" max="100" step="0.1" value="2">
                             <span id="opt-fixed-flare-rate-value">2.0</span>
                         </div>
                     </div>
