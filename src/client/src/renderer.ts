@@ -927,7 +927,7 @@ class StarFlareSystem {
         const coreColor = baseColor.clone().lerp(new THREE.Color(1.0, 0.98, 0.9), 0.55);
         const glowColor = baseColor.clone().lerp(new THREE.Color(1.0, 0.62, 0.32), 0.35);
 
-        const arcBase = new THREE.PlaneGeometry(1, 1, 20, 2);
+        const arcBase = new THREE.PlaneGeometry(1, 1, 32, 8);
         this.arcGeometry = new THREE.InstancedBufferGeometry();
         this.arcGeometry.index = arcBase.index;
         this.arcGeometry.setAttribute('position', arcBase.getAttribute('position'));
@@ -964,6 +964,7 @@ float flareLife(float t, float start, float duration) {
     float rise = exp(-6.0 * (1.0 - p / riseEnd));
     float peak = 1.0;
     float decay = exp(-4.2 * ((p - peakEnd) / max(1.0 - peakEnd, 1e-5)));
+    decay *= smoothstep(1.0, 0.85, p); // Fades completely to zero
     if (p < riseEnd) return rise;
     if (p < peakEnd) return peak;
     return decay;
@@ -986,7 +987,7 @@ void main() {
     float arcHeight = a_shape.y * (0.35 + 0.95 * life);
     float baseThickness = a_shape.z * (0.55 + 0.7 * life);
     // Taper: thick at base, thin at apex
-    float taper = 1.0 - pow(abs(x), 1.5);
+    float taper = 1.0 - pow(abs(x * 2.0), 2.0); // Smoothly tapers to 0 at the base (x = ±0.5)
     float thickness = baseThickness * (0.3 + 0.7 * taper);
     float curve = max(0.0, 1.0 - 4.0 * x * x);
     // Slight helical twist along arc length
@@ -1028,14 +1029,17 @@ void main() {
     float y = abs(vUv.y - 0.5) * 2.0;
     float core = exp(-6.0 * y * y);
     float outer = exp(-1.5 * y * y);
-    float turb = 0.5 + 0.5 * sin(vUv.x * 34.0 + u_time * (0.02 + 0.07 * u_animStrength) + vSeed * 5.3)
-                      * cos(vUv.y * 19.0 - u_time * (0.02 + 0.05 * u_animStrength) + vSeed * 2.1);
+    float tTime = u_time * u_animStrength;
+    float turb1 = sin(vUv.x * 34.0 + tTime * 0.07 + vSeed * 5.3) * cos(vUv.y * 19.0 - tTime * 0.05 + vSeed * 2.1);
+    float turb2 = sin(vUv.x * 74.0 - tTime * 0.11 + vSeed * 1.3) * cos(vUv.y * 41.0 + tTime * 0.09 + vSeed * 3.8);
+    float turb = 0.5 + 0.25 * turb1 + 0.25 * turb2;
     float intensity = (3.0 + 14.0 * vEnergy) * vLife * (0.72 + 0.28 * turb);
-    vec3 tint = mix(vec3(1.0, 0.2, 0.1), vec3(0.8, 0.9, 1.0), fract(vSeed * 3.7));
+    
+    // Subtle, physically plausible warm tints
+    vec3 tint = mix(vec3(1.0, 0.9, 0.7), vec3(1.0, 0.6, 0.2), fract(vSeed * 3.7));
     vec3 col = mix(u_glowColor, u_coreColor, core);
-    col = mix(col, tint, 0.4 + 0.4 * vEnergy);
-    float front = smoothstep(-0.18, 0.06, vFacing);
-    float alpha = edge * vLife * (0.25 * outer + 0.85 * core) * front;
+    col = mix(col, tint, 0.2 * vEnergy);
+    float alpha = edge * vLife * (0.25 * outer + 0.85 * core);
     gl_FragColor = vec4(col * intensity * u_brightness, alpha * u_brightness);
 }
 `,
@@ -1049,7 +1053,7 @@ void main() {
             transparent: true,
             blending: THREE.AdditiveBlending,
             side: THREE.DoubleSide,
-            depthTest: false,
+            depthTest: true,
             depthWrite: false,
             toneMapped: false,
         });
@@ -1095,6 +1099,7 @@ float flareLife(float t, float start, float duration) {
     float rise = exp(-6.0 * (1.0 - p / riseEnd));
     float peak = 1.0;
     float decay = exp(-4.2 * ((p - peakEnd) / max(1.0 - peakEnd, 1e-5)));
+    decay *= smoothstep(1.0, 0.85, p); // Fades completely to zero
     if (p < riseEnd) return rise;
     if (p < peakEnd) return peak;
     return decay;
@@ -1141,13 +1146,16 @@ void main() {
     float r = length(p) * 2.0;
     float core = exp(-8.0 * r * r);
     float halo = exp(-2.0 * r * r);
-    float plasma = 0.5 + 0.5 * sin(24.0 * p.x + u_time * (0.02 + 0.09 * u_animStrength) + vSeed * 1.7)
-                        * cos(18.0 * p.y - u_time * (0.02 + 0.07 * u_animStrength) + vSeed * 2.3);
+    float tTime = u_time * u_animStrength;
+    float plasma1 = sin(24.0 * p.x + tTime * 0.09 + vSeed * 1.7) * cos(18.0 * p.y - tTime * 0.07 + vSeed * 2.3);
+    float plasma2 = sin(54.0 * p.x - tTime * 0.14 + vSeed * 4.1) * cos(38.0 * p.y + tTime * 0.11 + vSeed * 0.9);
+    float plasma = 0.5 + 0.25 * plasma1 + 0.25 * plasma2;
     float intensity = (1.8 + 8.0 * vEnergy) * vLife * (0.8 + 0.2 * plasma);
-    vec3 tint = mix(vec3(1.0, 0.2, 0.1), vec3(0.8, 0.9, 1.0), fract(vSeed * 3.7));
+    
+    vec3 tint = mix(vec3(1.0, 0.9, 0.7), vec3(1.0, 0.6, 0.2), fract(vSeed * 3.7));
     vec3 col = mix(u_glowColor, u_coreColor, core);
-    col = mix(col, tint, 0.4 + 0.4 * vEnergy);
-    float front = smoothstep(-0.18, 0.06, vFacing);
+    col = mix(col, tint, 0.2 * vEnergy);
+    float front = smoothstep(-0.4, 0.0, vFacing);
     float alpha = vLife * (0.4 * halo + 0.8 * core) * (1.0 - smoothstep(0.85, 1.0, r)) * front;
     gl_FragColor = vec4(col * intensity * u_brightness, alpha * u_brightness);
 }
@@ -1208,6 +1216,7 @@ float flareLife(float t, float start, float duration) {
     float rise = exp(-6.0 * (1.0 - p / riseEnd));
     float peak = 1.0;
     float decay = exp(-4.2 * ((p - peakEnd) / max(1.0 - peakEnd, 1e-5)));
+    decay *= smoothstep(1.0, 0.85, p); // Fades completely to zero
     if (p < riseEnd) return rise;
     if (p < peakEnd) return peak;
     return decay;
@@ -1244,10 +1253,10 @@ void main() {
     vec2 p = vUv - 0.5;
     float r = length(p) * 2.0;
     float core = exp(-10.0 * r * r);
-    float front = smoothstep(-0.18, 0.06, vFacing);
+    float front = smoothstep(-0.4, 0.0, vFacing);
     float alpha = vLife * core * (1.0 - smoothstep(0.85, 1.0, r)) * front;
-    vec3 tint = mix(vec3(1.0, 0.2, 0.1), vec3(0.8, 0.9, 1.0), fract(vEnergy * 3.7));
-    vec3 col = mix(u_coreColor, tint, 0.5) * (2.2 + 4.5 * vEnergy);
+    vec3 tint = mix(vec3(1.0, 0.9, 0.7), vec3(1.0, 0.6, 0.2), fract(vEnergy * 3.7));
+    vec3 col = mix(u_coreColor, tint, 0.3) * (2.2 + 4.5 * vEnergy);
     gl_FragColor = vec4(col, alpha);
 }
 `,
